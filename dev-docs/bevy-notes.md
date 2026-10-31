@@ -8,6 +8,16 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - 2D camera with fixed height in art pixels: `Camera2d`, `Msaa::Off`, `Projection::Orthographic(OrthographicProjection { scaling_mode: ScalingMode::FixedVertical { viewport_height }, ..OrthographicProjection::default_2d() })`.
 - Nearest sampling: `DefaultPlugins.set(ImagePlugin::default_nearest())`.
 
+## Pitfalls
+
+- Do not compare normalised float vectors for equality between frames. `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction depending on the length, so a "did the direction change" check fires randomly. Compare signs or an enum.
+- To run a system after Bevy has updated keyboard state, use `PreUpdate` with `.after(bevy::input::InputSystems)`. To write keys into `ButtonInput<KeyCode>`, use `press` and `release`.
+- Exiting from a system: `MessageWriter<AppExit>` then `exit.write(AppExit::Success)`.
+
+## Gizmos
+
+- `mut gizmos: Gizmos` as a system parameter. `gizmos.rect_2d(Isometry2d::from_translation(centre), size, color)` and `gizmos.circle_2d(Isometry2d::from_translation(p), radius, color)`. Import `bevy::math::Isometry2d`. Included in the `2d` feature.
+
 ## Input and time
 
 - Keyboard: `Res<ButtonInput<KeyCode>>`, `.pressed(KeyCode::ArrowLeft)`.
@@ -24,6 +34,9 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Assets load from the game's own `assets/` folder (`games/<name>/assets/`). Through `cargo run`, Bevy finds it from `CARGO_MANIFEST_DIR`. A binary started directly looks next to the executable. Set `BEVY_ASSET_ROOT=<game folder>` (for example `games/long-way`) in that case.
 
 ## bevy_aseprite_ultra 0.10.0
+
+- A file with no tags: `animation: Animation::default()` plays all frames in a loop. A named tag that does not exist is an error.
+- 2D draw order: higher `Transform` z draws in front. Equal z has no guaranteed order.
 
 - `app.add_plugins(AsepriteUltraPlugin)`; `use bevy_aseprite_ultra::prelude::*;`
 - Spawn `AseAnimation { aseprite: server.load("art/characters/Guy.aseprite"), animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop) }` with `Sprite::default()`.

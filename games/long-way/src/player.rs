@@ -2,6 +2,8 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::VIEW_HEIGHT;
+use crate::collision::{CollisionSettings, GUY_FEET_OFFSET, SlideAssist, Trunk, move_feet};
+use crate::depth::DepthSort;
 
 /// Walk speed in art pixels per second.
 const WALK_SPEED: f32 = 300.0;
@@ -29,7 +31,7 @@ enum Facing {
 }
 
 #[derive(Component)]
-struct Player {
+pub struct Player {
     facing: Facing,
     walking: bool,
     /// Tag currently playing, so the animation only restarts when it changes.
@@ -48,6 +50,10 @@ fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
             animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop),
         },
         Sprite::default(),
+        DepthSort {
+            feet_offset: GUY_FEET_OFFSET,
+        },
+        SlideAssist::default(),
         Transform::default(),
     ));
 }
@@ -56,7 +62,9 @@ fn move_player(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Single<&Window>,
-    mut query: Query<(&mut Transform, &mut Player)>,
+    trunks: Query<&Trunk>,
+    settings: Res<CollisionSettings>,
+    mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
     // The camera shows a fixed height, so the visible width follows the window aspect ratio.
     let half_view = Vec2::new(VIEW_HEIGHT * window.width() / window.height(), VIEW_HEIGHT) / 2.0;
@@ -76,13 +84,25 @@ fn move_player(
         direction.y -= 1.0;
     }
 
-    for (mut transform, mut player) in &mut query {
+    for (mut transform, mut player, mut assist) in &mut query {
         player.walking = direction != Vec2::ZERO;
         if !player.walking {
+            assist.reset();
             continue;
         }
         let step = direction.normalize() * WALK_SPEED * time.delta_secs();
-        transform.translation += step.extend(0.0);
+        // Collision works on Guy's feet, not the centre of his canvas.
+        let old_feet = transform.translation.truncate() - Vec2::new(0.0, GUY_FEET_OFFSET);
+        let feet = move_feet(
+            &settings,
+            &mut assist,
+            old_feet,
+            step,
+            time.delta_secs(),
+            trunks.iter(),
+        );
+        transform.translation.x = feet.x;
+        transform.translation.y = feet.y + GUY_FEET_OFFSET;
         transform.translation.x = transform.translation.x.clamp(-limit.x, limit.x);
         transform.translation.y = transform.translation.y.clamp(-limit.y, limit.y);
 

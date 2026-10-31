@@ -2,7 +2,7 @@
 
 How Bevy works, in plain terms, using this project's code as the examples. Written for someone who knows game engines but not Bevy. Version: Bevy 0.20.1.
 
-Sections marked **Not used yet** describe things Bevy offers that this project has not touched. They come from reading `bevy-src/`, not from running them here. Treat them as leads, not proven patterns. Short verified code snippets also live in `dev-docs/bevy-notes.md`.
+Sections marked **Not used yet** describe things Bevy offers that this project has not touched. They come from reading `bevy-src/`, not from running them here. Treat them as leads, not proven patterns. Short verified code snippets also live in `dev-docs/bevy-notes.md`. Our own reusable design decisions built on top of Bevy (such as `allow_sliding`) are in `dev-docs/BEVY-ADDITIONS.md`.
 
 ## The big idea: ECS
 
@@ -173,6 +173,7 @@ The plugin teaches Bevy to load `.aseprite` files. An entity gets an `AseAnimati
 - An animation is chosen by **tag name**: `Animation::tag("Idle")`. Tag names are case sensitive and come straight from Aseprite.
 - `play_loop("Walk")` switches animation. We call it only when the tag changes, so the animation does not restart every frame.
 - Frame durations and loops come from the Aseprite file.
+- A file with no tags (the trees) plays every frame with `Animation::default()`. No tag name is needed.
 
 This is why layers and tags in Aseprite are the contract between art and code in this project.
 
@@ -198,6 +199,43 @@ Projection::Orthographic(OrthographicProjection {
 World units here equal art pixels, so a 60 pixel sprite is 60 units wide. Screen pixels only match art pixels when the window height equals `viewport_height`. Otherwise the art is scaled, and non-whole scales can make pixels uneven (see `adr-e7` in `dev-docs/adr/ENGINE.md`).
 
 World coordinates: the centre is (0, 0), x grows right and y grows up.
+
+## Draw order (z)
+
+In 2D, the `z` of a `Transform` decides what draws on top: a higher `z` draws in front. Bevy does not sort by `y` for you. For a top-down game, Guy should walk behind a tree when he is above it and in front when below. We do this ("y-sorting") with a small system in `depth.rs`:
+
+```rust
+fn sort_by_feet(mut query: Query<(&mut Transform, &DepthSort)>) {
+    for (mut transform, sort) in &mut query {
+        transform.translation.z = -sort.feet_y(transform.translation.y) * Z_PER_Y;
+    }
+}
+```
+
+Lower feet on screen give a higher `z`, so they draw in front. `DepthSort` is a component: any entity that has it (Guy, each tree) is sorted. Systems that read or write `Transform` do not need to know about drawing order.
+
+## Collision
+
+Bevy 0.20 has no built-in 2D collision, and we do not use a physics crate. Collision here is plain arithmetic in `collision.rs`:
+
+- A `Trunk` component holds a tree's solid edges in world coordinates.
+- `resolve(old, new, trunks)` takes Guy's feet position before and after a move and returns where he may end up. It checks each axis on its own, so Guy slides along a trunk.
+- `move_feet(...)` wraps `resolve` and adds the forgiving behaviour (`allow_sliding`): after pushing into a trunk for 0.2 seconds, Guy is slid past a nearby edge. The time he has been pushing is kept in a `SlideAssist` component on Guy.
+- The blocked area is a rectangle around the trunk. Its sides, bottom and top come from Guy's size and three rules (see `adr-lw1` in `dev-docs/adr/LONG-WAY.md`).
+
+`move_player` calls `move_feet` with `trunks: Query<&Trunk>`, a query that finds every trunk.
+
+The plugin takes a setting: `CollisionPlugin { allow_sliding: true }` in `main.rs`. A plugin can be a struct with fields, and `build` stores the setting as a resource (`CollisionSettings`) that systems read with `Res<CollisionSettings>`. This is how a game configures shared code. The rule is a plain function with unit tests, so `./dev-scripts/rust.sh test long-way` checks it without opening the game.
+
+## Gizmos (debug drawing)
+
+`Gizmos` is a system parameter for drawing lines and shapes for one frame, used for debugging:
+
+```rust
+gizmos.rect_2d(Isometry2d::from_translation(centre), size, Color::srgb(1.0, 0.1, 0.1));
+```
+
+Press F1 in Long Way to show the blocked areas (red) and each sprite's feet (green circle). Gizmos are included in the `2d` feature set. Whether gizmos draw on top of sprites in our setup has not been checked on screen.
 
 ## Input
 
@@ -243,9 +281,12 @@ games/long-way/
 ├── Cargo.toml
 ├── assets/
 └── src/
-    ├── main.rs      # builds the App, adds plugins
-    ├── camera.rs    # CameraPlugin: camera, background colour, VIEW_HEIGHT
-    └── player.rs    # PlayerPlugin: Guy spawn, movement, animation
+    ├── main.rs        # builds the App, adds plugins
+    ├── camera.rs      # CameraPlugin: camera, background colour, VIEW_HEIGHT
+    ├── player.rs      # PlayerPlugin: Guy spawn, movement, animation
+    ├── trees.rs       # TreesPlugin: spawns the two trees and their trunks
+    ├── collision.rs   # CollisionPlugin: trunk blocking rules, F1 debug overlay
+    └── depth.rs       # DepthPlugin: draw order sorted by feet
 ```
 
 One plugin per feature, each owning its components and systems, is the shape each game will grow in. The repo is a Cargo workspace: each game is a crate in `games/`, and they share one `target/` folder so Bevy compiles once.

@@ -15,6 +15,7 @@ Each ADR is an H2 heading with a date tag. The ID has the form `adr-<prefix><n>`
 | `ENGINE.md` | `e` |
 | `ART.md` | `a` |
 | `WORKSPACE.md` | `w` |
+| `LONG-WAY.md` | `lw` |
 
 IDs are assigned once and never reused or renumbered. A new record gets the next free number in its file. Add a new prefix to this table when a new topic file is created.
 

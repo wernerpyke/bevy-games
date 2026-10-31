@@ -1,12 +1,22 @@
 # CLAUDE.md
 
+## IMPORTANT: start the Rust LSP at the beginning of every session
+
+**After the first prompt of every session, before doing anything else, start the Rust LSP server.** Do this even if the first prompt does not look like a coding task.
+
+1. Load the deferred tool: ToolSearch with `select:LSP`.
+2. Make one LSP call on a Rust file to start rust-analyzer, for example `documentSymbol` on `games/long-way/src/main.rs`. If it answers that the server is starting, carry on with the user's request and retry before you first need it. Indexing Bevy takes about a minute.
+3. Use the LSP (goToDefinition, hover, findReferences) for all Rust and Bevy source reading afterwards, including source in `bevy-src/` and `~/.cargo/registry/src/`. Do not use `cat`, `sed` or grep to read Rust symbols when the LSP can answer (working rule 5).
+
+Starting it late wastes the indexing time and has led to reading Bevy source with grep by mistake.
+
 ## Conventions
 
 ### Git workflow
 
 Claude does NOT commit to git unless the human confirms. Claude includes commits as steps in plan documents, but either asks the human to confirm the commit or commits only when instructed. This keeps every commit intentional and reviewed.
 
-This project is not a git repo yet. Ask before running `git init`.
+The remote is `https://github.com/wernerpyke/bevy-games.git`, branch `main`. Do not push unless the user asks.
 
 ### Languages
 
@@ -102,9 +112,10 @@ bevy/
 ├── docs/                    # Human-facing docs (README.md is the entry point)
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work
-│   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE
+│   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, LONG-WAY
 │   ├── bevy-notes.md        # Verified Bevy 0.20 patterns
 │   ├── BEVY-CONCEPTS.md     # Human-friendly guide to how Bevy works
+│   ├── BEVY-ADDITIONS.md    # Our own reusable design decisions built on Bevy
 │   ├── art-tags.md          # Aseprite animation tag names
 │   └── PLAN-*.md            # Temporary plans
 ├── dev-scripts/             # Dev tooling
@@ -123,7 +134,7 @@ Game designs are not defined yet. Ask the user for design details before inventi
 
 | Game | Crate and folder | Status |
 |---|---|---|
-| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys and stays on screen |
+| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys, stays on screen, and a red and a green tree animate nearby and block him (F1 shows collision zones), with forgiving sliding past trunk edges |
 
 Rules for the workspace (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/`, with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.
@@ -159,12 +170,13 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 2. Libraries versus custom code is open. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why.
 3. Bevy is pinned to 0.20.1 (latest stable as of 2026-10-30) in the root `Cargo.toml` (`[workspace.dependencies]`). Check every Bevy ecosystem crate for compatibility with that version before adding it. Most Bevy plugins release one version per Bevy release.
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Check docs.rs and the official migration guide for the pinned version. Bundles such as `SpriteBundle` were removed in newer versions. Use required components.
-5. Use the Rust LSP (rust-analyzer) through the LSP tool for code navigation and checks: go to definition, find references, hover for types and signatures, and diagnostics. Prefer it over grep for Rust symbols in this project and in dependencies. Use grep for text search in examples and docs.
+5. Use the Rust LSP (rust-analyzer) through the LSP tool for code navigation and checks: go to definition, find references, hover for types and signatures, and diagnostics. Prefer it over grep for Rust symbols in this project and in dependencies. Use grep for text search in examples and docs. The LSP tool is deferred: load it at the start of work with ToolSearch (`select:LSP`). The server needs about a minute to index on first use, so retry once if it says it is starting. Use it (goToDefinition, hover) to read Bevy and plugin source in `~/.cargo/registry/src/`, not `cat` or `sed`.
 6. Bevy reference material, in this order: (a) Bevy repo checked out at the pinned version's tag in `bevy-src/` (git-ignored, shallow clone of tag `v0.20.1`; update it when the Bevy version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on the dependency source; (c) docs.rs for the pinned version. Search these for the exact API needed. Do not read whole files.
-7. Record verified Bevy patterns for the pinned version in `dev-docs/bevy-notes.md` and read it before searching again. Keep it short. When the project uses a new Bevy concept for the first time, add or update its section in `dev-docs/BEVY-CONCEPTS.md` (plain language, project code as the example). The user is learning Bevy.
+7. Record verified Bevy patterns for the pinned version in `dev-docs/bevy-notes.md` and read it before searching again. Keep it short. When the project uses a new Bevy concept for the first time, add or update its section in `dev-docs/BEVY-CONCEPTS.md` (plain language, project code as the example). The user is learning Bevy. Keep our own reusable, non-standard design decisions (such as `allow_sliding`) in `dev-docs/BEVY-ADDITIONS.md`, separate from plain Bevy concepts. Add an entry when we make such a decision, and link its ADR.
 8. Run `./dev-scripts/rust.sh lint` before reporting work as done. Run `./dev-scripts/rust.sh test` when tests exist.
 9. Run `./dev-scripts/rust.sh web` after adding dependencies, not only the native build.
-10. Match the style of surrounding code. Keep comments sparse.
+10. When behaviour does not work in the real game, reproduce it with `./dev-scripts/rust.sh script` first, write a failing test for the cause, fix it, then rerun the script. Do not report a fix as working from unit tests alone. Say which parts you did not see on screen.
+11. Match the style of surrounding code. Keep comments sparse.
 
 ## Architecture guidance (starting defaults, user may override)
 
@@ -196,7 +208,7 @@ Starting-point art lives in `~/Dark/graveyard_shift/diodrama-assets/` (55 `.asep
 
 - **Do NOT copy, import, convert or reference any file from it until the user names that file.** The user will say which file to copy across and when. Do not bulk copy the folder, and do not copy "related" files (palettes, other animations, `.xcf`, `.tps`) on your own initiative.
 - Never modify or delete anything in the source library. Copy only.
-- When the user names a file, ask which game it is for if that is not clear, copy it into that game's `assets/art/` (characters in `assets/art/characters/`), keeping its file name, then record it in that game's list below.
+- When the user names a file, ask which game it is for if that is not clear, copy it into that game's `assets/art/` (characters in `assets/art/characters/`, scenery in `assets/art/features/`), keeping its file name, then record it in that game's list below.
 - Browsing the library to answer a question is allowed. Reading a file with the Aseprite CLI to inspect it is allowed. Writing outside the project is not.
 - Licence: the game is for personal use. The user owns a licence for "Forest Graveyard" (GuttyKreum, GameDev Market), the source of the environment sprites. No redistribution is planned.
 
@@ -205,6 +217,8 @@ Files copied so far, by game:
 Long Way (`games/long-way/assets/art/`):
 - `diodrama_palette.aseprite` (from `diodrama_palette.aseprite`, 19 colours). The game's palette.
 - `characters/Guy.aseprite` (from `characters/guy/Guy.aseprite`, 60x60, 41 frames, tags: Idle, Walk, Up, Down, Block, Win)
+- `features/Green tree.aseprite` (from `features/`, resized in our copy from 512x512 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 12 colour palette, not the game palette)
+- `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
 
 ### Pipeline
 
@@ -237,6 +251,7 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
 - Run: `./dev-scripts/rust.sh run <game>`, for example `run long-way`
+- Run a game with scripted key presses and print its log: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Commands are in `games/long-way/src/script.rs`. Use it to check behaviour in the real game (`dev-docs/adr/LONG-WAY.md` adr-lw5).
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)
