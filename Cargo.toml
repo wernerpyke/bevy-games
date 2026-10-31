@@ -1,0 +1,26 @@
+[workspace]
+resolver = "3"
+members = ["games/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
+bevy_aseprite_ultra = "=0.10.0"
+
+# Compile dependencies (Bevy) with optimisation even in dev builds. Game code stays fast to rebuild.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev]
+opt-level = 1
+
+# Small web builds. Used with: cargo build --profile wasm-release --target wasm32-unknown-unknown
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+strip = true

@@ -1,0 +1,46 @@
+# Rust
+target/
+**/*.rs.bk
+# Cargo.lock IS committed (this is a binary, not a library)
+
+# Reference source: Bevy repo at the pinned tag (see dev-docs/adr/ENGINE.md adr-e3).
+# A read-only reference for examples and migration guides, not a dependency.
+bevy-src/
+
+# Generated Output
+# Web build output (wasm, JS glue, HTML) produced by the web build; regenerated on demand.
+dist/
+# Aseprite exports (PNG sheets and JSON) generated from games/*/assets/art/*.aseprite
+# (see dev-docs/adr/ART.md adr-a1). Never edited by hand.
+games/*/assets/generated/
+
+# IDE / Editor
+.vscode/
+.idea/
+.obsidian/
+*.swp
+*.swo
+*~
+Thumbs.db
+*.sublime-project
+*.sublime-workspace
+
+# OS files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+
+# Claude Code local config (settings, local overrides, project-local skills)
+.claude/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Miscellaneous
+*.log
+.cache/
