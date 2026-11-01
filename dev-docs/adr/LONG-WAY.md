@@ -19,9 +19,9 @@
 
 **How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), because equal z flickers (found with the rock rows, 2026-11-01). The sort runs in `Update` with no ordering against movement, so z can lag one frame.
 
-## adr-lw3. F1 collision debug overlay (2026-10-31)
+## adr-lw3. Collision debug overlay (2026-10-31, changed 2026-11-01)
 
-**Decision.** F1 toggles a debug overlay. Red rectangles show where Guy's feet may not go. Green circles mark the feet of every depth-sorted entity.
+**Decision.** A debug overlay shows the collision. First version: F1, gizmos, red trunk boxes and green feet circles. Now (`collision_debug.rs`): it follows the F2 grid switch and is drawn as sprites on the feature debug layer (`adr-lw9`). Yellow lines are every outline edge (with a tick on the blocked side), cyan boxes are interior rocks, green squares are the feet of every depth-sorted entity. The red trunk boxes are gone because the yellow outline already covers trunks. F1 does nothing now.
 
 **Rationale.** Collision rules are hard to check by eye, and Claude cannot watch the window.
 
@@ -58,7 +58,7 @@ When false, any blocked move leaves Guy where he was. There is no sliding of any
 1. **Grid (F2).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below Guy and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
 2. **Info box (F3).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are Guy's feet x/y and grid cell (in grid coordinates, relative to the origin) and his raw world position.
 
-Both start visible. The F1 collision overlay stays in `collision.rs`.
+Both start visible. The collision overlay is in `collision_debug.rs` and follows F2 (`adr-lw3`).
 
 **Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. Guy's feet are shown, not the sprite centre, because collision uses the feet.
 
@@ -100,7 +100,7 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 
 **Rationale.** Bevy has no layer system for 2D draw order: sprites are sorted by z, equal z has no fixed order, `RenderLayers` only picks which camera sees an entity, and 2D gizmos are always drawn last, on top of everything. The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-lw2`). Separate layers would stop that. The debug layer is above the world, so debug lines also draw over the player.
 
-**How to apply.** Never write a bare z number outside `layers.rs`. `bevy_ui` draws after all sprites and gizmos, so the HUD and UI are always above the feature debug layer. A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). Debug drawings that must follow the layers are sprites, not gizmos. The F1 collision overlay in `collision.rs` is still gizmos, so it is always on top. Plan step 8 changes that.
+**How to apply.** Never write a bare z number outside `layers.rs`. `bevy_ui` draws after all sprites and gizmos, so the HUD and UI are always above the feature debug layer. A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). Debug drawings that must follow the layers are sprites, not gizmos. The collision overlay in `collision_debug.rs` follows this rule.
 
 ## adr-lw10. Sliding along merged outlines, into notches (2026-11-01)
 

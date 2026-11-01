@@ -1,5 +1,5 @@
 //! Reusable visual debug tools. F2 toggles the grid, F3 toggles the info box.
-//! The collision overlay (F1) lives in `collision.rs`.
+//! The collision overlay lives in `collision_debug.rs` and follows F2.
 //!
 //! To show a value in the info box from any system, take `ResMut<DebugInfo>` and call `set`.
 

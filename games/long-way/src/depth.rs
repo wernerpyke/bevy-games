@@ -9,6 +9,9 @@ const Z_PER_Y: f32 = 0.001;
 /// `Z_PER_Y` even at x = 5000, so it never overrides a difference in y.
 const Z_PER_X: f32 = 0.000_000_01;
 
+// The world layer holds feet from y -99000 to 99000 (`layers.rs`).
+const _: () = assert!(Z_PER_Y * 99_000.0 < WORLD_HALF_BAND);
+
 pub struct DepthPlugin;
 
 impl Plugin for DepthPlugin {

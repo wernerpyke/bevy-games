@@ -18,7 +18,7 @@ Status key:
 | [Feet-based collision zones](#feet-based-collision-zones)                             | `collision.rs`                           | In use (Long Way) |
 | [Depth sorting by feet](#depth-sorting-by-feet)                                       | `depth.rs`                               | In use (Long Way) |
 | [Configurable plugins](#configurable-plugins)                                         | `collision.rs`, `main.rs`                | In use (Long Way) |
-| [F1 debug overlay](#f1-debug-overlay)                                                 | `collision.rs`                           | In use (Long Way) |
+| [Collision debug overlay](#collision-debug-overlay)                                                 | `collision_debug.rs`                           | In use (Long Way) |
 | [Rules as plain functions with unit tests](#rules-as-plain-functions-with-unit-tests) | `collision.rs`                           | In use (Long Way) |
 | [View height sets on-screen scale](#view-height-sets-on-screen-scale)                 | `camera.rs`                              | In use (Long Way) |
 | [Animation tag switching](#animation-tag-switching)                                   | `player.rs`                              | In use (Long Way) |
@@ -81,15 +81,15 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **How to use.** Make the plugin a struct with public fields. In `build`, `insert_resource` the settings. Systems and helper functions take the settings resource (or reference).
 
-## F1 debug overlay
+## Collision debug overlay
 
-**What.** Pressing F1 toggles drawing of the blocked areas (red rectangles) and the feet of every depth-sorted entity (green circles), using Bevy gizmos. See `adr-lw3`.
+**What.** The F2 switch also shows the collision: yellow outline edges with a tick on the blocked side, cyan boxes around interior rocks, green squares at the feet of every depth-sorted entity. All are sprites on the feature debug layer. See `adr-lw3`.
 
 **Why.** Collision rules are hard to judge by eye, and Claude cannot watch the window.
 
-**How to use.** `CollisionPlugin` includes it. The state lives in the `ShowCollision` resource.
+**How to use.** Add `CollisionDebugPlugin`. It draws once in `PostStartup`, after every blocked area is registered, so areas added later are not shown. Feet markers follow any entity that has `DepthSort`.
 
-**Limits.** Remove it or put it behind a debug feature before a release build. Whether gizmos draw on top of sprites has not been checked on screen.
+**Limits.** Remove it or put it behind a debug feature before a release build. The outline is static: it does not change if areas are added or removed after startup.
 
 ## Debug grid and info box
 
@@ -109,7 +109,7 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **How to use.** Import the constant from `layers`. Put a debug drawing on `FEATURE_DEBUG_Z` as a sprite, a HUD node on `GlobalZIndex(HUD_Z_INDEX)`.
 
-**Limits.** Gizmos cannot be placed in a layer. The F1 overlay still uses them.
+**Limits.** Gizmos cannot be placed in a layer, so no debug drawing uses them.
 
 ## Collision and sliding rules
 

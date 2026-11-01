@@ -134,7 +134,7 @@ Game designs are not defined yet. Ask the user for design details before inventi
 
 | Game | Crate and folder | Status |
 |---|---|---|
-| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys, stays on screen, and a red and a green tree animate nearby and block him (F1 shows collision zones), with forgiving sliding past trunk edges |
+| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys, stays on screen, and a red and a green tree animate nearby and block him (F2 shows the grid and collision outline), with forgiving sliding past trunk edges |
 
 Rules for the workspace (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/`, with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.

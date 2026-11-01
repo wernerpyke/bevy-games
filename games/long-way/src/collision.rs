@@ -1,7 +1,5 @@
-use bevy::math::Isometry2d;
 use bevy::prelude::*;
 
-use crate::depth::DepthSort;
 use crate::outline::{self, Cluster, Edge, Orientation, TOLERANCE};
 
 /// Half the width of Guy's body. Guy's feet are blocked this far from a trunk's sides.
@@ -42,13 +40,11 @@ pub struct CollisionPlugin {
 
 impl Plugin for CollisionPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<ShowCollision>()
-            .init_resource::<CollisionWorld>()
+        app.init_resource::<CollisionWorld>()
             .insert_resource(CollisionSettings {
                 allow_sliding: self.allow_sliding,
             })
-            .add_systems(PostStartup, register_trunks)
-            .add_systems(Update, (toggle_debug, draw_debug));
+            .add_systems(PostStartup, register_trunks);
     }
 }
 
@@ -75,6 +71,13 @@ impl CollisionWorld {
             .flat_map(|c| c.edges.iter().copied())
             .collect();
         first
+    }
+
+    /// The areas that touch no empty space, for the debug overlay.
+    pub fn interior_areas(&self) -> impl Iterator<Item = Rect> + '_ {
+        self.clusters
+            .iter()
+            .flat_map(|c| c.interior.iter().map(|&i| self.areas[i]))
     }
 
     pub fn clusters(&self) -> &[Cluster] {
@@ -372,47 +375,6 @@ fn slide_to_nearest_edge(
     };
     // The slide may not end inside another shape, for example one whose wall is closer than `SLIDE_PAST_CORNER`.
     Some(resolve(feet, target, edges).feet)
-}
-
-/// Debug overlay switch. Press F1 to toggle.
-#[derive(Resource, Default)]
-struct ShowCollision(bool);
-
-fn toggle_debug(input: Res<ButtonInput<KeyCode>>, mut show: ResMut<ShowCollision>) {
-    if input.just_pressed(KeyCode::F1) {
-        show.0 = !show.0;
-    }
-}
-
-/// Red: where feet may not go. Green circle: the feet of every depth-sorted entity.
-fn draw_debug(
-    show: Res<ShowCollision>,
-    trunks: Query<&Trunk>,
-    feet: Query<(&Transform, &DepthSort)>,
-    mut gizmos: Gizmos,
-) {
-    if !show.0 {
-        return;
-    }
-    for trunk in &trunks {
-        let area = trunk.blocked_area();
-        gizmos.rect_2d(
-            Isometry2d::from_translation(area.center()),
-            area.size(),
-            Color::srgb(1.0, 0.1, 0.1),
-        );
-    }
-    for (transform, sort) in &feet {
-        let point = Vec2::new(
-            transform.translation.x,
-            sort.feet_y(transform.translation.y),
-        );
-        gizmos.circle_2d(
-            Isometry2d::from_translation(point),
-            4.0,
-            Color::srgb(0.1, 1.0, 0.1),
-        );
-    }
 }
 
 #[cfg(test)]

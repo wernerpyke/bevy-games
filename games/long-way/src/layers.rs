@@ -23,10 +23,14 @@ pub const BACKGROUND_Z: f32 = -500.0;
 /// The F2 grid lines and their numbers.
 pub const GRID_DEBUG_Z: f32 = -200.0;
 /// The world layer spans z from `-WORLD_HALF_BAND` to `WORLD_HALF_BAND`. With `depth.rs` at 0.001 per unit of
-/// y, that holds feet from y -100000 to 100000.
+/// y, that holds feet from y -99000 to 99000 (checked in `depth.rs`).
 pub const WORLD_HALF_BAND: f32 = 100.0;
 /// Debug outlines of features, above everything in the world.
 pub const FEATURE_DEBUG_Z: f32 = 200.0;
+/// Sublayers of the feature debug layer, so overlapping debug sprites never share a z: the outline of interior
+/// areas, then the feet markers.
+pub const FEATURE_DEBUG_INTERIOR_Z: f32 = 201.0;
+pub const FEATURE_DEBUG_FEET_Z: f32 = 202.0;
 /// Z index of the HUD: the info box and other always-on-screen readouts.
 pub const HUD_Z_INDEX: i32 = 0;
 /// Z index of dialogs and menus, above the HUD.
@@ -38,7 +42,11 @@ const _: () = {
     assert!(BACKGROUND_Z < GRID_DEBUG_Z);
     assert!(GRID_DEBUG_Z < -WORLD_HALF_BAND);
     assert!(WORLD_HALF_BAND < FEATURE_DEBUG_Z);
+    assert!(
+        FEATURE_DEBUG_Z < FEATURE_DEBUG_INTERIOR_Z
+            && FEATURE_DEBUG_INTERIOR_Z < FEATURE_DEBUG_FEET_Z
+    );
     // `OrthographicProjection::default_2d` shows z from -1000 to 1000.
-    assert!(BACKGROUND_Z > -1000.0 && FEATURE_DEBUG_Z < 1000.0);
+    assert!(BACKGROUND_Z > -1000.0 && FEATURE_DEBUG_FEET_Z < 1000.0);
     assert!(HUD_Z_INDEX < UI_Z_INDEX);
 };

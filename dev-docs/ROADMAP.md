@@ -12,7 +12,7 @@ Choose the palette and sprite size grid. Existing assets in `~/Dark/graveyard_sh
 
 ### 3. Extract collision into shared code
 
-Make `games/long-way/src/collision.rs` usable across games. Per `adr-w6` (`dev-docs/adr/WORKSPACE.md`), a shared crate is created only when a second game needs it, and only after asking the developer. Considerations: the file mixes general parts (`resolve`, the swept axis check, the F1 debug overlay) with Long Way specific parts (Guy's size and the three overlap rules for trees), so the extraction needs a clear split between engine-neutral code and per-game constants. `depth.rs` is closely tied to collision (same feet line) and probably moves with it. Keep the unit tests with the code.
+Make `games/long-way/src/collision.rs` usable across games. Per `adr-w6` (`dev-docs/adr/WORKSPACE.md`), a shared crate is created only when a second game needs it, and only after asking the developer. Considerations: the file mixes general parts (`resolve`, the swept axis check) with Long Way specific parts (Guy's size and the three overlap rules for trees), so the extraction needs a clear split between engine-neutral code and per-game constants. `depth.rs` is closely tied to collision (same feet line) and probably moves with it. Keep the unit tests with the code.
 
 ### 4. Evaluate avian2d
 
@@ -50,7 +50,7 @@ Done 2026-10-31. `Green tree.aseprite` and `Red tree.aseprite` are copied from t
 
 ### Tree collision
 
-Done 2026-10-31. Guy cannot overlap a trunk from the left or right, can overlap it by 50% of his height when walking up from below, and can walk behind the tree from above but not into its bottom 10%. Draw order follows the feet so he passes behind and in front correctly. The rules are in `games/long-way/src/collision.rs` with 8 unit tests that pass. F1 shows the blocked areas. See `dev-docs/adr/LONG-WAY.md`. Not tested by hand: the real feel at the screen edge, whether the debug gizmos draw on top of sprites, and the trunk edges (taken from art pixels) and Guy's body width (20 each side, an estimate) on screen.
+Done 2026-10-31. Guy cannot overlap a trunk from the left or right, can overlap it by 50% of his height when walking up from below, and can walk behind the tree from above but not into its bottom 10%. Draw order follows the feet so he passes behind and in front correctly. The rules are in `games/long-way/src/collision.rs` with 8 unit tests that pass. The blocked areas were first shown with F1 (now the F2 overlay). See `dev-docs/adr/LONG-WAY.md`. Not tested by hand: the real feel at the screen edge, whether the debug gizmos draw on top of sprites, and the trunk edges (taken from art pixels) and Guy's body width (20 each side, an estimate) on screen.
 
 ### Forgiving collision (`allow_sliding`)
 

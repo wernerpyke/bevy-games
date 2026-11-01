@@ -235,7 +235,7 @@ The plugin takes a setting: `CollisionPlugin { allow_sliding: true }` in `main.r
 gizmos.rect_2d(Isometry2d::from_translation(centre), size, Color::srgb(1.0, 0.1, 0.1));
 ```
 
-Press F1 in Long Way to show the blocked areas (red) and each sprite's feet (green circle). Gizmos are included in the `2d` feature set. Whether gizmos draw on top of sprites in our setup has not been checked on screen.
+Gizmos draw lines and shapes for one frame without entities. In 2D they are always drawn on top of everything, so they cannot sit in a layer. Long Way draws its debug overlays as sprites instead (`collision_debug.rs`).
 
 ## Text
 
@@ -294,7 +294,7 @@ games/long-way/
     ├── camera.rs      # CameraPlugin: camera, background colour, VIEW_HEIGHT
     ├── player.rs      # PlayerPlugin: Guy spawn, movement, animation
     ├── trees.rs       # TreesPlugin: spawns the two trees and their trunks
-    ├── collision.rs   # CollisionPlugin: trunk blocking rules, F1 debug overlay
+    ├── collision.rs   # CollisionPlugin: blocking rules, outline, sliding
     └── depth.rs       # DepthPlugin: draw order sorted by feet
 ```
 

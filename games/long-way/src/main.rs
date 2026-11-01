@@ -1,5 +1,6 @@
 mod camera;
 mod collision;
+mod collision_debug;
 mod debug;
 mod depth;
 mod layers;
@@ -22,6 +23,7 @@ fn main() {
             collision::CollisionPlugin {
                 allow_sliding: true,
             },
+            collision_debug::CollisionDebugPlugin,
             debug::DebugPlugin {
                 cell_size: camera::CELL_SIZE,
                 grid_color: Color::srgb(1.0, 0.1, 0.1),
