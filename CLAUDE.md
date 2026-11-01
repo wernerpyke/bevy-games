@@ -251,7 +251,7 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
 - Run: `./dev-scripts/rust.sh run <game>`, for example `run long-way`
-- Run a game with scripted key presses and print its log: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Commands are in `games/long-way/src/script.rs`. Use it to check behaviour in the real game (`dev-docs/adr/LONG-WAY.md` adr-lw5).
+- Run a game with scripted key presses and print its log: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only), for example `script long-way "wait:0.5;screenshot:start;quit"`. Commands are in `games/long-way/src/script.rs`. Use it to check behaviour in the real game (`dev-docs/adr/LONG-WAY.md` adr-lw5).
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)

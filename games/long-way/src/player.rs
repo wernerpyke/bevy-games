@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
-use crate::camera::VIEW_HEIGHT;
+use crate::camera::half_view;
 use crate::collision::{CollisionSettings, GUY_FEET_OFFSET, SlideAssist, Trunk, move_feet};
 use crate::depth::DepthSort;
 
@@ -66,9 +66,7 @@ fn move_player(
     settings: Res<CollisionSettings>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
-    // The camera shows a fixed height, so the visible width follows the window aspect ratio.
-    let half_view = Vec2::new(VIEW_HEIGHT * window.width() / window.height(), VIEW_HEIGHT) / 2.0;
-    let limit = (half_view - Vec2::splat(HALF_SIZE)).max(Vec2::ZERO);
+    let limit = (half_view(&window) - Vec2::splat(HALF_SIZE)).max(Vec2::ZERO);
 
     let mut direction = Vec2::ZERO;
     if input.pressed(KeyCode::ArrowLeft) {

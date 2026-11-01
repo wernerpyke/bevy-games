@@ -14,9 +14,19 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - To run a system after Bevy has updated keyboard state, use `PreUpdate` with `.after(bevy::input::InputSystems)`. To write keys into `ButtonInput<KeyCode>`, use `press` and `release`.
 - Exiting from a system: `MessageWriter<AppExit>` then `exit.write(AppExit::Success)`.
 
+## Screenshots
+
+- `commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path))` with `use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};`. The file is written a few frames later, inside the observer. A second `.observe(|_: On<ScreenshotCaptured>, ..| ..)` added after it runs once the file is saved. Saves the window at physical size (2560x1440 on this Mac). Includes UI, sprites and gizmos.
+
 ## Gizmos
 
 - `mut gizmos: Gizmos` as a system parameter. `gizmos.rect_2d(Isometry2d::from_translation(centre), size, color)` and `gizmos.circle_2d(Isometry2d::from_translation(p), radius, color)`. Import `bevy::math::Isometry2d`. Included in the `2d` feature.
+
+## Text
+
+- World text: `Text2d::new("1")`, `TextFont::from_font_size(20.0)`, `TextColor(c)`, `Anchor::TOP_LEFT` (`bevy::sprite::Anchor`), `Transform`. UI text: `Text::new("")`, same font and colour, `Node { position_type: PositionType::Absolute, top: px(8), left: px(8), .. }`, optional `BackgroundColor`. Edit `Text.0` to change it.
+- `default_font` and `bevy_ui_render` are already on through the `2d` feature chain, so no new dependency.
+- Remove all children of an entity: `commands.entity(e).despawn_children().with_children(|p| { p.spawn(..); })`.
 
 ## Input and time
 

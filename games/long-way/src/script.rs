@@ -6,6 +6,9 @@
 //! - `teleport:<feet_x>:<feet_y>`   put Guy's feet at a position
 //! - `hold:<keys>:<seconds>`        hold arrow keys, for example `hold:up:3` or `hold:up+left:2`
 //! - `wait:<seconds>`
+//! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
+//!   `LONG_WAY_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
+//!   Add a `wait` before it after a `teleport`, so the frame shows the new position.
 //! - `quit`
 //!
 //! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`
@@ -14,6 +17,7 @@ use std::collections::VecDeque;
 
 use bevy::input::InputSystems;
 use bevy::prelude::*;
+use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 
 use crate::collision::GUY_FEET_OFFSET;
 use crate::player::Player;
@@ -36,15 +40,19 @@ impl Plugin for ScriptPlugin {
             commands,
             elapsed: -START_DELAY,
             since_log: 0.0,
+            shot_requested: false,
+            shot_saved: false,
         })
         .add_systems(PreUpdate, run_script.after(InputSystems));
     }
 }
 
+#[derive(Clone)]
 enum Command {
     Teleport(Vec2),
     Hold(Vec<KeyCode>, f32),
     Wait(f32),
+    Screenshot(String),
     Quit,
 }
 
@@ -54,6 +62,9 @@ struct Script {
     /// Seconds spent on the current command. Negative during the start delay.
     elapsed: f32,
     since_log: f32,
+    /// State of the current `screenshot` command.
+    shot_requested: bool,
+    shot_saved: bool,
 }
 
 fn parse(text: &str) -> VecDeque<Command> {
@@ -71,6 +82,14 @@ fn parse(text: &str) -> VecDeque<Command> {
                     Command::Hold(keys, seconds.parse().ok()?)
                 }
                 ["wait", seconds] => Command::Wait(seconds.parse().ok()?),
+                ["screenshot", name]
+                    if !name.is_empty()
+                        && name
+                            .chars()
+                            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
+                {
+                    Command::Screenshot(name.to_string())
+                }
                 ["quit"] => Command::Quit,
                 _ => None?,
             };
@@ -89,11 +108,17 @@ fn key(name: &str) -> Option<KeyCode> {
     }
 }
 
+/// Runs after `save_to_disk`, which is added first and saves the file inside its observer.
+fn mark_saved(_: On<ScreenshotCaptured>, mut script: ResMut<Script>) {
+    script.shot_saved = true;
+}
+
 fn feet_of(transform: &Transform) -> Vec2 {
     transform.translation.truncate() - Vec2::new(0.0, GUY_FEET_OFFSET)
 }
 
 fn run_script(
+    mut commands: Commands,
     mut script: ResMut<Script>,
     mut input: ResMut<ButtonInput<KeyCode>>,
     time: Res<Time>,
@@ -108,12 +133,12 @@ fn run_script(
         return;
     };
 
-    let Some(command) = script.commands.front() else {
+    let Some(command) = script.commands.front().cloned() else {
         exit.write(AppExit::Success);
         return;
     };
 
-    let finished = match command {
+    let finished = match &command {
         Command::Teleport(position) => {
             transform.translation.x = position.x;
             transform.translation.y = position.y + GUY_FEET_OFFSET;
@@ -136,6 +161,30 @@ fn run_script(
             }
         }
         Command::Wait(seconds) => script.elapsed >= *seconds,
+        Command::Screenshot(name) => {
+            if !script.shot_requested {
+                let dir = std::env::var("LONG_WAY_SCREENSHOT_DIR")
+                    .unwrap_or_else(|_| "target/screenshots".to_string());
+                let path = std::path::Path::new(&dir).join(format!("{name}.png"));
+                if let Err(error) = std::fs::create_dir_all(&dir) {
+                    warn!("script: cannot create {dir}: {error}");
+                }
+                let shown = std::path::absolute(&path).unwrap_or_else(|_| path.clone());
+                info!(
+                    "script: screenshot requested, saving to {}",
+                    shown.display()
+                );
+                script.shot_requested = true;
+                script.shot_saved = false;
+                commands
+                    .spawn(Screenshot::primary_window())
+                    .observe(save_to_disk(path))
+                    .observe(mark_saved);
+                false
+            } else {
+                script.shot_saved
+            }
+        }
         Command::Quit => {
             exit.write(AppExit::Success);
             true
@@ -155,5 +204,6 @@ fn run_script(
         info!("script: command done, feet {:?}", feet_of(&transform));
         script.commands.pop_front();
         script.elapsed = 0.0;
+        script.shot_requested = false;
     }
 }

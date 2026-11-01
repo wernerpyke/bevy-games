@@ -237,6 +237,15 @@ gizmos.rect_2d(Isometry2d::from_translation(centre), size, Color::srgb(1.0, 0.1,
 
 Press F1 in Long Way to show the blocked areas (red) and each sprite's feet (green circle). Gizmos are included in the `2d` feature set. Whether gizmos draw on top of sprites in our setup has not been checked on screen.
 
+## Text
+
+Two kinds of text, both in the `2d` feature set with the built-in font:
+
+- `Text2d` is text in the world. It moves with the camera and has a position like a sprite. The grid numbers use it (`debug.rs`).
+- `Text` with a `Node` is UI. It is placed on the screen in window pixels, not world units. The info box uses it, with `position_type: Absolute`, `top` and `left`.
+
+Size and colour come from `TextFont::from_font_size(16.0)` and `TextColor(color)`.
+
 ## Input
 
 Read the keyboard from `Res<ButtonInput<KeyCode>>`. `pressed` is true while held. The same resource also offers `just_pressed` and `just_released` (seen in Bevy examples, not used by us yet).

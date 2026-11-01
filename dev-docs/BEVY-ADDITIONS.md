@@ -24,6 +24,7 @@ Status key:
 | [Animation tag switching](#animation-tag-switching) | `player.rs` | In use (Long Way) |
 | [Scripted input](#scripted-input) | `script.rs`, `dev-scripts/rust.sh` | In use (Long Way) |
 | [Logging strategy](#logging-strategy) | `collision.rs` | In use (Long Way) |
+| [Debug grid and info box](#debug-grid-and-info-box) | `debug.rs` | In use (Long Way) |
 
 ## Forgiving collision (`allow_sliding`)
 
@@ -88,6 +89,16 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **Limits.** Remove it or put it behind a debug feature before a release build. Whether gizmos draw on top of sprites has not been checked on screen.
 
+## Debug grid and info box
+
+**What.** F2 toggles a red grid with one line per grid cell (64), numbered along the top and left edges, drawn at z -10 (below sprites, above a future background). The origin is configurable (`GridOrigin`). F3 toggles a text box at the top left. See `adr-lw6`.
+
+**Why.** Placing trees and checking collision needs a visible grid and live values.
+
+**How to use.** `DebugPlugin { cell_size, grid_color, grid_origin }` in `main.rs`. To show a value, a system takes `ResMut<DebugInfo>` and calls `info.set("label", value)`. Add new tools as new systems in `debug.rs`.
+
+**Limits.** Not seen on screen by Claude. Remove or gate behind a debug feature before a release build.
+
 ## Rules as plain functions with unit tests
 
 **What.** Game rules live in plain Rust functions that use only `Vec2` and `Rect` from Bevy, so they run without a window or an `App`. `resolve` and `move_feet` have unit tests. Run them with `./dev-scripts/rust.sh test long-way`.
@@ -118,6 +129,7 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 - `teleport:<feet_x>:<feet_y>`
 - `hold:<keys>:<seconds>`, for example `hold:up:3` or `hold:up+left:2`
 - `wait:<seconds>`
+- `screenshot:<name>`, saves the window to `target/screenshots/<name>.png` (folder set by `LONG_WAY_SCREENSHOT_DIR`). Claude opens the PNG to check what is drawn. Add a `wait` before it after a `teleport`.
 - `quit`
 
 **Why.** Claude cannot play the game, and unit tests do not reproduce real frame times. A script reproduces a problem in the real app. See `adr-lw5`.

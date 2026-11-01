@@ -13,6 +13,8 @@
 #   ./dev-scripts/rust.sh script <game> "<commands>"
 #                                             # run a game with scripted key presses and print its log,
 #                                             # for example: script long-way "teleport:225:-150;hold:up:3;quit"
+#                                             # add screenshot:<name> to save target/screenshots/<name>.png,
+#                                             # for example: script long-way "wait:0.5;screenshot:start;quit"
 #   ./dev-scripts/rust.sh <other> [args...]   # passed straight to cargo
 set -euo pipefail
 cd "$(dirname "$0")/.."
