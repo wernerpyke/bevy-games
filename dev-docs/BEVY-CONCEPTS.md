@@ -250,7 +250,7 @@ Size and colour come from `TextFont::from_font_size(16.0)` and `TextColor(color)
 
 Read the keyboard from `Res<ButtonInput<KeyCode>>`. `pressed` is true while held. The same resource also offers `just_pressed` and `just_released` (seen in Bevy examples, not used by us yet).
 
-For turn-based play, `just_pressed` is likely the call you want, because one key press should be one action.
+Use `pressed` for walking, which should continue while the key is held (Long Way is real-time). Use `just_pressed` when one key press should be one action, such as opening a menu or advancing dialogue.
 
 ## Movement
 

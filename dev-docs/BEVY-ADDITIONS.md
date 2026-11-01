@@ -59,7 +59,7 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **How to use.** Spawn a `Trunk { left, right, base_y, height }` (world coordinates) on each tree. Constants `GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW` and `BLOCKED_BOTTOM` set the numbers. Trunk edges come from art pixels (see `trees.rs`).
 
-**Limits.** Guy's size is a constant for now, not read from a component. Only trunks exist as obstacle types. A grid-based game may replace this with cell blocking.
+**Limits.** Guy's size is a constant for now, not read from a component. Only trunks exist as obstacle types. Rocks and forest clusters are planned in `PLAN-forest-collision.md`.
 
 ## Depth sorting by feet
 

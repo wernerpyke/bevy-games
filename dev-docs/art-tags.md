@@ -1,0 +1,10 @@
+# Aseprite animation tags
+
+Tag names are the contract between art and code (`CLAUDE.md`, art pipeline rule 7). Names are case sensitive.
+
+| File | Tags |
+|---|---|
+| `characters/Guy.aseprite` | `Idle`, `Walk`, `Up`, `Down`, `Block`, `Win` |
+| `features/Green tree.aseprite` | none (all 8 frames loop) |
+| `features/Red tree.aseprite` | none (all 8 frames loop) |
+| `features/Rocks.aseprite` | `rock_0` (frame 1), `rock_1` (frame 2). Each tag is one frame and is a rock variant, not an animation. |

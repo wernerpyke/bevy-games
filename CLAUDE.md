@@ -126,7 +126,7 @@ bevy/
 
 ## Purpose
 
-A workspace for 2D pixel art, turn-based games built with Bevy (Rust). Several games are developed side by side. Claude writes all code. The user makes architectural decisions and does not hand-write code.
+A workspace for 2D pixel art games built with Bevy (Rust). Long Way is a real-time top-down RPG (`dev-docs/adr/LONG-WAY.md` adr-lw7). Several games are developed side by side. Claude writes all code. The user makes architectural decisions and does not hand-write code.
 
 Game designs are not defined yet. Ask the user for design details before inventing mechanics.
 
@@ -155,7 +155,7 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 
 - 2D only. No 3D features. Disable unused Bevy default features where practical to keep the web build small.
 - Pixel art rendering: nearest-neighbour sampling, integer scaling, fixed low-resolution camera.
-- Turn-based: game logic advances by turns, not by frame time. Keep turn logic separate from rendering and animation.
+- Long Way is real-time: movement and collision use frame time (`time.delta_secs()`), and the game is not turn-based or grid-locked (adr-lw7). Other games state their own timing model, so ask. Keep game rules in plain Rust functions, separate from rendering and animation.
 
 ## User context
 
@@ -181,7 +181,7 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 ## Architecture guidance (starting defaults, user may override)
 
 - One Bevy plugin per feature area. Each plugin owns its components, resources, events and systems.
-- Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for turn phase.
+- Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for the play mode (for example exploring, dialogue, menu).
 - Use events or messages to pass actions between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
@@ -198,7 +198,7 @@ Versions verified for Bevy 0.20 in `dev-docs/adr/ENGINE.md` adr-e4. Verify wasm 
 | Input mapping | `leafwing-input-manager` |
 | Asset loading states | `bevy_asset_loader` |
 | Debug UI | `bevy_egui`, `bevy-inspector-egui` |
-| Physics | Not needed for turn-based. Use grid logic. Avoid `bevy_rapier2d` unless required. |
+| Physics | Long Way uses its own collision (adr-lw1). Evaluating `avian2d` is roadmap item 4. Do not add a physics crate before that is decided. |
 
 ## Art pipeline
 
@@ -219,6 +219,7 @@ Long Way (`games/long-way/assets/art/`):
 - `characters/Guy.aseprite` (from `characters/guy/Guy.aseprite`, 60x60, 41 frames, tags: Idle, Walk, Up, Down, Block, Win)
 - `features/Green tree.aseprite` (from `features/`, resized in our copy from 512x512 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 12 colour palette, not the game palette)
 - `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
+- `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256, with `dev-scripts/aseprite/frames_from_pngs.lua`: 128x128, 2 frames, tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
 
 ### Pipeline
 

@@ -7,9 +7,9 @@
 - **Bottom:** the tree's base minus half of Guy's height (30). Walking up from below, Guy stops with the top half of his body over the trunk base (50% overlap).
 - **Top:** the tree's base plus 10% of the tree height. Walking down from above, Guy stops before the bottom 10% of the tree. Above this line he can walk behind the tree, overlapping the trunk and canopy freely.
 
-**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is turn-based and uses grid logic later, so a physics engine (`bevy_rapier2d`) is not wanted.
+**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (roadmap item 4 evaluates `avian2d`).
 
-**How to apply.** The rule lives in `games/long-way/src/collision.rs` as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). When the game moves to a grid, expect to replace this with grid-cell blocking. Each axis is resolved separately so Guy slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk.
+**How to apply.** The rule lives in `games/long-way/src/collision.rs` as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). Each axis is resolved separately so Guy slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk.
 
 ## adr-lw2. Draw order sorted by feet (2026-10-31)
 
@@ -63,3 +63,25 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 **Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. Guy's feet are shown, not the sprite centre, because collision uses the feet.
 
 **How to apply.** Add a new tool as a new system in `DebugPlugin`, with a key toggle in `toggle_tools` and a field in `DebugSettings`. Report values from any system through `DebugInfo`. The code stays in the game crate until a second game needs it (`adr-w6`). Remove or gate the tools behind a debug feature before a release build.
+
+## adr-lw7. Long Way is a real-time top-down RPG (2026-11-01)
+
+**Decision.** Long Way is a real-time, top-down RPG. It is not turn-based and not locked to a grid. Movement, sliding and animation use frame time. The 64 pixel cell is a tool for placing things (the F2 grid and map files), not a movement rule.
+
+**Rationale.** The developer chose this direction on 2026-11-01. It replaces the earlier workspace default of turn-based play for this game. Walking, collision and the slide delay were already real-time, so no existing code changes.
+
+**How to apply.** Do not add turn logic, turn phases or grid-cell movement to Long Way. Use `time.delta_secs()` for anything that changes over time. Expect NPCs, dialogue and pathfinding later, so keep rules in plain functions that moving entities share (`move_feet`). Evaluating a physics crate stays on the roadmap (item 4). Other games in the workspace choose their own timing model. This updates the rationale of `adr-lw1`, which assumed a later grid game.
+
+## adr-lw8. Maps are markdown files, rocks come first (2026-11-01)
+
+**Decision.**
+1. A human describes object layouts in a markdown file with frontmatter. Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The exact format is in `dev-docs/PLAN-forest-collision.md` until it is built.
+2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`).
+3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
+4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on each side.
+5. Rocks are drawn slightly overlapping (shrub look). The drawn size may be larger than the footprint, and collision stays on the inset footprint. Placement (one character per cell or per rock slot) and the slide range on long edges are decided by experiment.
+6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 6.
+
+**Rationale.** The developer wants simple, human editable map making in the first iteration, and wants to give Claude a layout in a form that is easy to write and review. Rocks are a simpler shape than trees (no walk-behind part), so they test merged collision first.
+
+**How to apply.** See the plan for the file format, parser and collision steps. Trees reuse the same map format later with their own object kind and collision rule.

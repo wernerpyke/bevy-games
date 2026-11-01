@@ -2,9 +2,9 @@
 
 ## Items for Future Implementation
 
-### 1. Forest of overlapping trees (next session, 2026-11-01)
+### 1. Rock clusters, then forests of overlapping trees
 
-Start of the next session: build a forest out of overlapping trees, and have Guy slide around the edges of the forest. Today `allow_sliding` (`adr-lw4`) slides Guy to the nearest edge of one trunk's blocked area. With overlapping trees the blocked areas merge into one larger shape, so sliding to the nearest edge of a single tree could push Guy into a neighbouring tree. Things to settle: how the edge of the merged shape is found (union of the blocked rectangles, or walking along them), how far Guy may slide before giving up, and whether the 35% range rule still makes sense for a long forest edge. Also check that depth sorting still looks right where tree canopies overlap, that the walk-behind rule (`adr-lw1`) works when Guy is behind several trees, and how trees are placed (a hand-written list for now is probably enough). Reproduce and check each case with the scripted input tool (`adr-lw5`) and add unit tests for the merged edges. Expect this to change `collision.rs`, so it affects roadmap item 3 (extracting collision). Decide the approach with the developer before building.
+Build clusters of solid rocks first (`Rocks.aseprite`), described in a markdown map file, then forests of overlapping trees. Guy walks only around the outline of a cluster and slides around its edges. Today `allow_sliding` (`adr-lw4`) slides Guy to the nearest edge of one trunk's blocked area. With overlapping trees the blocked areas merge into one larger shape, so sliding to the nearest edge of a single tree could push Guy into a neighbouring tree. Things to settle: how the edge of the merged shape is found (union of the blocked rectangles, or walking along them), how far Guy may slide before giving up, and whether the 35% range rule still makes sense for a long forest edge. Also check that depth sorting still looks right where tree canopies overlap, that the walk-behind rule (`adr-lw1`) works when Guy is behind several trees, and how trees are placed (a hand-written list for now is probably enough). Reproduce and check each case with the scripted input tool (`adr-lw5`) and add unit tests for the merged edges. Expect this to change `collision.rs`, so it affects roadmap item 3 (extracting collision). Decide the approach with the developer before building. Research and approaches are in `dev-docs/PLAN-forest-collision.md`.
 
 ### 2. Art pipeline
 
@@ -16,11 +16,15 @@ Make `games/long-way/src/collision.rs` usable across games. Per `adr-w6` (`dev-d
 
 ### 4. Evaluate avian2d
 
-Spike `avian2d` 0.8.0 (declares `bevy ^0.20`) in a separate game under `games/` and compare it with the custom collision in `adr-lw1`. Questions to answer: whether the 50% overlap from below and the walk-behind-from-above rules can be expressed with sensors or collision filters, wasm build size and build time against the current baseline, behaviour with a turn-based and grid-based game, and how testable the result is without a running world. Check that it compiles for `wasm32-unknown-unknown`. Record the outcome as a decision in `dev-docs/adr/`. `bevy_rapier2d` 0.37.0 also declares Bevy 0.20 and can be included in the comparison. Not compiled yet.
+Spike `avian2d` 0.8.0 (declares `bevy ^0.20`) in a separate game under `games/` and compare it with the custom collision in `adr-lw1`. Questions to answer: whether the 50% overlap from below and the walk-behind-from-above rules can be expressed with sensors or collision filters, wasm build size and build time against the current baseline, behaviour with real-time top-down movement and later NPCs (`adr-lw7`), and how testable the result is without a running world. Check that it compiles for `wasm32-unknown-unknown`. Record the outcome as a decision in `dev-docs/adr/`. `bevy_rapier2d` 0.37.0 also declares Bevy 0.20 and can be included in the comparison. Not compiled yet.
 
 ### 5. Debug grid: overlapping corner labels
 
 With the grid origin at the bottom left, the column "0" label (top edge) and the highest row label (left edge) overlap in the top left corner. Found in a screenshot on 2026-11-01. Fix by moving the row labels, for example to the bottom of each cell, or by hiding the row label that sits on the top edge. The info box also covers the top left row labels, but F2 and F3 toggle each tool, so that needs no fix.
+
+### 6. Robust map and collision pipeline
+
+The first rock map uses `include_str!` and an own parser for the frontmatter (`PLAN-forest-collision.md`, `adr-lw8`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
 
 ## Completed Items
 
@@ -34,7 +38,7 @@ Done 2026-10-31. Bevy 0.20.1 (2D feature profile) with pinned Rust 1.97.1. Nativ
 
 ### First test: Guy walks with the arrow keys
 
-Done 2026-10-31. Guy starts in the centre and walks with the arrow keys, using the `Idle`, `Walk`, `Up` and `Down` tags of `Guy.aseprite` through `bevy_aseprite_ultra`. Code is in `games/long-way/src/player.rs` and `camera.rs`. This is real-time movement to test the pipeline, not turn-based logic. It builds, lints and compiles for the web, and starts without errors. Key presses were not tested by Claude. The web build has not been run in a browser.
+Done 2026-10-31. Guy starts in the centre and walks with the arrow keys, using the `Idle`, `Walk`, `Up` and `Down` tags of `Guy.aseprite` through `bevy_aseprite_ultra`. Code is in `games/long-way/src/player.rs` and `camera.rs`. This is the real-time movement the game uses (`adr-lw7`). It builds, lints and compiles for the web, and starts without errors. Key presses were not tested by Claude. The web build has not been run in a browser.
 
 ### Keep Guy on screen
 
