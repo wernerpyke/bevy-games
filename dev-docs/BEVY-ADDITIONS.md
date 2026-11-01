@@ -12,20 +12,21 @@ Status key:
 
 ## Index
 
-| Addition | Where | Status |
-|---|---|---|
-| [Forgiving collision (`allow_sliding`)](#forgiving-collision-allow_sliding) | `collision.rs` | In use (Long Way) |
-| [Feet-based collision zones](#feet-based-collision-zones) | `collision.rs` | In use (Long Way) |
-| [Depth sorting by feet](#depth-sorting-by-feet) | `depth.rs` | In use (Long Way) |
-| [Configurable plugins](#configurable-plugins) | `collision.rs`, `main.rs` | In use (Long Way) |
-| [F1 debug overlay](#f1-debug-overlay) | `collision.rs` | In use (Long Way) |
-| [Rules as plain functions with unit tests](#rules-as-plain-functions-with-unit-tests) | `collision.rs` | In use (Long Way) |
-| [View height sets on-screen scale](#view-height-sets-on-screen-scale) | `camera.rs` | In use (Long Way) |
-| [Animation tag switching](#animation-tag-switching) | `player.rs` | In use (Long Way) |
-| [Scripted input](#scripted-input) | `script.rs`, `dev-scripts/rust.sh` | In use (Long Way) |
-| [Logging strategy](#logging-strategy) | `collision.rs` | In use (Long Way) |
-| [Debug grid and info box](#debug-grid-and-info-box) | `debug.rs` | In use (Long Way) |
-| [Draw order layers](#draw-order-layers) | `layers.rs` | In use (Long Way) |
+| Addition                                                                              | Where                                    | Status            |
+| ------------------------------------------------------------------------------------- | ---------------------------------------- | ----------------- |
+| [Forgiving collision (`allow_sliding`)](#forgiving-collision-allow_sliding)           | `collision.rs`                           | In use (Long Way) |
+| [Feet-based collision zones](#feet-based-collision-zones)                             | `collision.rs`                           | In use (Long Way) |
+| [Depth sorting by feet](#depth-sorting-by-feet)                                       | `depth.rs`                               | In use (Long Way) |
+| [Configurable plugins](#configurable-plugins)                                         | `collision.rs`, `main.rs`                | In use (Long Way) |
+| [F1 debug overlay](#f1-debug-overlay)                                                 | `collision.rs`                           | In use (Long Way) |
+| [Rules as plain functions with unit tests](#rules-as-plain-functions-with-unit-tests) | `collision.rs`                           | In use (Long Way) |
+| [View height sets on-screen scale](#view-height-sets-on-screen-scale)                 | `camera.rs`                              | In use (Long Way) |
+| [Animation tag switching](#animation-tag-switching)                                   | `player.rs`                              | In use (Long Way) |
+| [Scripted input](#scripted-input)                                                     | `script.rs`, `dev-scripts/rust.sh`       | In use (Long Way) |
+| [Logging strategy](#logging-strategy)                                                 | `collision.rs`                           | In use (Long Way) |
+| [Debug grid and info box](#debug-grid-and-info-box)                                   | `debug.rs`                               | In use (Long Way) |
+| [Draw order layers](#draw-order-layers)                                               | `layers.rs`                              | In use (Long Way) |
+| [Collision and sliding rules](#collision-and-sliding-rules)                           | `collision.rs`, `outline.rs`, `rocks.rs` | In use (Long Way) |
 
 ## Forgiving collision (`allow_sliding`)
 
@@ -109,6 +110,57 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 **How to use.** Import the constant from `layers`. Put a debug drawing on `FEATURE_DEBUG_Z` as a sprite, a HUD node on `GlobalZIndex(HUD_Z_INDEX)`.
 
 **Limits.** Gizmos cannot be placed in a layer. The F1 overlay still uses them.
+
+## Collision and sliding rules
+
+**What.** The full set of rules for what blocks Guy and how he is helped past obstacles. This is the specification the code in `collision.rs`, `outline.rs`, `rocks.rs`, `depth.rs` and `layers.rs` must follow. Each rule names its ADR.
+
+**Terms.** Feet: the point (x, y) at the bottom of Guy's sprite, 30 below the canvas centre. Blocked area: a rectangle the feet may not enter. Cluster: blocked areas that touch or overlap, merged into one shape. Outline: the straight edges around a cluster. Face: one edge. Convex end: a face end where the shape turns away (the outside corner of the shape). Concave end: a face end where the shape turns inward (an inside corner).
+
+### A. What is blocked
+
+1. Only feet are tested. Nothing tests the sprite body (`adr-lw1`).
+2. Trunk: blocked area from `left - 20` to `right + 20` in x (Guy's half width), and from `base_y - 30` (half Guy's height) to `base_y + 10%` of the tree height in y. Above that line Guy walks behind the tree (`adr-lw1`).
+3. Rock: footprint 2x2 cells (128). Blocked area is the footprint inset by 10% on the left, right and top, no inset at the bottom, then grown sideways by 20. There is no other vertical margin (`adr-lw8`, `adr-lw10`).
+4. Rocks drawn overlapping does not change collision. Blocked areas merge when they touch or overlap. With 20 pixels of sideways growth, rocks 2 cells apart join (`adr-lw8`).
+
+### B. Outline
+
+5. All blocked areas, trunks and rocks together, go through one `outline::build` inside `CollisionWorld::add_blocked`, which merges overlapping rectangles into clusters (coordinate compression). A trunk that overlaps a rock joins the rock's cluster. Each cluster has edges. An edge knows its side (`blocked_positive`) and whether each end is concave (`adr-lw10`). Rocks mark themselves interior in `PostStartup`, after the trunks are added.
+6. A cluster member is interior when no cell it covers has an empty 4-neighbour. The flag is information only. Interior members must stay in the input of `build`, because one can fill a hole. Collision uses edges only, so interior members cost nothing per frame.
+7. Edge ends: a convex end is excluded from the face (`covers`), so feet on a corner line can walk along the outside. A concave end is included, because past it the feet would be inside the shape. A vertex where two rectangles touch only at a corner counts as concave for all four edge ends there, so there is no zero-width gap to walk through. Positions within `TOLERANCE` (0.01) of an end count as at the end.
+
+### C. Moving
+
+8. `resolve` moves x first, then y. Each axis stops at the first edge it crosses from the free side. A large step cannot jump over a shape because the test is a crossing, not a position check. A start within `TOLERANCE` on the blocked side counts as free (rounding noise after stopping on an edge).
+9. With `allow_sliding` off, any blocked move leaves Guy where he was (`adr-lw4`).
+10. With it on, a diagonal move into an obstacle slides along it, because each axis is resolved alone.
+
+### D. Assisted sliding (`allow_sliding`, `adr-lw4`, `adr-lw10`)
+
+11. It starts only when input is straight along one axis. Pushing is tracked as signs of the step, not floats. The timer resets when the direction changes or when Guy does not push.
+12. Guy must push for 0.2 s (`SLIDE_DELAY`) before any help. The pause makes the collision visible.
+13. The face is the edge that blocked the pushed axis. The range is the smaller of 35% of the face and 64 (`SLIDE_RANGE_CAP`), from the nearer end. If the nearer end is outside the range, there is no slide. The middle of a long face never slides.
+14. A concave nearer end refuses the slide.
+15. At a convex end, Guy slides along the face at 120 units per second. The target is the end itself if the way beyond is open for 192 (`SLIDE_CLEARANCE`). If the way is blocked, the target is 0.5 (`SLIDE_PAST_CORNER`) beyond the end, so Guy is off the face and walks on until the next face stops him. The slide target goes through `resolve`, so a slide never ends inside another shape.
+16. After the slide, normal movement continues. The next stop may start a new slide.
+
+### E. Draw order (`adr-lw2`, `adr-lw9`)
+
+17. World sprites and characters sort together by feet: `z = -feet_y * 0.001 + x * 1e-8`. Lower feet are in front. The x term only breaks ties between equal feet y, and is far too small to override a difference in y.
+18. z stays inside `WORLD_HALF_BAND` (100), checked by `debug_assert`.
+19. A rock sorts at its blocked bottom plus `SORT_BIAS` (1). Guy stopped at the rock edge is drawn in front of it. Guy above the rock is behind it.
+20. Layers from back to front: background, grid debug, world, feature debug, HUD, UI. Draw code takes z and `GlobalZIndex` only from `layers.rs`. Debug drawings are sprites on their layer, not gizmos.
+
+### F. Map and rocks (`adr-lw8`)
+
+21. Map cell (0, 0) is the fixed world position `MAP_ORIGIN` (-1024, -576). A `cells` block anchors its bottom-left character at the cell given by `at`. Rows run top to bottom.
+22. Rock art is 32x32, drawn at a whole-number scale. The lowest 4 art rows are empty, so the sprite is placed with its lowest visible pixel on the footprint bottom.
+23. The yellow outline (F2) is drawn from the same edges collision uses. It shows the blocked side with ticks.
+
+**Not covered yet.** Interior rock colour in the overlay and trunk overlay on the feature layer (plan step 8). Named, reusable clusters (step 9). The player clamps Guy to the view after collision (`player.rs`), which can move his feet into a shape. Guy placed inside a shape (teleport) can walk freely inside it. The 64 and 192 numbers are first guesses, and 192 assumes a 64 pixel cell. Rock `draw` and `cell` sizes must agree, or sprite and blocked area drift apart.
+
+**Tests.** Inline in each file. Collision tests: stops, crossing, slide range, pockets, notches, long faces, noise. Outline tests: shapes, concave flags, interior (including a random brute-force check). Rock tests: placement, blocked area, sort line.
 
 ## Rules as plain functions with unit tests
 

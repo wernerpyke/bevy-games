@@ -1,5 +1,5 @@
 //! Merges blocked rectangles into clusters and finds the outline of each cluster. Plain Rust with no Bevy
-//! types except `Rect`, so it is unit tested without a running app. See `dev-docs/PLAN-forest-collision.md`.
+//! types except `Rect`, so it is unit tested without a running app. See "Collision and sliding rules" in `dev-docs/BEVY-ADDITIONS.md`.
 //!
 //! All input rectangles are the areas Guy's feet may not enter, already grown by his half width, so the feet
 //! are a point. Rectangles that touch or overlap form one cluster. The edges of a cluster are the boundary of
@@ -35,7 +35,8 @@ pub struct Edge {
     /// True when the blocked side is the side with larger x (vertical) or larger y (horizontal).
     pub blocked_positive: bool,
     /// True when the outline turns inward at this end (the blocked region fills three of the four cells around
-    /// the corner). The end point itself then counts as part of the edge, see `covers`.
+    /// the corner, or two cells that touch only at the corner). The end point itself then counts as part of the
+    /// edge, see `covers`.
     pub from_concave: bool,
     pub to_concave: bool,
 }
@@ -169,22 +170,20 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
         }
     }
 
-    // An inward corner has exactly three filled cells around its vertex (k, l).
+    // An inward corner has exactly three filled cells around its vertex (k, l). Two filled cells that only touch
+    // at the vertex (a checkerboard) count too: there is no gap to walk through, so both edges include the vertex.
     let concave = |k: usize, l: usize| -> bool {
         let filled = |i: Option<usize>, j: Option<usize>| match (i, j) {
             (Some(i), Some(j)) if i < cols && j < rows => owner[j * cols + i].is_some(),
             _ => false,
         };
-        [
+        let [bl, br, tl, tr] = [
             filled(k.checked_sub(1), l.checked_sub(1)),
             filled(Some(k), l.checked_sub(1)),
             filled(k.checked_sub(1), Some(l)),
             filled(Some(k), Some(l)),
-        ]
-        .iter()
-        .filter(|f| **f)
-        .count()
-            == 3
+        ];
+        [bl, br, tl, tr].iter().filter(|f| **f).count() == 3 || (bl == tr && br == tl && bl != br)
     };
     let cell = |i: Option<usize>, j: Option<usize>| -> Option<usize> {
         match (i, j) {
@@ -516,6 +515,29 @@ mod tests {
     }
 
     #[test]
+    fn the_vertex_where_two_rectangles_touch_at_a_corner_counts_as_an_inward_corner() {
+        let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 10.0, 20.0, 20.0)]);
+        let at_vertex = |e: &&Edge| match e.orientation {
+            Orientation::Horizontal => e.from == 10.0 || e.to == 10.0,
+            Orientation::Vertical => e.from == 10.0 || e.to == 10.0,
+        };
+        let ends: Vec<bool> = clusters[0]
+            .edges
+            .iter()
+            .filter(|e| (e.at == 10.0) && at_vertex(e))
+            .flat_map(|e| {
+                [
+                    (e.from == 10.0).then_some(e.from_concave),
+                    (e.to == 10.0).then_some(e.to_concave),
+                ]
+            })
+            .flatten()
+            .collect();
+        assert_eq!(ends.len(), 4, "four edge ends meet at (10, 10)");
+        assert!(ends.iter().all(|concave| *concave));
+    }
+
+    #[test]
     fn rectangles_far_apart_are_separate_clusters_ordered_by_lowest_member() {
         let clusters = build(&[
             rect(0.0, 0.0, 10.0, 10.0),
@@ -561,7 +583,7 @@ mod tests {
     }
 
     #[test]
-    fn a_gap_wider_than_the_tolerance_stays_open() {
+    fn a_gap_wider_than_epsilon_stays_open() {
         let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.01, 0.0, 20.0, 10.0)]);
         assert_eq!(clusters.len(), 2);
     }

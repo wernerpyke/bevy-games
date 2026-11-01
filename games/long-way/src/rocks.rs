@@ -6,12 +6,12 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
-use crate::collision::{CollisionWorld, GUY_HALF_WIDTH};
+use crate::collision::{CollisionWorld, GUY_HALF_WIDTH, register_trunks};
 use crate::debug::DebugSettings;
 use crate::depth::DepthSort;
 use crate::layers::FEATURE_DEBUG_Z;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
-use crate::outline::{self, Cluster, Edge, Orientation};
+use crate::outline::{Cluster, Edge, Orientation};
 
 /// Footprint of a rock in cells, in x and y.
 const FOOTPRINT_CELLS: f32 = 2.0;
@@ -38,6 +38,10 @@ pub struct RocksPlugin;
 impl Plugin for RocksPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_rocks)
+            .add_systems(
+                PostStartup,
+                mark_interior_and_draw_outline.after(register_trunks),
+            )
             .add_systems(Update, show_outline);
     }
 }
@@ -135,30 +139,8 @@ fn spawn_rocks(
             (map.draw_size / ART_PIXELS).round().max(1.0) * ART_PIXELS
         );
     }
-    // The outline comes first, because it says which rocks are interior.
     let areas: Vec<Rect> = map.objects.iter().map(|o| blocked_area(o, map)).collect();
-    let clusters = outline::build(&areas);
-    let mut interior = vec![false; areas.len()];
-    for index in clusters.iter().flat_map(|c| &c.interior) {
-        interior[*index] = true;
-    }
-    info!(
-        "rocks: {} rocks form {} clusters with {} outline edges, {} of the rocks are interior",
-        areas.len(),
-        clusters.len(),
-        clusters.iter().map(|c| c.edges.len()).sum::<usize>(),
-        interior.iter().filter(|i| **i).count()
-    );
-    for cluster in &clusters {
-        debug!(
-            "rocks: cluster of {} rocks, bounds {:?}, {} edges",
-            cluster.members.len(),
-            cluster.bounds,
-            cluster.edges.len()
-        );
-    }
-    world.add_clusters(&clusters);
-    spawn_outline_sprites(&mut commands, &clusters);
+    let first_area = world.add_blocked(&areas);
 
     for (index, object) in map.objects.iter().enumerate() {
         let tag = match object.kind {
@@ -166,8 +148,9 @@ fn spawn_rocks(
             Kind::Rock1 => "rock_1",
         };
         let placement = placement(object, map);
-        let mut rock = commands.spawn((
+        commands.spawn((
             Rock,
+            BlockedArea(first_area + index),
             AseAnimation {
                 aseprite: server.load("art/features/Rocks.aseprite"),
                 animation: Animation::tag(tag),
@@ -179,10 +162,43 @@ fn spawn_rocks(
             Transform::from_translation(placement.centre.extend(0.0))
                 .with_scale(Vec3::splat(placement.scale)),
         ));
-        if interior[index] {
-            rock.insert(InteriorRock);
+    }
+}
+
+/// Number of the rock's blocked area in `CollisionWorld`.
+#[derive(Component)]
+struct BlockedArea(usize);
+
+/// Runs after every plugin has added its blocked areas, so the outline includes trunks that touch rocks.
+fn mark_interior_and_draw_outline(
+    mut commands: Commands,
+    world: Res<CollisionWorld>,
+    rocks: Query<(Entity, &BlockedArea), With<Rock>>,
+) {
+    let mut interior = 0;
+    for (entity, area) in &rocks {
+        if world.is_interior(area.0) {
+            commands.entity(entity).insert(InteriorRock);
+            interior += 1;
         }
     }
+    let clusters = world.clusters();
+    info!(
+        "collision: {} clusters with {} outline edges, {} of {} rocks are interior",
+        clusters.len(),
+        clusters.iter().map(|c| c.edges.len()).sum::<usize>(),
+        interior,
+        rocks.iter().count()
+    );
+    for cluster in clusters {
+        debug!(
+            "collision: cluster of {} areas, bounds {:?}, {} edges",
+            cluster.members.len(),
+            cluster.bounds,
+            cluster.edges.len()
+        );
+    }
+    spawn_outline_sprites(&mut commands, clusters);
 }
 
 /// Parent of the outline sprites, so they show and hide with the F2 grid.
@@ -252,6 +268,7 @@ fn show_outline(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::outline;
 
     fn map(draw_size: f32, jitter: f32) -> Map {
         Map {

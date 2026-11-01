@@ -25,17 +25,17 @@ const SLIDE_RANGE_FRACTION: f32 = 0.35;
 /// The most Guy may be from an end of a face and still be slid past it, in world units. A long face of a cluster
 /// would otherwise slide him a long way. One cell. To be tuned by trying it.
 const SLIDE_RANGE_CAP: f32 = 64.0;
-/// How far past the end of a face the way must be open for the end to be used, in world units. Three cells, more
-/// than the 128 deep notches between neighbouring rocks. An end
-/// that leads into a pocket or under an overhang, where Guy would be stopped again soon after, is refused.
+/// How far past a convex end of a face the way is probed, in world units (three cells at a cell size of 64). If it
+/// is open, Guy is put exactly on the end. If a face blocks it (a notch or an overhang), he is put
+/// `SLIDE_PAST_CORNER` past the end and walks on until that face stops him.
 const SLIDE_CLEARANCE: f32 = 192.0;
-/// A slide that ends at an inward corner stops this far past the end of the face, so Guy is off the face and can
-/// walk on until the next face blocks him.
+/// A slide towards an end whose way on is blocked stops this far past the end of the face, so Guy is off the face
+/// and can walk on until the next face blocks him. Ends at inward corners refuse the slide instead.
 const SLIDE_PAST_CORNER: f32 = 0.5;
 
 pub struct CollisionPlugin {
-    /// When true, collision is forgiving: Guy slides along a trunk when walking diagonally into it, and
-    /// is slid past an edge when he keeps pushing straight into a trunk close to that edge.
+    /// When true, collision is forgiving: Guy slides along an obstacle when walking diagonally into it, and
+    /// is slid past an edge when he keeps pushing straight into an obstacle close to that edge.
     /// When false, any blocked move stops Guy completely.
     pub allow_sliding: bool,
 }
@@ -52,28 +52,49 @@ impl Plugin for CollisionPlugin {
     }
 }
 
-/// Every static blocked outline Guy collides with. Other plugins add their outlines at startup with
-/// `add_clusters`, trunks are added by this plugin. `resolve` and `move_feet` take its `edges`.
+/// Every static blocked area Guy collides with, merged into clusters with one outline. Plugins add their blocked
+/// areas at startup with `add_blocked` (rocks) and this plugin adds the trunks, so a trunk that overlaps a rock
+/// joins the same cluster. `resolve` and `move_feet` take its `edges`.
 #[derive(Resource, Default)]
 pub struct CollisionWorld {
+    areas: Vec<Rect>,
+    clusters: Vec<Cluster>,
     edges: Vec<Edge>,
 }
 
 impl CollisionWorld {
-    pub fn add_clusters(&mut self, clusters: &[Cluster]) {
-        self.edges
-            .extend(clusters.iter().flat_map(|c| c.edges.iter().copied()));
+    /// Adds blocked areas and rebuilds every cluster and edge. Returns the number of the first added area, which
+    /// is the number `is_interior` takes.
+    pub fn add_blocked(&mut self, areas: &[Rect]) -> usize {
+        let first = self.areas.len();
+        self.areas.extend_from_slice(areas);
+        self.clusters = outline::build(&self.areas);
+        self.edges = self
+            .clusters
+            .iter()
+            .flat_map(|c| c.edges.iter().copied())
+            .collect();
+        first
+    }
+
+    pub fn clusters(&self) -> &[Cluster] {
+        &self.clusters
     }
 
     pub fn edges(&self) -> &[Edge] {
         &self.edges
     }
+
+    /// True when the area touches no empty space (`Cluster::interior`).
+    pub fn is_interior(&self, area: usize) -> bool {
+        self.clusters.iter().any(|c| c.interior.contains(&area))
+    }
 }
 
-/// Trunks are spawned in `Startup`, so they can be read after it.
-fn register_trunks(trunks: Query<&Trunk>, mut world: ResMut<CollisionWorld>) {
+/// Trunks are spawned in `Startup`, so they can be read after it. Runs before anything that reads the clusters.
+pub fn register_trunks(trunks: Query<&Trunk>, mut world: ResMut<CollisionWorld>) {
     let areas: Vec<Rect> = trunks.iter().map(Trunk::blocked_area).collect();
-    world.add_clusters(&outline::build(&areas));
+    world.add_blocked(&areas);
 }
 
 #[derive(Resource)]
@@ -81,7 +102,7 @@ pub struct CollisionSettings {
     pub allow_sliding: bool,
 }
 
-/// Tracks how long an entity has pushed straight into a trunk. Put it on every entity that uses `move_feet`.
+/// Tracks how long an entity has pushed straight into an obstacle. Put it on every entity that uses `move_feet`.
 #[derive(Component, Default)]
 pub struct SlideAssist {
     direction: Vec2,
@@ -154,7 +175,8 @@ pub struct Resolved {
 /// Moves Guy's feet from `old` towards `new`, stopping at the first outline edge it crosses. A blocked region
 /// is on one side of each edge (`blocked_positive`), so an edge only stops a move coming from the free side. Each
 /// axis is resolved on its own, and a move is stopped when it crosses an edge, so a large step cannot jump over a
-/// shape. An edge covers the range between its ends, including an end at an inward corner (`Edge::covers`), so feet on a corner line cannot slip into the shape.
+/// shape. An edge covers the range between its ends, including an end at an inward corner (`Edge::covers`), so
+/// feet on a corner line cannot slip into the shape.
 pub fn resolve(old: Vec2, new: Vec2, edges: &[Edge]) -> Resolved {
     let mut x = new.x;
     let mut blocked_x = None;
@@ -329,8 +351,6 @@ fn slide_to_nearest_edge(
     } else {
         Vec2::new(feet.x, end)
     };
-    // Past an inward corner, or a notch that blocks the way on, Guy still slides to the corner and walks on until
-    // the next face stops him. Only the clearance decides how far past the end he is put.
     // Past an inward corner there is only solid ground, so Guy is not slid there. Past a convex end that leads into
     // a notch, he still slides to just past the end and walks on until the next face stops him.
     if concave {
@@ -345,11 +365,13 @@ fn slide_to_nearest_edge(
     } else {
         (position + travel).min(max + past)
     };
-    Some(if pushing_vertically {
+    let target = if pushing_vertically {
         Vec2::new(slid, feet.y)
     } else {
         Vec2::new(feet.x, slid)
-    })
+    };
+    // The slide may not end inside another shape, for example one whose wall is closer than `SLIDE_PAST_CORNER`.
+    Some(resolve(feet, target, edges).feet)
 }
 
 /// Debug overlay switch. Press F1 to toggle.
@@ -838,5 +860,126 @@ mod tests {
             Vec2::new(0.0, 50.0),
             &edges
         ));
+    }
+
+    /// An L shape: a base 0..100 by 0..10 and a pillar 0..10 by 10..50. The inside corner is at (10, 10).
+    fn l_shape() -> Vec<Edge> {
+        edges_of(&[
+            Rect::new(0.0, 0.0, 100.0, 10.0),
+            Rect::new(0.0, 10.0, 10.0, 50.0),
+        ])
+    }
+
+    #[test]
+    fn an_end_at_an_inward_corner_refuses_the_slide() {
+        let edges = l_shape();
+        let face = resolve(Vec2::new(20.0, 30.0), Vec2::new(20.0, 0.0), &edges)
+            .blocked_y
+            .expect("the top of the base blocks a move down");
+        assert!(face.from_concave);
+        // 10 from the inward end and in range, but a slide there only runs into the pillar.
+        let slid = slide_to_nearest_edge(
+            face,
+            Vec2::new(20.0, 10.0),
+            true,
+            Vec2::new(0.0, -1.0),
+            DT,
+            &edges,
+        );
+        assert_eq!(slid, None);
+    }
+
+    #[test]
+    fn changing_the_push_direction_restarts_the_slide_timer() {
+        let edges = l_shape();
+        let mut assist = SlideAssist::default();
+        let corner = Vec2::new(10.0, 10.0);
+        // Pushing down into the base for 10 frames (0.17 s), just under the delay.
+        for _ in 0..10 {
+            move_feet(
+                &SLIDING,
+                &mut assist,
+                corner,
+                Vec2::new(0.0, -STEP),
+                DT,
+                &edges,
+            );
+        }
+        assert!(assist.held > 0.16 && assist.held < SLIDE_DELAY);
+        // Pushing left into the pillar, still blocked: the timer starts again from this frame.
+        move_feet(
+            &SLIDING,
+            &mut assist,
+            corner,
+            Vec2::new(-STEP, 0.0),
+            DT,
+            &edges,
+        );
+        assert_eq!(assist.held, DT);
+    }
+
+    #[test]
+    fn a_second_slide_can_follow_the_first() {
+        // Under the base, near its left end. After sliding left past the base, Guy walks up to the underside of a
+        // second rectangle and slides again, this time to its right end.
+        let edges = edges_of(&[
+            Rect::new(0.0, 0.0, 100.0, 10.0),
+            Rect::new(-50.0, 30.0, 5.0, 60.0),
+        ]);
+        let end = simulate_edges(Vec2::new(10.0, -10.0), Vec2::new(0.0, STEP), 200, &edges);
+        assert_eq!(end.x, 5.0);
+        assert!(
+            end.y > 60.0,
+            "walked on past the second rectangle, got {end}"
+        );
+    }
+
+    #[test]
+    fn a_move_stops_at_the_first_of_two_edges_in_either_order() {
+        let mut edges = edges_of(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(0.0, 20.0, 10.0, 30.0),
+        ]);
+        for _ in 0..2 {
+            let up = resolve(Vec2::new(5.0, -5.0), Vec2::new(5.0, 40.0), &edges).feet;
+            assert_eq!(up, Vec2::new(5.0, 0.0));
+            let down = resolve(Vec2::new(5.0, 50.0), Vec2::new(5.0, -5.0), &edges).feet;
+            assert_eq!(down, Vec2::new(5.0, 30.0));
+            edges.reverse();
+        }
+    }
+
+    #[test]
+    fn rectangles_touching_only_at_a_corner_leave_no_gap_to_walk_through() {
+        let edges = edges_of(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(10.0, 10.0, 20.0, 20.0),
+        ]);
+        let end = resolve(Vec2::new(10.0, -5.0), Vec2::new(10.0, 30.0), &edges).feet;
+        // Walking up the line between the first rectangle and the corner of the second stops at that corner.
+        assert_eq!(end, Vec2::new(10.0, 10.0));
+    }
+
+    #[test]
+    fn a_slide_never_ends_inside_another_shape() {
+        // The base's left end is at x 0. A second shape's wall is at x -0.2, closer than `SLIDE_PAST_CORNER`.
+        let edges = edges_of(&[
+            Rect::new(0.0, 0.0, 100.0, 10.0),
+            Rect::new(-50.0, 10.0, -0.2, 60.0),
+            Rect::new(-50.0, -60.0, -0.2, 0.0),
+        ]);
+        let end = simulate_edges(Vec2::new(10.0, -10.0), Vec2::new(0.0, STEP), 120, &edges);
+        assert!(end.x >= -0.2, "ended inside the shape at {end}");
+    }
+
+    #[test]
+    fn blocked_areas_added_in_separate_calls_merge_into_one_cluster() {
+        let mut world = CollisionWorld::default();
+        let first = world.add_blocked(&[Rect::new(0.0, 0.0, 100.0, 10.0)]);
+        let second = world.add_blocked(&[Rect::new(90.0, 0.0, 120.0, 60.0)]);
+        assert_eq!((first, second), (0, 1));
+        assert_eq!(world.clusters().len(), 1);
+        assert_eq!(world.edges().len(), 6, "an L shape has six edges");
+        assert!(!world.is_interior(0));
     }
 }

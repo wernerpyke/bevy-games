@@ -32,7 +32,7 @@
 **Decision.** `CollisionPlugin` takes an `allow_sliding` flag. Long Way sets it to `true`. When true:
 1. Guy slides along a trunk when walking diagonally into it.
 2. Walking straight into a face stops Guy, which shows the collision.
-3. If he keeps pushing for 0.2 seconds (first 0.5, shortened on 2026-10-31 after the developer tried it) and his feet are within 35% of the face length from an edge, he is slid sideways at 120 units per second to that edge, then walks on past the trunk. This works from below (slide left or right), from above, and into the trunk sides (slide up or down).
+3. If he keeps pushing for 0.2 seconds (first 0.5, shortened on 2026-10-31 after the developer tried it) and his feet are within 35% of the face length from an edge (capped at 64 pixels, see `adr-lw10`, which also covers faces of merged outlines and notches), he is slid sideways at 120 units per second to that edge, then walks on past the trunk. This works from below (slide left or right), from above, and into the trunk sides (slide up or down).
 Pushing into the middle of a face never slides him, so he must walk around.
 
 When false, any blocked move leaves Guy where he was. There is no sliding of any kind.
@@ -101,3 +101,16 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 **Rationale.** Bevy has no layer system for 2D draw order: sprites are sorted by z, equal z has no fixed order, `RenderLayers` only picks which camera sees an entity, and 2D gizmos are always drawn last, on top of everything. The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-lw2`). Separate layers would stop that. The debug layer is above the world, so debug lines also draw over the player.
 
 **How to apply.** Never write a bare z number outside `layers.rs`. `bevy_ui` draws after all sprites and gizmos, so the HUD and UI are always above the feature debug layer. A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). Debug drawings that must follow the layers are sprites, not gizmos. The F1 collision overlay in `collision.rs` is still gizmos, so it is always on top. Plan step 8 changes that.
+
+## adr-lw10. Sliding along merged outlines, into notches (2026-11-01)
+
+**Decision.** Blocked rectangles that touch or overlap are merged into one outline per cluster (`outline.rs`). Guy collides with the outline edges only, and `allow_sliding` (`adr-lw4`) works on those edges. The slide rules for an outline are:
+1. The range is the smaller of 35% of the face and 64 pixels (`SLIDE_RANGE_CAP`), measured from the nearer end.
+2. An end at an inward (concave) corner never slides Guy. Past it there is only solid ground.
+3. At a convex end, Guy always slides. If the way on is open for 192 pixels (`SLIDE_CLEARANCE`) he stops exactly on the end. If a face blocks it (a notch or an overhang), he stops 0.5 pixels past the end (`SLIDE_PAST_CORNER`) and walks on until that face stops him. Example: pushing up into the bottom face of the test cluster from world x 463, Guy slides to x 440.3 and walks up to y 64.
+4. All blocked areas (trunks and rocks) are merged by one `outline::build`, so a trunk touching a rock is one cluster. Two rectangles that touch only at a corner leave no gap: that vertex counts as an inward corner. A slide target is passed through `resolve`, so it never ends inside another shape.
+5. A rock's blocked area is the footprint inset by 10% on the left, right and top, not at the bottom (`adr-lw8`), grown sideways by Guy's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (`SORT_BIAS`), so Guy standing at the rock is drawn in front.
+
+**Rationale.** The first version refused to slide when the way past the end was blocked within 192 pixels, to avoid pushing Guy into pockets. The developer tried it at a notch under an overhang and wanted him to slide to the corner and walk on, stopping at the back of the notch (2026-11-01). Sliding into an inward corner is still refused, because it only puts Guy inside the next rock.
+
+**How to apply.** The rules are in `slide_to_nearest_edge` in `collision.rs`, with tests for pockets, notches and long faces. The numbers are first values, tuned by playing. A full description of all collision rules is in `dev-docs/BEVY-ADDITIONS.md`.
