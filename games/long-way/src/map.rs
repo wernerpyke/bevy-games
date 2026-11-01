@@ -21,43 +21,15 @@ use std::fmt;
 use bevy::math::IVec2;
 use bevy::prelude::*;
 
-/// Map files built into the game. Edit one and rebuild. The first is the default. Set `LONG_WAY_MAP` to a file
-/// name (for example `rocks-v2`) to load another one. The v2 and v3 files are for the placement experiment
-/// in `dev-docs/PLAN-forest-collision.md` and are removed when it is decided.
-const MAPS: [(&str, &str); 3] = [
-    (
-        "assets/maps/rocks-test.md",
-        include_str!("../assets/maps/rocks-test.md"),
-    ),
-    (
-        "assets/maps/rocks-v2.md",
-        include_str!("../assets/maps/rocks-v2.md"),
-    ),
-    (
-        "assets/maps/rocks-v3.md",
-        include_str!("../assets/maps/rocks-v3.md"),
-    ),
-];
-
-fn selected_map() -> (&'static str, &'static str) {
-    let Ok(wanted) = std::env::var("LONG_WAY_MAP") else {
-        return MAPS[0];
-    };
-    MAPS.iter()
-        .copied()
-        .find(|(name, _)| name.contains(wanted.as_str()))
-        .unwrap_or_else(|| {
-            let known: Vec<_> = MAPS.iter().map(|(name, _)| *name).collect();
-            panic!("LONG_WAY_MAP={wanted} matches no map. Known maps: {known:?}")
-        })
-}
+/// The map file Long Way loads. Edit it and rebuild.
+const MAP_NAME: &str = "assets/maps/rocks-test.md";
+const MAP_SOURCE: &str = include_str!("../assets/maps/rocks-test.md");
 
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        let (name, source) = selected_map();
-        let map = parse(name, source).unwrap_or_else(|error| panic!("{error}"));
+        let map = parse(MAP_NAME, MAP_SOURCE).unwrap_or_else(|error| panic!("{error}"));
         info!(
             "map: {} cell {} pitch {} draw {} jitter {}, {} objects",
             map.name,
@@ -469,7 +441,7 @@ mod tests {
 
     #[test]
     fn the_bundled_map_parses() {
-        let map = parse_ok(MAPS[0].1);
+        let map = parse_ok(MAP_SOURCE);
         assert_eq!(map.name, "rocks-test");
         assert_eq!(map.cell_size, 64.0);
         assert_eq!(map.pitch, 1);

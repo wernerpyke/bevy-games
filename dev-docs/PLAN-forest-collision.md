@@ -96,27 +96,10 @@ The example above gives 10 rocks. Blocked outline: one cluster, about 6 x 5 cell
 
 - **Parser.** A small own parser for the flat frontmatter (`key: value`, plus the `legend` list) needs no dependency. `serde_yaml` is archived and unmaintained, so a YAML crate would be a poor base. Recommended: own parser, with the supported subset written in the file header and covered by tests.
 - **Loading.** Recommended first: `include_str!` of the map file. Edit the file, rebuild (about 8 seconds), no loader code, safe on wasm. Later: a Bevy asset loader with hot reload.
-- **Placement meaning.** Not decided. Experiment with three variants (below). Rule 3 describes variant V1.
 
-### Placement experiment
+### Placement (decided: V1)
 
-To compare variants on the same painted map, three temporary frontmatter keys control placement. They are experiment knobs. When a variant wins, the values move into the object kind table in code, the keys are removed, and an ADR records the choice.
-
-| Key | Meaning | Default |
-|---|---|---|
-| `pitch` | Cells per character, in x and y. Character column k is at cell `at.x + k * pitch` | 1 |
-| `draw` | Drawn size of a rock in pixels (the footprint for collision stays 128) | 128 |
-| `jitter` | Largest random offset of a rock's drawn position and footprint in pixels, set from the cell number so a map always looks the same | 0 |
-
-| Variant | `pitch` | `draw` | `jitter` | Look |
-|---|---|---|---|---|
-| V1 | 1 | 128 | 0 | Dense pile, 50% overlap, fine control of the cluster shape |
-| V2 | 2 | 160 | 0 | One rock per slot, slight overlap (about 17 px), regular |
-| V3 | 2 | 160 | 8 | As V2 with an organic, shrubbery look |
-
-Size rule: `n` characters in a row cover `pitch * (n - 1) + 2` cells. Three characters cover 4 cells in V1 and 6 cells in V2 and V3.
-
-The same map is run with each variant, a screenshot is taken for each (`screenshot:v1`, `screenshot:v2`, `screenshot:v3`), and the developer picks. The three variants are separate map files (`rocks-test.md`, `rocks-v2.md`, `rocks-v3.md`) and `LONG_WAY_MAP=rocks-v2` loads one. The files are removed when a variant is chosen.
+Chosen on 2026-11-01 after comparing three variants on screen: **one character per cell (`pitch: 1`), rocks drawn at 128 px (`draw: 128`), no jitter**. A dense pile with 50% overlap and fine control of the cluster shape. The variants with a 2 cell pitch (regular boulders, with and without 8 px jitter) were dropped. `pitch`, `draw` and `jitter` stay as optional frontmatter keys with these defaults, because shrubs or other kinds may want a different look later. Size rule: `n` characters in a row cover `pitch * (n - 1) + 2` cells.
 
 ### Reusable clusters (step 9)
 
@@ -221,13 +204,13 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 ## 7. Steps
 
 1. **Map parser (done 2026-11-01).** Plain functions with unit tests: frontmatter, legend, cell blocks, errors with file and line. A first map file `assets/maps/rocks-test.md`.
-2. **Spawn rocks from the map (done 2026-11-01).** Sprites from `Rocks.aseprite` (variant by tag), `DepthSort`, placed from cell numbers, with the `pitch`, `draw` and `jitter` knobs. Screenshot V1, V2 and V3 of the same map next to the F2 grid, and let the developer pick.
-3. **Failing tests for the outline.** Two touching rectangles, an L shape, a notch, a gap just wide enough for Guy, a gap too narrow.
-4. **Union and outline** (plain functions, no Bevy types).
+2. **Spawn rocks from the map (done 2026-11-01).** Sprites from `Rocks.aseprite` (variant by tag), `DepthSort`, placed from cell numbers, with the `pitch`, `draw` and `jitter` knobs. Compared three variants on screen next to the F2 grid; the developer chose V1.
+3. **Failing tests for the outline (done 2026-11-01).** Two touching rectangles, an L shape, a notch, a gap just wide enough for Guy, a gap too narrow.
+4. **Union and outline (done 2026-11-01)** in `outline.rs` (plain functions, only `Rect` from Bevy), by coordinate compression. 18 tests. The grid is built over all rectangles at once, so very large maps need chunking (roadmap item 6).
 5. **`resolve` against the outline.** Trunk collision keeps working through the same tests.
 6. **Slide target on the connected outline edge**, with the range and give up rules.
 7. **Interior cull (D)**, with a test that culled objects change no result.
-8. **Collision overlay** draws the outline, interior objects in another colour. Decided: it turns on and off together with the F2 grid, so F1 is no longer a separate switch (the `ShowCollision` resource in `collision.rs` follows `DebugSettings.show_grid`).
+8. **Collision overlay** (started: `rocks.rs` draws the rock outline in yellow with ticks to the blocked side whenever F2 is on, 2026-11-01. Still to do: interior rocks in another colour, and the trunk overlay following F2.) draws the outline, interior objects in another colour. Decided: it turns on and off together with the F2 grid, so F1 is no longer a separate switch (the `ShowCollision` resource in `collision.rs` follows `DebugSettings.show_grid`).
 
 9. **Reusable clusters.** Define a cluster once and place it several times on the map (section 5, "Reusable clusters"). Parser: a `cells name=<name>` block defines a template, a `place <name>` block lists `at=x,y` positions. Tests first: one template placed twice, overlapping placements, an unknown template name, a template used before it is defined, a name defined twice, nesting (not allowed in the first version). The outline then merges overlapping placements with no extra code. Screenshot a map that places one cluster three times.
 
@@ -239,7 +222,7 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 ## 8. Open decisions
 
 1. **Vertical margin:** decided, 0. Rocks are drawn slightly overlapping (section 4).
-2. **Placement meaning:** experiment with V1, V2 and V3 (section 5), then decide.
+2. **Placement meaning:** decided, V1 (section 5).
 3. **Slide range** on long edges: experiment. Try a 64 px cap, a 96 px cap and the nearest corner with a cap, using scripted runs and the slide log lines. Keep the three behind one constant or function while testing.
 4. **Loading and parser:** decided for now: `include_str!` and an own parser. A more robust approach is roadmap item 6.
 

@@ -79,10 +79,10 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`).
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on each side.
-5. Rocks are drawn slightly overlapping (shrub look). The drawn size may be larger than the footprint, and collision stays on the inset footprint. Placement (one character per cell or per rock slot) and the slide range on long edges are decided by experiment.
+5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `pitch`, `draw` and `jitter` stay as optional frontmatter keys. Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
 6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 6.
 7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F2 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
-8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32). The placement experiment uses three built-in map files and the `LONG_WAY_MAP` environment variable.
+8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).
 
 **Rationale.** The developer wants simple, human editable map making in the first iteration, and wants to give Claude a layout in a form that is easy to write and review. Rocks are a simpler shape than trees (no walk-behind part), so they test merged collision first.
 

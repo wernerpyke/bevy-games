@@ -3,6 +3,7 @@ mod collision;
 mod debug;
 mod depth;
 mod map;
+mod outline;
 mod player;
 mod rocks;
 mod script;
