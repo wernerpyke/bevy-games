@@ -2,35 +2,39 @@
 
 ## Items for Future Implementation
 
-### 1. Rock clusters, then forests of overlapping trees
-
-Build clusters of solid rocks first (`Rocks.aseprite`), described in a markdown map file, then forests of overlapping trees. Guy walks only around the outline of a cluster and slides around its edges. Today `allow_sliding` (`adr-lw4`) slides Guy to the nearest edge of one trunk's blocked area. With overlapping trees the blocked areas merge into one larger shape, so sliding to the nearest edge of a single tree could push Guy into a neighbouring tree. Things to settle: how the edge of the merged shape is found (union of the blocked rectangles, or walking along them), how far Guy may slide before giving up, and whether the 35% range rule still makes sense for a long forest edge. Also check that depth sorting still looks right where tree canopies overlap, that the walk-behind rule (`adr-lw1`) works when Guy is behind several trees, and how trees are placed (a hand-written list for now is probably enough). Reproduce and check each case with the scripted input tool (`adr-lw5`) and add unit tests for the merged edges. Expect this to change `collision.rs`, so it affects roadmap item 3 (extracting collision). Decide the approach with the developer before building. Research and approaches are in `dev-docs/PLAN-forest-collision.md`.
-
-### 2. Art pipeline
+### 1. Art pipeline
 
 Choose the palette and sprite size grid. Existing assets in `~/Dark/graveyard_shift/diodrama-assets/` are the starting point, copied one file at a time on request (`adr-a3`). `Guy.aseprite` is copied. The palette is chosen (`adr-a4`). Remaining: decide the size grid (64x64 cell accepted for the first test). Write `dev-scripts/aseprite/lib.lua`. Produce the first placeholder sprites.
 
-### 3. Extract collision into shared code
+### 2. Extract collision into shared code
 
 Make `games/long-way/src/collision.rs` usable across games. Per `adr-w6` (`dev-docs/adr/WORKSPACE.md`), a shared crate is created only when a second game needs it, and only after asking the developer. Considerations: the file mixes general parts (`resolve`, the swept axis check) with Long Way specific parts (Guy's size and the three overlap rules for trees), so the extraction needs a clear split between engine-neutral code and per-game constants. A spec-first review on 2026-11-01 (`dev-docs/BEVY-ADDITIONS.md`, "Collision and sliding rules") found what blocks the split: `outline.rs` is nearly standalone, but its tests import `GUY_HALF_WIDTH`. `collision.rs` depends on `Trunk` (a Long Way idea) and the `GUY_*` constants, and `move_feet` and `resolve` need an actor size parameter instead. `rocks.rs` and `trees.rs` depend on `camera::MAP_ORIGIN` and `map`. The outline, `resolve` and `move_feet` are the shared part, and `Trunk`, rocks and the overlay stay in the game. `depth.rs` is closely tied to collision (same feet line) and probably moves with it. Keep the unit tests with the code.
 
-### 4. Evaluate avian2d
+### 3. Evaluate avian2d
 
 Spike `avian2d` 0.8.0 (declares `bevy ^0.20`) in a separate game under `games/` and compare it with the custom collision in `adr-lw1`. Questions to answer: whether the 50% overlap from below and the walk-behind-from-above rules can be expressed with sensors or collision filters, wasm build size and build time against the current baseline, behaviour with real-time top-down movement and later NPCs (`adr-lw7`), and how testable the result is without a running world. Check that it compiles for `wasm32-unknown-unknown`. Record the outcome as a decision in `dev-docs/adr/`. `bevy_rapier2d` 0.37.0 also declares Bevy 0.20 and can be included in the comparison. Not compiled yet.
 
-### 5. Debug grid: overlapping corner labels
+### 4. Debug grid: overlapping corner labels
 
 With the grid origin at the bottom left, the column "0" label (top edge) and the highest row label (left edge) overlap in the top left corner. Found in a screenshot on 2026-11-01. Fix by moving the row labels, for example to the bottom of each cell, or by hiding the row label that sits on the top edge. The info box also covers the top left row labels, but F2 and F3 toggle each tool, so that needs no fix.
 
-### 6. Robust map and collision pipeline
+### 5. Robust map and collision pipeline
 
-The first rock map uses `include_str!` and an own parser for the frontmatter (`PLAN-forest-collision.md`, `adr-lw8`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
+The first rock map uses `include_str!` and an own parser for the frontmatter (`adr-lw8`, `adr-lw11`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
 
-### 7. Alternative formats for map files
+### 6. Alternative formats for map files
 
-Maps are markdown files with frontmatter, a `# Features` section and a `# Map` section (`dev-docs/GAME-MAPS.md`, `adr-lw8`). This suits small maps that a human reads and edits. Maps may become more complex than markdown handles well: many object kinds with their own settings, areas with triggers or dialogue, enemies and paths, several layers, and values that need real types (numbers, lists, nested data). Consider other formats, among them YAML and TOML. Questions to answer: how the painted `cells` grids fit in (a block string, or a separate file), how the features and the placements look in the new format, whether the human editing experience stays as good, comment support, error messages with line numbers, wasm support of the parser crate (check each crate for the pinned Rust and Bevy), and how it fits with roadmap item 6 (asset loader, hot reload, Tiled maps). Not worth doing now. Decide when a map needs data that markdown handles badly, and at the latest together with item 6. Keep the parser in `map.rs` behind one function (`parse`) so a format can be swapped without touching `rocks.rs`.
+Maps are markdown files with frontmatter, a `# Features` section and a `# Map` section (`dev-docs/GAME-MAPS.md`, `adr-lw8`). This suits small maps that a human reads and edits. Maps may become more complex than markdown handles well: many object kinds with their own settings, areas with triggers or dialogue, enemies and paths, several layers, and values that need real types (numbers, lists, nested data). Consider other formats, among them YAML and TOML. Questions to answer: how the painted `cells` grids fit in (a block string, or a separate file), how the features and the placements look in the new format, whether the human editing experience stays as good, comment support, error messages with line numbers, wasm support of the parser crate (check each crate for the pinned Rust and Bevy), and how it fits with roadmap item 5 (asset loader, hot reload, Tiled maps). Not worth doing now. Decide when a map needs data that markdown handles badly, and at the latest together with item 5. Keep the parser in `map.rs` behind one function (`parse`) so a format can be swapped without touching `rocks.rs`.
+
+### 7. Tune sliding by playing
+
+The slide rules are built and tested (`adr-lw10`), but the numbers are first guesses: `SLIDE_RANGE_CAP` 64, `SLIDE_RANGE_FRACTION` 0.35, `SLIDE_CLEARANCE` 192, `SLIDE_DELAY` 0.2 s and `SLIDE_SPEED` 120. Play with rocks and trees and adjust. Options not built: a 96 px cap, or the nearest outline corner with a cap. `SLIDE_CLEARANCE` assumes a 64 pixel cell, so it should be written in cells if the cell size changes. Use scripted runs and the slide log lines (`RUST_LOG=long_way=debug`) to compare values. Also check the cases not run so far: a slide past a corner of the lower left patches, a tree touching a rock, and a flicker check of overlapping rocks over several frames.
 
 ## Completed Items
+
+### Rock clusters, trees and markdown maps
+
+Done 2026-11-01. A markdown map file (`dev-docs/GAME-MAPS.md`, `adr-lw8`, `adr-lw11`) places rocks and trees. Blocked areas of trunks and rocks merge into clusters with one outline (`outline.rs`), and Guy walks around the outline, sliding past edges and into notches (`adr-lw10`). Draw order uses layers (`adr-lw9`). The debug grid and collision overlay (F2) are sprites on the debug layers. A spec-first review of the collision code found and fixed several problems (the merge of trunks and rocks, corner-touching shapes, slide targets inside shapes). Research and geometry are in `dev-docs/COLLISION-RESEARCH.md`, the rules in `dev-docs/BEVY-ADDITIONS.md`. Known issues and follow-ups: slide numbers are untuned (item 7), the player clamp to the view can move Guy's feet into a shape, Guy placed inside a shape can walk freely, `outline` builds one grid over all rectangles so large maps need chunking (item 5), and the maps are loaded with `include_str!` (item 5).
 
 ### Plugin compatibility check
 
@@ -62,4 +66,4 @@ Done 2026-10-31. `CollisionPlugin { allow_sliding }` is set to `true` for Long W
 
 ### Visual debug tools and screenshots
 
-Done 2026-11-01. `games/long-way/src/debug.rs` has a red grid (F2) with one line per 64 pixel cell, numbered along the top and left edges, drawn below the sprites, with a configurable origin (bottom left for Long Way). It also has an info box (F3) that any system can add values to, starting with Guy's position. The scripted input tool has a `screenshot:<name>` command that saves the window to `target/screenshots/` so Claude can check the result. See `adr-lw6` and `adr-lw5`. Known issues: the corner label overlap (roadmap item 5). With a bottom left origin the grid x numbers shift against the world when the window is resized, because the view width follows the window aspect ratio. Screenshot is native only.
+Done 2026-11-01. `games/long-way/src/debug.rs` has a red grid (F2) with one line per 64 pixel cell, numbered along the top and left edges, drawn below the sprites, with a configurable origin (bottom left for Long Way). It also has an info box (F3) that any system can add values to, starting with Guy's position. The scripted input tool has a `screenshot:<name>` command that saves the window to `target/screenshots/` so Claude can check the result. See `adr-lw6` and `adr-lw5`. Known issues: the corner label overlap (roadmap item 4). With a bottom left origin the grid x numbers shift against the world when the window is resized, because the view width follows the window aspect ratio. Screenshot is native only.

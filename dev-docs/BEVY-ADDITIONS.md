@@ -62,7 +62,7 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **How to use.** Spawn a `Trunk { left, right, base_y, height }` (world coordinates) on each tree. Constants `GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW` and `BLOCKED_BOTTOM` set the numbers. Trunk edges come from art pixels (see `trees.rs`).
 
-**Limits.** Guy's size is a constant for now, not read from a component. Only trunks exist as obstacle types. Rocks and forest clusters are planned in `PLAN-forest-collision.md`.
+**Limits.** Guy's size is a constant for now, not read from a component. Trunks and rocks are the obstacle types (see "Collision and sliding rules" below).
 
 ## Depth sorting by feet
 
@@ -171,7 +171,7 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 
 **How to use.** Write the file as in `dev-docs/GAME-MAPS.md`. A new object kind needs a `Kind` in `map.rs` and a spawning system.
 
-**Limits.** The map is read with `include_str!`, so a change needs a rebuild. One map per game build. Another format is roadmap item 7, a loader with hot reload is item 6.
+**Limits.** The map is read with `include_str!`, so a change needs a rebuild. One map per game build. Another format is roadmap item 6, a loader with hot reload is item 5.
 
 ## Rules as plain functions with unit tests
 

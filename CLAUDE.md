@@ -113,6 +113,7 @@ bevy/
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work
 │   ├── GAME-MAPS.md         # How to write a map file (human guide)
+│   ├── COLLISION-RESEARCH.md # Collision approaches compared, rock geometry, sources
 │   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, LONG-WAY
 │   ├── bevy-notes.md        # Verified Bevy 0.20 patterns
 │   ├── BEVY-CONCEPTS.md     # Human-friendly guide to how Bevy works
@@ -200,7 +201,7 @@ Versions verified for Bevy 0.20 in `dev-docs/adr/ENGINE.md` adr-e4. Verify wasm 
 | Input mapping | `leafwing-input-manager` |
 | Asset loading states | `bevy_asset_loader` |
 | Debug UI | `bevy_egui`, `bevy-inspector-egui` |
-| Physics | Long Way uses its own collision (adr-lw1). Evaluating `avian2d` is roadmap item 4. Do not add a physics crate before that is decided. |
+| Physics | Long Way uses its own collision (adr-lw1). Evaluating `avian2d` is roadmap item 3. Do not add a physics crate before that is decided. |
 
 ## Art pipeline
 

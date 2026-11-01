@@ -7,7 +7,7 @@
 - **Bottom:** the tree's base minus half of Guy's height (30). Walking up from below, Guy stops with the top half of his body over the trunk base (50% overlap).
 - **Top:** the tree's base plus 10% of the tree height. Walking down from above, Guy stops before the bottom 10% of the tree. Above this line he can walk behind the tree, overlapping the trunk and canopy freely.
 
-**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (roadmap item 4 evaluates `avian2d`).
+**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (roadmap item 3 evaluates `avian2d`).
 
 **How to apply.** The rule lives in `games/long-way/src/collision.rs` as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). Each axis is resolved separately so Guy slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk.
 
@@ -70,17 +70,17 @@ Both start visible. The collision overlay is in `collision_debug.rs` and follows
 
 **Rationale.** The developer chose this direction on 2026-11-01. It replaces the earlier workspace default of turn-based play for this game. Walking, collision and the slide delay were already real-time, so no existing code changes.
 
-**How to apply.** Do not add turn logic, turn phases or grid-cell movement to Long Way. Use `time.delta_secs()` for anything that changes over time. Expect NPCs, dialogue and pathfinding later, so keep rules in plain functions that moving entities share (`move_feet`). Evaluating a physics crate stays on the roadmap (item 4). Other games in the workspace choose their own timing model. This updates the rationale of `adr-lw1`, which assumed a later grid game.
+**How to apply.** Do not add turn logic, turn phases or grid-cell movement to Long Way. Use `time.delta_secs()` for anything that changes over time. Expect NPCs, dialogue and pathfinding later, so keep rules in plain functions that moving entities share (`move_feet`). Evaluating a physics crate stays on the roadmap (item 3). Other games in the workspace choose their own timing model. This updates the rationale of `adr-lw1`, which assumed a later grid game.
 
 ## adr-lw8. Maps are markdown files, rocks come first (2026-11-01)
 
 **Decision.**
-1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The exact format is in `dev-docs/PLAN-forest-collision.md` until it is built.
+1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The format is in `dev-docs/GAME-MAPS.md` and `adr-lw11`.
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`). Trees followed the same day: `green_tree` and `red_tree` are map kinds, placed from the map file with the trunk collision rule of `adr-lw1`.
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
 5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `pitch`, `draw` and `jitter` stay as optional frontmatter keys. Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
-6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 6.
+6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 5.
 7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F2 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
 8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).
 
@@ -124,4 +124,4 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
 
-**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 7 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 6 covers a sturdier loader.
+**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 6 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 5 covers a sturdier loader.
