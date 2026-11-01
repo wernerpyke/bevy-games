@@ -1,5 +1,7 @@
 use bevy::prelude::*;
 
+use crate::layers::WORLD_HALF_BAND;
+
 /// Z distance between one world unit of y and the draw order. Small enough to stay inside the camera range.
 const Z_PER_Y: f32 = 0.001;
 /// Z distance between one world unit of x, used only to break ties. Two sprites with the same feet y and an
@@ -30,10 +32,13 @@ impl DepthSort {
 
 fn sort_by_feet(mut query: Query<(&mut Transform, &DepthSort)>) {
     for (mut transform, sort) in &mut query {
-        transform.translation.z = depth_z(
-            transform.translation.x,
-            sort.feet_y(transform.translation.y),
+        let feet_y = sort.feet_y(transform.translation.y);
+        let z = depth_z(transform.translation.x, feet_y);
+        debug_assert!(
+            z.abs() < WORLD_HALF_BAND,
+            "feet at y {feet_y} are outside the world layer, see layers.rs"
         );
+        transform.translation.z = z;
     }
 }
 
@@ -59,6 +64,13 @@ mod tests {
         // Neighbouring rocks 64 apart must differ by more than f32 rounding at this z.
         let z = depth_z(0.0, 50.0);
         assert!(depth_z(64.0, 50.0) - z > z.abs() * f32::EPSILON * 4.0);
+    }
+
+    #[test]
+    fn the_world_layer_holds_feet_far_beyond_the_screen() {
+        for (x, y) in [(5000.0, 99_000.0), (-5000.0, -99_000.0)] {
+            assert!(depth_z(x, y).abs() < WORLD_HALF_BAND, "x {x} y {y}");
+        }
     }
 
     #[test]

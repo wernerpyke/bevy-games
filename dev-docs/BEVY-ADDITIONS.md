@@ -25,6 +25,7 @@ Status key:
 | [Scripted input](#scripted-input) | `script.rs`, `dev-scripts/rust.sh` | In use (Long Way) |
 | [Logging strategy](#logging-strategy) | `collision.rs` | In use (Long Way) |
 | [Debug grid and info box](#debug-grid-and-info-box) | `debug.rs` | In use (Long Way) |
+| [Draw order layers](#draw-order-layers) | `layers.rs` | In use (Long Way) |
 
 ## Forgiving collision (`allow_sliding`)
 
@@ -98,6 +99,16 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 **How to use.** `DebugPlugin { cell_size, grid_color, grid_origin }` in `main.rs`. To show a value, a system takes `ResMut<DebugInfo>` and calls `info.set("label", value)`. Add new tools as new systems in `debug.rs`.
 
 **Limits.** Not seen on screen by Claude. Remove or gate behind a debug feature before a release build.
+
+## Draw order layers
+
+**What.** One file, `layers.rs`, names every layer from background to UI, with its z or `GlobalZIndex`. World sprites (features and characters) share one y-sorted layer. See `adr-lw9`.
+
+**Why.** Bevy has no 2D layer system, and bare z numbers scattered over the code led to the grid, rock and flicker problems.
+
+**How to use.** Import the constant from `layers`. Put a debug drawing on `FEATURE_DEBUG_Z` as a sprite, a HUD node on `GlobalZIndex(HUD_Z_INDEX)`.
+
+**Limits.** Gizmos cannot be placed in a layer. The F1 overlay still uses them.
 
 ## Rules as plain functions with unit tests
 

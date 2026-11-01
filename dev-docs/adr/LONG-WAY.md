@@ -87,3 +87,17 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 **Rationale.** The developer wants simple, human editable map making in the first iteration, and wants to give Claude a layout in a form that is easy to write and review. Rocks are a simpler shape than trees (no walk-behind part), so they test merged collision first.
 
 **How to apply.** See the plan for the file format, parser and collision steps. Trees reuse the same map format later with their own object kind and collision rule.
+
+## adr-lw9. Draw order layers (2026-11-01)
+
+**Decision.** Everything on screen belongs to one of six layers, from back to front, defined in `games/long-way/src/layers.rs`:
+1. **Background** (sprite z `BACKGROUND_Z`)
+2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F2 grid
+3. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`
+4. **Feature debug** (sprite z `FEATURE_DEBUG_Z`): the yellow rock outline and other debug drawings of features
+5. **HUD** (UI `GlobalZIndex` `HUD_Z_INDEX`): the info box and other readouts that are always on screen
+6. **UI** (UI `GlobalZIndex` `UI_Z_INDEX`): dialogs and menus, above the HUD
+
+**Rationale.** Bevy has no layer system for 2D draw order: sprites are sorted by z, equal z has no fixed order, `RenderLayers` only picks which camera sees an entity, and 2D gizmos are always drawn last, on top of everything. The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-lw2`). Separate layers would stop that. The debug layer is above the world, so debug lines also draw over the player.
+
+**How to apply.** Never write a bare z number outside `layers.rs`. `bevy_ui` draws after all sprites and gizmos, so the HUD and UI are always above the feature debug layer. A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). Debug drawings that must follow the layers are sprites, not gizmos. The F1 collision overlay in `collision.rs` is still gizmos, so it is always on top. Plan step 8 changes that.

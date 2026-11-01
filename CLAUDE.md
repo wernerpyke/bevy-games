@@ -184,6 +184,7 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 - Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for the play mode (for example exploring, dialogue, menu).
 - Use events or messages to pass actions between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
+- Draw order comes from `games/long-way/src/layers.rs` (adr-lw9). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos, because gizmos are always on top.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
 
 ## Candidate crates

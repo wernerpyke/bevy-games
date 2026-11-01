@@ -10,11 +10,9 @@ use bevy::sprite::Anchor;
 
 use crate::camera::half_view;
 use crate::depth::DepthSort;
+use crate::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
 use crate::player::Player;
 
-/// Draw order of the grid. Depth-sorted entities stay within about -1 to 1, so the grid is below
-/// them. A background must be placed below this value to stay under the grid.
-pub const GRID_Z: f32 = -10.0;
 const LINE_THICKNESS: f32 = 2.0;
 const LABEL_FONT_SIZE: f32 = 20.0;
 const LABEL_MARGIN: f32 = 3.0;
@@ -118,6 +116,7 @@ fn spawn_grid_root(mut commands: Commands) {
 fn spawn_info_box(mut commands: Commands) {
     commands.spawn((
         InfoBox,
+        GlobalZIndex(HUD_Z_INDEX),
         Text::new(""),
         TextFont::from_font_size(INFO_FONT_SIZE),
         TextColor(Color::WHITE),
@@ -186,28 +185,28 @@ fn rebuild_grid(
                 let x = origin.x + i as f32 * cell;
                 parent.spawn((
                     Sprite::from_color(color, Vec2::new(LINE_THICKNESS, half.y * 2.0)),
-                    Transform::from_xyz(x, 0.0, GRID_Z),
+                    Transform::from_xyz(x, 0.0, GRID_DEBUG_Z),
                 ));
                 parent.spawn((
                     Text2d::new(i.to_string()),
                     font.clone(),
                     TextColor(color),
                     Anchor::TOP_LEFT,
-                    Transform::from_xyz(x + LABEL_MARGIN, half.y - LABEL_MARGIN, GRID_Z),
+                    Transform::from_xyz(x + LABEL_MARGIN, half.y - LABEL_MARGIN, GRID_DEBUG_Z),
                 ));
             }
             for j in line_range(origin.y, half.y, cell) {
                 let y = origin.y + j as f32 * cell;
                 parent.spawn((
                     Sprite::from_color(color, Vec2::new(half.x * 2.0, LINE_THICKNESS)),
-                    Transform::from_xyz(0.0, y, GRID_Z),
+                    Transform::from_xyz(0.0, y, GRID_DEBUG_Z),
                 ));
                 parent.spawn((
                     Text2d::new(j.to_string()),
                     font.clone(),
                     TextColor(color),
                     Anchor::BOTTOM_LEFT,
-                    Transform::from_xyz(-half.x + LABEL_MARGIN, y + LABEL_MARGIN, GRID_Z),
+                    Transform::from_xyz(-half.x + LABEL_MARGIN, y + LABEL_MARGIN, GRID_DEBUG_Z),
                 ));
             }
         });

@@ -2,6 +2,7 @@ mod camera;
 mod collision;
 mod debug;
 mod depth;
+mod layers;
 mod map;
 mod outline;
 mod player;

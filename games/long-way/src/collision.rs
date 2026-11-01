@@ -22,6 +22,13 @@ const SLIDE_DELAY: f32 = 0.2;
 const SLIDE_SPEED: f32 = 120.0;
 /// How close to an edge Guy must be to get slid past it, as a fraction of the length of the face he is pushing into.
 const SLIDE_RANGE_FRACTION: f32 = 0.35;
+/// The most Guy may be from an end of a face and still be slid past it, in world units. A long face of a cluster
+/// would otherwise slide him a long way. One cell. To be tuned by trying it.
+const SLIDE_RANGE_CAP: f32 = 64.0;
+/// How far past the end of a face the way must be open for the end to be used, in world units. Three cells, more
+/// than the 128 deep notches between neighbouring rocks. An end
+/// that leads into a pocket or under an overhang, where Guy would be stopped again soon after, is refused.
+const SLIDE_CLEARANCE: f32 = 192.0;
 
 pub struct CollisionPlugin {
     /// When true, collision is forgiving: Guy slides along a trunk when walking diagonally into it, and
@@ -243,7 +250,7 @@ pub fn move_feet(
     if assist.held < SLIDE_DELAY {
         return moved.feet;
     }
-    match slide_to_nearest_edge(face, moved.feet, straight_up_or_down, dt) {
+    match slide_to_nearest_edge(face, moved.feet, straight_up_or_down, direction, dt, edges) {
         Some(slid) => {
             if assist.phase != Phase::Sliding {
                 assist.phase = Phase::Sliding;
@@ -255,7 +262,7 @@ pub fn move_feet(
             if assist.phase != Phase::OutOfRange {
                 assist.phase = Phase::OutOfRange;
                 debug!(
-                    "collision: held {:.2}s at feet {:?} but too far from an edge of {:?}",
+                    "collision: held {:.2}s at feet {:?} but no usable edge in range of {:?}",
                     assist.held, moved.feet, face
                 );
             }
@@ -279,19 +286,40 @@ fn push_direction(step: Vec2) -> Vec2 {
     Vec2::new(sign(step.x), sign(step.y))
 }
 
-/// Moves `feet` along the face towards the nearer edge. Returns `None` if neither edge is within range.
+/// True when walking from `from` along `probe` is not stopped by any edge.
+fn clear_beyond(from: Vec2, probe: Vec2, edges: &[Edge]) -> bool {
+    let moved = resolve(from, from + probe, edges);
+    (moved.feet - from).length() >= probe.length() - TOLERANCE
+}
+
+/// Moves `feet` along the face towards the nearer end. Returns `None` when the nearer end is out of range (the
+/// smaller of `SLIDE_RANGE_FRACTION` of the face and `SLIDE_RANGE_CAP`), or when the way past it is not clear for
+/// `SLIDE_CLEARANCE`. An end at an inward corner is never clear, so Guy is not slid into a corner.
 /// `pushing_vertically` is true when Guy pushes up or down, so the face is horizontal and he slides along x.
+/// `push` is the push direction as signs.
 fn slide_to_nearest_edge(
     face: Edge,
     feet: Vec2,
     pushing_vertically: bool,
+    push: Vec2,
     dt: f32,
+    edges: &[Edge],
 ) -> Option<Vec2> {
     let position = if pushing_vertically { feet.x } else { feet.y };
     let (min, max) = (face.from, face.to);
     let to_min = position - min;
     let to_max = max - position;
-    if to_min.min(to_max) > SLIDE_RANGE_FRACTION * (max - min) {
+    let range = (SLIDE_RANGE_FRACTION * (max - min)).min(SLIDE_RANGE_CAP);
+    if to_min.min(to_max) > range {
+        return None;
+    }
+    let end = if to_min <= to_max { min } else { max };
+    let end_point = if pushing_vertically {
+        Vec2::new(end, feet.y)
+    } else {
+        Vec2::new(feet.x, end)
+    };
+    if !clear_beyond(end_point, push * SLIDE_CLEARANCE, edges) {
         return None;
     }
 
@@ -714,5 +742,82 @@ mod tests {
             &two_rocks(),
         );
         assert_eq!(end, Vec2::new(50.0, 0.0));
+    }
+
+    /// Two rocks as in the test map: a bottom one and one above it shifted left, so there is a pocket under the
+    /// upper rock between x 376.8 and 440.8 (64 wide, bounded on the right by the bottom rock).
+    fn pocket() -> Vec<Edge> {
+        edges_of(&[
+            Rect::new(440.8, 12.8, 647.2, 115.2),
+            Rect::new(376.8, 76.8, 583.2, 179.2),
+        ])
+    }
+
+    #[test]
+    fn the_slide_range_is_capped_on_a_long_face() {
+        let edges = edges_of(&[Rect::new(0.0, 0.0, 400.0, 20.0)]);
+        // 80 from the left end is inside 35% of the 400 long face, but beyond the cap: Guy stays stopped.
+        let end = simulate_edges(Vec2::new(80.0, -10.0), Vec2::new(0.0, STEP), 90, &edges);
+        assert_eq!(end, Vec2::new(80.0, 0.0));
+        // 50 from the end is inside the cap: slid to the end, then walks on up.
+        let end = simulate_edges(Vec2::new(50.0, -10.0), Vec2::new(0.0, STEP), 90, &edges);
+        assert_eq!(end.x, 0.0);
+        assert!(end.y > 20.0, "walked up past the rock, got {end}");
+    }
+
+    #[test]
+    fn guy_is_not_slid_into_a_pocket_under_an_overhang() {
+        let edges = pocket();
+        // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket, which is blocked
+        // 64 further on. The far end is out of range. So he stays stopped.
+        let end = simulate_edges(Vec2::new(300.0, 100.0), Vec2::new(STEP, 0.0), 120, &edges);
+        assert_eq!(end, Vec2::new(376.8, 100.0));
+        // Pushing up into the bottom face near its left end: the end leads up the wall into the same pocket.
+        let end = simulate_edges(Vec2::new(460.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
+        assert_eq!(end, Vec2::new(460.0, 12.8));
+    }
+
+    #[test]
+    fn guy_is_not_slid_into_a_shallow_notch_between_rocks() {
+        // The right side of the test cluster: a bottom rock, a middle rock further left and an upper rock shifted
+        // right. Under the upper rock is a notch 25.6 high and 128 deep, closed at the back by the middle rock.
+        let edges = edges_of(&[
+            Rect::new(440.8, 12.8, 647.2, 115.2),
+            Rect::new(376.8, 76.8, 583.2, 179.2),
+            Rect::new(583.2, 140.8, 711.2, 243.2),
+        ]);
+        let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
+        assert_eq!(end, Vec2::new(630.0, 12.8));
+        let end = simulate_edges(Vec2::new(900.0, 160.0), Vec2::new(-STEP, 0.0), 120, &edges);
+        assert_eq!(end, Vec2::new(711.2, 160.0));
+    }
+
+    #[test]
+    fn guy_is_slid_past_a_free_corner_of_a_cluster() {
+        let edges = edges_of(&[Rect::new(440.8, 12.8, 647.2, 115.2)]);
+        let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
+        assert_eq!(end.x, 647.2);
+        assert!(end.y > 115.2, "walked up past the rock, got {end}");
+    }
+
+    #[test]
+    fn clear_beyond_checks_the_path_past_the_end() {
+        let edges = edges_of(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
+        assert!(clear_beyond(
+            Vec2::new(20.0, 5.0),
+            Vec2::new(50.0, 0.0),
+            &edges
+        ));
+        assert!(!clear_beyond(
+            Vec2::new(-20.0, 5.0),
+            Vec2::new(50.0, 0.0),
+            &edges
+        ));
+        // Along the side line of the rectangle is free.
+        assert!(clear_beyond(
+            Vec2::new(10.0, -20.0),
+            Vec2::new(0.0, 50.0),
+            &edges
+        ));
     }
 }

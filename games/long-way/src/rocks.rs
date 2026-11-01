@@ -9,8 +9,9 @@ use crate::camera::MAP_ORIGIN;
 use crate::collision::{CollisionWorld, GUY_HALF_WIDTH};
 use crate::debug::DebugSettings;
 use crate::depth::DepthSort;
+use crate::layers::FEATURE_DEBUG_Z;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
-use crate::outline::{self, Cluster, Orientation};
+use crate::outline::{self, Cluster, Edge, Orientation};
 
 /// Footprint of a rock in cells, in x and y.
 const FOOTPRINT_CELLS: f32 = 2.0;
@@ -21,22 +22,23 @@ const ART_PIXELS: f32 = 32.0;
 const BOTTOM_MARGIN: f32 = 0.125;
 /// Part of the footprint, on each side, that Guy may overlap. Gives the rock a softer edge than the full 128 box.
 const INSET_FRACTION: f32 = 0.1;
+/// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
+/// draw order of the two would be a tie. With it Guy is drawn in front when he stands at the rock or below it.
+const SORT_BIAS: f32 = 1.0;
 /// Outline colour and the length of the ticks that point to the blocked side.
 const OUTLINE_COLOR: Color = Color::srgb(1.0, 0.8, 0.1);
 const TICK_LENGTH: f32 = 12.0;
+/// Line thickness of the outline sprites, the same as the grid lines.
+const OUTLINE_THICKNESS: f32 = 2.0;
 
 pub struct RocksPlugin;
 
 impl Plugin for RocksPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, (spawn_rocks, build_outline).chain())
-            .add_systems(Update, draw_outline);
+            .add_systems(Update, show_outline);
     }
 }
-
-/// The merged outline of all rock clusters, kept for drawing. Guy collides with it through `CollisionWorld`.
-#[derive(Resource)]
-pub struct RockOutline(pub Vec<Cluster>);
 
 /// Marker for a rock. The collision work (plan step 3 onward) queries it.
 #[derive(Component)]
@@ -49,7 +51,7 @@ struct Placement {
     centre: Vec2,
     /// Whole number scale applied to the 32x32 art.
     scale: f32,
-    /// Distance from the sprite centre down to the bottom of the footprint, for depth sorting.
+    /// Distance from the sprite centre down to the sort line, for depth sorting.
     feet_offset: f32,
 }
 
@@ -59,11 +61,16 @@ fn placement(object: &MapObject, map: &Map) -> Placement {
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let corner =
         MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter);
-    let feet_offset = (0.5 - BOTTOM_MARGIN) * draw;
+    // The canvas centre is above the footprint bottom by this much, which puts the visible rock bottom on it.
+    let centre_above_footprint = (0.5 - BOTTOM_MARGIN) * draw;
     Placement {
-        centre: Vec2::new(corner.x + footprint / 2.0, corner.y + feet_offset),
+        centre: Vec2::new(
+            corner.x + footprint / 2.0,
+            corner.y + centre_above_footprint,
+        ),
         scale,
-        feet_offset,
+        // The sort line is the bottom of the blocked area plus a small bias, not the bottom of the footprint.
+        feet_offset: centre_above_footprint - INSET_FRACTION * footprint - SORT_BIAS,
     }
 }
 
@@ -157,35 +164,70 @@ fn build_outline(mut commands: Commands, map: Res<CurrentMap>, mut world: ResMut
         );
     }
     world.add_clusters(&clusters);
-    commands.insert_resource(RockOutline(clusters));
+    spawn_outline_sprites(&mut commands, &clusters);
 }
 
-/// Draws the outline with the F2 grid. Each tick points to the blocked side.
-fn draw_outline(settings: Res<DebugSettings>, outline: Res<RockOutline>, mut gizmos: Gizmos) {
-    if !settings.show_grid {
-        return;
+/// Parent of the outline sprites, so they show and hide with the F2 grid.
+#[derive(Component)]
+struct RockOutlineRoot;
+
+/// Spawns the outline as thin sprites on the feature debug layer, not as gizmos. Gizmos are always drawn on top of
+/// everything, so they could not be given a place in the layers. Each tick points to the blocked side.
+fn spawn_outline_sprites(commands: &mut Commands, clusters: &[Cluster]) {
+    commands
+        .spawn((RockOutlineRoot, Transform::default(), Visibility::default()))
+        .with_children(|parent| {
+            for edge in clusters.iter().flat_map(|c| &c.edges) {
+                for (centre, size) in edge_boxes(edge) {
+                    parent.spawn((
+                        Sprite::from_color(OUTLINE_COLOR, size),
+                        Transform::from_translation(centre.extend(FEATURE_DEBUG_Z)),
+                    ));
+                }
+            }
+        });
+}
+
+/// The boxes (centre and size) that draw an edge: the line, then the tick on its blocked side.
+fn edge_boxes(edge: &Edge) -> [(Vec2, Vec2); 2] {
+    let side = if edge.blocked_positive { 1.0 } else { -1.0 };
+    let length = edge.to - edge.from;
+    let middle = (edge.from + edge.to) / 2.0;
+    match edge.orientation {
+        Orientation::Vertical => [
+            (
+                Vec2::new(edge.at, middle),
+                Vec2::new(OUTLINE_THICKNESS, length),
+            ),
+            (
+                Vec2::new(edge.at + side * TICK_LENGTH / 2.0, middle),
+                Vec2::new(TICK_LENGTH, OUTLINE_THICKNESS),
+            ),
+        ],
+        Orientation::Horizontal => [
+            (
+                Vec2::new(middle, edge.at),
+                Vec2::new(length, OUTLINE_THICKNESS),
+            ),
+            (
+                Vec2::new(middle, edge.at + side * TICK_LENGTH / 2.0),
+                Vec2::new(OUTLINE_THICKNESS, TICK_LENGTH),
+            ),
+        ],
     }
-    for edge in outline.0.iter().flat_map(|c| &c.edges) {
-        let (a, b, normal) = match edge.orientation {
-            Orientation::Vertical => (
-                Vec2::new(edge.at, edge.from),
-                Vec2::new(edge.at, edge.to),
-                Vec2::X,
-            ),
-            Orientation::Horizontal => (
-                Vec2::new(edge.from, edge.at),
-                Vec2::new(edge.to, edge.at),
-                Vec2::Y,
-            ),
-        };
-        gizmos.line_2d(a, b, OUTLINE_COLOR);
-        let middle = (a + b) / 2.0;
-        let inward = if edge.blocked_positive {
-            normal
-        } else {
-            -normal
-        };
-        gizmos.line_2d(middle, middle + inward * TICK_LENGTH, OUTLINE_COLOR);
+}
+
+fn show_outline(
+    settings: Res<DebugSettings>,
+    mut root: Single<&mut Visibility, With<RockOutlineRoot>>,
+) {
+    let wanted = if settings.show_grid {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    if **root != wanted {
+        **root = wanted;
     }
 }
 
@@ -217,7 +259,23 @@ mod tests {
         // Footprint 128 wide: centre is 64 right of the corner. The 128 canvas is 48 above the footprint bottom.
         assert_eq!(p.centre, MAP_ORIGIN + Vec2::new(64.0, 48.0));
         assert_eq!(p.scale, 4.0);
-        assert_eq!(p.feet_offset, 48.0);
+        assert_eq!(p.feet_offset, (48.0 - 12.8 - SORT_BIAS));
+    }
+
+    #[test]
+    fn rocks_sort_just_above_the_bottom_of_their_blocked_area() {
+        // Guy is stopped at the bottom of the blocked area, or walks below it. Both must draw in front of the rock.
+        for draw in [128.0, 160.0] {
+            let m = map(draw, 0.0);
+            let o = rock(4, 2);
+            let p = placement(&o, &m);
+            let sort_y = p.centre.y - p.feet_offset;
+            let bottom = blocked_area(&o, &m).min.y;
+            assert!(
+                (sort_y - (bottom + SORT_BIAS)).abs() < 0.001,
+                "draw {draw}: sort {sort_y}, blocked bottom {bottom}"
+            );
+        }
     }
 
     #[test]
@@ -278,6 +336,35 @@ mod tests {
             .map(|o| blocked_area(o, &m))
             .collect();
         assert_eq!(outline::build(&apart).len(), 2);
+    }
+
+    #[test]
+    fn an_edge_is_drawn_as_a_line_and_a_tick_on_its_blocked_side() {
+        let edge = |orientation, blocked_positive| Edge {
+            orientation,
+            at: 10.0,
+            from: 20.0,
+            to: 60.0,
+            blocked_positive,
+            from_concave: false,
+            to_concave: false,
+        };
+        let [line, tick] = edge_boxes(&edge(Orientation::Vertical, true));
+        assert_eq!(
+            line,
+            (Vec2::new(10.0, 40.0), Vec2::new(OUTLINE_THICKNESS, 40.0))
+        );
+        assert_eq!(tick.0, Vec2::new(10.0 + TICK_LENGTH / 2.0, 40.0));
+        let [_, tick] = edge_boxes(&edge(Orientation::Vertical, false));
+        assert_eq!(tick.0, Vec2::new(10.0 - TICK_LENGTH / 2.0, 40.0));
+        let [line, tick] = edge_boxes(&edge(Orientation::Horizontal, true));
+        assert_eq!(
+            line,
+            (Vec2::new(40.0, 10.0), Vec2::new(40.0, OUTLINE_THICKNESS))
+        );
+        assert_eq!(tick.0, Vec2::new(40.0, 10.0 + TICK_LENGTH / 2.0));
+        let [_, tick] = edge_boxes(&edge(Orientation::Horizontal, false));
+        assert_eq!(tick.0, Vec2::new(40.0, 10.0 - TICK_LENGTH / 2.0));
     }
 
     #[test]
