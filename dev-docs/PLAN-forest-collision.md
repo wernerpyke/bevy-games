@@ -89,7 +89,7 @@ Rules:
 4. **Errors.** An unknown character, a ragged row or a missing `at=` stops loading and names the file and line. A silent skip would hide layout mistakes.
 5. **Check.** The F2 grid and the `screenshot:` script command let Claude and the human compare the file with the screen.
 
-The example above gives 11 rocks. Blocked outline: one cluster, about 6 x 5 cells.
+The example above gives 10 rocks. Blocked outline: one cluster, about 6 x 5 cells.
 
 ### Format choices to confirm
 
@@ -116,6 +116,33 @@ To compare variants on the same painted map, three temporary frontmatter keys co
 Size rule: `n` characters in a row cover `pitch * (n - 1) + 2` cells. Three characters cover 4 cells in V1 and 6 cells in V2 and V3.
 
 The same map is run with each variant, a screenshot is taken for each (`screenshot:v1`, `screenshot:v2`, `screenshot:v3`), and the developer picks. The art for V2 and V3 needs `Rocks.aseprite` rebuilt at 160 pixels (one command with `frames_from_pngs.lua`).
+
+### Reusable clusters (step 9)
+
+A cluster can be defined once and placed several times, so a good shrub patch is drawn once and reused across the map. Proposed format, added after the basic format works:
+
+````markdown
+```cells name=shrub-patch
+. 0 0 .
+0 1 1 0
+. 0 0 .
+```
+
+```place shrub-patch
+at=20,6
+at=40,12
+at=5,30
+```
+````
+
+Rules:
+
+1. A `cells` block with `name=` and no `at=` is a **template**. It places nothing by itself. Its rows are read exactly like a normal block, with the bottom left character as the anchor.
+2. A `place <name>` block has one `at=x,y` per line. Each line places a copy of the template with its bottom left character at that cell.
+3. A template must be defined before it is placed. Names are unique. A template cannot contain `place` lines (no nesting in the first version). Errors name the file and line.
+4. A normal `cells at=x,y` block still works and can sit beside templates in the same file.
+5. Each copy is the same shape, but `jitter` uses the world cell, so copies look slightly different if jitter is on. Mirroring or rotating a copy is not planned.
+6. Collision needs nothing new: copies are ordinary objects, so overlapping copies merge in the outline.
 
 ### Extending to trees
 
@@ -200,10 +227,13 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 6. **Slide target on the connected outline edge**, with the range and give up rules.
 7. **Interior cull (D)**, with a test that culled objects change no result.
 8. **F1 overlay** draws the outline, interior objects in another colour.
-9. **Check in the real game** with `script` and `screenshot:`: push into a long face, slide past a cluster corner, push into a notch, walk through a narrow gap, depth order of overlapping rocks. Report what was not seen on screen.
-10. `lint`, `test`, `web`.
-11. **Record** decisions in `dev-docs/adr/LONG-WAY.md` (collision and map format, `adr-lw9` onward). Add the outline and map format to `BEVY-ADDITIONS.md`, new Bevy patterns to `bevy-notes.md`, kind tags to `art-tags.md`. Update roadmap item 3 (the general versus Long Way split in `collision.rs`).
-12. **Migrate lasting content** from this plan into long-lived docs (a user guide for map files in `docs/`, decisions in `dev-docs/adr/`), then delete this file. Ask the developer before the commit.
+
+9. **Reusable clusters.** Define a cluster once and place it several times on the map (section 5, "Reusable clusters"). Parser: a `cells name=<name>` block defines a template, a `place <name>` block lists `at=x,y` positions. Tests first: one template placed twice, overlapping placements, an unknown template name, a template used before it is defined, a name defined twice, nesting (not allowed in the first version). The outline then merges overlapping placements with no extra code. Screenshot a map that places one cluster three times.
+
+10. **Check in the real game** with `script` and `screenshot:`: push into a long face, slide past a cluster corner, push into a notch, walk through a narrow gap, depth order of overlapping rocks. Report what was not seen on screen.
+11. `lint`, `test`, `web`.
+12. **Record** decisions in `dev-docs/adr/LONG-WAY.md` (collision and map format, `adr-lw9` onward). Add the outline and map format to `BEVY-ADDITIONS.md`, new Bevy patterns to `bevy-notes.md`, kind tags to `art-tags.md`. Update roadmap item 3 (the general versus Long Way split in `collision.rs`).
+13. **Migrate lasting content** from this plan into long-lived docs (a user guide for map files in `docs/`, decisions in `dev-docs/adr/`), then delete this file. Ask the developer before the commit.
 
 ## 8. Open decisions
 

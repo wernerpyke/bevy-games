@@ -2,6 +2,7 @@ mod camera;
 mod collision;
 mod debug;
 mod depth;
+mod map;
 mod player;
 mod script;
 mod trees;
@@ -24,6 +25,7 @@ fn main() {
                 grid_origin: debug::GridOrigin::BottomLeft,
             },
             depth::DepthPlugin,
+            map::MapPlugin,
             player::PlayerPlugin,
             script::ScriptPlugin,
             trees::TreesPlugin,
