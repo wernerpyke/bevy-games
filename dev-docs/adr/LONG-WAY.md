@@ -17,7 +17,7 @@
 
 **Rationale.** Guy must draw behind a tree when his feet are above its base and in front when below. A fixed z cannot do both. The same sort line also decides collision, so what the player sees matches where he can walk.
 
-**How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. The sort runs in `Update` with no ordering against movement, so z can lag one frame.
+**How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), because equal z flickers (found with the rock rows, 2026-11-01). The sort runs in `Update` with no ordering against movement, so z can lag one frame.
 
 ## adr-lw3. F1 collision debug overlay (2026-10-31)
 
@@ -81,6 +81,8 @@ Both start visible. The F1 collision overlay stays in `collision.rs`.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on each side.
 5. Rocks are drawn slightly overlapping (shrub look). The drawn size may be larger than the footprint, and collision stays on the inset footprint. Placement (one character per cell or per rock slot) and the slide range on long edges are decided by experiment.
 6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 6.
+7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F2 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
+8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32). The placement experiment uses three built-in map files and the `LONG_WAY_MAP` environment variable.
 
 **Rationale.** The developer wants simple, human editable map making in the first iteration, and wants to give Claude a layout in a form that is easy to write and review. Rocks are a simpler shape than trees (no walk-behind part), so they test merged collision first.
 

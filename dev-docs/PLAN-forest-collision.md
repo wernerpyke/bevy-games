@@ -13,19 +13,20 @@ Long Way is a real-time top-down RPG (`adr-lw7`). Movement and sliding use frame
 
 ## 2. Decisions already made
 
-| Topic | Decision |
-|---|---|
-| Game type | Real-time top-down RPG, not turn-based, not grid-locked (`adr-lw7`) |
-| First shape | Rocks before trees. `Rocks.aseprite` exists: 128x128, two frames, tags `rock_0` and `rock_1` |
-| Rock behaviour | Solid on all sides. No walk-behind part. Walk around the outline only |
-| Rock size | 2x2 cells, 128 pixels |
-| Rock collision | Rectangle inset 10% on each side of the 128 pixel footprint |
-| Vertical margin | 0 above and below the inset rectangle (decision 1, agreed) |
-| Drawn look | Rocks are drawn slightly overlapping, like shrubs in a top-down RPG. Collision does not follow the overlap, it stays on the inset footprint |
-| Layout | Paint cells as text in a markdown file with frontmatter |
-| Placement, slide range | Not decided. Experiment first (sections 5 and 6) |
-| Loader and parser | `include_str!` and an own parser for now. A more robust approach is on the roadmap (item 6) |
-| Scope of this iteration | Includes the primitive map-making (parse file, place objects, collision), not only collision |
+| Topic                   | Decision                                                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Game type               | Real-time top-down RPG, not turn-based, not grid-locked (`adr-lw7`)                                                                         |
+| First shape             | Rocks before trees. `Rocks.aseprite` exists: 128x128, two frames, tags `rock_0` and `rock_1`                                                |
+| Rock behaviour          | Solid on all sides. No walk-behind part. Walk around the outline only                                                                       |
+| Rock size               | 2x2 cells, 128 pixels                                                                                                                       |
+| Rock collision          | Rectangle inset 10% on each side of the 128 pixel footprint                                                                                 |
+| Vertical margin         | 0 above and below the inset rectangle (decision 1, agreed)                                                                                  |
+| Drawn look              | Rocks are drawn slightly overlapping, like shrubs in a top-down RPG. Collision does not follow the overlap, it stays on the inset footprint |
+| Layout                  | Paint cells as text in a markdown file with frontmatter                                                                                     |
+| Map cell (0, 0)         | Fixed world position `MAP_ORIGIN` = (-1024, -576), the F2 grid uses it too, so cells do not move when the window is resized                 |
+| Placement, slide range  | Not decided. Experiment first (sections 5 and 6)                                                                                            |
+| Loader and parser       | `include_str!` and an own parser for now. A more robust approach is on the roadmap (item 6)                                                 |
+| Scope of this iteration | Includes the primitive map-making (parse file, place objects, collision), not only collision                                                |
 
 ## 3. What the code does today
 
@@ -51,7 +52,7 @@ The vertical margin is 0: the blocked area ends at the inset rectangle above and
 - The opaque part of the rock is 232 x 208 of 256 (x 8 to 239, y 16 to 223): 90.6% of the width and 81% of the height.
 - Our `Rocks.aseprite` is 128x128, so one art pixel is 4 screen pixels. The rock is about 116 wide. At a pitch of 2 cells (128) two neighbours do **not** touch: 12 pixels of gap.
 - To overlap slightly at a pitch of 2 cells, draw the rock larger than its footprint. 160 pixels is exactly 5x the art, so pixels stay even. The rock is then about 145 wide and neighbours overlap by about 17 pixels (about 12%). 192 pixels (6x) overlaps by about 46 pixels.
-- Do **not** stretch the 128 pixel file to 160 in the engine. 4x to 5x is not a whole number, and pixel widths would be uneven. Rebuild `Rocks.aseprite` from the 256 pixel PNGs at the chosen size instead (nearest-neighbour from 256 to 160 is an exact 5x).
+- `Rocks.aseprite` is therefore kept at the native 32x32 and scaled in the engine by `draw / 32`, which must be a whole number (4 = 128, 5 = 160, 6 = 192). Pixels stay even. Stretching a 128 pixel file to 160 would not (4x to 5x).
 - Drawing larger than the footprint does not change collision. The inset footprints are 25.6 apart at a pitch of 2 cells, and Guy's 20 pixel margin each side closes that gap, so the blocked areas join and a cluster has no gaps.
 
 ## 5. The map file (human interface)
@@ -115,7 +116,7 @@ To compare variants on the same painted map, three temporary frontmatter keys co
 
 Size rule: `n` characters in a row cover `pitch * (n - 1) + 2` cells. Three characters cover 4 cells in V1 and 6 cells in V2 and V3.
 
-The same map is run with each variant, a screenshot is taken for each (`screenshot:v1`, `screenshot:v2`, `screenshot:v3`), and the developer picks. The art for V2 and V3 needs `Rocks.aseprite` rebuilt at 160 pixels (one command with `frames_from_pngs.lua`).
+The same map is run with each variant, a screenshot is taken for each (`screenshot:v1`, `screenshot:v2`, `screenshot:v3`), and the developer picks. The three variants are separate map files (`rocks-test.md`, `rocks-v2.md`, `rocks-v3.md`) and `LONG_WAY_MAP=rocks-v2` loads one. The files are removed when a variant is chosen.
 
 ### Reusable clusters (step 9)
 
@@ -219,14 +220,14 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 
 ## 7. Steps
 
-1. **Map parser.** Plain functions with unit tests: frontmatter, legend, cell blocks, errors with file and line. A first map file `assets/maps/rocks-test.md`.
-2. **Spawn rocks from the map.** Sprites from `Rocks.aseprite` (variant by tag), `DepthSort`, placed from cell numbers, with the `pitch`, `draw` and `jitter` knobs. Rebuild `Rocks.aseprite` at 160 pixels for V2 and V3. Screenshot V1, V2 and V3 of the same map next to the F2 grid, and let the developer pick.
+1. **Map parser (done 2026-11-01).** Plain functions with unit tests: frontmatter, legend, cell blocks, errors with file and line. A first map file `assets/maps/rocks-test.md`.
+2. **Spawn rocks from the map (done 2026-11-01).** Sprites from `Rocks.aseprite` (variant by tag), `DepthSort`, placed from cell numbers, with the `pitch`, `draw` and `jitter` knobs. Screenshot V1, V2 and V3 of the same map next to the F2 grid, and let the developer pick.
 3. **Failing tests for the outline.** Two touching rectangles, an L shape, a notch, a gap just wide enough for Guy, a gap too narrow.
 4. **Union and outline** (plain functions, no Bevy types).
 5. **`resolve` against the outline.** Trunk collision keeps working through the same tests.
 6. **Slide target on the connected outline edge**, with the range and give up rules.
 7. **Interior cull (D)**, with a test that culled objects change no result.
-8. **F1 overlay** draws the outline, interior objects in another colour.
+8. **Collision overlay** draws the outline, interior objects in another colour. Decided: it turns on and off together with the F2 grid, so F1 is no longer a separate switch (the `ShowCollision` resource in `collision.rs` follows `DebugSettings.show_grid`).
 
 9. **Reusable clusters.** Define a cluster once and place it several times on the map (section 5, "Reusable clusters"). Parser: a `cells name=<name>` block defines a template, a `place <name>` block lists `at=x,y` positions. Tests first: one template placed twice, overlapping placements, an unknown template name, a template used before it is defined, a name defined twice, nesting (not allowed in the first version). The outline then merges overlapping placements with no extra code. Screenshot a map that places one cluster three times.
 

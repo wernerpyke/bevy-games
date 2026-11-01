@@ -28,9 +28,12 @@ for i, path in ipairs(paths) do
   end
   local frame = i == 1 and spr.frames[1] or spr:newEmptyFrame()
   spr:newCel(layer, frame, image, Point(0, 0))
-  local name = app.fs.fileTitle(path)
+end
+
+-- Tags are created after all frames exist. Adding a frame at the end would stretch an earlier tag.
+for i, path in ipairs(paths) do
   local tag = spr:newTag(i, i)
-  tag.name = name
+  tag.name = app.fs.fileTitle(path)
 end
 
 local width = tonumber(app.params["width"])

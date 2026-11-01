@@ -4,6 +4,7 @@ mod debug;
 mod depth;
 mod map;
 mod player;
+mod rocks;
 mod script;
 mod trees;
 
@@ -22,11 +23,12 @@ fn main() {
             debug::DebugPlugin {
                 cell_size: camera::CELL_SIZE,
                 grid_color: Color::srgb(1.0, 0.1, 0.1),
-                grid_origin: debug::GridOrigin::BottomLeft,
+                grid_origin: debug::GridOrigin::World(camera::MAP_ORIGIN),
             },
             depth::DepthPlugin,
             map::MapPlugin,
             player::PlayerPlugin,
+            rocks::RocksPlugin,
             script::ScriptPlugin,
             trees::TreesPlugin,
         ))

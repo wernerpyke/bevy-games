@@ -219,7 +219,7 @@ Long Way (`games/long-way/assets/art/`):
 - `characters/Guy.aseprite` (from `characters/guy/Guy.aseprite`, 60x60, 41 frames, tags: Idle, Walk, Up, Down, Block, Win)
 - `features/Green tree.aseprite` (from `features/`, resized in our copy from 512x512 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 12 colour palette, not the game palette)
 - `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
-- `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256, with `dev-scripts/aseprite/frames_from_pngs.lua`: 128x128, 2 frames, tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
+- `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256 (32x32 art scaled 8x), with `dev-scripts/aseprite/frames_from_pngs.lua`: native 32x32, 2 frames, drawn in the game at a whole number scale (4x = 128 px), tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
 
 ### Pipeline
 
