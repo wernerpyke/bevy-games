@@ -108,7 +108,7 @@ bevy/
 │       ├── src/             # Game code (Rust)
 │       ├── assets/          # This game's runtime assets (Bevy loads from here)
 │       │   └── art/         # .aseprite sources and palette
-│       └── tests/           # Integration tests
+│       └── tests/           # README only: unit tests are inline in src/ (see tests/README.md)
 ├── docs/                    # Human-facing docs (README.md is the entry point)
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work

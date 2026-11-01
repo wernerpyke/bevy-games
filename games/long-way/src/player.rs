@@ -2,7 +2,9 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::half_view;
-use crate::collision::{CollisionSettings, GUY_FEET_OFFSET, SlideAssist, Trunk, move_feet};
+use crate::collision::{
+    CollisionSettings, CollisionWorld, GUY_FEET_OFFSET, SlideAssist, move_feet,
+};
 use crate::depth::DepthSort;
 
 /// Walk speed in art pixels per second.
@@ -62,7 +64,7 @@ fn move_player(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     window: Single<&Window>,
-    trunks: Query<&Trunk>,
+    world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
@@ -97,7 +99,7 @@ fn move_player(
             old_feet,
             step,
             time.delta_secs(),
-            trunks.iter(),
+            world.edges(),
         );
         transform.translation.x = feet.x;
         transform.translation.y = feet.y + GUY_FEET_OFFSET;

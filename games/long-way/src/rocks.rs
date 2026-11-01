@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
-use crate::collision::GUY_HALF_WIDTH;
+use crate::collision::{CollisionWorld, GUY_HALF_WIDTH};
 use crate::debug::DebugSettings;
 use crate::depth::DepthSort;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
@@ -34,7 +34,7 @@ impl Plugin for RocksPlugin {
     }
 }
 
-/// The merged outline of all rock clusters. Plan steps 5 and 6 make Guy collide with it.
+/// The merged outline of all rock clusters, kept for drawing. Guy collides with it through `CollisionWorld`.
 #[derive(Resource)]
 pub struct RockOutline(pub Vec<Cluster>);
 
@@ -138,7 +138,7 @@ fn spawn_rocks(mut commands: Commands, server: Res<AssetServer>, map: Res<Curren
     }
 }
 
-fn build_outline(mut commands: Commands, map: Res<CurrentMap>) {
+fn build_outline(mut commands: Commands, map: Res<CurrentMap>, mut world: ResMut<CollisionWorld>) {
     let map = &map.0;
     let areas: Vec<Rect> = map.objects.iter().map(|o| blocked_area(o, map)).collect();
     let clusters = outline::build(&areas);
@@ -156,6 +156,7 @@ fn build_outline(mut commands: Commands, map: Res<CurrentMap>) {
             cluster.edges.len()
         );
     }
+    world.add_clusters(&clusters);
     commands.insert_resource(RockOutline(clusters));
 }
 

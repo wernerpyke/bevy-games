@@ -2,6 +2,7 @@ use bevy::math::Isometry2d;
 use bevy::prelude::*;
 
 use crate::depth::DepthSort;
+use crate::outline::{self, Cluster, Edge, Orientation, TOLERANCE};
 
 /// Half the width of Guy's body. Guy's feet are blocked this far from a trunk's sides.
 pub const GUY_HALF_WIDTH: f32 = 20.0;
@@ -32,11 +33,37 @@ pub struct CollisionPlugin {
 impl Plugin for CollisionPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ShowCollision>()
+            .init_resource::<CollisionWorld>()
             .insert_resource(CollisionSettings {
                 allow_sliding: self.allow_sliding,
             })
+            .add_systems(PostStartup, register_trunks)
             .add_systems(Update, (toggle_debug, draw_debug));
     }
+}
+
+/// Every static blocked outline Guy collides with. Other plugins add their outlines at startup with
+/// `add_clusters`, trunks are added by this plugin. `resolve` and `move_feet` take its `edges`.
+#[derive(Resource, Default)]
+pub struct CollisionWorld {
+    edges: Vec<Edge>,
+}
+
+impl CollisionWorld {
+    pub fn add_clusters(&mut self, clusters: &[Cluster]) {
+        self.edges
+            .extend(clusters.iter().flat_map(|c| c.edges.iter().copied()));
+    }
+
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
+}
+
+/// Trunks are spawned in `Startup`, so they can be read after it.
+fn register_trunks(trunks: Query<&Trunk>, mut world: ResMut<CollisionWorld>) {
+    let areas: Vec<Rect> = trunks.iter().map(Trunk::blocked_area).collect();
+    world.add_clusters(&outline::build(&areas));
 }
 
 #[derive(Resource)]
@@ -107,48 +134,39 @@ impl Trunk {
     }
 }
 
-/// Result of `resolve`: where the feet ended up, and the blocked area that stopped each axis, if any.
+/// Result of `resolve`: where the feet ended up, and the outline edge that stopped each axis, if any.
 pub struct Resolved {
     pub feet: Vec2,
-    pub blocked_x: Option<Rect>,
-    pub blocked_y: Option<Rect>,
+    pub blocked_x: Option<Edge>,
+    pub blocked_y: Option<Edge>,
 }
 
-/// Moves Guy's feet from `old` towards `new`, stopping at the edge of any trunk's blocked area.
-/// Each axis is resolved on its own. A move is stopped when it crosses an edge, so a large step
-/// cannot jump over a trunk.
-pub fn resolve<'a>(
-    old: Vec2,
-    new: Vec2,
-    trunks: impl Iterator<Item = &'a Trunk> + Clone,
-) -> Resolved {
+/// Moves Guy's feet from `old` towards `new`, stopping at the first outline edge it crosses. A blocked region
+/// is on one side of each edge (`blocked_positive`), so an edge only stops a move coming from the free side. Each
+/// axis is resolved on its own, and a move is stopped when it crosses an edge, so a large step cannot jump over a
+/// shape. An edge covers the range between its ends, including an end at an inward corner (`Edge::covers`), so feet on a corner line cannot slip into the shape.
+pub fn resolve(old: Vec2, new: Vec2, edges: &[Edge]) -> Resolved {
     let mut x = new.x;
     let mut blocked_x = None;
-    for trunk in trunks.clone() {
-        let area = trunk.blocked_area();
-        if old.y > area.min.y && old.y < area.max.y {
-            if old.x <= area.min.x && x > area.min.x {
-                x = area.min.x;
-                blocked_x = Some(area);
-            } else if old.x >= area.max.x && x < area.max.x {
-                x = area.max.x;
-                blocked_x = Some(area);
-            }
+    for edge in edges
+        .iter()
+        .filter(|e| e.orientation == Orientation::Vertical)
+    {
+        if edge.covers(old.y) && crosses(edge.blocked_positive, old.x, x, edge.at) {
+            x = edge.at;
+            blocked_x = Some(*edge);
         }
     }
 
     let mut y = new.y;
     let mut blocked_y = None;
-    for trunk in trunks {
-        let area = trunk.blocked_area();
-        if x > area.min.x && x < area.max.x {
-            if old.y <= area.min.y && y > area.min.y {
-                y = area.min.y;
-                blocked_y = Some(area);
-            } else if old.y >= area.max.y && y < area.max.y {
-                y = area.max.y;
-                blocked_y = Some(area);
-            }
+    for edge in edges
+        .iter()
+        .filter(|e| e.orientation == Orientation::Horizontal)
+    {
+        if edge.covers(x) && crosses(edge.blocked_positive, old.y, y, edge.at) {
+            y = edge.at;
+            blocked_y = Some(*edge);
         }
     }
 
@@ -156,6 +174,17 @@ pub fn resolve<'a>(
         feet: Vec2::new(x, y),
         blocked_x,
         blocked_y,
+    }
+}
+
+/// True when a move from `old` to `new` along one axis reaches an edge at `at` from its free side. A start
+/// within `TOLERANCE` on the blocked side is still treated as on the free side: that is rounding noise after a
+/// stop exactly on the edge.
+fn crosses(blocked_positive: bool, old: f32, new: f32, at: f32) -> bool {
+    if blocked_positive {
+        old <= at + TOLERANCE && new > at
+    } else {
+        old >= at - TOLERANCE && new < at
     }
 }
 
@@ -168,16 +197,16 @@ pub fn resolve<'a>(
 /// 2. A move straight into a face stops Guy, which shows the collision.
 /// 3. If Guy keeps pushing for `SLIDE_DELAY` seconds and is close to an edge of that face, he is slid
 ///    sideways to that edge, then continues past the trunk.
-pub fn move_feet<'a>(
+pub fn move_feet(
     settings: &CollisionSettings,
     assist: &mut SlideAssist,
     old: Vec2,
     step: Vec2,
     dt: f32,
-    trunks: impl Iterator<Item = &'a Trunk> + Clone,
+    edges: &[Edge],
 ) -> Vec2 {
     let desired = old + step;
-    let moved = resolve(old, desired, trunks);
+    let moved = resolve(old, desired, edges);
 
     if !settings.allow_sliding {
         return if moved.feet == desired { desired } else { old };
@@ -253,16 +282,13 @@ fn push_direction(step: Vec2) -> Vec2 {
 /// Moves `feet` along the face towards the nearer edge. Returns `None` if neither edge is within range.
 /// `pushing_vertically` is true when Guy pushes up or down, so the face is horizontal and he slides along x.
 fn slide_to_nearest_edge(
-    face: Rect,
+    face: Edge,
     feet: Vec2,
     pushing_vertically: bool,
     dt: f32,
 ) -> Option<Vec2> {
-    let (position, min, max) = if pushing_vertically {
-        (feet.x, face.min.x, face.max.x)
-    } else {
-        (feet.y, face.min.y, face.max.y)
-    };
+    let position = if pushing_vertically { feet.x } else { feet.y };
+    let (min, max) = (face.from, face.to);
     let to_min = position - min;
     let to_max = max - position;
     if to_min.min(to_max) > SLIDE_RANGE_FRACTION * (max - min) {
@@ -338,8 +364,16 @@ mod tests {
         }
     }
 
+    /// The outline edges of the test trunk, as the game builds them.
+    fn trunk_edges() -> Vec<Edge> {
+        outline::build(&[trunk().blocked_area()])
+            .iter()
+            .flat_map(|c| c.edges.iter().copied())
+            .collect()
+    }
+
     fn walk(from: Vec2, to: Vec2) -> Vec2 {
-        resolve(from, to, [trunk()].iter()).feet
+        resolve(from, to, &trunk_edges()).feet
     }
 
     const DT: f32 = 1.0 / 60.0;
@@ -351,7 +385,7 @@ mod tests {
         let mut assist = SlideAssist::default();
         let mut feet = start;
         for _ in 0..frames {
-            feet = move_feet(settings, &mut assist, feet, step, DT, [trunk()].iter());
+            feet = move_feet(settings, &mut assist, feet, step, DT, &trunk_edges());
         }
         feet
     }
@@ -459,7 +493,7 @@ mod tests {
             old,
             Vec2::new(5.0, 5.0),
             DT,
-            [trunk()].iter(),
+            &trunk_edges(),
         );
         assert_eq!(end, old);
     }
@@ -473,7 +507,7 @@ mod tests {
             Vec2::new(-20.0, -10.0),
             Vec2::new(5.0, 5.0),
             DT,
-            [trunk()].iter(),
+            &trunk_edges(),
         );
         assert_eq!(end, Vec2::new(-20.0, -5.0));
     }
@@ -485,11 +519,11 @@ mod tests {
         let mut feet = Vec2::new(-10.0, -30.0);
         // 10 frames is 0.17 s, under the delay. Letting go in between restarts the count.
         for _ in 0..10 {
-            feet = move_feet(&SLIDING, &mut assist, feet, up, DT, [trunk()].iter());
+            feet = move_feet(&SLIDING, &mut assist, feet, up, DT, &trunk_edges());
         }
         assist.reset();
         for _ in 0..10 {
-            feet = move_feet(&SLIDING, &mut assist, feet, up, DT, [trunk()].iter());
+            feet = move_feet(&SLIDING, &mut assist, feet, up, DT, &trunk_edges());
         }
         assert_eq!(feet, Vec2::new(-10.0, -30.0));
     }
@@ -511,7 +545,7 @@ mod tests {
         for dt in frame_times().take(300) {
             // The step length depends on the frame time, as it does in the game (300 units per second).
             let step = Vec2::new(0.0, 300.0 * dt);
-            let next = move_feet(&SLIDING, &mut assist, feet, step, dt, [trunk()].iter());
+            let next = move_feet(&SLIDING, &mut assist, feet, step, dt, &trunk_edges());
             if next.x != feet.x {
                 // The slide may start on the frame that brings the push time to the delay.
                 let held = pushed + dt;
@@ -526,5 +560,159 @@ mod tests {
             pushed += dt;
         }
         panic!("never slid in {pushed} s");
+    }
+
+    fn edges_of(rects: &[Rect]) -> Vec<Edge> {
+        outline::build(rects)
+            .iter()
+            .flat_map(|c| c.edges.iter().copied())
+            .collect()
+    }
+
+    /// A U shape: base 0..40 by 0..10 and pillars 0..10 and 30..40 up to y 40. The notch is x 10..30 above y 10.
+    fn notch() -> Vec<Edge> {
+        edges_of(&[
+            Rect::new(0.0, 0.0, 40.0, 10.0),
+            Rect::new(0.0, 10.0, 10.0, 40.0),
+            Rect::new(30.0, 10.0, 40.0, 40.0),
+        ])
+    }
+
+    #[test]
+    fn walking_along_a_wall_cannot_slip_into_the_shape_at_an_inward_corner() {
+        // Two rocks, the upper one shifted left. The wall x 40 (y 0 to 20) ends at an inward corner at (40, 20),
+        // where the upper rock's bottom face (x 0 to 40, y 20) starts. Guy stopped on the wall line pushes up.
+        let edges = edges_of(&[
+            Rect::new(40.0, 0.0, 100.0, 20.0),
+            Rect::new(0.0, 20.0, 80.0, 60.0),
+        ]);
+        let end = resolve(Vec2::new(40.0, 5.0), Vec2::new(40.0, 100.0), &edges).feet;
+        assert_eq!(
+            end,
+            Vec2::new(40.0, 20.0),
+            "stopped in the corner, not walked into the shape"
+        );
+    }
+
+    #[test]
+    fn walking_along_a_floor_cannot_slip_into_the_shape_at_an_inward_corner() {
+        // The same shape as above turned on its side: the face y 40 (x 0 to 20) ends at an inward corner at
+        // (20, 40), where the vertical wall x 20 (y 40 to 80) starts. Guy stopped on the line pushes right.
+        let edges = edges_of(&[
+            Rect::new(0.0, 40.0, 20.0, 100.0),
+            Rect::new(20.0, 0.0, 60.0, 80.0),
+        ]);
+        let end = resolve(Vec2::new(5.0, 40.0), Vec2::new(100.0, 40.0), &edges).feet;
+        assert_eq!(end, Vec2::new(20.0, 40.0));
+    }
+
+    #[test]
+    fn rounding_noise_on_the_stop_line_does_not_let_guy_into_a_shape() {
+        let edges = edges_of(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
+        // Guy was stopped at y 0 below the rectangle, and the recomputed feet came out a hair high.
+        let end = resolve(Vec2::new(5.0, 0.000_005), Vec2::new(5.0, 3.0), &edges).feet;
+        assert_eq!(end.y, 0.0);
+        let end = resolve(Vec2::new(-0.000_005, 5.0), Vec2::new(3.0, 5.0), &edges).feet;
+        assert_eq!(end.x, 0.0);
+    }
+
+    #[test]
+    fn rounding_noise_at_a_corner_line_does_not_catch_or_leak() {
+        // Convex corner: feet a hair inside the end of a face still walk past it.
+        let edges = edges_of(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
+        let end = resolve(
+            Vec2::new(-5.0, 0.000_005),
+            Vec2::new(30.0, 0.000_005),
+            &edges,
+        )
+        .feet;
+        assert_eq!(end.x, 30.0);
+        // Inward corner: feet a hair past the end still stop in the corner.
+        let edges = edges_of(&[
+            Rect::new(40.0, 0.0, 100.0, 20.0),
+            Rect::new(0.0, 20.0, 80.0, 60.0),
+        ]);
+        let end = resolve(Vec2::new(40.0, 5.0), Vec2::new(40.000_005, 100.0), &edges).feet;
+        assert_eq!(end.y, 20.0);
+    }
+
+    #[test]
+    fn feet_on_the_line_of_an_outward_corner_can_walk_past_it() {
+        let edges = edges_of(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
+        // Along the top line y 10, past the whole rectangle.
+        let end = resolve(Vec2::new(-5.0, 10.0), Vec2::new(30.0, 10.0), &edges).feet;
+        assert_eq!(end.x, 30.0);
+    }
+
+    #[test]
+    fn the_notch_walls_and_floor_stop_guy_inside_it() {
+        let edges = notch();
+        let from = Vec2::new(20.0, 25.0);
+        assert_eq!(resolve(from, Vec2::new(-50.0, 25.0), &edges).feet.x, 10.0);
+        assert_eq!(resolve(from, Vec2::new(90.0, 25.0), &edges).feet.x, 30.0);
+        assert_eq!(resolve(from, Vec2::new(20.0, -50.0), &edges).feet.y, 10.0);
+        // Straight up and out of the open top of the notch is free.
+        assert_eq!(resolve(from, Vec2::new(20.0, 90.0), &edges).feet.y, 90.0);
+    }
+
+    #[test]
+    fn a_cluster_stops_guy_from_every_side_and_a_big_step_cannot_jump_it() {
+        let edges = notch();
+        let at = |from: Vec2, to: Vec2| resolve(from, to, &edges).feet;
+        assert_eq!(at(Vec2::new(-100.0, 20.0), Vec2::new(500.0, 20.0)).x, 0.0);
+        assert_eq!(at(Vec2::new(500.0, 20.0), Vec2::new(-100.0, 20.0)).x, 40.0);
+        assert_eq!(at(Vec2::new(20.0, -100.0), Vec2::new(20.0, 500.0)).y, 0.0);
+        assert_eq!(at(Vec2::new(5.0, 100.0), Vec2::new(5.0, -100.0)).y, 40.0);
+    }
+
+    #[test]
+    fn walking_along_the_side_of_a_cluster_is_free() {
+        let edges = notch();
+        // Feet exactly on the line of the left side, walking up past the whole cluster.
+        let end = resolve(Vec2::new(0.0, -10.0), Vec2::new(0.0, 100.0), &edges).feet;
+        assert_eq!(end, Vec2::new(0.0, 100.0));
+    }
+
+    /// Two touching rocks side by side. Their shared face is one merged edge 0 to 120 long.
+    fn two_rocks() -> Vec<Edge> {
+        edges_of(&[
+            Rect::new(0.0, 0.0, 60.0, 20.0),
+            Rect::new(60.0, 0.0, 120.0, 20.0),
+        ])
+    }
+
+    fn simulate_edges(start: Vec2, step: Vec2, frames: usize, edges: &[Edge]) -> Vec2 {
+        let mut assist = SlideAssist::default();
+        let mut feet = start;
+        for _ in 0..frames {
+            feet = move_feet(&SLIDING, &mut assist, feet, step, DT, edges);
+        }
+        feet
+    }
+
+    #[test]
+    fn sliding_goes_to_the_end_of_the_merged_face_not_the_end_of_one_rock() {
+        // 35% of the 120 long face is 42. Feet at x 20 are 20 from the left end: slid to x 0, then walk on up.
+        let end = simulate_edges(
+            Vec2::new(20.0, -10.0),
+            Vec2::new(0.0, STEP),
+            60,
+            &two_rocks(),
+        );
+        assert_eq!(end.x, 0.0);
+        assert!(end.y > 20.0, "walked up past the rocks, got {end}");
+    }
+
+    #[test]
+    fn guy_is_not_slid_into_the_seam_between_two_touching_rocks() {
+        // Feet at x 50 are 10 from the seam at x 60, but the seam is not an edge. The nearest end is 50 away,
+        // out of range, so Guy stays stopped. Per rock he would have been slid to x 60 and walked up the seam.
+        let end = simulate_edges(
+            Vec2::new(50.0, -10.0),
+            Vec2::new(0.0, STEP),
+            90,
+            &two_rocks(),
+        );
+        assert_eq!(end, Vec2::new(50.0, 0.0));
     }
 }

@@ -12,6 +12,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 
 - Do not compare normalised float vectors for equality between frames. `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction depending on the length, so a "did the direction change" check fires randomly. Compare signs or an enum.
 - To run a system after Bevy has updated keyboard state, use `PreUpdate` with `.after(bevy::input::InputSystems)`. To write keys into `ButtonInput<KeyCode>`, use `press` and `release`.
+- Positions that are stored in one form and recomputed in another drift by millionths: Guy's feet are `translation.y - 30`, so a feet y of 76.8 can come back as 76.800003. Never test exact equality against an edge or corner coordinate. `outline::TOLERANCE` (0.01) is used for this, and `collision::crosses` and `Edge::covers` apply it.
 - Sprites with equal z have no fixed draw order, so overlapping sprites flicker. Always give overlapping sprites different z. `depth.rs` adds a tiny x term (`Z_PER_X`) to the feet y sort. To check for flicker, take 12 screenshots in a row (`screenshot:` with `wait:0.05` between) and count changed pixels between neighbours: any non-zero count in a static area is a flicker.
 - Exiting from a system: `MessageWriter<AppExit>` then `exit.write(AppExit::Success)`.
 

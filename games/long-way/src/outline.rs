@@ -11,6 +11,10 @@ use bevy::math::Rect;
 /// two rectangles that are meant to touch.
 pub const EPSILON: f32 = 0.001;
 
+/// Slack for positions that sit on an edge line. Guy's feet are recomputed from his sprite centre every frame
+/// (add 30, subtract 30), which can move a coordinate by a few millionths. Far above that and far below a pixel.
+pub const TOLERANCE: f32 = 0.01;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Orientation {
     /// The edge has a fixed x and runs along y.
@@ -30,6 +34,30 @@ pub struct Edge {
     pub to: f32,
     /// True when the blocked side is the side with larger x (vertical) or larger y (horizontal).
     pub blocked_positive: bool,
+    /// True when the outline turns inward at this end (the blocked region fills three of the four cells around
+    /// the corner). The end point itself then counts as part of the edge, see `covers`.
+    pub from_concave: bool,
+    pub to_concave: bool,
+}
+
+impl Edge {
+    /// True when `along` (y for a vertical edge, x for a horizontal one) is within the edge. The ends are
+    /// excluded, so feet exactly on a corner line can walk along the outside of a convex corner. An end at an
+    /// inward (concave) corner is included: past it the feet would be inside the shape. Positions within
+    /// `TOLERANCE` of an end count as at the end, so rounding noise cannot change the answer.
+    pub fn covers(&self, along: f32) -> bool {
+        let above_start = if self.from_concave {
+            along >= self.from - TOLERANCE
+        } else {
+            along > self.from + TOLERANCE
+        };
+        let below_end = if self.to_concave {
+            along <= self.to + TOLERANCE
+        } else {
+            along < self.to - TOLERANCE
+        };
+        above_start && below_end
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -114,6 +142,23 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
             }
         }
     }
+    // An inward corner has exactly three filled cells around its vertex (k, l).
+    let concave = |k: usize, l: usize| -> bool {
+        let filled = |i: Option<usize>, j: Option<usize>| match (i, j) {
+            (Some(i), Some(j)) if i < cols && j < rows => owner[j * cols + i].is_some(),
+            _ => false,
+        };
+        [
+            filled(k.checked_sub(1), l.checked_sub(1)),
+            filled(Some(k), l.checked_sub(1)),
+            filled(k.checked_sub(1), Some(l)),
+            filled(Some(k), Some(l)),
+        ]
+        .iter()
+        .filter(|f| **f)
+        .count()
+            == 3
+    };
     let cell = |i: Option<usize>, j: Option<usize>| -> Option<usize> {
         match (i, j) {
             (Some(i), Some(j)) if i < cols && j < rows => owner[j * cols + i],
@@ -141,6 +186,8 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
                     from: ys[from],
                     to: ys[to],
                     blocked_positive: positive,
+                    from_concave: concave(k, from),
+                    to_concave: concave(k, to),
                 });
             });
         }
@@ -163,6 +210,8 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
                     from: xs[from],
                     to: xs[to],
                     blocked_positive: positive,
+                    from_concave: concave(from, l),
+                    to_concave: concave(to, l),
                 });
             });
         }
@@ -253,6 +302,8 @@ mod tests {
             from,
             to,
             blocked_positive,
+            from_concave: false,
+            to_concave: false,
         }
     }
 
@@ -263,7 +314,21 @@ mod tests {
             from,
             to,
             blocked_positive,
+            from_concave: false,
+            to_concave: false,
         }
+    }
+
+    /// The edges without the concave flags, so shape tests can compare positions and sides only.
+    fn plain(edges: &[Edge]) -> Vec<Edge> {
+        edges
+            .iter()
+            .map(|e| Edge {
+                from_concave: false,
+                to_concave: false,
+                ..*e
+            })
+            .collect()
     }
 
     fn sorted(mut edges: Vec<Edge>) -> Vec<Edge> {
@@ -297,7 +362,7 @@ mod tests {
         assert_eq!(clusters[0].members, vec![0]);
         assert_eq!(clusters[0].bounds, rect(0.0, 0.0, 10.0, 20.0));
         assert_eq!(
-            clusters[0].edges,
+            plain(&clusters[0].edges),
             sorted(vec![
                 vertical(0.0, 0.0, 20.0, true),
                 vertical(10.0, 0.0, 20.0, false),
@@ -313,7 +378,7 @@ mod tests {
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].members, vec![0, 1]);
         assert_eq!(
-            clusters[0].edges,
+            plain(&clusters[0].edges),
             sorted(vec![
                 vertical(0.0, 0.0, 10.0, true),
                 vertical(25.0, 0.0, 10.0, false),
@@ -345,7 +410,7 @@ mod tests {
         let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(8.0, 5.0, 20.0, 15.0)]);
         assert_eq!(clusters.len(), 1);
         assert_eq!(
-            clusters[0].edges,
+            plain(&clusters[0].edges),
             sorted(vec![
                 vertical(0.0, 0.0, 10.0, true),
                 vertical(8.0, 10.0, 15.0, true),
@@ -365,7 +430,7 @@ mod tests {
         let clusters = build(&[rect(0.0, 0.0, 30.0, 10.0), rect(0.0, 10.0, 10.0, 30.0)]);
         assert_eq!(clusters.len(), 1);
         assert_eq!(
-            clusters[0].edges,
+            plain(&clusters[0].edges),
             sorted(vec![
                 vertical(0.0, 0.0, 30.0, true),
                 vertical(10.0, 10.0, 30.0, false),
@@ -386,7 +451,7 @@ mod tests {
             rect(30.0, 10.0, 40.0, 40.0),
         ]);
         assert_eq!(clusters.len(), 1);
-        let edges = &clusters[0].edges;
+        let edges = plain(&clusters[0].edges);
         assert_eq!(edges.len(), 8);
         // The notch floor is blocked below it, and the two notch walls are blocked outside the notch.
         assert!(edges.contains(&horizontal(10.0, 10.0, 30.0, false)));
@@ -408,7 +473,7 @@ mod tests {
             rect(20.0, 20.0, 30.0, 30.0),
         ]);
         assert_eq!(clusters.len(), 1);
-        let edges = &clusters[0].edges;
+        let edges = plain(&clusters[0].edges);
         assert_eq!(edges.len(), 8);
         assert!(edges.contains(&vertical(10.0, 10.0, 20.0, false)));
         assert!(edges.contains(&vertical(20.0, 10.0, 20.0, true)));
@@ -472,6 +537,111 @@ mod tests {
     fn a_gap_wider_than_the_tolerance_stays_open() {
         let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.01, 0.0, 20.0, 10.0)]);
         assert_eq!(clusters.len(), 2);
+    }
+
+    #[test]
+    fn a_single_rectangle_has_no_concave_ends() {
+        let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0)]);
+        assert!(
+            clusters[0]
+                .edges
+                .iter()
+                .all(|e| !e.from_concave && !e.to_concave)
+        );
+    }
+
+    #[test]
+    fn an_l_shape_has_one_inward_corner_at_its_inner_vertex() {
+        let clusters = build(&[rect(0.0, 0.0, 30.0, 10.0), rect(0.0, 10.0, 10.0, 30.0)]);
+        let edges = &clusters[0].edges;
+        let concave_ends: Vec<_> = edges
+            .iter()
+            .flat_map(|e| [(e, e.from_concave, e.from), (e, e.to_concave, e.to)])
+            .filter(|(_, concave, _)| *concave)
+            .map(|(e, _, along)| match e.orientation {
+                Orientation::Vertical => (e.at, along),
+                Orientation::Horizontal => (along, e.at),
+            })
+            .collect();
+        // Two edges meet at the inner vertex (10, 10), and both mark that end.
+        assert_eq!(concave_ends, vec![(10.0, 10.0), (10.0, 10.0)]);
+    }
+
+    #[test]
+    fn the_ends_of_a_notch_floor_are_both_inward_corners() {
+        let clusters = build(&[
+            rect(0.0, 0.0, 40.0, 10.0),
+            rect(0.0, 10.0, 10.0, 40.0),
+            rect(30.0, 10.0, 40.0, 40.0),
+        ]);
+        let floor = clusters[0]
+            .edges
+            .iter()
+            .find(|e| e.orientation == Orientation::Horizontal && e.at == 10.0)
+            .copied()
+            .expect("notch floor");
+        assert!(floor.from_concave && floor.to_concave);
+        // The notch walls meet the floor at their lower end, which is inward, and end in the open at the top.
+        let wall = clusters[0]
+            .edges
+            .iter()
+            .find(|e| e.orientation == Orientation::Vertical && e.at == 10.0)
+            .copied()
+            .expect("notch wall");
+        assert!(wall.from_concave && !wall.to_concave);
+    }
+
+    #[test]
+    fn the_inner_corners_of_a_ring_are_inward() {
+        let rects: Vec<Rect> = [
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (20.0, 0.0),
+            (0.0, 10.0),
+            (20.0, 10.0),
+            (0.0, 20.0),
+            (10.0, 20.0),
+            (20.0, 20.0),
+        ]
+        .iter()
+        .map(|(x, y)| rect(*x, *y, x + 10.0, y + 10.0))
+        .collect();
+        let edges = build(&rects)[0].edges.clone();
+        let inner: Vec<_> = edges
+            .iter()
+            .filter(|e| e.at == 10.0 || e.at == 20.0)
+            .filter(|e| e.from == 10.0 && e.to == 20.0)
+            .collect();
+        assert_eq!(inner.len(), 4);
+        assert!(inner.iter().all(|e| e.from_concave && e.to_concave));
+        let outer = edges.iter().filter(|e| e.at == 0.0 || e.at == 30.0);
+        assert!(outer.into_iter().all(|e| !e.from_concave && !e.to_concave));
+    }
+
+    #[test]
+    fn covers_excludes_convex_ends_and_includes_inward_ends() {
+        let edge = |from_concave, to_concave| Edge {
+            orientation: Orientation::Vertical,
+            at: 0.0,
+            from: 10.0,
+            to: 20.0,
+            blocked_positive: true,
+            from_concave,
+            to_concave,
+        };
+        let convex = edge(false, false);
+        assert!(convex.covers(15.0));
+        assert!(!convex.covers(10.0) && !convex.covers(20.0));
+        let inward = edge(true, true);
+        assert!(inward.covers(10.0) && inward.covers(20.0));
+        assert!(!inward.covers(9.9) && !inward.covers(20.1));
+        let mixed = edge(true, false);
+        assert!(mixed.covers(10.0) && !mixed.covers(20.0));
+        // Noise within the tolerance counts as at the end.
+        assert!(!convex.covers(10.005) && !convex.covers(19.995));
+        assert!(convex.covers(10.02) && convex.covers(19.98));
+        assert!(inward.covers(9.995) && inward.covers(20.005));
+        assert!(!inward.covers(9.98) && !inward.covers(20.02));
     }
 
     #[test]
