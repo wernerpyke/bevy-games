@@ -6,6 +6,8 @@ legend:
   ".": empty
   "0": rock_0
   "1": rock_1
+  "g": green_tree
+  "r": red_tree
 ---
 
 # Rocks test
@@ -29,6 +31,20 @@ A small cluster of rocks for testing collision.
 . . 0 0 . .
 ```
 
+## Green tree
+
+One green tree. Its footprint is 2 by 2 cells, like a rock. The trunk blocks Guy.
+
+```cells
+g
+```
+
+## Red tree
+
+```cells
+r
+```
+
 ## Reusable cluster
 
 A cluster defined once and placed several times. The copies are ordinary rocks, so copies that
@@ -47,3 +63,5 @@ the cell of the feature's bottom left character.
 
 - 'Rocks test' at (21,9)
 - 'Reusable cluster' at (2,12), (2,3) and (6,3)
+- 'Green tree' at (12,8)
+- 'Red tree' at (18,8)

@@ -60,13 +60,21 @@ pub struct CurrentMap(pub Map);
 pub enum Kind {
     Rock0,
     Rock1,
+    GreenTree,
+    RedTree,
 }
 
 impl Kind {
+    pub fn is_rock(self) -> bool {
+        matches!(self, Kind::Rock0 | Kind::Rock1)
+    }
+
     fn from_name(name: &str) -> Option<Kind> {
         match name {
             "rock_0" => Some(Kind::Rock0),
             "rock_1" => Some(Kind::Rock1),
+            "green_tree" => Some(Kind::GreenTree),
+            "red_tree" => Some(Kind::RedTree),
             _ => None,
         }
     }
@@ -462,7 +470,7 @@ fn parse_header(lines: &[&str], first_line: usize, fail: &Fail) -> Result<Header
             let Some(kind) = Kind::from_name(value) else {
                 return Err(fail(
                     line,
-                    format!("unknown kind `{value}` (known: rock_0, rock_1)"),
+                    format!("unknown kind `{value}` (known: rock_0, rock_1, green_tree, red_tree)"),
                 ));
             };
             header.legend.insert(character, kind);
@@ -640,8 +648,10 @@ mod tests {
         assert_eq!(map.pitch, 1);
         assert_eq!(map.draw_size, 128.0);
         assert_eq!(map.jitter, 0.0);
-        // 10 rocks in the first feature and three copies of the 8 rock patch.
-        assert_eq!(map.objects.len(), 34);
+        // 10 rocks in the first feature, three copies of the 8 rock patch and two trees.
+        assert_eq!(map.objects.len(), 36);
+        assert_eq!(cells(&map, Kind::GreenTree), vec![(12, 8)]);
+        assert_eq!(cells(&map, Kind::RedTree), vec![(18, 8)]);
     }
 
     #[test]

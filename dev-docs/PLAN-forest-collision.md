@@ -132,9 +132,11 @@ Each object kind has art, a footprint and a collision rule, defined once in code
 | Kind | Art | Footprint | Collision |
 |---|---|---|---|
 | `rock_0`, `rock_1` | `Rocks.aseprite` tag | 2x2 cells | solid, inset 10% |
-| `green_tree`, `red_tree` (later) | tree art | 2x2 cells | trunk band (`adr-lw1`) |
+| `green_tree`, `red_tree` | `Green tree.aseprite`, `Red tree.aseprite` (128x128, all frames loop) | 2x2 cells | trunk band (`adr-lw1`) |
 
 The map file only names kinds. Adding a kind never changes the file format.
+
+Step 9b (done 2026-11-01): the two trees are placed from the map file. `trees.rs` reads the map, spawns a `Trunk` and a sprite per tree object, and `rocks.rs` skips tree kinds. The trunk is at pixels 76 to 104 of the canvas, the base is the bottom of the footprint. The trees moved slightly: they are now on whole cells ((12,8) and (18,8)) and 34 pixels lower than the old fixed positions. Checked in the game: walking up into the green tree stops Guy at y -94 (base -64 minus 30) and walking down from above stops him at y -51.2 (base plus 12.8), as before.
 
 ## 6. Collision approaches (research summary)
 
@@ -210,6 +212,7 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 8. **Collision overlay (done 2026-11-01).** `collision_debug.rs` draws the overlay as sprites on the feature debug layer, and it turns on and off with F2 (F1 is gone, the gizmo overlay was removed). Yellow: every outline edge with a tick on the blocked side, trunks included. Cyan: the blocked area of each interior rock. Green squares: the feet of every depth-sorted entity. The red trunk boxes were dropped, the yellow outline covers them. Checked on screen with a screenshot. Also added compile-time checks for the layer order and the depth range.
 
 9. **Reusable clusters (done 2026-11-01).** First built as `cells name=` templates and `place` blocks. The developer then chose a clearer file layout (section 5): a `# Features` section with one `## Name` heading and `cells` block per feature, and a `# Map` section with bullets like `- 'Reusable cluster' at (2,12), (2,3) and (6,3)`. `map.rs` parses that format (`parse_body`) with errors that name the line, and 34 tests cover it. `rocks-test.md` uses it. Checked in the game: same result as before (34 objects, 5 clusters, 54 edges).
+9b. **Trees from the map (done 2026-11-01).** `green_tree` and `red_tree` are map kinds. The two trees are features ('Green tree', 'Red tree') placed in `# Map`. See section 5, "Extending to trees".
 
 10. **Check in the real game** with `script` and `screenshot:`: push into a long face, slide past a cluster corner, push into a notch, walk through a narrow gap, depth order of overlapping rocks. Report what was not seen on screen.
 11. `lint`, `test`, `web`.

@@ -36,7 +36,7 @@ legend:
 | `origin` | yes | Must be `bottom-left`. Cell (0, 0) is the bottom left cell, as on the F2 grid. |
 | `legend` | yes | Says what each character in a `cells` block means. See below. |
 | `pitch` | no | Cells between two characters. Default 1. |
-| `draw` | no | Drawn size of a rock in pixels. Default 128. Use a multiple of 32. |
+| `draw` | no | Drawn size of a rock in pixels. Default 128. Use a multiple of 32. Rocks only. |
 | `jitter` | no | Largest random shift of each object in pixels. Default 0. |
 
 Rules for the frontmatter:
@@ -44,7 +44,7 @@ Rules for the frontmatter:
 - A `#` starts a comment when it is at the start of a line or after a space.
 - A legend character must be one character. Put it in quotes, for example `"#"`.
 - The character `.` always means empty. Write it as `".": empty`.
-- The kinds you can use now are `rock_0` and `rock_1`.
+- The kinds you can use now are `rock_0`, `rock_1`, `green_tree` and `red_tree`.
 
 ## 2. Features
 
@@ -77,9 +77,15 @@ Rules:
 
 ### How big is a rock?
 
-One rock covers 2 by 2 cells. The character you write is the bottom left cell of that rock. The rock extends one cell to the right and one cell up.
+One rock covers 2 by 2 cells. The character you write is the bottom left cell of that rock. The rock extends one cell to the right and one cell up. A tree also has a 2 by 2 cell footprint, with its bottom left corner on the cell you write.
 
 Characters that are next to each other overlap by one cell. This is on purpose. It makes a pile of rocks that looks like one cluster. A solid block of 4 by 3 characters gives a cluster of 5 by 4 cells.
+
+### Trees
+
+A tree is a feature with one character, for example `g` for `green_tree`. The trunk blocks Guy. Guy can walk behind the tree from above and overlap its trunk from below by half of his height (`adr-lw1`). Trunks that touch rocks join the rock cluster. `draw` applies to rocks only. `jitter` also shifts trees.
+
+### Rocks and collision
 
 Guy cannot walk through a rock. The game joins the rocks of a cluster and Guy walks around the edge of the whole cluster. Rocks in the middle of a cluster have no edge and cost no extra work.
 

@@ -74,7 +74,7 @@ fn placement(object: &MapObject, map: &Map) -> Placement {
 }
 
 /// World position of the bottom left corner of the footprint.
-fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
+pub fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
     MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
 }
 
@@ -127,13 +127,15 @@ fn spawn_rocks(
             (map.draw_size / ART_PIXELS).round().max(1.0) * ART_PIXELS
         );
     }
-    let areas: Vec<Rect> = map.objects.iter().map(|o| blocked_area(o, map)).collect();
+    let rocks: Vec<&MapObject> = map.objects.iter().filter(|o| o.kind.is_rock()).collect();
+    let areas: Vec<Rect> = rocks.iter().map(|o| blocked_area(o, map)).collect();
     let first_area = world.add_blocked(&areas);
 
-    for (index, object) in map.objects.iter().enumerate() {
+    for (index, object) in rocks.into_iter().enumerate() {
         let tag = match object.kind {
             Kind::Rock0 => "rock_0",
             Kind::Rock1 => "rock_1",
+            _ => unreachable!("only rocks are spawned here"),
         };
         let placement = placement(object, map);
         commands.spawn((
