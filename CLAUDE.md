@@ -112,6 +112,7 @@ bevy/
 ├── docs/                    # Human-facing docs (README.md is the entry point)
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work
+│   ├── GAME-MAPS.md         # How to write a map file (human guide)
 │   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, LONG-WAY
 │   ├── bevy-notes.md        # Verified Bevy 0.20 patterns
 │   ├── BEVY-CONCEPTS.md     # Human-friendly guide to how Bevy works

@@ -26,6 +26,10 @@ With the grid origin at the bottom left, the column "0" label (top edge) and the
 
 The first rock map uses `include_str!` and an own parser for the frontmatter (`PLAN-forest-collision.md`, `adr-lw8`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
 
+### 7. Alternative formats for map files
+
+Maps are markdown files with frontmatter, a `# Features` section and a `# Map` section (`dev-docs/GAME-MAPS.md`, `adr-lw8`). This suits small maps that a human reads and edits. Maps may become more complex than markdown handles well: many object kinds with their own settings, areas with triggers or dialogue, enemies and paths, several layers, and values that need real types (numbers, lists, nested data). Consider other formats, among them YAML and TOML. Questions to answer: how the painted `cells` grids fit in (a block string, or a separate file), how the features and the placements look in the new format, whether the human editing experience stays as good, comment support, error messages with line numbers, wasm support of the parser crate (check each crate for the pinned Rust and Bevy), and how it fits with roadmap item 6 (asset loader, hot reload, Tiled maps). Not worth doing now. Decide when a map needs data that markdown handles badly, and at the latest together with item 6. Keep the parser in `map.rs` behind one function (`parse`) so a format can be swapped without touching `rocks.rs`.
+
 ## Completed Items
 
 ### Plugin compatibility check

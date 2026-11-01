@@ -75,7 +75,7 @@ Both start visible. The collision overlay is in `collision_debug.rs` and follows
 ## adr-lw8. Maps are markdown files, rocks come first (2026-11-01)
 
 **Decision.**
-1. A human describes object layouts in a markdown file with frontmatter. Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The exact format is in `dev-docs/PLAN-forest-collision.md` until it is built.
+1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The exact format is in `dev-docs/PLAN-forest-collision.md` until it is built.
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`).
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).

@@ -57,11 +57,11 @@ The vertical margin is 0: the blocked area ends at the inset rectangle above and
 
 ## 5. The map file (human interface)
 
-File location: `games/long-way/assets/maps/<name>.md`. The body is ordinary markdown, so a human can write notes, headings and sketches around the maps. Only the frontmatter and the fenced `cells` blocks are read.
+File location: `games/long-way/assets/maps/<name>.md`. The body is ordinary markdown, so a human can write notes, headings and sketches around the maps. The game reads the frontmatter, the `# Features` section and the `# Map` section (format decided 2026-11-01, replacing the first format where each `cells` block had its own `at=x,y`).
 
 ````markdown
 ---
-map: rock-cluster-test
+map: rocks-test
 cell: 64
 origin: bottom-left
 legend:
@@ -70,27 +70,47 @@ legend:
   "1": rock_1
 ---
 
-# Rock cluster test
+# Features
 
-Free text. The game ignores this. Use it to explain the layout.
+Describes every feature that can be drawn.
 
-```cells at=10,6
+## Rocks test
+
+Notes about the feature, then its `cells` block.
+
+```cells
 . . 1 1 . .
 . 0 0 1 1 .
 . 0 0 . . .
 . . 0 0 . .
 ```
+
+## Reusable cluster
+
+```cells
+. 0 0 .
+0 1 1 0
+. 0 0 .
+```
+
+# Map
+
+Places the features. Positions are in parentheses.
+
+- 'Rocks test' at (21,9)
+- 'Reusable cluster' at (2,12), (2,3) and (6,3)
 ````
 
 Rules:
 
-1. **Frontmatter.** `map` is a name for log messages. `cell` is the cell size in pixels (64). `origin: bottom-left` says cell (0, 0) is the bottom left cell, as in the F2 grid. `legend` maps one character to an object kind. `.` is always empty. Kinds are defined in code (`rock_0`, `rock_1` now, trees later).
-2. **Cell block.** A fenced block that starts with `cells at=x,y`. `x,y` is the cell of the **bottom left character**. Rows are written top to bottom, so the first row has the highest y. Characters are separated by spaces. A map can have several blocks.
-3. **Placement.** A character places one object whose **bottom left corner** is that cell. A rock covers 2x2 cells, so it extends one cell right and one cell up. Neighbouring characters overlap by one cell, which makes a pile. A solid 4 x 3 painted area gives a cluster of 5 x 4 cells.
-4. **Errors.** An unknown character, a ragged row or a missing `at=` stops loading and names the file and line. A silent skip would hide layout mistakes.
-5. **Check.** The F2 grid and the `screenshot:` script command let Claude and the human compare the file with the screen.
+1. **Frontmatter.** `map` is a name for log messages. `cell` is the cell size in pixels (64). `origin: bottom-left` says cell (0, 0) is the bottom left cell, as in the F2 grid. `legend` maps one character to an object kind. `.` is always empty. Kinds are defined in code (`rock_0`, `rock_1` now, trees later). Optional keys: `pitch`, `draw`, `jitter`.
+2. **Features.** Under `# Features`, each `## Name` heading defines one feature. It has one fenced `cells` block, with free text around it. Rows are written top to bottom, so the first row has the highest y. Characters are separated by spaces. The bottom left character is the anchor of the feature. A `cells` block takes no options.
+3. **Map.** Under `# Map`, each bullet (`-` or `*`) is `'Feature name' at (x,y), (x,y) and (x,y)`. The name is in single or double quotes and must match a `##` heading exactly. Each position is the cell of the feature's anchor, in the F2 grid numbers. Commas and `and` separate positions. Features may be defined before or after the `# Map` section. Other text in the section is ignored.
+4. **Placement.** A character places one object whose **bottom left corner** is that cell. A rock covers 2x2 cells, so it extends one cell right and one cell up. Neighbouring characters overlap by one cell, which makes a pile. A solid 4 x 3 painted area gives a cluster of 5 x 4 cells.
+5. **Errors.** Every mistake stops loading and names the file and line: an unknown character, a ragged row, a `cells` block outside a feature, two `cells` blocks in one feature, a feature with none, a duplicate feature name, an unknown feature in a bullet, and a bad position. A silent skip would hide layout mistakes.
+6. **Check.** The F2 grid and the `screenshot:` script command let Claude and the human compare the file with the screen.
 
-The example above gives 10 rocks. Blocked outline: one cluster, about 6 x 5 cells.
+The example above gives 10 rocks and 24 more from the three copies.
 
 ### Format choices to confirm
 
@@ -101,32 +121,9 @@ The example above gives 10 rocks. Blocked outline: one cluster, about 6 x 5 cell
 
 Chosen on 2026-11-01 after comparing three variants on screen: **one character per cell (`pitch: 1`), rocks drawn at 128 px (`draw: 128`), no jitter**. A dense pile with 50% overlap and fine control of the cluster shape. The variants with a 2 cell pitch (regular boulders, with and without 8 px jitter) were dropped. `pitch`, `draw` and `jitter` stay as optional frontmatter keys with these defaults, because shrubs or other kinds may want a different look later. Size rule: `n` characters in a row cover `pitch * (n - 1) + 2` cells.
 
-### Reusable clusters (step 9)
+### Reusable clusters (step 9, done)
 
-A cluster can be defined once and placed several times, so a good shrub patch is drawn once and reused across the map. Proposed format, added after the basic format works:
-
-````markdown
-```cells name=shrub-patch
-. 0 0 .
-0 1 1 0
-. 0 0 .
-```
-
-```place shrub-patch
-at=20,6
-at=40,12
-at=5,30
-```
-````
-
-Rules:
-
-1. A `cells` block with `name=` and no `at=` is a **template**. It places nothing by itself. Its rows are read exactly like a normal block, with the bottom left character as the anchor.
-2. A `place <name>` block has one `at=x,y` per line. Each line places a copy of the template with its bottom left character at that cell.
-3. A template must be defined before it is placed. Names are unique. A template cannot contain `place` lines (no nesting in the first version). Errors name the file and line.
-4. A normal `cells at=x,y` block still works and can sit beside templates in the same file.
-5. Each copy is the same shape, but `jitter` uses the world cell, so copies look slightly different if jitter is on. Mirroring or rotating a copy is not planned.
-6. Collision needs nothing new: copies are ordinary objects, so overlapping copies merge in the outline.
+A cluster is a feature in the `# Features` section. Placing it more than once is one bullet with several positions, for example `- 'Reusable cluster' at (2,12), (2,3) and (6,3)`. Copies are ordinary objects, so overlapping copies merge in the outline, and `jitter` uses the world cell, so copies look slightly different if jitter is on. Mirroring or rotating a copy is not planned. The first step 9 format (`cells name=` templates and `place` blocks) was replaced by this one on 2026-11-01.
 
 ### Extending to trees
 
@@ -212,7 +209,7 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 7. **Interior rocks (D) (done 2026-11-01).** `outline::build` lists the interior members of each cluster (`Cluster::interior`): members whose cells touch no empty space. Rocks get an `InteriorRock` marker for the step 8 overlay. This is a flag, not a speed-up: collision uses only the outline edges, so interior rocks already cost nothing. The plan said "culled objects change no result", but that is false for removing them from the input of `build`: an interior rectangle can be the only thing filling a hole, and a test shows the outline then changes. What the tests check instead: the flag matches a brute-force check (no edge lies on the rectangle) over 300 random layouts, plus fixed cases (3 by 3 block, 5 by 5 block, a plus shape, the hole case).
 8. **Collision overlay (done 2026-11-01).** `collision_debug.rs` draws the overlay as sprites on the feature debug layer, and it turns on and off with F2 (F1 is gone, the gizmo overlay was removed). Yellow: every outline edge with a tick on the blocked side, trunks included. Cyan: the blocked area of each interior rock. Green squares: the feet of every depth-sorted entity. The red trunk boxes were dropped, the yellow outline covers them. Checked on screen with a screenshot. Also added compile-time checks for the layer order and the depth range.
 
-9. **Reusable clusters.** Define a cluster once and place it several times on the map (section 5, "Reusable clusters"). Parser: a `cells name=<name>` block defines a template, a `place <name>` block lists `at=x,y` positions. Tests first: one template placed twice, overlapping placements, an unknown template name, a template used before it is defined, a name defined twice, nesting (not allowed in the first version). The outline then merges overlapping placements with no extra code. Screenshot a map that places one cluster three times.
+9. **Reusable clusters (done 2026-11-01).** First built as `cells name=` templates and `place` blocks. The developer then chose a clearer file layout (section 5): a `# Features` section with one `## Name` heading and `cells` block per feature, and a `# Map` section with bullets like `- 'Reusable cluster' at (2,12), (2,3) and (6,3)`. `map.rs` parses that format (`parse_body`) with errors that name the line, and 34 tests cover it. `rocks-test.md` uses it. Checked in the game: same result as before (34 objects, 5 clusters, 54 edges).
 
 10. **Check in the real game** with `script` and `screenshot:`: push into a long face, slide past a cluster corner, push into a notch, walk through a narrow gap, depth order of overlapping rocks. Report what was not seen on screen.
 11. `lint`, `test`, `web`.
