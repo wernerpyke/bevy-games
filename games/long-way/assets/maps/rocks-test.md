@@ -45,6 +45,14 @@ g
 r
 ```
 
+## Single rock
+
+One rock. Two of them 3 cells apart leave a gap that Guy can walk through.
+
+```cells
+0
+```
+
 ## Reusable cluster
 
 A cluster defined once and placed several times. The copies are ordinary rocks, so copies that
@@ -63,5 +71,6 @@ the cell of the feature's bottom left character.
 
 - 'Rocks test' at (21,9)
 - 'Reusable cluster' at (2,12), (2,3) and (6,3)
+- 'Single rock' at (24,2) and (27,2)
 - 'Green tree' at (12,8)
 - 'Red tree' at (18,8)

@@ -648,8 +648,8 @@ mod tests {
         assert_eq!(map.pitch, 1);
         assert_eq!(map.draw_size, 128.0);
         assert_eq!(map.jitter, 0.0);
-        // 10 rocks in the first feature, three copies of the 8 rock patch and two trees.
-        assert_eq!(map.objects.len(), 36);
+        // 10 rocks in the first feature, three copies of the 8 rock patch, two single rocks and two trees.
+        assert_eq!(map.objects.len(), 38);
         assert_eq!(cells(&map, Kind::GreenTree), vec![(12, 8)]);
         assert_eq!(cells(&map, Kind::RedTree), vec![(18, 8)]);
     }
