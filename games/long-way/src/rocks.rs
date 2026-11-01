@@ -20,8 +20,10 @@ const ART_PIXELS: f32 = 32.0;
 /// Empty rows at the bottom of the rock art, as a fraction of its height (4 of 32 art pixels). The rock is
 /// placed so that its visible bottom, not the canvas bottom, sits on the bottom of the footprint.
 const BOTTOM_MARGIN: f32 = 0.125;
-/// Part of the footprint, on each side, that Guy may overlap. Gives the rock a softer edge than the full 128 box.
+/// Part of the footprint, on the left, right and top, that Guy may overlap. Gives the rock a softer edge than the full 128 box.
 const INSET_FRACTION: f32 = 0.1;
+/// Part of the footprint inset at the bottom. 0 puts the bottom line on the lowest pixel of the art, not inside it.
+const BOTTOM_INSET_FRACTION: f32 = 0.0;
 /// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
 /// draw order of the two would be a tie. With it Guy is drawn in front when he stands at the rock or below it.
 const SORT_BIAS: f32 = 1.0;
@@ -35,7 +37,7 @@ pub struct RocksPlugin;
 
 impl Plugin for RocksPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, (spawn_rocks, build_outline).chain())
+        app.add_systems(Startup, spawn_rocks)
             .add_systems(Update, show_outline);
     }
 }
@@ -43,6 +45,11 @@ impl Plugin for RocksPlugin {
 /// Marker for a rock. The collision work (plan step 3 onward) queries it.
 #[derive(Component)]
 pub struct Rock;
+
+/// Marks a rock that touches no empty space, because rocks around it fill every side (`outline::Cluster::interior`).
+/// Collision uses only the outline edges, so this costs nothing there. The debug overlay colours these rocks.
+#[derive(Component)]
+pub struct InteriorRock;
 
 /// Where and how large to draw one rock.
 #[derive(Debug, PartialEq)]
@@ -70,7 +77,7 @@ fn placement(object: &MapObject, map: &Map) -> Placement {
         ),
         scale,
         // The sort line is the bottom of the blocked area plus a small bias, not the bottom of the footprint.
-        feet_offset: centre_above_footprint - INSET_FRACTION * footprint - SORT_BIAS,
+        feet_offset: centre_above_footprint - BOTTOM_INSET_FRACTION * footprint - SORT_BIAS,
     }
 }
 
@@ -79,15 +86,15 @@ fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
     MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
 }
 
-/// The area Guy's feet may not enter: the footprint inset by `INSET_FRACTION` on each side, then grown sideways
-/// by Guy's half width. There is no vertical margin.
+/// The area Guy's feet may not enter: the footprint inset by `INSET_FRACTION` on the left, right and top and by
+/// `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by Guy's half width. There is no vertical margin.
 fn blocked_area(object: &MapObject, map: &Map) -> Rect {
     let corner = footprint_corner(object, map);
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let inset = INSET_FRACTION * footprint;
     Rect::new(
         corner.x + inset - GUY_HALF_WIDTH,
-        corner.y + inset,
+        corner.y + BOTTOM_INSET_FRACTION * footprint,
         corner.x + footprint - inset + GUY_HALF_WIDTH,
         corner.y + footprint - inset,
     )
@@ -112,7 +119,12 @@ fn jitter_offset(object: &MapObject, jitter: f32) -> Vec2 {
     Vec2::new(unit(1), unit(2)) * jitter
 }
 
-fn spawn_rocks(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
+fn spawn_rocks(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    map: Res<CurrentMap>,
+    mut world: ResMut<CollisionWorld>,
+) {
     let map = &map.0;
     if (map.draw_size / ART_PIXELS).fract() != 0.0 {
         warn!(
@@ -123,13 +135,38 @@ fn spawn_rocks(mut commands: Commands, server: Res<AssetServer>, map: Res<Curren
             (map.draw_size / ART_PIXELS).round().max(1.0) * ART_PIXELS
         );
     }
-    for object in &map.objects {
+    // The outline comes first, because it says which rocks are interior.
+    let areas: Vec<Rect> = map.objects.iter().map(|o| blocked_area(o, map)).collect();
+    let clusters = outline::build(&areas);
+    let mut interior = vec![false; areas.len()];
+    for index in clusters.iter().flat_map(|c| &c.interior) {
+        interior[*index] = true;
+    }
+    info!(
+        "rocks: {} rocks form {} clusters with {} outline edges, {} of the rocks are interior",
+        areas.len(),
+        clusters.len(),
+        clusters.iter().map(|c| c.edges.len()).sum::<usize>(),
+        interior.iter().filter(|i| **i).count()
+    );
+    for cluster in &clusters {
+        debug!(
+            "rocks: cluster of {} rocks, bounds {:?}, {} edges",
+            cluster.members.len(),
+            cluster.bounds,
+            cluster.edges.len()
+        );
+    }
+    world.add_clusters(&clusters);
+    spawn_outline_sprites(&mut commands, &clusters);
+
+    for (index, object) in map.objects.iter().enumerate() {
         let tag = match object.kind {
             Kind::Rock0 => "rock_0",
             Kind::Rock1 => "rock_1",
         };
         let placement = placement(object, map);
-        commands.spawn((
+        let mut rock = commands.spawn((
             Rock,
             AseAnimation {
                 aseprite: server.load("art/features/Rocks.aseprite"),
@@ -142,29 +179,10 @@ fn spawn_rocks(mut commands: Commands, server: Res<AssetServer>, map: Res<Curren
             Transform::from_translation(placement.centre.extend(0.0))
                 .with_scale(Vec3::splat(placement.scale)),
         ));
+        if interior[index] {
+            rock.insert(InteriorRock);
+        }
     }
-}
-
-fn build_outline(mut commands: Commands, map: Res<CurrentMap>, mut world: ResMut<CollisionWorld>) {
-    let map = &map.0;
-    let areas: Vec<Rect> = map.objects.iter().map(|o| blocked_area(o, map)).collect();
-    let clusters = outline::build(&areas);
-    info!(
-        "rocks: {} rocks form {} clusters with {} outline edges",
-        areas.len(),
-        clusters.len(),
-        clusters.iter().map(|c| c.edges.len()).sum::<usize>()
-    );
-    for cluster in &clusters {
-        debug!(
-            "rocks: cluster of {} rocks, bounds {:?}, {} edges",
-            cluster.members.len(),
-            cluster.bounds,
-            cluster.edges.len()
-        );
-    }
-    world.add_clusters(&clusters);
-    spawn_outline_sprites(&mut commands, &clusters);
 }
 
 /// Parent of the outline sprites, so they show and hide with the F2 grid.
@@ -259,7 +277,7 @@ mod tests {
         // Footprint 128 wide: centre is 64 right of the corner. The 128 canvas is 48 above the footprint bottom.
         assert_eq!(p.centre, MAP_ORIGIN + Vec2::new(64.0, 48.0));
         assert_eq!(p.scale, 4.0);
-        assert_eq!(p.feet_offset, (48.0 - 12.8 - SORT_BIAS));
+        assert_eq!(p.feet_offset, (48.0 - SORT_BIAS));
     }
 
     #[test]
@@ -305,8 +323,8 @@ mod tests {
     #[test]
     fn the_blocked_area_is_the_inset_footprint_grown_sideways_by_guys_half_width() {
         let a = blocked_area(&rock(0, 0), &map(128.0, 0.0));
-        // Footprint 128, inset 12.8 each side, so 12.8 to 115.2, then 20 wider on each side.
-        assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - 20.0, 12.8));
+        // Footprint 128, inset 12.8 left, right and top, none at the bottom, then 20 wider on each side.
+        assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - 20.0, 0.0));
         assert_eq!(a.max, MAP_ORIGIN + Vec2::new(115.2 + 20.0, 115.2));
     }
 
@@ -315,11 +333,27 @@ mod tests {
         let plain = blocked_area(&rock(3, 2), &map(128.0, 0.0));
         assert_eq!(
             plain.min,
-            MAP_ORIGIN + Vec2::new(192.0 + 12.8 - 20.0, 128.0 + 12.8)
+            MAP_ORIGIN + Vec2::new(192.0 + 12.8 - 20.0, 128.0)
         );
         let jittered = blocked_area(&rock(3, 2), &map(128.0, 8.0));
         assert_eq!(jittered.size(), plain.size());
         assert!((jittered.min - plain.min).abs().max_element() <= 8.0);
+    }
+
+    #[test]
+    fn rocks_in_the_middle_of_a_pile_are_interior_and_the_rim_is_not() {
+        let m = map(128.0, 0.0);
+        let rocks: Vec<MapObject> = (0..5)
+            .flat_map(|y| (0..5).map(move |x| rock(x, y)))
+            .collect();
+        let areas: Vec<Rect> = rocks.iter().map(|o| blocked_area(o, &m)).collect();
+        let clusters = outline::build(&areas);
+        assert_eq!(clusters.len(), 1);
+        let interior = &clusters[0].interior;
+        assert!(interior.contains(&12), "the centre rock (2, 2) is interior");
+        for rim in [0, 4, 20, 24, 2, 10, 14, 22] {
+            assert!(!interior.contains(&rim), "rock {rim} is on the rim");
+        }
     }
 
     #[test]

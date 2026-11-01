@@ -29,6 +29,9 @@ const SLIDE_RANGE_CAP: f32 = 64.0;
 /// than the 128 deep notches between neighbouring rocks. An end
 /// that leads into a pocket or under an overhang, where Guy would be stopped again soon after, is refused.
 const SLIDE_CLEARANCE: f32 = 192.0;
+/// A slide that ends at an inward corner stops this far past the end of the face, so Guy is off the face and can
+/// walk on until the next face blocks him.
+const SLIDE_PAST_CORNER: f32 = 0.5;
 
 pub struct CollisionPlugin {
     /// When true, collision is forgiving: Guy slides along a trunk when walking diagonally into it, and
@@ -293,8 +296,9 @@ fn clear_beyond(from: Vec2, probe: Vec2, edges: &[Edge]) -> bool {
 }
 
 /// Moves `feet` along the face towards the nearer end. Returns `None` when the nearer end is out of range (the
-/// smaller of `SLIDE_RANGE_FRACTION` of the face and `SLIDE_RANGE_CAP`), or when the way past it is not clear for
-/// `SLIDE_CLEARANCE`. An end at an inward corner is never clear, so Guy is not slid into a corner.
+/// smaller of `SLIDE_RANGE_FRACTION` of the face and `SLIDE_RANGE_CAP`). When the way past the end is blocked
+/// (a notch shallower than `SLIDE_CLEARANCE`), Guy still slides to just past the end and walks on
+/// until the next face blocks him.
 /// `pushing_vertically` is true when Guy pushes up or down, so the face is horizontal and he slides along x.
 /// `push` is the push direction as signs.
 fn slide_to_nearest_edge(
@@ -313,21 +317,33 @@ fn slide_to_nearest_edge(
     if to_min.min(to_max) > range {
         return None;
     }
-    let end = if to_min <= to_max { min } else { max };
+    let towards_min = to_min <= to_max;
+    let end = if towards_min { min } else { max };
+    let concave = if towards_min {
+        face.from_concave
+    } else {
+        face.to_concave
+    };
     let end_point = if pushing_vertically {
         Vec2::new(end, feet.y)
     } else {
         Vec2::new(feet.x, end)
     };
-    if !clear_beyond(end_point, push * SLIDE_CLEARANCE, edges) {
+    // Past an inward corner, or a notch that blocks the way on, Guy still slides to the corner and walks on until
+    // the next face stops him. Only the clearance decides how far past the end he is put.
+    // Past an inward corner there is only solid ground, so Guy is not slid there. Past a convex end that leads into
+    // a notch, he still slides to just past the end and walks on until the next face stops him.
+    if concave {
         return None;
     }
+    let pocket = !clear_beyond(end_point, push * SLIDE_CLEARANCE, edges);
 
     let travel = SLIDE_SPEED * dt;
-    let slid = if to_min <= to_max {
-        (position - travel).max(min)
+    let past = if pocket { SLIDE_PAST_CORNER } else { 0.0 };
+    let slid = if towards_min {
+        (position - travel).max(min - past)
     } else {
-        (position + travel).min(max)
+        (position + travel).min(max + past)
     };
     Some(if pushing_vertically {
         Vec2::new(slid, feet.y)
@@ -766,19 +782,20 @@ mod tests {
     }
 
     #[test]
-    fn guy_is_not_slid_into_a_pocket_under_an_overhang() {
+    fn guy_slides_into_a_pocket_under_an_overhang_and_stops_at_its_back() {
         let edges = pocket();
-        // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket, which is blocked
-        // 64 further on. The far end is out of range. So he stays stopped.
+        // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket. He slides to just
+        // below the overhang and walks on until the bottom rock stops him. The inward corner there never slides him.
         let end = simulate_edges(Vec2::new(300.0, 100.0), Vec2::new(STEP, 0.0), 120, &edges);
-        assert_eq!(end, Vec2::new(376.8, 100.0));
-        // Pushing up into the bottom face near its left end: the end leads up the wall into the same pocket.
+        assert_eq!(end, Vec2::new(440.8, 76.3));
+        // Pushing up into the bottom face near its left end: he slides left past the end, walks up the wall and is
+        // stopped under the overhang.
         let end = simulate_edges(Vec2::new(460.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
-        assert_eq!(end, Vec2::new(460.0, 12.8));
+        assert_eq!(end, Vec2::new(440.3, 76.8));
     }
 
     #[test]
-    fn guy_is_not_slid_into_a_shallow_notch_between_rocks() {
+    fn guy_slides_into_a_shallow_notch_between_rocks() {
         // The right side of the test cluster: a bottom rock, a middle rock further left and an upper rock shifted
         // right. Under the upper rock is a notch 25.6 high and 128 deep, closed at the back by the middle rock.
         let edges = edges_of(&[
@@ -786,10 +803,12 @@ mod tests {
             Rect::new(376.8, 76.8, 583.2, 179.2),
             Rect::new(583.2, 140.8, 711.2, 243.2),
         ]);
+        // Pushing up under the bottom rock's right end: he slides right past it and walks up until the upper rock stops him.
         let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
-        assert_eq!(end, Vec2::new(630.0, 12.8));
+        assert_eq!(end, Vec2::new(647.7, 140.8));
         let end = simulate_edges(Vec2::new(900.0, 160.0), Vec2::new(-STEP, 0.0), 120, &edges);
-        assert_eq!(end, Vec2::new(711.2, 160.0));
+        // Pushing left into the upper rock near its bottom end: he slides into the notch and walks to its back.
+        assert_eq!(end, Vec2::new(583.2, 140.3));
     }
 
     #[test]

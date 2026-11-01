@@ -64,6 +64,10 @@ impl Edge {
 pub struct Cluster {
     /// Indices into the input slice of the rectangles in this cluster, ascending.
     pub members: Vec<usize>,
+    /// Members that touch no empty space: every side of every grid cell they cover has a blocked cell next to it,
+    /// so no outline edge lies on them. Ascending input indices. Collision uses only the edges, so these cost
+    /// nothing there. Do not drop them from the input of `build`: an interior rectangle can be what fills a hole.
+    pub interior: Vec<usize>,
     /// Outline edges, sorted by orientation, then `at`, then `from`.
     pub edges: Vec<Edge>,
     /// Smallest rectangle around all members.
@@ -115,6 +119,7 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
         let cluster = *cluster_of_root[root].get_or_insert_with(|| {
             clusters.push(Cluster {
                 members: Vec::new(),
+                interior: Vec::new(),
                 edges: Vec::new(),
                 bounds: rects[valid[k]],
             });
@@ -142,6 +147,28 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
             }
         }
     }
+    // A rectangle is interior when none of the cells it covers has an empty cell beside it. The edge of the grid
+    // counts as empty. Indices stay ascending because `valid` is ascending.
+    for (k, span) in spans.iter().enumerate() {
+        let touches_empty = (span.y0..span.y1).any(|j| {
+            (span.x0..span.x1).any(|i| {
+                [(0_isize, -1_isize), (0, 1), (-1, 0), (1, 0)]
+                    .iter()
+                    .any(|(di, dj)| {
+                        let (ni, nj) = (i as isize + di, j as isize + dj);
+                        ni < 0
+                            || nj < 0
+                            || ni >= cols as isize
+                            || nj >= rows as isize
+                            || owner[nj as usize * cols + ni as usize].is_none()
+                    })
+            })
+        });
+        if !touches_empty {
+            clusters[cluster_of_rect[k]].interior.push(valid[k]);
+        }
+    }
+
     // An inward corner has exactly three filled cells around its vertex (k, l).
     let concave = |k: usize, l: usize| -> bool {
         let filled = |i: Option<usize>, j: Option<usize>| match (i, j) {
@@ -642,6 +669,126 @@ mod tests {
         assert!(convex.covers(10.02) && convex.covers(19.98));
         assert!(inward.covers(9.995) && inward.covers(20.005));
         assert!(!inward.covers(9.98) && !inward.covers(20.02));
+    }
+
+    fn interior_of(rects: &[Rect]) -> Vec<usize> {
+        let mut found: Vec<usize> = build(rects)
+            .iter()
+            .flat_map(|c| c.interior.iter().copied())
+            .collect();
+        found.sort();
+        found
+    }
+
+    fn grid_of_rects(columns: usize, rows: usize) -> Vec<Rect> {
+        (0..rows)
+            .flat_map(|j| (0..columns).map(move |i| (i as f32 * 10.0, j as f32 * 10.0)))
+            .map(|(x, y)| rect(x, y, x + 10.0, y + 10.0))
+            .collect()
+    }
+
+    #[test]
+    fn a_single_rectangle_is_not_interior() {
+        assert!(interior_of(&[rect(0.0, 0.0, 10.0, 10.0)]).is_empty());
+    }
+
+    #[test]
+    fn only_the_middle_of_a_three_by_three_block_is_interior() {
+        assert_eq!(interior_of(&grid_of_rects(3, 3)), vec![4]);
+    }
+
+    #[test]
+    fn a_five_by_five_block_has_nine_interior_rectangles() {
+        let interior = interior_of(&grid_of_rects(5, 5));
+        let expected: Vec<usize> = (1..4)
+            .flat_map(|j| (1..4).map(move |i| j * 5 + i))
+            .collect();
+        assert_eq!(interior, expected);
+    }
+
+    #[test]
+    fn the_middle_of_a_plus_is_interior_though_its_corners_are_empty() {
+        let interior = interior_of(&[
+            rect(10.0, 10.0, 20.0, 20.0),
+            rect(0.0, 10.0, 10.0, 20.0),
+            rect(20.0, 10.0, 30.0, 20.0),
+            rect(10.0, 0.0, 20.0, 10.0),
+            rect(10.0, 20.0, 20.0, 30.0),
+        ]);
+        assert_eq!(interior, vec![0]);
+    }
+
+    #[test]
+    fn dropping_an_interior_rectangle_from_the_input_can_open_a_hole() {
+        // A ring of eight with a ninth rectangle filling the hole. The ninth is interior, and it is the only
+        // thing covering that area, so the flag must not be used to remove rectangles from `build`.
+        let full = grid_of_rects(3, 3);
+        assert_eq!(interior_of(&full), vec![4]);
+        assert_eq!(build(&full)[0].edges.len(), 4);
+        let mut ring = full.clone();
+        ring.remove(4);
+        assert_eq!(build(&ring)[0].edges.len(), 8);
+    }
+
+    /// A small repeatable random number source, so the random layouts below are the same on every run.
+    struct Lcg(u64);
+
+    impl Lcg {
+        fn below(&mut self, n: u64) -> u64 {
+            self.0 = self
+                .0
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            (self.0 >> 33) % n
+        }
+    }
+
+    /// True when an outline edge has some length lying on the closed rectangle.
+    fn touches_an_edge(r: &Rect, edges: &[Edge]) -> bool {
+        edges.iter().any(|e| {
+            let (across, along_min, along_max, rect_across, rect_min, rect_max) = match e
+                .orientation
+            {
+                Orientation::Vertical => (e.at, r.min.y, r.max.y, (r.min.x, r.max.x), e.from, e.to),
+                Orientation::Horizontal => {
+                    (e.at, r.min.x, r.max.x, (r.min.y, r.max.y), e.from, e.to)
+                }
+            };
+            across >= rect_across.0 - EPSILON
+                && across <= rect_across.1 + EPSILON
+                && rect_max.min(along_max) - rect_min.max(along_min) > EPSILON
+        })
+    }
+
+    #[test]
+    fn interior_means_no_edge_lies_on_the_rectangle_in_random_layouts() {
+        let mut random = Lcg(7);
+        let mut interior_seen = 0;
+        for _ in 0..300 {
+            let count = 3 + random.below(10) as usize;
+            let rects: Vec<Rect> = (0..count)
+                .map(|_| {
+                    let (x, y) = (random.below(6) as f32 * 10.0, random.below(6) as f32 * 10.0);
+                    let (w, h) = (
+                        10.0 + random.below(3) as f32 * 10.0,
+                        10.0 + random.below(3) as f32 * 10.0,
+                    );
+                    rect(x, y, x + w, y + h)
+                })
+                .collect();
+            for cluster in build(&rects) {
+                for &member in &cluster.members {
+                    let on_outline = touches_an_edge(&rects[member], &cluster.edges);
+                    let flagged = cluster.interior.contains(&member);
+                    assert_eq!(flagged, !on_outline, "member {member} of {rects:?}");
+                    interior_seen += flagged as usize;
+                }
+            }
+        }
+        assert!(
+            interior_seen > 20,
+            "the layouts must contain interior rectangles, got {interior_seen}"
+        );
     }
 
     #[test]
