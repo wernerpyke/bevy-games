@@ -24,6 +24,15 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 ## Gizmos
 
 - `mut gizmos: Gizmos` as a system parameter. `gizmos.rect_2d(Isometry2d::from_translation(centre), size, color)` and `gizmos.circle_2d(Isometry2d::from_translation(p), radius, color)`. Import `bevy::math::Isometry2d`. Included in the `2d` feature.
+- In 2D, gizmos are drawn with sort key infinity (read in `bevy_gizmos_render` `pipeline_2d.rs`), so they are always on top of sprites and cannot sit in a layer. For debug drawings that must respect `layers.rs`, use thin sprites: `Sprite::from_color(color, size)` with a `Transform` at the layer z, as children of one root entity that has a `Visibility`. Show and hide the root (`Single<&mut Visibility, With<Root>>`). See `collision_debug.rs`.
+
+## Ordering and startup
+
+- `Startup` commands are applied before `PostStartup`, so a `PostStartup` system can read entities and resources that `Startup` systems created.
+- Order systems from different plugins with `my_system.after(other_plugin::pub_system_fn)`. Bevy inserts a sync point between them, so commands of the first are applied before the second runs.
+- `Query<Entity, Added<T>>` finds entities that got `T` since the last run of the system. Use it to attach helper entities to new spawns.
+- Let chains work in this edition: `else if cond && let Some(x) = value { .. }`.
+- `./dev-scripts/rust.sh script` keeps only log lines that match `script:|collision:|WARN|ERROR|panicked`. Set `LOG_FILTER="rocks:"` to see another module's lines.
 
 ## Text
 

@@ -8,3 +8,14 @@ Tag names are the contract between art and code (`CLAUDE.md`, art pipeline rule 
 | `features/Green tree.aseprite` | none (all 8 frames loop) |
 | `features/Red tree.aseprite` | none (all 8 frames loop) |
 | `features/Rocks.aseprite` | `rock_0` (frame 1), `rock_1` (frame 2). Each tag is one frame and is a rock variant, not an animation. |
+
+## Map kinds
+
+Kinds are the names a map legend uses (`dev-docs/GAME-MAPS.md`). Each is defined in code (`map.rs`).
+
+| Kind | Art | Tag used |
+|---|---|---|
+| `rock_0` | `features/Rocks.aseprite` | `rock_0` |
+| `rock_1` | `features/Rocks.aseprite` | `rock_1` |
+| `green_tree` | `features/Green tree.aseprite` | none, all frames loop |
+| `red_tree` | `features/Red tree.aseprite` | none, all frames loop |

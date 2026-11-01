@@ -114,3 +114,14 @@ Both start visible. The collision overlay is in `collision_debug.rs` and follows
 **Rationale.** The first version refused to slide when the way past the end was blocked within 192 pixels, to avoid pushing Guy into pockets. The developer tried it at a notch under an overhang and wanted him to slide to the corner and walk on, stopping at the back of the notch (2026-11-01). Sliding into an inward corner is still refused, because it only puts Guy inside the next rock.
 
 **How to apply.** The rules are in `slide_to_nearest_edge` in `collision.rs`, with tests for pockets, notches and long faces. The numbers are first values, tuned by playing. A full description of all collision rules is in `dev-docs/BEVY-ADDITIONS.md`.
+
+## adr-lw11. Map file layout: Features and Map sections (2026-11-01)
+
+**Decision.** A map file is markdown with frontmatter and two sections the game reads (`dev-docs/GAME-MAPS.md`):
+1. `# Features`: each `## Name` heading defines a feature with exactly one `cells` block. The bottom left character is the anchor.
+2. `# Map`: a bulleted list that places features, `- 'Name' at (x,y), (x,y) and (x,y)`. Positions are the anchor cell, in F2 grid numbers.
+Everything else in the file is notes for people. Trees are map kinds (`green_tree`, `red_tree`) placed the same way as rocks. Every format error stops loading and names the file and line.
+
+**Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
+
+**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 7 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 6 covers a sturdier loader.

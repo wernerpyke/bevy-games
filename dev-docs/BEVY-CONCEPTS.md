@@ -218,12 +218,13 @@ Lower feet on screen give a higher `z`, so they draw in front. `DepthSort` is a 
 
 Bevy 0.20 has no built-in 2D collision, and we do not use a physics crate. Collision here is plain arithmetic in `collision.rs`:
 
-- A `Trunk` component holds a tree's solid edges in world coordinates.
-- `resolve(old, new, trunks)` takes Guy's feet position before and after a move and returns where he may end up. It checks each axis on its own, so Guy slides along a trunk.
-- `move_feet(...)` wraps `resolve` and adds the forgiving behaviour (`allow_sliding`): after pushing into a trunk for 0.2 seconds, Guy is slid past a nearby edge. The time he has been pushing is kept in a `SlideAssist` component on Guy.
-- The blocked area is a rectangle around the trunk. Its sides, bottom and top come from Guy's size and three rules (see `adr-lw1` in `dev-docs/adr/LONG-WAY.md`).
+- Everything solid is a rectangle of blocked area for Guy's feet: a `Trunk` component for each tree (`adr-lw1`) and a rectangle for each rock (`rocks.rs`). The `CollisionWorld` resource collects them all.
+- `outline.rs` merges rectangles that touch into clusters and finds the outline: straight edges around each cluster. Guy collides with edges, not rectangles, so a pile of rocks is one shape.
+- `resolve(old, new, edges)` takes Guy's feet position before and after a move and returns where he may end up. It checks each axis on its own, so Guy slides along a face.
+- `move_feet(...)` wraps `resolve` and adds the forgiving behaviour (`allow_sliding`): after pushing into a face for 0.2 seconds, Guy is slid past a nearby edge, into a notch if needed (`adr-lw10`). The time he has been pushing is kept in a `SlideAssist` component on Guy.
+- The full rules are in `dev-docs/BEVY-ADDITIONS.md`, section "Collision and sliding rules".
 
-`move_player` calls `move_feet` with `trunks: Query<&Trunk>`, a query that finds every trunk.
+`move_player` calls `move_feet` with `world: Res<CollisionWorld>`, which holds every edge.
 
 The plugin takes a setting: `CollisionPlugin { allow_sliding: true }` in `main.rs`. A plugin can be a struct with fields, and `build` stores the setting as a resource (`CollisionSettings`) that systems read with `Res<CollisionSettings>`. This is how a game configures shared code. The rule is a plain function with unit tests, so `./dev-scripts/rust.sh test long-way` checks it without opening the game.
 
@@ -293,8 +294,15 @@ games/long-way/
     ├── main.rs        # builds the App, adds plugins
     ├── camera.rs      # CameraPlugin: camera, background colour, VIEW_HEIGHT
     ├── player.rs      # PlayerPlugin: Guy spawn, movement, animation
-    ├── trees.rs       # TreesPlugin: spawns the two trees and their trunks
-    ├── collision.rs   # CollisionPlugin: blocking rules, outline, sliding
+    ├── trees.rs       # TreesPlugin: spawns the map's trees and their trunks
+    ├── rocks.rs       # RocksPlugin: spawns the map's rocks and their blocked areas
+    ├── map.rs         # MapPlugin: parses the markdown map file
+    ├── outline.rs     # merges blocked rectangles into clusters and outline edges
+    ├── collision.rs   # CollisionPlugin: CollisionWorld, resolve, sliding
+    ├── collision_debug.rs # collision overlay (F2), sprites on the feature debug layer
+    ├── debug.rs       # DebugPlugin: grid (F2) and info box (F3)
+    ├── layers.rs      # draw order layers
+    ├── script.rs      # scripted input and screenshots for testing
     └── depth.rs       # DepthPlugin: draw order sorted by feet
 ```
 

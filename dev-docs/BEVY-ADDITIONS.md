@@ -26,6 +26,7 @@ Status key:
 | [Logging strategy](#logging-strategy)                                                 | `collision.rs`                           | In use (Long Way) |
 | [Debug grid and info box](#debug-grid-and-info-box)                                   | `debug.rs`                               | In use (Long Way) |
 | [Draw order layers](#draw-order-layers)                                               | `layers.rs`                              | In use (Long Way) |
+| [Markdown map files](#markdown-map-files) | `map.rs`, `rocks.rs`, `trees.rs` | In use (Long Way) |
 | [Collision and sliding rules](#collision-and-sliding-rules)                           | `collision.rs`, `outline.rs`, `rocks.rs` | In use (Long Way) |
 
 ## Forgiving collision (`allow_sliding`)
@@ -161,6 +162,16 @@ Pushing into the middle of a face never slides the player. When `allow_sliding` 
 **Not covered yet.** Interior rock colour in the overlay and trunk overlay on the feature layer (plan step 8). Named, reusable clusters (step 9). The player clamps Guy to the view after collision (`player.rs`), which can move his feet into a shape. Guy placed inside a shape (teleport) can walk freely inside it. The 64 and 192 numbers are first guesses, and 192 assumes a 64 pixel cell. Rock `draw` and `cell` sizes must agree, or sprite and blocked area drift apart.
 
 **Tests.** Inline in each file. Collision tests: stops, crossing, slide range, pockets, notches, long faces, noise. Outline tests: shapes, concave flags, interior (including a random brute-force check). Rock tests: placement, blocked area, sort line.
+
+## Markdown map files
+
+**What.** A human edits a markdown file to lay out rocks and trees. A `# Features` section defines painted features, a `# Map` section places them with a bulleted list. Collision is built from the placed objects, so no outline is drawn by hand.
+
+**Why.** Fast, readable level layout in the first iteration, without an editor tool. See `adr-lw8` and `adr-lw11`.
+
+**How to use.** Write the file as in `dev-docs/GAME-MAPS.md`. A new object kind needs a `Kind` in `map.rs` and a spawning system.
+
+**Limits.** The map is read with `include_str!`, so a change needs a rebuild. One map per game build. Another format is roadmap item 7, a loader with hot reload is item 6.
 
 ## Rules as plain functions with unit tests
 
