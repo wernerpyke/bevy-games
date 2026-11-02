@@ -3,4 +3,5 @@
 pub mod collision;
 pub mod depth;
 pub mod layers;
+pub mod map;
 pub mod outline;

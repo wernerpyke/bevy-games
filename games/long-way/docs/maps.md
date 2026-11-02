@@ -3,7 +3,7 @@
 How to write a map file for Long Way. The file format itself is the [map files extension](../../../dev-docs/extensions/map-files.md). This page covers what Long Way adds: the kinds, sizes, files and checks.
 
 - Files are in `games/long-way/assets/maps/`. The current example is `rocks-test.md`.
-- The game loads one map. Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`). After you edit the file, rebuild the game.
+- The game loads one map. Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
 - Press F2 to show the grid with cell numbers. Use those numbers for positions.
 - Cell size is 64 pixels (`cell: 64`).
 - Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells (`adr-lw8`).

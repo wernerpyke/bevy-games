@@ -7,9 +7,10 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::GUY_HALF_WIDTH;
-use crate::map::{CurrentMap, Kind, Map, MapObject};
+use crate::map::{CurrentMap, Kind};
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::depth::DepthSort;
+use game_kit::map::{Map, MapObject};
 
 /// Footprint of a rock in cells, in x and y.
 const FOOTPRINT_CELLS: f32 = 2.0;
@@ -22,6 +23,8 @@ const BOTTOM_MARGIN: f32 = 0.125;
 const INSET_FRACTION: f32 = 0.1;
 /// Part of the footprint inset at the bottom. 0 puts the bottom line on the lowest pixel of the art, not inside it.
 const BOTTOM_INSET_FRACTION: f32 = 0.0;
+/// Drawn size of a rock in pixels when the map file has no `draw` key.
+const DEFAULT_DRAW_SIZE: f32 = 128.0;
 /// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
 /// draw order of the two would be a tie. With it Guy is drawn in front when he stands at the rock or below it.
 pub const SORT_BIAS: f32 = 1.0;
@@ -56,7 +59,7 @@ struct Placement {
 }
 
 fn placement(object: &MapObject, map: &Map) -> Placement {
-    let scale = (map.draw_size / ART_PIXELS).round().max(1.0);
+    let scale = (draw_size(map) / ART_PIXELS).round().max(1.0);
     let draw = scale * ART_PIXELS;
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let corner =
@@ -72,6 +75,11 @@ fn placement(object: &MapObject, map: &Map) -> Placement {
         // The sort line is the bottom of the blocked area plus a small bias, not the bottom of the footprint.
         feet_offset: centre_above_footprint - BOTTOM_INSET_FRACTION * footprint - SORT_BIAS,
     }
+}
+
+/// The drawn size of a rock: the `draw` key of the map file, or the default.
+fn draw_size(map: &Map) -> f32 {
+    map.draw_size.unwrap_or(DEFAULT_DRAW_SIZE)
 }
 
 /// World position of the bottom left corner of the footprint.
@@ -119,21 +127,25 @@ fn spawn_rocks(
     mut world: ResMut<CollisionWorld>,
 ) {
     let map = &map.0;
-    if (map.draw_size / ART_PIXELS).fract() != 0.0 {
+    if (draw_size(map) / ART_PIXELS).fract() != 0.0 {
         warn!(
             "map {}: draw {} is not a multiple of {}, using {}",
             map.name,
-            map.draw_size,
+            draw_size(map),
             ART_PIXELS,
-            (map.draw_size / ART_PIXELS).round().max(1.0) * ART_PIXELS
+            (draw_size(map) / ART_PIXELS).round().max(1.0) * ART_PIXELS
         );
     }
-    let rocks: Vec<&MapObject> = map.objects.iter().filter(|o| o.kind.is_rock()).collect();
+    let rocks: Vec<&MapObject> = map
+        .objects
+        .iter()
+        .filter(|o| Kind::of(o).is_rock())
+        .collect();
     let areas: Vec<Rect> = rocks.iter().map(|o| blocked_area(o, map)).collect();
     let first_area = world.add_blocked(&areas);
 
     for (index, object) in rocks.into_iter().enumerate() {
-        let tag = match object.kind {
+        let tag = match Kind::of(object) {
             Kind::Rock0 => "rock_0",
             Kind::Rock1 => "rock_1",
             _ => unreachable!("only rocks are spawned here"),
@@ -190,7 +202,7 @@ mod tests {
             name: "t".into(),
             cell_size: 64.0,
             pitch: 1,
-            draw_size,
+            draw_size: Some(draw_size),
             jitter,
             objects: Vec::new(),
         }
@@ -198,7 +210,7 @@ mod tests {
 
     fn rock(x: i32, y: i32) -> MapObject {
         MapObject {
-            kind: Kind::Rock0,
+            kind: "rock_0".to_string(),
             cell: IVec2::new(x, y),
         }
     }

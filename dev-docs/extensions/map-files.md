@@ -13,7 +13,8 @@ A markdown file that a human edits to place objects. The game reads three parts 
 
 | Part | Code today | Shared? |
 |---|---|---|
-| Parser | `games/long-way/src/map.rs` | The format yes. Object kinds are per game. |
+| Parser: `parse(file, source, kinds)`, `Map`, `MapObject`, `MapError` | `crates/game-kit/src/map.rs` | Shared. Object kinds are names (adr-x13). |
+| Loading and `Kind` | `games/long-way/src/map.rs` | Per game |
 | Spawning | `rocks.rs`, `trees.rs` | Per game |
 
 Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-way/docs/maps.md`. Other formats and a loader with hot reload: roadmap items 5 and 4.
@@ -36,11 +37,11 @@ Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-wa
 | `origin` | yes | Must be `bottom-left` |
 | `legend` | yes | Maps each character in a `cells` block to an object kind |
 | `pitch` | no | Cells between two characters. Default 1 |
-| `draw` | no | Drawn size of a rock in pixels. Default 128 |
+| `draw` | no | Drawn size of an object in pixels. The game gives the default (Long Way: 128 for rocks) |
 | `jitter` | no | Largest random shift of each object in pixels. Default 0 |
 
 5. A legend character is one character, in quotes. `.` always means empty and is written `".": empty`.
-6. The set of kinds is defined in code (`Kind` in `map.rs`).
+6. The set of kinds is defined by the game. It passes the legend names it knows to `parse`, which reports any other name with its line. Objects carry the name as a `String`, and the game converts it to its own enum (adr-x13).
 
 ### Features
 
@@ -61,7 +62,7 @@ Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-wa
 
 ## Usage
 
-- Add a new object kind in `Kind` in `map.rs`, in the module that spawns it, and in the legend.
+- Add a new object kind to the game's name list and `Kind` enum (Long Way: `map.rs`), to the module that spawns it, and to the legend.
 - Do not add per block options to `cells`.
 - The map is read with `include_str!`, so a change needs a rebuild.
 
@@ -72,4 +73,4 @@ Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-wa
 
 ## Tests
 
-Inline in `map.rs`: the parser, every error message, and the bundled map file.
+Inline in `game-kit` `map.rs`: the parser and every error message. The game tests its own map file (Long Way: `map.rs`).

@@ -5,9 +5,10 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
-use crate::map::{CurrentMap, Kind, Map, MapObject};
+use crate::map::{CurrentMap, Kind};
 use crate::rocks::{SORT_BIAS, footprint_corner};
 use game_kit::depth::DepthSort;
+use game_kit::map::{Map, MapObject};
 
 /// Both tree canvases are 128x128, the size of a 2x2 cell footprint at a cell size of 64.
 const TREE_SIZE: f32 = 128.0;
@@ -49,7 +50,7 @@ fn placement(corner: Vec2) -> (Vec2, Trunk) {
 fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
     let map = &map.0;
     for object in &map.objects {
-        let Some(path) = art_path(object.kind) else {
+        let Some(path) = art_path(Kind::of(object)) else {
             continue;
         };
         spawn_tree(&mut commands, &server, path, object, map);
