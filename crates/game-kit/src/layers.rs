@@ -18,7 +18,6 @@
 //! after all sprites and gizmos, so they are always above the feature debug layer.
 
 /// Ground and tiles. Sublayers go between this and `GRID_DEBUG_Z` when a background exists.
-#[allow(dead_code)]
 pub const BACKGROUND_Z: f32 = -500.0;
 /// The F2 grid lines and their numbers.
 pub const GRID_DEBUG_Z: f32 = -200.0;
@@ -34,7 +33,6 @@ pub const FEATURE_DEBUG_FEET_Z: f32 = 202.0;
 /// Z index of the HUD: the info box and other always-on-screen readouts.
 pub const HUD_Z_INDEX: i32 = 0;
 /// Z index of dialogs and menus, above the HUD.
-#[allow(dead_code)]
 pub const UI_Z_INDEX: i32 = 100;
 
 // Checked when the game is compiled.

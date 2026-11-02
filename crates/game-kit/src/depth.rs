@@ -12,12 +12,33 @@ const Z_PER_X: f32 = 0.000_000_01;
 // The world layer holds feet from y -99000 to 99000 (`layers.rs`).
 const _: () = assert!(Z_PER_Y * 99_000.0 < WORLD_HALF_BAND);
 
-pub struct DepthPlugin;
+/// Sorts every `DepthSort` entity by its feet each frame.
+pub struct DepthPlugin {
+    /// The world layer spans z from `-world_half_band` to `world_half_band` (`layers.rs`). Feet outside it trip a
+    /// debug assertion. A game that changes its layers passes its own band.
+    pub world_half_band: f32,
+}
+
+impl Default for DepthPlugin {
+    fn default() -> Self {
+        DepthPlugin {
+            world_half_band: WORLD_HALF_BAND,
+        }
+    }
+}
 
 impl Plugin for DepthPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, sort_by_feet);
+        app.insert_resource(DepthSettings {
+            world_half_band: self.world_half_band,
+        })
+        .add_systems(Update, sort_by_feet);
     }
+}
+
+#[derive(Resource)]
+struct DepthSettings {
+    world_half_band: f32,
 }
 
 /// Sorts an entity by its feet so it draws behind things whose feet are lower on the screen.
@@ -33,12 +54,12 @@ impl DepthSort {
     }
 }
 
-fn sort_by_feet(mut query: Query<(&mut Transform, &DepthSort)>) {
+fn sort_by_feet(settings: Res<DepthSettings>, mut query: Query<(&mut Transform, &DepthSort)>) {
     for (mut transform, sort) in &mut query {
         let feet_y = sort.feet_y(transform.translation.y);
         let z = depth_z(transform.translation.x, feet_y);
         debug_assert!(
-            z.abs() < WORLD_HALF_BAND,
+            z.abs() < settings.world_half_band,
             "feet at y {feet_y} are outside the world layer, see layers.rs"
         );
         transform.translation.z = z;

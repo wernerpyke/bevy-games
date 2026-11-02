@@ -17,7 +17,7 @@ Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, archit
 | `crates/game-kit/src/outline.rs` | merging rectangles into clusters, outline edges, inward corners, `Edge::covers` |
 | `src/map.rs` | the markdown map parser, including every error message and the bundled map file |
 | `src/rocks.rs` | rock placement, blocked areas, jitter |
-| `src/depth.rs` | draw order from the feet |
+| `crates/game-kit/src/depth.rs` | draw order from the feet |
 | `src/debug.rs` | the grid line range, grid origin, and the info box rows |
 
 ## How to run

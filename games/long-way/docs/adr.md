@@ -47,7 +47,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw12. Long Way draw order layers (2026-11-01)
 
-**Decision.** Long Way uses six layers, from back to front, defined in `games/long-way/src/layers.rs`. The mechanism is `adr-x9`.
+**Decision.** Long Way uses six layers, from back to front, use the kit defaults in `crates/game-kit/src/layers.rs` (`adr-x9`, `adr-x14`).
 1. **Background** (sprite z `BACKGROUND_Z`)
 2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F2 grid
 3. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`

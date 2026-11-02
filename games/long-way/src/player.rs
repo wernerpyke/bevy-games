@@ -3,8 +3,8 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::half_view;
 use crate::collision::GUY_FEET_OFFSET;
-use crate::depth::DepthSort;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
+use game_kit::depth::DepthSort;
 
 /// Walk speed in art pixels per second.
 const WALK_SPEED: f32 = 300.0;

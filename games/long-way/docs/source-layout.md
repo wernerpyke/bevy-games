@@ -19,8 +19,6 @@ games/long-way/
     ├── collision.rs    Trunk and Guy constants. The engine is `game_kit::collision`
     ├── collision_debug.rs  collision overlay
     ├── debug.rs        DebugPlugin: grid and info box
-    ├── layers.rs       draw order layers
-    ├── depth.rs        DepthPlugin: draw order sorted by feet
     └── script.rs       scripted input and screenshots
 ```
 
@@ -29,7 +27,7 @@ games/long-way/
 | Extension | Files |
 |---|---|
 | [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `GUY_*` and `rocks.rs`) |
-| [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` |
+| [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` in `crates/game-kit` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` |
 | [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` |

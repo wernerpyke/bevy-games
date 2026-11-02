@@ -85,7 +85,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for play mode.
 - Use events or messages between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
-- Draw order comes from `games/long-way/src/layers.rs` (adr-x9). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos.
+- Draw order comes from `crates/game-kit/src/layers.rs` and a game's own overrides (adr-x9, adr-x14). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
 
 ## Art

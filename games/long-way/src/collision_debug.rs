@@ -7,9 +7,9 @@
 use bevy::prelude::*;
 
 use crate::debug::DebugSettings;
-use crate::depth::DepthSort;
-use crate::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
 use game_kit::collision::{CollisionWorld, register_blockers};
+use game_kit::depth::DepthSort;
+use game_kit::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
 use game_kit::outline::{Edge, Orientation};
 
 const OUTLINE_COLOR: Color = Color::srgb(1.0, 0.8, 0.1);

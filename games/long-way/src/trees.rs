@@ -5,9 +5,9 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
-use crate::depth::DepthSort;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
 use crate::rocks::{SORT_BIAS, footprint_corner};
+use game_kit::depth::DepthSort;
 
 /// Both tree canvases are 128x128, the size of a 2x2 cell footprint at a cell size of 64.
 const TREE_SIZE: f32 = 128.0;

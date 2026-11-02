@@ -6,14 +6,14 @@ Two parts: sorting world sprites by their feet, and a fixed set of named layers.
 
 - Bevy 2D sorts sprites by `z` and has no layer system. Equal `z` has no fixed order and flickers.
 - `DepthSort` sets `z` from the feet position, so a character walks behind an object above it and in front of an object below it.
-- `layers.rs` names every layer from background to UI. No other file writes a bare z number.
+- `layers.rs` in the kit names every layer from background to UI. Game code writes no bare z number: it uses these names or its own layers module (adr-x14).
 
 ## Status
 
 | Part | Code today | Shared? |
 |---|---|---|
-| `DepthSort`, `DepthPlugin` | `games/long-way/src/depth.rs` | Yes, no game specific code |
-| Layer constants | `games/long-way/src/layers.rs` | The idea yes, the list is per game |
+| `DepthSort`, `DepthPlugin { world_half_band }` | `crates/game-kit/src/depth.rs` | Shared. |
+| Layer constants | `crates/game-kit/src/layers.rs` | Shared defaults. A game overrides a value through a plugin field or adds its own layers. |
 
 Decisions: `adr-x2`, `adr-x9`, and `adr-lw12` for the Long Way layers. The same feet line decides collision ([collision.md](collision.md)), so what is drawn matches where the character can walk.
 
@@ -42,7 +42,7 @@ Back to front:
 | UI | `GlobalZIndex` | `UI_Z_INDEX` |
 
 7. Features and characters share the world layer, so a character can walk behind a feature.
-8. Draw code takes z and `GlobalZIndex` only from `layers.rs`.
+8. Draw code takes z and `GlobalZIndex` only from `layers.rs` or the game's own layers module.
 9. A background uses a z below `GRID_DEBUG_Z`.
 10. Debug drawings are sprites on their layer, not gizmos. 2D gizmos use sort key infinity and are always on top. See [Bevy notes](../bevy/notes.md).
 11. `bevy_ui` nodes draw after all sprites and gizmos, so HUD and UI are always above the feature debug layer.
@@ -51,7 +51,7 @@ Back to front:
 
 - Add `DepthPlugin`.
 - Add `DepthSort { feet_offset }` to any sprite that should sort.
-- Import layer constants from `layers`. A debug sprite goes on `FEATURE_DEBUG_Z`. A HUD node uses `GlobalZIndex(HUD_Z_INDEX)`.
+- Import layer constants from `game_kit::layers`. A debug sprite goes on `FEATURE_DEBUG_Z`. A HUD node uses `GlobalZIndex(HUD_Z_INDEX)`.
 
 ## Limits
 
@@ -61,4 +61,4 @@ Back to front:
 
 ## Tests
 
-Inline in `depth.rs`: lower feet in front, ties broken by x, the world band holds far positions, x never beats y.
+Inline in `game-kit` `depth.rs`: lower feet in front, ties broken by x, the world band holds far positions, x never beats y.

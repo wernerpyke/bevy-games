@@ -9,9 +9,9 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::camera::half_view;
-use crate::depth::DepthSort;
-use crate::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
 use crate::player::Player;
+use game_kit::depth::DepthSort;
+use game_kit::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
 
 const LINE_THICKNESS: f32 = 2.0;
 const LABEL_FONT_SIZE: f32 = 20.0;

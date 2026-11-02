@@ -7,9 +7,9 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::GUY_HALF_WIDTH;
-use crate::depth::DepthSort;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
 use game_kit::collision::{CollisionWorld, register_blockers};
+use game_kit::depth::DepthSort;
 
 /// Footprint of a rock in cells, in x and y.
 const FOOTPRINT_CELLS: f32 = 2.0;

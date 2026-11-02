@@ -2,8 +2,6 @@ mod camera;
 mod collision;
 mod collision_debug;
 mod debug;
-mod depth;
-mod layers;
 mod map;
 mod player;
 mod rocks;
@@ -29,7 +27,7 @@ fn main() {
                 grid_color: Color::srgb(1.0, 0.1, 0.1),
                 grid_origin: debug::GridOrigin::World(camera::MAP_ORIGIN),
             },
-            depth::DepthPlugin,
+            game_kit::depth::DepthPlugin::default(),
             map::MapPlugin,
             player::PlayerPlugin,
             rocks::RocksPlugin,
