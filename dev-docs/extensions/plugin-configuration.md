@@ -33,7 +33,7 @@ impl Plugin for CollisionPlugin {
 }
 ```
 
-`DebugPlugin { cell_size, grid_color, grid_origin }` ([debug-tools.md](debug-tools.md)) follows the same pattern.
+`DebugPlugin { cell_size, grid_color, grid_origin, target_name, grid_z, hud_z_index }` ([debug-tools.md](debug-tools.md)) follows the same pattern.
 
 ## Limits
 

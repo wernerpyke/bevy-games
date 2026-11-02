@@ -41,6 +41,7 @@ pub struct Player {
 
 fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
     commands.spawn((
+        game_kit::Controlled,
         Player {
             facing: Facing::Down,
             walking: false,

@@ -19,7 +19,8 @@ Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, archit
 | `crates/game-kit/src/map.rs` | the markdown map parser, including every error message |
 | `src/rocks.rs` | rock placement, blocked areas, jitter |
 | `crates/game-kit/src/depth.rs` | draw order from the feet |
-| `src/debug.rs` | the grid line range, grid origin, and the info box rows |
+| `crates/game-kit/src/debug.rs` | the grid line range (also for a moved camera), the visible rect, grid origin, and the info box rows |
+| `crates/game-kit/src/collision_debug.rs` | the overlay line boxes |
 
 ## How to run
 

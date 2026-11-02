@@ -17,8 +17,6 @@ games/long-way/
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
     ├── map.rs          MapPlugin, `Kind`: loads the map file and names its kinds. The parser is `game_kit::map`
     ├── collision.rs    Trunk and Guy constants. The engine is `game_kit::collision`
-    ├── collision_debug.rs  collision overlay
-    ├── debug.rs        DebugPlugin: grid and info box
     └── script.rs       scripted input and screenshots
 ```
 
@@ -29,9 +27,9 @@ games/long-way/
 | [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `GUY_*` and `rocks.rs`) |
 | [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` in `crates/game-kit` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` (plus the parser in `crates/game-kit`) |
-| [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` |
+| [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
 | [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` |
-| [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` |
+| [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` |
 
 Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.

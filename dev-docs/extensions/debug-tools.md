@@ -14,22 +14,22 @@ All tools are sprites or UI on named layers ([draw-order.md](draw-order.md)), no
 
 | Tool | Code today | Shared? |
 |---|---|---|
-| Grid and info box | `games/long-way/src/debug.rs` | Yes, configured by `DebugPlugin` fields |
-| Collision overlay | `games/long-way/src/collision_debug.rs` | Needs the collision extension |
+| Grid and info box | `crates/game-kit/src/debug.rs` | Shared, configured by `DebugPlugin` fields |
+| Collision overlay | `crates/game-kit/src/collision_debug.rs` | Shared, uses the collision extension |
 
-Decisions: `adr-x3`, `adr-x6`, `adr-x9`. They stay in the game until a second game needs them (`adr-w6`).
+Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`.
 
 ## Specification
 
 ### Grid (key F2)
 
-1. Lines at every `cell_size`, in `grid_color`, over the visible area. Thin sprites on `GRID_DEBUG_Z`.
-2. Column numbers run along the top edge and row numbers along the left edge.
-3. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` or `World(Vec2)`. `BottomLeft` is the corner of the visible area, which moves sideways in world units when the window is resized, because the view width follows the window shape. Use `World(Vec2)` for a fixed origin.
+1. Lines at every `cell_size`, in `grid_color`, over the area the camera shows (the `Camera2d` with an orthographic projection). Thin sprites on `grid_z` (default `GRID_DEBUG_Z`). The grid follows a scrolling camera: it is rebuilt when the camera crosses a line.
+2. Column numbers stay on the top edge and row numbers on the left edge of the view, also while the camera moves.
+3. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` or `World(Vec2)`. `BottomLeft` is the corner of the visible area, which moves when the window is resized or the camera moves. Use `World(Vec2)` for a fixed origin.
 
 ### Info box (key F3)
 
-4. A text box at the top left, in the HUD layer.
+4. A text box at the top left, in the HUD layer (`hud_z_index`). It shows the grid position, cell and world position of the feet of the entity with the `Controlled` component, named by `target_name` (Long Way: "guy").
 5. A system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use.
 
 ### Collision overlay (follows F2)
@@ -39,9 +39,9 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`. They stay in the game until a second ga
 
 ## Usage
 
-- Add `DebugPlugin { cell_size, grid_color, grid_origin }` and `CollisionDebugPlugin`.
+- Add `Controlled` to the player entity. Add `DebugPlugin::new(cell_size, grid_color, grid_origin)` (set `target_name`, `grid_z` or `hud_z_index` with struct update syntax) and `CollisionDebugPlugin::default()` (fields `outline_z`, `interior_z`, `feet_z`).
 - Report a value from any system through `DebugInfo`.
-- Add a new tool as a new system in `debug.rs`, with a key toggle in `toggle_tools` and a field in `DebugSettings`.
+- Add a new tool as a new system in the kit `debug.rs`, with a key toggle in `toggle_tools` and a field in `DebugSettings`.
 
 ## Limits
 

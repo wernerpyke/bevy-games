@@ -1,16 +1,16 @@
-//! The collision debug overlay, drawn as sprites on the feature debug layer (`layers.rs`), not as gizmos, which
+//! The collision debug overlay, drawn as sprites on the feature debug layers (`layers.rs`), not as gizmos, which
 //! are always on top. It follows the F2 grid switch (`DebugSettings::show_grid`). It shows:
-//! - yellow: every outline edge Guy collides with, with a tick on the blocked side
+//! - yellow: every outline edge the actor collides with, with a tick on the blocked side
 //! - cyan: the blocked area of every interior rock, which has no outline edge of its own
 //! - green: the feet of every depth-sorted entity
 
 use bevy::prelude::*;
 
+use crate::collision::{CollisionWorld, register_blockers};
 use crate::debug::DebugSettings;
-use game_kit::collision::{CollisionWorld, register_blockers};
-use game_kit::depth::DepthSort;
-use game_kit::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
-use game_kit::outline::{Edge, Orientation};
+use crate::depth::DepthSort;
+use crate::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
+use crate::outline::{Edge, Orientation};
 
 const OUTLINE_COLOR: Color = Color::srgb(1.0, 0.8, 0.1);
 const INTERIOR_COLOR: Color = Color::srgb(0.2, 0.9, 1.0);
@@ -22,15 +22,45 @@ const LINE_THICKNESS: f32 = 2.0;
 /// Side of the square that marks a pair of feet.
 const FEET_MARKER_SIZE: f32 = 8.0;
 
-pub struct CollisionDebugPlugin;
+/// The collision overlay. The draw order of its three sprite groups defaults to the kit layers (adr-x14).
+pub struct CollisionDebugPlugin {
+    /// Outline edges.
+    pub outline_z: f32,
+    /// Blocked areas of interior shapes.
+    pub interior_z: f32,
+    /// Feet markers.
+    pub feet_z: f32,
+}
+
+impl Default for CollisionDebugPlugin {
+    fn default() -> Self {
+        CollisionDebugPlugin {
+            outline_z: FEATURE_DEBUG_Z,
+            interior_z: FEATURE_DEBUG_INTERIOR_Z,
+            feet_z: FEATURE_DEBUG_FEET_Z,
+        }
+    }
+}
+
+#[derive(Resource)]
+struct OverlayLayers {
+    outline_z: f32,
+    interior_z: f32,
+    feet_z: f32,
+}
 
 impl Plugin for CollisionDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostStartup, draw_outline.after(register_blockers))
-            .add_systems(
-                Update,
-                (add_feet_markers, move_feet_markers, show_overlay).chain(),
-            );
+        app.insert_resource(OverlayLayers {
+            outline_z: self.outline_z,
+            interior_z: self.interior_z,
+            feet_z: self.feet_z,
+        })
+        .add_systems(PostStartup, draw_outline.after(register_blockers))
+        .add_systems(
+            Update,
+            (add_feet_markers, move_feet_markers, show_overlay).chain(),
+        );
     }
 }
 
@@ -43,7 +73,7 @@ struct OverlayRoot;
 struct FeetMarker(Entity);
 
 /// Runs after every blocked area is registered, so the outline includes trunks and rocks.
-fn draw_outline(mut commands: Commands, world: Res<CollisionWorld>) {
+fn draw_outline(mut commands: Commands, world: Res<CollisionWorld>, layers: Res<OverlayLayers>) {
     let clusters = world.clusters();
     info!(
         "collision: {} clusters with {} outline edges",
@@ -63,12 +93,12 @@ fn draw_outline(mut commands: Commands, world: Res<CollisionWorld>) {
         .with_children(|parent| {
             for edge in clusters.iter().flat_map(|c| &c.edges) {
                 for (centre, size) in edge_boxes(edge) {
-                    parent.spawn(line(OUTLINE_COLOR, FEATURE_DEBUG_Z, centre, size));
+                    parent.spawn(line(OUTLINE_COLOR, layers.outline_z, centre, size));
                 }
             }
             for area in world.interior_areas() {
                 for (centre, size) in rect_boxes(area) {
-                    parent.spawn(line(INTERIOR_COLOR, FEATURE_DEBUG_INTERIOR_Z, centre, size));
+                    parent.spawn(line(INTERIOR_COLOR, layers.interior_z, centre, size));
                 }
             }
         });
@@ -135,6 +165,7 @@ fn rect_boxes(rect: Rect) -> [(Vec2, Vec2); 4] {
 
 fn add_feet_markers(
     mut commands: Commands,
+    layers: Res<OverlayLayers>,
     new: Query<Entity, Added<DepthSort>>,
     root: Single<Entity, With<OverlayRoot>>,
 ) {
@@ -142,7 +173,7 @@ fn add_feet_markers(
         commands.entity(*root).with_child((
             FeetMarker(target),
             Sprite::from_color(FEET_COLOR, Vec2::splat(FEET_MARKER_SIZE)),
-            Transform::from_xyz(0.0, 0.0, FEATURE_DEBUG_FEET_Z),
+            Transform::from_xyz(0.0, 0.0, layers.feet_z),
         ));
     }
 }

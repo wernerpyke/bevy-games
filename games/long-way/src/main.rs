@@ -1,7 +1,5 @@
 mod camera;
 mod collision;
-mod collision_debug;
-mod debug;
 mod map;
 mod player;
 mod rocks;
@@ -21,11 +19,14 @@ fn main() {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,
             },
-            collision_debug::CollisionDebugPlugin,
-            debug::DebugPlugin {
-                cell_size: camera::CELL_SIZE,
-                grid_color: Color::srgb(1.0, 0.1, 0.1),
-                grid_origin: debug::GridOrigin::World(camera::MAP_ORIGIN),
+            game_kit::collision_debug::CollisionDebugPlugin::default(),
+            game_kit::debug::DebugPlugin {
+                target_name: "guy",
+                ..game_kit::debug::DebugPlugin::new(
+                    camera::CELL_SIZE,
+                    Color::srgb(1.0, 0.1, 0.1),
+                    game_kit::debug::GridOrigin::World(camera::MAP_ORIGIN),
+                )
             },
             game_kit::depth::DepthPlugin::default(),
             map::MapPlugin,
