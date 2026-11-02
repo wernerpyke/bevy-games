@@ -86,7 +86,8 @@ Deferred. Pack has 6 music themes and 20+ effects.
 ## 13. Open questions
 
 - The real town layout (after the first playable). The first playable uses a test map.
-- Exact base footprint size of each house and tree kind (in cells), and the overlap-from-below fraction at 16 px scale.
+- Exact base footprint size of each house and tree kind (in cells).
+- Overlap from below: Long Way removed it on 2026-11-02 (trees stop at the base line, like rocks). Section 5 and adr-rt5 say the hero "may overlap from below", so decide whether R-Town keeps that.
 - Collision geometry: Long Way's `Trunk` and `GUY_*` values are in 60 px art units, so they need R-Town values (shared-crate plan step 4).
 - Aseprite import script: frame layout and tag names per category.
 - Combat model, world structure beyond the town, progression and save, interaction features, audio, UI.

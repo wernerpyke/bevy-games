@@ -7,7 +7,7 @@ use bevy_aseprite_ultra::prelude::*;
 use crate::collision::Trunk;
 use crate::depth::DepthSort;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
-use crate::rocks::footprint_corner;
+use crate::rocks::{SORT_BIAS, footprint_corner};
 
 /// Both tree canvases are 128x128, the size of a 2x2 cell footprint at a cell size of 64.
 const TREE_SIZE: f32 = 128.0;
@@ -67,7 +67,7 @@ fn spawn_tree(
     commands.spawn((
         trunk.blocker(),
         DepthSort {
-            feet_offset: TREE_SIZE / 2.0,
+            feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,
         },
         AseAnimation {
             aseprite: server.load(path),

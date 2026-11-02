@@ -24,7 +24,7 @@ const INSET_FRACTION: f32 = 0.1;
 const BOTTOM_INSET_FRACTION: f32 = 0.0;
 /// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
 /// draw order of the two would be a tie. With it Guy is drawn in front when he stands at the rock or below it.
-const SORT_BIAS: f32 = 1.0;
+pub const SORT_BIAS: f32 = 1.0;
 
 pub struct RocksPlugin;
 

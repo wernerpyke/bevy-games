@@ -5,13 +5,9 @@ use game_kit::collision::Blocker;
 
 /// Half the width of Guy's body. Guy's feet are blocked this far from a trunk's sides.
 pub const GUY_HALF_WIDTH: f32 = 20.0;
-/// Height of Guy's 60x60 canvas.
-pub const GUY_HEIGHT: f32 = 60.0;
 /// Distance from the centre of Guy's canvas down to his feet.
 pub const GUY_FEET_OFFSET: f32 = 30.0;
 
-/// How far up the trunk Guy may overlap it when walking up from below, as a fraction of his height.
-const OVERLAP_FROM_BELOW: f32 = 0.5;
 /// How much of the tree's bottom Guy may not enter when walking down from above, as a fraction of the tree height.
 const BLOCKED_BOTTOM: f32 = 0.1;
 
@@ -27,10 +23,10 @@ pub struct Trunk {
 }
 
 impl Trunk {
-    /// Lowest feet y that is blocked. Below this Guy is in front of the trunk and may walk up to here,
-    /// which puts the top half of his body over the trunk base.
+    /// Lowest feet y that is blocked: the base of the tree. Guy walking up from below stops on this line, as he
+    /// does at the bottom of a rock (`adr-lw13`).
     fn y_low(&self) -> f32 {
-        self.base_y - OVERLAP_FROM_BELOW * GUY_HEIGHT
+        self.base_y
     }
 
     /// Highest feet y that is blocked. Above this Guy is behind the tree.
@@ -61,7 +57,7 @@ mod tests {
     use game_kit::outline::{self, Edge};
 
     // Base at y 0, tree 128 high, trunk x 0 to 30.
-    // Blocked feet area: x -20 to 50, y -30 to 12.8.
+    // Blocked feet area: x -20 to 50, y 0 to 12.8.
     fn trunk() -> Trunk {
         Trunk {
             left: 0.0,
@@ -84,18 +80,18 @@ mod tests {
 
     #[test]
     fn stops_at_left_side() {
-        assert_eq!(walk(Vec2::new(-100.0, 0.0), Vec2::new(0.0, 0.0)).x, -20.0);
+        assert_eq!(walk(Vec2::new(-100.0, 5.0), Vec2::new(0.0, 5.0)).x, -20.0);
     }
 
     #[test]
     fn stops_at_right_side() {
-        assert_eq!(walk(Vec2::new(100.0, 0.0), Vec2::new(0.0, 0.0)).x, 50.0);
+        assert_eq!(walk(Vec2::new(100.0, 5.0), Vec2::new(0.0, 5.0)).x, 50.0);
     }
 
     #[test]
-    fn walking_up_overlaps_half_of_guy() {
-        let end = walk(Vec2::new(10.0, -100.0), Vec2::new(10.0, 0.0));
-        assert_eq!(end.y, -30.0);
+    fn walking_up_stops_at_the_base() {
+        let end = walk(Vec2::new(10.0, -100.0), Vec2::new(10.0, 10.0));
+        assert_eq!(end.y, 0.0);
     }
 
     #[test]

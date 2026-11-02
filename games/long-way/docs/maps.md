@@ -26,7 +26,7 @@ Characters that are next to each other overlap by one cell. This is on purpose: 
 
 ## Trees
 
-A tree is a feature with one character, for example `g` for `green_tree`. The trunk blocks Guy. He can walk behind the tree from above and overlap its trunk from below by half of his height (`adr-lw1`). Trunks that touch rocks join the rock cluster.
+A tree is a feature with one character, for example `g` for `green_tree`. The trunk blocks Guy. He can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster.
 
 ## Rocks and collision
 
