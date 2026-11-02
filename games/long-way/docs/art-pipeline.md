@@ -25,7 +25,7 @@ Source of truth: `.aseprite` files in each game's `assets/art/` (`games/<name>/a
 
 Tools:
 - Aseprite CLI, run as `aseprite --batch --script <script.lua>`. Binary: `/Applications/Aseprite.app/Contents/MacOS/aseprite`.
-- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them.
+- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes.
 
 Rules:
 1. Write one shared helper first (`dev-scripts/aseprite/lib.lua`): new sprite, load palette, draw tile, outline, shade, tag frames, save. Sprite scripts call the helper. Do not repeat drawing code per sprite.

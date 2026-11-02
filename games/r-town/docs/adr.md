@@ -49,3 +49,11 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 **Rationale.** The base-only rule keeps the forgiving feel of Long Way and lets the hero pass behind roofs and leaves. A 10 px wide box fits through a one-cell (16 px) gap with 3 px to spare each side. A 4 px tall box gives a clear walk-behind line.
 
 **How to apply.** The kit collision takes these sizes as values from the game (adr-x12). Base footprint sizes per kind go in the R-Town map kind table.
+
+## adr-rt6. Art file layout, tags and map conventions (2026-11-02)
+
+**Decision.** Pack PNGs are packed by `dev-scripts/aseprite/pack_pngs.lua` into `assets/art/characters/characters.aseprite` (tags `char_<n>`) and `assets/art/features/background-elements.aseprite` (tags `bg_<n>`). Files are named after the pack folder, not the category names in adr-rt1. Images sit at the bottom centre of a shared canvas. The catalogue of frames and tags is `games/r-town/docs/art-tags.md`, in `docs/` and not in `assets/`, so it is not shipped in a web build. A map object stands on its cell: the bottom centre of its art is the bottom centre of the cell. The hero entity is at the feet, with the sprite as a child. The test map has no size key: the size is `MAP_CELLS` in `src/map.rs` (80x60), and cell (0, 0) is at the world origin.
+
+**Rationale.** A shared canvas with a common bottom line means one anchor rule for every sprite, and feet or tree bases never need per-sprite offsets. A child sprite lets the walking bob move the picture and not the collision feet. The tags are the contract with code, and a catalogue next to the ADRs keeps developer material out of shipped assets.
+
+**How to apply.** Add a sprite by adding its PNG to the pack command and a row to `art-tags.md`. Measure its base from the bottom rows of the PNG before using it as an obstacle.

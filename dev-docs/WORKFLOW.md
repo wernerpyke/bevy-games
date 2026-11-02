@@ -57,4 +57,5 @@ Topics covered for R-Town, in the order that worked:
 - Explain a question with concrete examples when asked. Abstract trade-offs ("generic parser") did not work.
 - Build and test each shared crate on its own (`./dev-scripts/rust.sh test game-kit`). A workspace build unifies Bevy features, so a crate can compile with a missing feature until it is built alone.
 - A scripted screenshot can come out completely black when the display is asleep or locked, even though the log looks fine. Check one screenshot of a known good build before trusting a visual check.
+- Debug and overlay sizes that are fixed in world units look wrong at another art scale. Scale them by the cell size from the start.
 - Game values from the first game (such as `GUY_*`) are in that game's art units. A new game needs its own values.

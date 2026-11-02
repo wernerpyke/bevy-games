@@ -4477,6 +4477,8 @@ name = "r-town"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_aseprite_ultra",
+ "game-kit",
 ]
 
 [[package]]
