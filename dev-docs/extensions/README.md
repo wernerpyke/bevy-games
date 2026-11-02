@@ -20,7 +20,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [collision.md](collision.md) | Feet-point collision, merged outlines, forgiving sliding | `game-kit` `collision.rs`, `outline.rs` | lw4, lw10 (lw1, lw13 for Long Way) |
 | [collision-research.md](collision-research.md) | Approaches compared, why outlines | none | lw1, lw10 |
 | [draw-order.md](draw-order.md) | Depth sort by feet, named layers | `game-kit` `depth.rs`, `layers.rs` | lw2, lw9 (lw12 for Long Way) |
-| [map-files.md](map-files.md) | Markdown map format and parser contract | `game-kit` `map.rs` | lw8, lw11 |
+| [map-files.md](map-files.md) | Text map format and parser contract | `game-kit` `map.rs` | lw8, lw11, x18 |
 | [debug-tools.md](debug-tools.md) | Grid, info box, collision overlay | `game-kit` `debug.rs`, `collision_debug.rs` | lw3, lw6 |
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | lw5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |

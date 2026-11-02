@@ -5,6 +5,9 @@
 //! or a scrolling view. The info box reports on the entity with the `Controlled` component.
 //!
 //! To show a value in the info box from any system, take `ResMut<DebugInfo>` and call `set`.
+//!
+//! Row numbers normally count up from the grid origin. A game with a top-left map file sets
+//! `DebugSettings::rows_from_top` so the numbers match the file (0 is the top row).
 
 use std::ops::RangeInclusive;
 
@@ -85,6 +88,7 @@ impl Plugin for DebugPlugin {
             target_name: self.target_name,
             grid_z: self.grid_z,
             hud_z_index: self.hud_z_index,
+            rows_from_top: None,
             show_grid: true,
             show_info: true,
         })
@@ -112,11 +116,23 @@ pub struct DebugSettings {
     pub target_name: &'static str,
     pub grid_z: f32,
     pub hud_z_index: i32,
+    /// When set, row numbers count down from the top of a map with this many rows (0 is the top row), as in a map
+    /// file with `origin: top-left`. When `None`, rows count up from the grid origin. Only the numbers change. The
+    /// lines stay where they are.
+    pub rows_from_top: Option<i32>,
     pub show_grid: bool,
     pub show_info: bool,
 }
 
 impl DebugSettings {
+    /// The number shown for the cell row `row`, counted up from the grid origin.
+    pub fn row_number(&self, row: i32) -> i32 {
+        match self.rows_from_top {
+            Some(rows) => rows - 1 - row,
+            None => row,
+        }
+    }
+
     /// How much to scale the debug sizes: the cell size over 64, the cell size they are tuned for.
     pub fn scale(&self) -> f32 {
         self.cell_size / 64.0
@@ -208,7 +224,7 @@ fn line_range(origin: f32, low: f32, high: f32, cell: f32) -> RangeInclusive<i32
 }
 
 /// The lines and origin the grid was last built for.
-type GridKey = (RangeInclusive<i32>, RangeInclusive<i32>, Vec2);
+type GridKey = (RangeInclusive<i32>, RangeInclusive<i32>, Vec2, Option<i32>);
 
 /// Lines are thin sprites, not gizmos, because gizmos always draw on top of everything.
 /// Column numbers run along the top edge, row numbers along the left edge (`pin_grid_labels`).
@@ -235,7 +251,12 @@ fn rebuild_grid(
     let cell = settings.cell_size;
     let columns = line_range(origin.x, visible.min.x, visible.max.x, cell);
     let rows = line_range(origin.y, visible.min.y, visible.max.y, cell);
-    let key = (columns.clone(), rows.clone(), origin);
+    let key = (
+        columns.clone(),
+        rows.clone(),
+        origin,
+        settings.rows_from_top,
+    );
     if last.as_ref() == Some(&key) {
         return;
     }
@@ -280,7 +301,7 @@ fn rebuild_grid(
                 ));
                 parent.spawn((
                     RowLabel { y },
-                    Text2d::new(j.to_string()),
+                    Text2d::new(settings.row_number(j).to_string()),
                     font.clone(),
                     TextColor(color),
                     Anchor::BOTTOM_LEFT,
@@ -333,11 +354,18 @@ fn report_target(
     let grid = world - origin;
     let cell = (grid / settings.cell_size).floor();
     let name = settings.target_name;
+    let (grid_y, cell_y) = match settings.rows_from_top {
+        Some(rows) => (
+            rows as f32 * settings.cell_size - grid.y,
+            settings.row_number(cell.y as i32) as f32,
+        ),
+        None => (grid.y, cell.y),
+    };
     info.set(
         format!("{name} x/y"),
-        format!("{:.0}, {:.0}", grid.x, grid.y),
+        format!("{:.0}, {:.0}", grid.x, grid_y),
     );
-    info.set(format!("{name} cell"), format!("{}, {}", cell.x, cell.y));
+    info.set(format!("{name} cell"), format!("{}, {}", cell.x, cell_y));
     info.set(
         format!("{name} world"),
         format!("{:.0}, {:.0}", world.x, world.y),
@@ -404,5 +432,25 @@ mod tests {
         info.set("b", "2");
         info.set("a", "3");
         assert_eq!(info.text(), "a: 3\nb: 2");
+    }
+
+    #[test]
+    fn rows_count_down_from_the_top_when_asked() {
+        let mut settings = DebugSettings {
+            cell_size: 16.0,
+            grid_color: Color::WHITE,
+            grid_origin: GridOrigin::World(Vec2::ZERO),
+            target_name: "t",
+            grid_z: 0.0,
+            hud_z_index: 0,
+            rows_from_top: None,
+            show_grid: true,
+            show_info: true,
+        };
+        assert_eq!(settings.row_number(30), 30);
+        settings.rows_from_top = Some(60);
+        assert_eq!(settings.row_number(0), 59);
+        assert_eq!(settings.row_number(59), 0);
+        assert_eq!(settings.row_number(30), 29);
     }
 }

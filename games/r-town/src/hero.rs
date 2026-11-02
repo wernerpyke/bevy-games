@@ -4,11 +4,12 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 use game_kit::Controlled;
+use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 
 use crate::collision::FEET_HALF_WIDTH;
-use crate::map::{MAP_CELLS, map_rect};
+use crate::map::PlayerStart;
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
 const WALK_SPEED: f32 = 80.0;
@@ -37,8 +38,8 @@ struct Hero {
 #[derive(Component)]
 struct HeroSprite;
 
-fn spawn_hero(mut commands: Commands, server: Res<AssetServer>) {
-    let start = MAP_CELLS.as_vec2() * crate::camera::CELL_SIZE / 2.0;
+fn spawn_hero(mut commands: Commands, server: Res<AssetServer>, player_start: Res<PlayerStart>) {
+    let start = player_start.0.as_vec2() * crate::camera::CELL_SIZE;
     commands
         .spawn((
             Controlled,
@@ -82,6 +83,7 @@ fn move_hero(
     time: Res<Time>,
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
+    bounds: Res<CameraBounds>,
     hero: Single<(&mut Transform, &mut Hero, &mut SlideAssist)>,
 ) {
     let (mut transform, mut hero, mut assist) = hero.into_inner();
@@ -98,7 +100,7 @@ fn move_hero(
     let old = transform.translation.truncate();
     let step = direction.normalize() * WALK_SPEED * dt;
     let feet = move_feet(&settings, &mut assist, old, step, dt, world.edges());
-    let area = map_rect();
+    let area = bounds.0;
     let feet = feet.clamp(
         area.min + Vec2::new(FEET_HALF_WIDTH, 0.0),
         area.max - Vec2::new(FEET_HALF_WIDTH, 0.0),

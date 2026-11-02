@@ -57,3 +57,11 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 **Rationale.** A shared canvas with a common bottom line means one anchor rule for every sprite, and feet or tree bases never need per-sprite offsets. A child sprite lets the walking bob move the picture and not the collision feet. The tags are the contract with code, and a catalogue next to the ADRs keeps developer material out of shipped assets.
 
 **How to apply.** Add a sprite by adding its PNG to the pack command and a row to `art-tags.md`. Measure its base from the bottom rows of the PNG before using it as an obstacle.
+
+## adr-rt7. R-Town map: top-left grid, size and hero start in the file (2026-11-02)
+
+**Decision.** `assets/maps/test.txt` uses `origin: top-left`, so row labels count down the page from 0, like rows of text. The file holds the map size (`size: 80x60`) and the hero start, a legend marker `"@": player_start`. The code has no `MAP_CELLS` constant, and the hero spawns at the marker cell. The F2 grid numbers rows from the top to match the file (`DebugSettings::rows_from_top`).
+
+**Rationale.** The developer wanted to read the map like a page, with cell (0, 0) at the top left. The size and the start belong to the map, so they live in the file. The parser still returns cells numbered from the bottom left with y up, so collision, camera and spawn code did not change.
+
+**How to apply.** Read cell numbers from the file for editing, and from F2 for play. Both use the same numbers. A marker has no art and no `Kind`: `load_map` in `map.rs` removes it from the object list. The file needs exactly one `player_start`. The format is in `dev-docs/extensions/map-files.md` (`adr-x18`).

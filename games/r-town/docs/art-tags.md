@@ -64,7 +64,7 @@ The descriptions come from looking at a scaled contact sheet. Check a sprite on 
 
 ## Map kinds
 
-Kinds are the names a map legend uses (`assets/maps/test.md`). Each is defined in code (`src/map.rs`, `src/trees.rs`). A tree stands on its cell: the bottom centre of the art is the bottom centre of the cell.
+Kinds are the names a map legend uses (`assets/maps/test.txt`). Each is defined in code (`src/map.rs`, `src/trees.rs`). A tree stands on its cell: the bottom centre of the art is the bottom centre of the cell.
 
 | Kind | Tag | Blocking base (pixels from the tree centre) | Source of the numbers |
 |---|---|---|---|

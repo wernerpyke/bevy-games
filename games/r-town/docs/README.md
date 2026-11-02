@@ -13,4 +13,4 @@ Related:
 - Shared code: `crates/game-kit/`, extensions in `dev-docs/extensions/README.md`
 - Run it: `./dev-scripts/rust.sh run r-town`. A scripted run: `./dev-scripts/rust.sh script r-town "teleport:648:640;hold:up:2;screenshot:tree;quit"`. Arrow keys or WASD walk the hero. F2 toggles the grid and collision overlay, F3 the info box.
 
-Source layout (`games/r-town/src/`): `main.rs` builds the app, `camera.rs` has the view height, cell size and colours, `collision.rs` the hero's sizes, `map.rs` loads the map and names the kinds, `trees.rs` spawns trees with their blocked bases, `hero.rs` moves and animates the hero. Map: `assets/maps/test.md`. Art: `assets/art/`.
+Source layout (`games/r-town/src/`): `main.rs` builds the app, `camera.rs` has the view height, cell size and colours, `collision.rs` the hero's sizes, `map.rs` loads the map and names the kinds, `trees.rs` spawns trees with their blocked bases, `hero.rs` moves and animates the hero. Map: `assets/maps/test.txt`. Art: `assets/art/`.

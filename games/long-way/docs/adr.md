@@ -6,7 +6,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 |---|---|
 | adr-lw1 | Custom tree collision with a blocked band |
 | adr-lw7 | Long Way is a real-time top-down RPG |
-| adr-lw8 | Maps are markdown files, rocks come first |
+| adr-lw8 | Maps are text grids, rocks come first |
 | adr-lw12 | Long Way draw order layers |
 | adr-lw13 | Rock blocked area and sort line |
 
@@ -29,14 +29,14 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **How to apply.** Do not add turn logic, turn phases or grid-cell movement to Long Way. Use `time.delta_secs()` for anything that changes over time. Expect NPCs, dialogue and pathfinding later, so keep rules in plain functions that moving entities share (`move_feet`). Evaluating a physics crate stays on the roadmap (item 2). Other games in the workspace choose their own timing model. This updates the rationale of `adr-lw1`, which assumed a later grid game.
 
-## adr-lw8. Maps are markdown files, rocks come first (2026-11-01)
+## adr-lw8. Maps are text grids, rocks come first (2026-11-01, format changed 2026-11-02)
 
 **Decision.**
-1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The format is in `dev-docs/extensions/map-files.md` and `adr-x11`.
+1. A human draws object layouts in one text file: front matter, then a grid with one character per 64 pixel cell. Long Way uses `origin: bottom-left`, so row labels match the F2 grid. The format is in `dev-docs/extensions/map-files.md` and `adr-x18`. It replaced the markdown format with `# Features` and `# Map` sections (`adr-x11`).
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`). Trees followed the same day: `green_tree` and `red_tree` are map kinds, placed from the map file with the trunk collision rule of `adr-lw1`.
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
-5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `pitch`, `draw` and `jitter` stay as optional frontmatter keys. Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
+5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `draw` and `jitter` stay as optional front matter keys (`pitch` went with the markdown format). Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
 6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 3.
 7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F2 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
 8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).

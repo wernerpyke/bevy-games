@@ -201,7 +201,8 @@ mod tests {
         Map {
             name: "t".into(),
             cell_size: 64.0,
-            pitch: 1,
+            origin: game_kit::map::Origin::BottomLeft,
+            size: bevy::math::IVec2::ZERO,
             draw_size: Some(draw_size),
             jitter,
             objects: Vec::new(),

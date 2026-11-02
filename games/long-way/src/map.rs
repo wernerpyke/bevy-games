@@ -5,8 +5,8 @@ use bevy::prelude::*;
 use game_kit::map::{Map, MapObject, parse};
 
 /// The map file Long Way loads. Edit it and rebuild.
-const MAP_NAME: &str = "assets/maps/rocks-test.md";
-const MAP_SOURCE: &str = include_str!("../assets/maps/rocks-test.md");
+const MAP_NAME: &str = "assets/maps/rocks-test.txt";
+const MAP_SOURCE: &str = include_str!("../assets/maps/rocks-test.txt");
 
 /// The legend names the parser accepts.
 const KIND_NAMES: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree"];
@@ -17,10 +17,10 @@ impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         let map = parse(MAP_NAME, MAP_SOURCE, KIND_NAMES).unwrap_or_else(|error| panic!("{error}"));
         info!(
-            "map: {} cell {} pitch {} draw {:?} jitter {}, {} objects",
+            "map: {} cell {} size {} draw {:?} jitter {}, {} objects",
             map.name,
             map.cell_size,
-            map.pitch,
+            map.size,
             map.draw_size,
             map.jitter,
             map.objects.len()
@@ -86,13 +86,16 @@ mod tests {
         let map = parse(MAP_NAME, MAP_SOURCE, KIND_NAMES).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(map.name, "rocks-test");
         assert_eq!(map.cell_size, 64.0);
-        assert_eq!(map.pitch, 1);
+        assert_eq!(map.size, IVec2::new(32, 18));
         assert_eq!(map.draw_size, None);
         assert_eq!(map.jitter, 0.0);
-        // 10 rocks in the first feature, three copies of the 8 rock patch, two single rocks and two trees.
-        assert_eq!(map.objects.len(), 38);
+        // 10 rocks in the first feature, three copies of the 8 rock patch, two single rocks, two trees and a grove of four red trees.
+        assert_eq!(map.objects.len(), 42);
         assert_eq!(cells(&map, Kind::GreenTree), vec![(12, 8)]);
-        assert_eq!(cells(&map, Kind::RedTree), vec![(18, 8)]);
+        assert_eq!(
+            cells(&map, Kind::RedTree),
+            vec![(12, 2), (12, 4), (14, 2), (14, 4), (18, 8)]
+        );
     }
 
     #[test]

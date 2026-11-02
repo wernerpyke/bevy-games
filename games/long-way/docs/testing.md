@@ -16,7 +16,7 @@ Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, archit
 | `crates/game-kit/src/collision.rs` | `resolve`, `move_feet`, sliding, merged cluster cases, float noise at edges |
 | `crates/game-kit/src/outline.rs` | merging rectangles into clusters, outline edges, inward corners, `Edge::covers` |
 | `src/map.rs` | the bundled map file and the kind names |
-| `crates/game-kit/src/map.rs` | the markdown map parser, including every error message |
+| `crates/game-kit/src/map.rs` | the text map parser, including every error message |
 | `src/rocks.rs` | rock placement, blocked areas, jitter |
 | `crates/game-kit/src/depth.rs` | draw order from the feet |
 | `crates/game-kit/src/debug.rs` | the grid line range (also for a moved camera), the visible rect, grid origin, and the info box rows |

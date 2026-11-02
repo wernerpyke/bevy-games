@@ -79,6 +79,8 @@ The blocked area and sort line of a rock are game rules, in `adr-lw13` (`games/l
 
 ## adr-x11. Map file layout: Features and Map sections (2026-11-01)
 
+**Superseded by `adr-x18` (2026-11-02): a map is now one drawn grid. This record keeps the reasons it gave.**
+
 **Decision.** A map file is markdown with frontmatter and two sections the game reads (`dev-docs/extensions/map-files.md`):
 1. `# Features`: each `## Name` heading defines a feature with exactly one `cells` block. The bottom left character is the anchor.
 2. `# Map`: a bulleted list that places features, `- 'Name' at (x,y), (x,y) and (x,y)`. Positions are the anchor cell, in F2 grid numbers.
@@ -137,3 +139,18 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** A scrolling camera is needed by every game with a map larger than the view, and rounding keeps pixel art from shimmering when it scrolls. The debug sizes were world units chosen for Long Way's 1200 unit view. At R-Town's 240 unit view they were five times too large on screen.
 
 **How to apply.** Insert `CameraBounds` in the plugin that loads the map. Do not move the camera elsewhere, or the follow system overwrites it each frame.
+
+## adr-x18. Map files are one drawn grid in a text file (2026-11-02)
+
+**Decision.** A map file is plain text with front matter and a grid (`dev-docs/extensions/map-files.md`). It replaces the markdown format of `adr-x11`.
+1. The grid shows every cell of the map. One character is one cell. A legend in the front matter maps characters to object kinds. A blank or `.` is empty.
+2. Each grid row is `<label>|<cells>|`, and cell k is the character at offset 2k. Rulers help a reader. Row labels are zero-based and checked. Both `.` and blanks may draw a footprint, and the parser treats them the same.
+3. A character marks the anchor cell (bottom left) of an object. The footprint size belongs to the game. There are no layers, and one cell holds one object.
+4. `size: WxH` is in the file. `origin` is `bottom-left` or `top-left` and only sets how rows are labelled. `parse` always returns cells numbered from the bottom left, with y up.
+5. A legend entry may be a marker (R-Town `"@": player_start`). It is an ordinary object that the game reads and does not draw.
+6. The F2 grid can number rows from the top (`DebugSettings::rows_from_top`) so that it matches a `top-left` file.
+7. Parsing stays a small hand parser in `game-kit` with no new dependency. Every error names the file and line.
+
+**Rationale.** The developer wanted to see a whole map in one file, edit it in a text editor, and not install an editor or tool. A drawn grid shows gaps and clusters at a glance. The markdown format split a map into features and a placement list, so no one place showed the map. Research found no standard text map format (`dev-docs/RESEARCH-map-layouts.md`), and editor formats (Tiled, LDtk, Ogmo) need their editors. A seeded generator can later return the same `Map` value as the parser, so the format does not block generated maps.
+
+**How to apply.** Add a new kind to the game's name list and `Kind` enum and to the legend. Use fixed-width font and turn off word wrap when editing wide maps. Layers, larger objects with own settings, chunk files and a visual editor are roadmap items. The visual editor must keep this format as the source of truth.

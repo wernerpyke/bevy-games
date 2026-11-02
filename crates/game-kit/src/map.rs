@@ -1,26 +1,22 @@
-//! Map files: markdown with frontmatter, a `# Features` section and a `# Map` section. See
-//! `dev-docs/extensions/map-files.md` for the format. The parser is plain Rust and has no Bevy dependency except
-//! `IVec2`, so it is unit tested without a running app. Object kinds are names (adr-x13): the game passes the
-//! names it knows, and converts the names of the parsed objects to its own type.
+//! Map files: front matter and a drawn grid, one character per cell. See `dev-docs/extensions/map-files.md` for the
+//! format. The parser is plain Rust and has no Bevy dependency except `IVec2`, so it is unit tested without a
+//! running app. Object kinds are names (adr-x13): the game passes the names it knows, and converts the names of
+//! the parsed objects to its own type.
 //!
-//! Supported frontmatter (a small subset of YAML, one `key: value` per line):
+//! Supported front matter (a small subset of YAML, one `key: value` per line):
 //! - `map`: name used in log and error messages. Required.
 //! - `cell`: cell size in pixels. Required.
-//! - `origin`: must be `bottom-left`. Required.
-//! - `pitch`: cells per character. Default 1.
+//! - `origin`: `bottom-left` or `top-left`, the corner where row labels start at 0. Required.
+//! - `size`: width and height in cells, written `WxH`. Required.
 //! - `draw`: drawn size of an object in pixels. Optional, the game gives the default.
 //! - `jitter`: largest random offset in pixels. Default 0.
 //! - `legend`: indented `char: kind` lines. `.` is always empty. Quote the character
 //!   (for example `"#"`), because an unquoted `#` starts a comment.
 //!
-//! Body:
-//! - `# Features`: each `## Name` heading defines a feature, with one fenced `cells` block. Rows run
-//!   top to bottom, one character per `pitch` cells. The bottom left character is the anchor.
-//! - `# Map`: a bulleted list that places features, for example `- 'Name' at (2,12), (2,3) and (6,3)`.
-//!   Positions are the cell of the anchor. Features may be defined before or after the `# Map` section.
-//! - Any other heading, text or code block is ignored.
+//! Grid: rows of the form `<label>|<cells>|`. Cell k is the character at offset 2k between the bars, and a
+//! blank or `.` is empty. Ruler lines, blank lines and `#` comment lines are ignored.
 //!
-//! Comments in the frontmatter start with `#` at the start of a line or after a space.
+//! Comments in the front matter start with `#` at the start of a line or after a space.
 
 use std::collections::HashMap;
 use std::fmt;
@@ -35,11 +31,22 @@ pub struct MapObject {
     pub cell: IVec2,
 }
 
+/// The corner of the grid where the row labels start at 0. It only changes how a file is written. Cells in
+/// `MapObject` are always numbered from the bottom left, with y up, whichever origin the file uses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Origin {
+    BottomLeft,
+    TopLeft,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     pub name: String,
     pub cell_size: f32,
-    pub pitch: i32,
+    /// The `origin` key: how the file numbers its rows.
+    pub origin: Origin,
+    /// Width and height in cells, from the `size` key.
+    pub size: IVec2,
     /// The `draw` key, if the file has one.
     pub draw_size: Option<f32>,
     pub jitter: f32,
@@ -67,23 +74,19 @@ impl std::error::Error for MapError {}
 struct Header {
     name: Option<String>,
     cell_size: Option<f32>,
-    origin_ok: bool,
-    pitch: Option<i32>,
+    origin: Option<Origin>,
+    size: Option<IVec2>,
     draw_size: Option<f32>,
     jitter: Option<f32>,
     legend: HashMap<char, String>,
 }
 
-/// Parses a map file. `file` is only used in error messages. `kinds` are the legend names the game knows. Any other
-/// name in the legend is an error with its line.
-pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> {
-    let fail = |line: usize, message: String| MapError {
-        file: file.to_string(),
-        line,
-        message,
-    };
-    let lines: Vec<&str> = source.lines().collect();
-
+/// Reads the frontmatter. Returns the index of the closing `---` line, the header, the map name and the cell size.
+fn front_matter(
+    lines: &[&str],
+    kinds: &[&str],
+    fail: &Fail,
+) -> Result<(usize, Header, String, f32), MapError> {
     if lines.first().map(|l| l.trim()) != Some("---") {
         return Err(fail(
             1,
@@ -95,7 +98,7 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
     };
     let close = close + 1;
 
-    let header = parse_header(&lines[1..close], 2, kinds, &fail)?;
+    let header = parse_header(&lines[1..close], 2, kinds, fail)?;
     let name = header
         .name
         .clone()
@@ -103,256 +106,140 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
     let cell_size = header
         .cell_size
         .ok_or_else(|| fail(1, "missing required key `cell`".into()))?;
-    if !header.origin_ok {
+    if header.origin.is_none() {
         return Err(fail(
             1,
-            "missing required key `origin` (use `origin: bottom-left`)".into(),
+            "missing required key `origin` (`bottom-left` or `top-left`)".into(),
         ));
     }
-    let pitch = header.pitch.unwrap_or(1);
+    Ok((close, header, name, cell_size))
+}
 
-    let objects = parse_body(&lines, close + 1, pitch, &header.legend, &fail)?;
+/// Parses a text map file: frontmatter, then a drawn grid (`dev-docs/extensions/map-files.md`). `file` is only
+/// used in error messages. `kinds` are the legend names the game knows.
+pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> {
+    let fail = |line: usize, message: String| MapError {
+        file: file.to_string(),
+        line,
+        message,
+    };
+    let lines: Vec<&str> = source.lines().collect();
+    let (close, header, name, cell_size) = front_matter(&lines, kinds, &fail)?;
+    let size = header
+        .size
+        .ok_or_else(|| fail(1, "missing required key `size`".into()))?;
+
+    let origin = header.origin.unwrap_or(Origin::BottomLeft);
+    let objects = parse_grid(&lines, close + 1, size, origin, &header.legend, &fail)?;
 
     Ok(Map {
         name,
         cell_size,
-        pitch,
+        origin,
+        size,
         draw_size: header.draw_size,
         jitter: header.jitter.unwrap_or(0.0),
         objects,
     })
 }
 
-/// Where the body of the file is, as it is read.
-#[derive(Clone, Copy, PartialEq)]
-enum Section {
-    Other,
-    Features,
-    Map,
-}
-
-/// A feature: a painted `cells` block under a `## Name` heading, with positions relative to its anchor.
-struct Feature {
-    line: usize,
-    objects: Option<Vec<MapObject>>,
-}
-
-/// One bullet of the `# Map` section.
-struct Placement {
-    line: usize,
-    name: String,
-    at: Vec<IVec2>,
-}
-
-/// Reads the body: `# Features` holds `## Name` headings with a `cells` block each, `# Map` holds a bulleted
-/// list that places features. Other headings, text and code blocks are ignored.
-fn parse_body(
+/// Reads the grid rows. `first` is the index in `lines` of the first line after the frontmatter, so line
+/// numbers in errors are `index + 1`. Row labels count down from the top for `BottomLeft` and up from the top for
+/// `TopLeft`. Objects come back top row first, left to right, with cells numbered from the bottom left.
+fn parse_grid(
     lines: &[&str],
     first: usize,
-    pitch: i32,
+    size: IVec2,
+    origin: Origin,
     legend: &HashMap<char, String>,
     fail: &Fail,
 ) -> Result<Vec<MapObject>, MapError> {
-    let mut section = Section::Other;
-    let mut features: HashMap<String, Feature> = HashMap::new();
-    let mut current: Option<String> = None;
-    let mut placements: Vec<Placement> = Vec::new();
-    let mut i = first;
-    while i < lines.len() {
-        let trimmed = lines[i].trim_start();
-        if let Some(info) = trimmed.strip_prefix("```") {
-            let start = i;
-            let Some(end) = (start + 1..lines.len()).find(|&index| lines[index].trim() == "```")
-            else {
-                return Err(fail(start + 1, "code block is not closed".into()));
-            };
-            let words: Vec<&str> = info.split_whitespace().collect();
-            if words.first() == Some(&"cells") {
-                if words.len() > 1 {
-                    return Err(fail(
-                        start + 1,
-                        "a `cells` block takes no options: positions go in the `# Map` section and the name is the `##` heading"
-                            .into(),
-                    ));
-                }
-                let feature = current
-                    .as_ref()
-                    .filter(|_| section == Section::Features)
-                    .and_then(|name| features.get_mut(name.as_str()))
-                    .ok_or_else(|| {
-                        fail(
-                            start + 1,
-                            "a `cells` block belongs under a `## Feature name` heading in the `# Features` section"
-                                .into(),
-                        )
-                    })?;
-                if feature.objects.is_some() {
-                    return Err(fail(
-                        start + 1,
-                        "a feature has one `cells` block, this is a second".into(),
-                    ));
-                }
-                let mut objects = Vec::new();
-                parse_cells(
-                    &lines[start + 1..end],
-                    start + 2,
-                    IVec2::ZERO,
-                    pitch,
-                    legend,
-                    fail,
-                    &mut objects,
-                )?;
-                feature.objects = Some(objects);
-            }
-            i = end + 1;
+    let width = size.x as usize;
+    let mut objects = Vec::new();
+    let mut rows = 0;
+    for (index, raw) in lines.iter().enumerate().skip(first) {
+        let line = index + 1;
+        let text = raw.trim();
+        if text.is_empty() || text.starts_with('#') {
             continue;
         }
-        if let Some(title) = trimmed.strip_prefix("# ") {
-            section = match title.trim().to_lowercase().as_str() {
-                "features" => Section::Features,
-                "map" => Section::Map,
-                _ => Section::Other,
-            };
-            current = None;
-        } else if let Some(title) = trimmed.strip_prefix("## ") {
-            if section == Section::Features {
-                let name = title.trim().to_string();
-                if features.contains_key(&name) {
-                    return Err(fail(i + 1, format!("feature `{name}` is already defined")));
-                }
-                features.insert(
-                    name.clone(),
-                    Feature {
-                        line: i + 1,
-                        objects: None,
-                    },
-                );
-                current = Some(name);
-            }
-        } else if section == Section::Map
-            && let Some(item) = trimmed
-                .strip_prefix("- ")
-                .or_else(|| trimmed.strip_prefix("* "))
-        {
-            placements.push(parse_placement(item, i + 1, fail)?);
-        }
-        i += 1;
-    }
-
-    if let Some((name, feature)) = features
-        .iter()
-        .filter(|(_, f)| f.objects.is_none())
-        .min_by_key(|(_, f)| f.line)
-    {
-        return Err(fail(
-            feature.line,
-            format!("feature `{name}` has no `cells` block"),
-        ));
-    }
-    let mut objects = Vec::new();
-    for placement in placements {
-        let Some(feature) = features.get(&placement.name) else {
+        let Some(open) = raw.find('|') else {
             return Err(fail(
-                placement.line,
-                format!(
-                    "feature `{}` is not defined under `# Features`",
-                    placement.name
-                ),
+                line,
+                format!("expected a grid row like ` 3 |. . .|`, found `{text}`"),
             ));
         };
-        for at in placement.at {
-            objects.extend(feature.objects.iter().flatten().map(|o| MapObject {
-                kind: o.kind.clone(),
-                cell: o.cell + at,
-            }));
+        let label = raw[..open].trim();
+        if label.is_empty() {
+            continue;
         }
+        let rest = raw[open + 1..].trim_end();
+        let Some(cells) = rest.strip_suffix('|') else {
+            return Err(fail(line, "grid row has no closing `|`".into()));
+        };
+        if rows >= size.y {
+            return Err(fail(
+                line,
+                format!("more rows than the height {} in `size`", size.y),
+            ));
+        }
+        let y = size.y - 1 - rows;
+        let expected = match origin {
+            Origin::BottomLeft => y,
+            Origin::TopLeft => rows,
+        };
+        if label.parse::<i32>().ok() != Some(expected) {
+            return Err(fail(
+                line,
+                format!("row label `{label}` is wrong, expected {expected}"),
+            ));
+        }
+        rows += 1;
+        let chars: Vec<char> = cells.chars().collect();
+        if chars.len() != 2 * width - 1 {
+            return Err(fail(
+                line,
+                format!(
+                    "row has {} characters between the bars but {} are needed for {width} cells",
+                    chars.len(),
+                    2 * width - 1
+                ),
+            ));
+        }
+        for x in 0..width {
+            if x > 0 && chars[2 * x - 1] != ' ' {
+                return Err(fail(
+                    line,
+                    format!(
+                        "expected a space after cell {}, found `{}`",
+                        x - 1,
+                        chars[2 * x - 1]
+                    ),
+                ));
+            }
+            let character = chars[2 * x];
+            if character == ' ' || character == '.' {
+                continue;
+            }
+            let Some(kind) = legend.get(&character) else {
+                return Err(fail(
+                    line,
+                    format!("character `{character}` is not in the legend"),
+                ));
+            };
+            objects.push(MapObject {
+                kind: kind.clone(),
+                cell: IVec2::new(x as i32, y),
+            });
+        }
+    }
+    if rows != size.y {
+        return Err(fail(
+            lines.len().max(first),
+            format!("the grid needs {} rows, found {rows}", size.y),
+        ));
     }
     Ok(objects)
-}
-
-/// Reads `'Feature name' at (x,y), (x,y) and (x,y)`. The name may be in single or double quotes.
-fn parse_placement(item: &str, line: usize, fail: &Fail) -> Result<Placement, MapError> {
-    let item = item.trim();
-    let Some(quote) = item.chars().next().filter(|c| *c == '\'' || *c == '"') else {
-        return Err(fail(
-            line,
-            "expected a quoted feature name, for example `- 'Rocks test' at (21,9)`".into(),
-        ));
-    };
-    let rest = &item[1..];
-    let Some(close) = rest.find(quote) else {
-        return Err(fail(line, "the feature name has no closing quote".into()));
-    };
-    let name = rest[..close].trim().to_string();
-    let after = rest[close + 1..].trim_start();
-    let Some(positions) = after
-        .strip_prefix("at")
-        .filter(|r| r.is_empty() || r.starts_with(char::is_whitespace) || r.starts_with('('))
-    else {
-        return Err(fail(
-            line,
-            "expected `at` and positions after the name, for example `at (2,12), (2,3) and (6,3)`"
-                .into(),
-        ));
-    };
-    Ok(Placement {
-        line,
-        name,
-        at: parse_positions(positions, line, fail)?,
-    })
-}
-
-/// Reads positions in parentheses, separated by commas and `and`: `(2,12), (2,3) and (6,3)`.
-fn parse_positions(text: &str, line: usize, fail: &Fail) -> Result<Vec<IVec2>, MapError> {
-    let mut positions = Vec::new();
-    let mut rest = text.trim();
-    while let Some(open) = rest.find('(') {
-        let between = rest[..open].replace(',', " ");
-        let words: Vec<&str> = between.split_whitespace().collect();
-        let allowed = if positions.is_empty() {
-            words.is_empty()
-        } else {
-            words.is_empty() || words == ["and"]
-        };
-        if !allowed {
-            return Err(fail(
-                line,
-                format!(
-                    "unexpected text `{}` between positions",
-                    rest[..open].trim()
-                ),
-            ));
-        }
-        let Some(close) = rest.find(')') else {
-            return Err(fail(line, "a position has no closing `)`".into()));
-        };
-        let inner = &rest[open + 1..close];
-        let bad = || {
-            fail(
-                line,
-                format!("`({inner})` must be two whole numbers, for example `(10,6)`"),
-            )
-        };
-        let (x, y) = inner.split_once(',').ok_or_else(bad)?;
-        positions.push(IVec2::new(
-            x.trim().parse().map_err(|_| bad())?,
-            y.trim().parse().map_err(|_| bad())?,
-        ));
-        rest = rest[close + 1..].trim_start();
-    }
-    if positions.is_empty() {
-        return Err(fail(
-            line,
-            "expected at least one position like `(10,6)`".into(),
-        ));
-    }
-    if !rest.trim_end_matches('.').trim().is_empty() {
-        return Err(fail(
-            line,
-            format!("unexpected text `{rest}` after the positions"),
-        ));
-    }
-    Ok(positions)
 }
 
 type Fail<'a> = dyn Fn(usize, String) -> MapError + 'a;
@@ -416,6 +303,12 @@ fn parse_header(
             if character.is_whitespace() {
                 return Err(fail(line, "legend key cannot be a space".into()));
             }
+            if character == '|' {
+                return Err(fail(
+                    line,
+                    "legend key `|` is reserved for the grid bars".into(),
+                ));
+            }
             if character == '.' {
                 if value != "empty" {
                     return Err(fail(line, "`.` is always empty, use `\".\": empty`".into()));
@@ -436,28 +329,33 @@ fn parse_header(
             "map" => header.name = Some(value.to_string()),
             "cell" => header.cell_size = Some(positive(value, "cell", line, fail)?),
             "origin" => {
-                if value != "bottom-left" {
-                    return Err(fail(
-                        line,
-                        format!("`origin` must be `bottom-left`, found `{value}`"),
-                    ));
-                }
-                header.origin_ok = true;
+                header.origin = Some(match value {
+                    "bottom-left" => Origin::BottomLeft,
+                    "top-left" => Origin::TopLeft,
+                    _ => {
+                        return Err(fail(
+                            line,
+                            format!(
+                                "`origin` must be `bottom-left` or `top-left`, found `{value}`"
+                            ),
+                        ));
+                    }
+                });
             }
-            "pitch" => {
-                let pitch = value
-                    .parse::<i32>()
-                    .ok()
-                    .filter(|p| *p >= 1)
+            "size" => {
+                let size = value
+                    .split_once('x')
+                    .and_then(|(w, h)| Some(IVec2::new(w.trim().parse().ok()?, h.trim().parse().ok()?)))
+                    .filter(|s| s.x >= 1 && s.y >= 1)
                     .ok_or_else(|| {
                         fail(
                             line,
                             format!(
-                                "`pitch` must be a whole number of at least 1, found `{value}`"
+                                "`size` must be written `WxH` with whole numbers of at least 1, found `{value}`"
                             ),
                         )
                     })?;
-                header.pitch = Some(pitch);
+                header.size = Some(size);
             }
             "draw" => header.draw_size = Some(positive(value, "draw", line, fail)?),
             "jitter" => {
@@ -501,90 +399,44 @@ fn positive(value: &str, key: &str, line: usize, fail: &Fail) -> Result<f32, Map
         })
 }
 
-/// Rows run top to bottom, so the first row has the highest y. Character `k` of a row is at
-/// cell `at.x + k * pitch`.
-fn parse_cells(
-    rows: &[&str],
-    first_line: usize,
-    at: IVec2,
-    pitch: i32,
-    legend: &HashMap<char, String>,
-    fail: &Fail,
-    objects: &mut Vec<MapObject>,
-) -> Result<(), MapError> {
-    let height = rows.len() as i32;
-    let mut width = None;
-    for (row_index, row) in rows.iter().enumerate() {
-        let line = first_line + row_index;
-        if row.trim().is_empty() {
-            return Err(fail(line, "blank line in `cells` block".into()));
-        }
-        let tokens: Vec<&str> = row.split_whitespace().collect();
-        if *width.get_or_insert(tokens.len()) != tokens.len() {
-            return Err(fail(
-                line,
-                format!(
-                    "row has {} characters but the first row has {}",
-                    tokens.len(),
-                    width.unwrap_or(0)
-                ),
-            ));
-        }
-        for (column, token) in tokens.iter().enumerate() {
-            let mut chars = token.chars();
-            let (Some(character), None) = (chars.next(), chars.next()) else {
-                return Err(fail(
-                    line,
-                    format!(
-                        "expected one character per cell, found `{token}` (separate cells with spaces)"
-                    ),
-                ));
-            };
-            if character == '.' {
-                continue;
-            }
-            let Some(kind) = legend.get(&character) else {
-                return Err(fail(
-                    line,
-                    format!("character `{character}` is not in the legend"),
-                ));
-            };
-            objects.push(MapObject {
-                kind: kind.clone(),
-                cell: IVec2::new(
-                    at.x + column as i32 * pitch,
-                    at.y + (height - 1 - row_index as i32) * pitch,
-                ),
-            });
-        }
-    }
-    Ok(())
-}
-
 #[cfg(test)]
-mod tests {
+mod text_tests {
     use super::*;
 
-    const HEADER: &str = "---\nmap: t\ncell: 64\norigin: bottom-left\nlegend:\n  \"0\": rock_0\n  \"1\": rock_1\n---\n";
+    const KINDS: &[&str] = &["player_start", "tree_big", "red"];
+    const RULERS: &str = "   |0 1 2 3 4 5|\n";
+    const DOTS: &str = ". . . . . .";
 
-    /// A body with a `# Features` section and a `# Map` section. `features` starts on line 11 and the
-    /// `# Map` heading follows it.
-    fn source(features: &str, map: &str) -> String {
-        format!("{HEADER}# Features\n\n{features}# Map\n\n{map}")
+    /// The front matter of a 6 by 4 test map. It is 11 lines, so the grid starts on line 12.
+    fn head(size: &str) -> String {
+        format!(
+            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: {size}\nlegend:\n  \".\": empty\n  \"@\": player_start\n  \"g\": tree_big\n  \"r\": red\n---\n"
+        )
     }
 
-    /// A feature of three rocks: two on the left column, one on the bottom right. Lines 11 to 17.
-    const PATCH: &str = "## Patch\n\n```cells\n0 .\n0 1\n```\n\n";
+    /// Four labelled rows, top row first. `rows` is the cell text between the bars.
+    fn body(rows: [&str; 4]) -> String {
+        format!(
+            " 3 |{}|\n 2 |{}|\n 1 |{}|\n 0 |{}|\n",
+            rows[0], rows[1], rows[2], rows[3]
+        )
+    }
 
-    /// The kind names the tests know.
-    const KINDS: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree"];
+    /// A whole test file with the top ruler. Rulers are on line 12 and the rows on lines 13 to 16.
+    fn grid(rows: [&str; 4]) -> String {
+        format!("{}{RULERS}{}", head("6x4"), body(rows))
+    }
+
+    fn try_parse(source: &str) -> Result<Map, MapError> {
+        parse("t.txt", source, KINDS)
+    }
 
     fn parse_ok(source: &str) -> Map {
-        parse("t.md", source, KINDS).unwrap_or_else(|e| panic!("{e}"))
+        try_parse(source).unwrap_or_else(|e| panic!("{e}"))
     }
 
     fn error(source: &str) -> MapError {
-        parse("t.md", source, KINDS).expect_err("expected an error")
+        try_parse(source).expect_err("expected an error")
     }
 
     fn cells(map: &Map, kind: &str) -> Vec<(i32, i32)> {
@@ -599,254 +451,290 @@ mod tests {
     }
 
     #[test]
+    fn dotted_and_blank_footprints_give_the_same_objects() {
+        let dotted = parse_ok(&grid([DOTS, DOTS, ". g . . . .", DOTS]));
+        let blank = parse_ok(&grid([DOTS, ".     . . .", ". g   . . .", DOTS]));
+        assert_eq!(dotted.objects, blank.objects);
+        assert_eq!(cells(&blank, "tree_big"), vec![(1, 1)]);
+    }
+
+    #[test]
+    fn one_grid_may_mix_both_styles() {
+        let map = parse_ok(&grid([DOTS, ".     . . .", ". g   . . .", ". . . . g ."]));
+        assert_eq!(cells(&map, "tree_big"), vec![(1, 1), (4, 0)]);
+    }
+
+    #[test]
+    fn a_blank_in_the_middle_of_a_row_does_not_shift_later_cells() {
+        let map = parse_ok(&grid([DOTS, DOTS, DOTS, "r   r . . ."]));
+        assert_eq!(cells(&map, "red"), vec![(0, 0), (2, 0)]);
+    }
+
+    #[test]
+    fn blanks_before_the_closing_bar_are_kept() {
+        let map = parse_ok(&grid([DOTS, DOTS, DOTS, ". . .      "]));
+        assert!(map.objects.is_empty());
+        let spaced = grid([DOTS, DOTS, DOTS, ". . .      "]).replace("|\n", "| \n");
+        assert!(parse_ok(&spaced).objects.is_empty());
+        let stripped = error(&grid([DOTS, DOTS, DOTS, ". . ."]));
+        assert_eq!(stripped.line, 16);
+        assert!(stripped.message.contains("characters between the bars"));
+    }
+
+    #[test]
+    fn a_row_of_the_wrong_width_names_its_line() {
+        let e = error(&grid([DOTS, DOTS, ". . . . .", DOTS]));
+        assert_eq!(e.line, 15);
+        assert!(e.message.contains("characters between the bars"), "{e}");
+    }
+
+    #[test]
+    fn a_wrong_row_label_names_its_line() {
+        let e = error(&grid([DOTS; 4]).replace(" 2 |", " 5 |"));
+        assert_eq!(e.line, 14);
+        assert!(
+            e.message.contains("label") && e.message.contains("expected 2"),
+            "{e}"
+        );
+        let e = error(&grid([DOTS; 4]).replace(" 2 |", " b |"));
+        assert!(e.message.contains("label"), "{e}");
+    }
+
+    #[test]
+    fn rulers_are_ignored_and_may_be_anywhere() {
+        let rows = [DOTS, DOTS, ". g . . . .", ". . . . @ ."];
+        let plain = body(rows);
+        let expected = parse_ok(&format!("{}{RULERS}{plain}", head("6x4"))).objects;
+        for text in [
+            plain.clone(),
+            format!("{plain}{RULERS}"),
+            format!("{RULERS}{plain}{RULERS}"),
+        ] {
+            assert_eq!(
+                parse_ok(&format!("{}{text}", head("6x4"))).objects,
+                expected
+            );
+        }
+        assert_eq!(expected.len(), 2);
+    }
+
+    #[test]
+    fn a_character_not_in_the_legend_names_its_line() {
+        let e = error(&grid([DOTS, DOTS, ". x . . . .", DOTS]));
+        assert_eq!(e.line, 15);
+        assert!(e.message.contains("`x` is not in the legend"), "{e}");
+    }
+
+    #[test]
     fn rows_run_top_to_bottom_from_the_bottom_left_cell() {
-        let map = parse_ok(&source(
-            "## Cluster\n\n```cells\n. . 1 1 . .\n. 0 0 1 1 .\n. 0 0 . . .\n. . 0 0 . .\n```\n\n",
-            "- 'Cluster' at (10,6)\n",
-        ));
-        assert_eq!(
-            cells(&map, "rock_0"),
-            vec![(11, 7), (11, 8), (12, 6), (12, 7), (12, 8), (13, 6)]
+        let map = parse_ok(&grid(["g . . . . .", DOTS, DOTS, "g . . . . ."]));
+        assert_eq!(cells(&map, "tree_big"), vec![(0, 0), (0, 3)]);
+        assert_eq!(map.size, IVec2::new(6, 4));
+        assert_eq!(map.cell_size, 16.0);
+        assert_eq!(map.name, "t");
+    }
+
+    #[test]
+    fn the_row_count_must_match_the_height() {
+        let few = format!(
+            "{}{RULERS} 3 |{DOTS}|\n 2 |{DOTS}|\n 1 |{DOTS}|\n",
+            head("6x4")
         );
-        assert_eq!(
-            cells(&map, "rock_1"),
-            vec![(12, 9), (13, 8), (13, 9), (14, 8)]
+        let e = error(&few);
+        assert!(
+            e.message.contains("4 rows") && e.message.contains("found 3"),
+            "{e}"
         );
+        let many = format!("{}{RULERS}{} -1 |{DOTS}|\n", head("6x4"), body([DOTS; 4]));
+        let e = error(&many);
+        assert_eq!(e.line, 17);
+        assert!(e.message.contains("more rows"), "{e}");
     }
 
     #[test]
-    fn a_feature_is_placed_at_every_listed_position() {
-        let map = parse_ok(&source(PATCH, "- 'Patch' at (10,6), (20,2) and (-3,5)\n"));
-        assert_eq!(
-            cells(&map, "rock_0"),
-            vec![(-3, 5), (-3, 6), (10, 6), (10, 7), (20, 2), (20, 3)]
+    fn the_width_in_size_sets_the_cell_count() {
+        let e = error(&format!("{}{RULERS}{}", head("5x4"), body([DOTS; 4])));
+        assert!(e.message.contains("characters between the bars"), "{e}");
+    }
+
+    #[test]
+    fn a_character_between_cells_must_be_a_space() {
+        let e = error(&grid([DOTS, DOTS, ".x. . . . .", DOTS]));
+        assert_eq!(e.line, 15);
+        assert!(e.message.contains("space"), "{e}");
+    }
+
+    #[test]
+    fn a_row_needs_both_bars() {
+        let no_close = format!("{}{}", head("6x4"), " 3 |. . . . . .\n");
+        let e = error(&no_close);
+        assert_eq!(e.line, 12);
+        assert!(e.message.contains("closing"), "{e}");
+        let no_bars = format!("{}{}", head("6x4"), ". . . . . .\n");
+        let e = error(&no_bars);
+        assert!(e.message.contains("grid row"), "{e}");
+    }
+
+    #[test]
+    fn reserved_legend_keys_are_errors() {
+        for key in ["|", ".", " "] {
+            let source = head("6x4").replace("\"g\": tree_big", &format!("\"{key}\": tree_big"));
+            let e = error(&format!("{source}{RULERS}{}", body([DOTS; 4])));
+            assert_eq!(e.line, 9, "key `{key}`: {e}");
+        }
+    }
+
+    #[test]
+    fn player_start_is_an_ordinary_object() {
+        let map = parse_ok(&grid([DOTS, DOTS, ". . . . @ .", DOTS]));
+        assert_eq!(cells(&map, "player_start"), vec![(4, 1)]);
+    }
+
+    #[test]
+    fn comments_blank_lines_and_windows_line_endings_work() {
+        let plain = grid([DOTS, DOTS, ". g . . . .", DOTS]);
+        let noisy = format!(
+            "{}# a note\n\n{RULERS}# another note\n{}\n",
+            head("6x4"),
+            body([DOTS, DOTS, ". g . . . .", DOTS])
         );
-        assert_eq!(cells(&map, "rock_1"), vec![(-2, 5), (11, 6), (21, 2)]);
+        let expected = parse_ok(&plain).objects;
+        assert_eq!(parse_ok(&noisy).objects, expected);
+        assert_eq!(parse_ok(&plain.replace('\n', "\r\n")).objects, expected);
     }
 
     #[test]
-    fn a_feature_with_no_placement_draws_nothing() {
-        assert!(parse_ok(&source(PATCH, "")).objects.is_empty());
-    }
-
-    #[test]
-    fn bullets_may_vary_in_style() {
-        let map = parse_ok(&source(
-            PATCH,
-            "* \"Patch\" at (1, 1) , (5,5).\n- 'Patch' at (9,9)\nText that is not a bullet.\n",
+    fn front_matter_problems_are_errors_with_their_line() {
+        let rows = body([DOTS; 4]);
+        let no_size = head("6x4").replace("size: 6x4\n", "");
+        let e = error(&format!("{no_size}{rows}"));
+        assert_eq!(e.line, 1);
+        assert!(e.message.contains("missing required key `size`"), "{e}");
+        for bad in ["6by4", "0x4", "6x", "6x-1"] {
+            let e = error(&format!("{}{rows}", head(bad)));
+            assert_eq!(e.line, 5, "size `{bad}`");
+            assert!(e.message.contains("`size`"), "{e}");
+        }
+        let e = error(&format!(
+            "{}{rows}",
+            head("6x4").replace("bottom-left", "centre")
         ));
-        assert_eq!(map.objects.len(), 9);
-    }
-
-    #[test]
-    fn features_may_come_after_the_map_section() {
-        let map = parse_ok(&format!(
-            "{HEADER}# Map\n\n- 'Patch' at (0,0)\n\n# Features\n\n{PATCH}"
+        assert_eq!(e.line, 4);
+        assert!(e.message.contains("origin"), "{e}");
+        let e = error(&format!(
+            "{}{rows}",
+            head("6x4").replace("tree_big", "bush")
         ));
-        assert_eq!(map.objects.len(), 3);
+        assert_eq!(e.line, 9);
+        assert!(e.message.contains("unknown kind"), "{e}");
     }
 
     #[test]
-    fn overlapping_placements_keep_every_object() {
-        let map = parse_ok(&source(PATCH, "- 'Patch' at (0,0), (1,0)\n"));
-        assert_eq!(map.objects.len(), 6);
-    }
-
-    #[test]
-    fn pitch_spaces_the_characters() {
-        let map = parse_ok(
-            "---\nmap: t\ncell: 64\norigin: bottom-left\npitch: 2\nlegend:\n  \"0\": rock_0\n---\n# Features\n\n## A\n\n```cells\n0 0\n. 0\n```\n\n# Map\n\n- 'A' at (4,2)\n",
-        );
-        assert_eq!(cells(&map, "rock_0"), vec![(4, 4), (6, 2), (6, 4)]);
-    }
-
-    #[test]
-    fn other_headings_text_and_code_blocks_are_ignored() {
-        let map = parse_ok(&format!(
-            "{HEADER}# Title\n\n- a bullet in prose\n```rust\n0 0 0\n```\n# Features\n\n{PATCH}### Detail\n\ntext\n\n# Map\n\nProse.\n\n- 'Patch' at (0,0)\n\n# Later\n\n- 'not a placement'\n"
-        ));
-        assert_eq!(map.objects.len(), 3);
+    fn objects_come_back_top_row_first_then_left_to_right() {
+        let map = parse_ok(&grid([". g . . g .", DOTS, DOTS, ". . g . . ."]));
+        let order: Vec<_> = map.objects.iter().map(|o| (o.cell.x, o.cell.y)).collect();
+        assert_eq!(order, vec![(1, 3), (4, 3), (2, 0)]);
     }
 
     #[test]
     fn optional_keys_and_comments() {
-        let map = parse_ok(
-            "---\n# a comment\nmap: t # trailing\ncell: 32\norigin: bottom-left\ndraw: 160\njitter: 8\nlegend:\n  \"#\": rock_0 # quoted hash key\n---\n# Features\n\n## A\n\n```cells\n#\n```\n\n# Map\n\n- 'A' at (0,0)\n",
-        );
+        let source = "---\n# a comment\nmap: t # trailing\ncell: 32\norigin: bottom-left\nsize: 1x1\ndraw: 160\njitter: 8\nlegend:\n  \"#\": tree_big # quoted hash key\n---\n# a note\n   |0|\n 0 |#|\n";
+        let map = parse_ok(source);
         assert_eq!(map.name, "t");
         assert_eq!(map.cell_size, 32.0);
         assert_eq!(map.draw_size, Some(160.0));
         assert_eq!(map.jitter, 8.0);
-        assert_eq!(cells(&map, "rock_0"), vec![(0, 0)]);
+        assert_eq!(cells(&map, "tree_big"), vec![(0, 0)]);
     }
 
     #[test]
-    fn windows_line_endings_work() {
-        let text = source("## A\n\n```cells\n0\n```\n\n", "- 'A' at (1,1)\n").replace('\n', "\r\n");
-        assert_eq!(parse_ok(&text).objects.len(), 1);
-    }
-
-    #[test]
-    fn an_unknown_character_names_its_line() {
-        let e = error(&source(
-            "## A\n\n```cells\n0 0\n0 x\n```\n\n",
-            "- 'A' at (0,0)\n",
-        ));
-        assert_eq!(e.line, 15);
-        assert!(e.message.contains("`x`"), "{}", e.message);
-        assert_eq!(e.to_string(), format!("t.md:15: {}", e.message));
-    }
-
-    #[test]
-    fn a_ragged_row_is_an_error() {
-        let e = error(&source("## A\n\n```cells\n0 0\n0\n```\n\n", ""));
-        assert_eq!(e.line, 15);
-        assert!(e.message.contains("first row"), "{}", e.message);
-    }
-
-    #[test]
-    fn two_characters_without_a_space_is_an_error() {
-        let e = error(&source("## A\n\n```cells\n00\n```\n\n", ""));
-        assert!(
-            e.message.contains("one character per cell"),
-            "{}",
-            e.message
-        );
-    }
-
-    #[test]
-    fn a_blank_line_in_a_block_is_an_error() {
-        let e = error(&source("## A\n\n```cells\n0\n\n0\n```\n\n", ""));
-        assert!(e.message.contains("blank line"), "{}", e.message);
-    }
-
-    #[test]
-    fn an_unclosed_block_is_an_error() {
-        let e = error(&format!("{HEADER}# Features\n\n## A\n\n```cells\n0\n"));
-        assert_eq!(e.line, 13);
-        assert!(e.message.contains("not closed"), "{}", e.message);
-    }
-
-    #[test]
-    fn a_cells_block_outside_a_feature_is_an_error() {
-        let e = error(&format!("{HEADER}# Features\n\n```cells\n0\n```\n"));
-        assert_eq!(e.line, 11);
-        assert!(e.message.contains("belongs under"), "{}", e.message);
-        let e = error(&format!("{HEADER}# Map\n\n## A\n\n```cells\n0\n```\n"));
-        assert!(e.message.contains("belongs under"), "{}", e.message);
-    }
-
-    #[test]
-    fn cells_options_are_an_error() {
-        for info in ["cells at=1,1", "cells name=a"] {
-            let e = error(&source(&format!("## A\n\n```{info}\n0\n```\n\n"), ""));
-            assert_eq!(e.line, 13);
-            assert!(e.message.contains("takes no options"), "{}", e.message);
-        }
-    }
-
-    #[test]
-    fn a_feature_has_exactly_one_cells_block() {
-        let e = error(&source(
-            "## A\n\n```cells\n0\n```\n\n```cells\n1\n```\n\n",
-            "",
-        ));
-        assert_eq!(e.line, 17);
-        assert!(e.message.contains("second"), "{}", e.message);
-        let e = error(&source("## A\n\ntext only\n\n", ""));
-        assert_eq!(e.line, 11);
-        assert!(e.message.contains("no `cells` block"), "{}", e.message);
-    }
-
-    #[test]
-    fn a_feature_name_cannot_be_defined_twice() {
-        let e = error(&source(&format!("{PATCH}{PATCH}"), ""));
-        assert_eq!(e.line, 18);
-        assert!(e.message.contains("already defined"), "{}", e.message);
-    }
-
-    #[test]
-    fn an_unknown_feature_names_the_bullet_line() {
-        let e = error(&source(PATCH, "- 'Patch' at (0,0)\n- 'Shrubs' at (1,1)\n"));
-        assert_eq!(e.line, 21);
-        assert!(
-            e.message.contains("`Shrubs` is not defined"),
-            "{}",
-            e.message
-        );
-    }
-
-    #[test]
-    fn bad_bullets_are_errors_with_their_line() {
-        let cases = [
-            ("- Patch at (0,0)", "quoted feature name"),
-            ("- 'Patch at (0,0)", "closing quote"),
-            ("- 'Patch' (0,0)", "expected `at`"),
-            ("- 'Patch' at", "at least one position"),
-            ("- 'Patch' at (x,2)", "two whole numbers"),
-            ("- 'Patch' at (1,2", "closing `)`"),
-            ("- 'Patch' at (1,2) there", "after the positions"),
-            ("- 'Patch' at and (1,2)", "unexpected text"),
-        ];
-        for (bullet, expected) in cases {
-            let e = error(&source(PATCH, &format!("{bullet}\n")));
-            assert_eq!(e.line, 20, "{bullet}");
-            assert!(e.message.contains(expected), "{bullet}: {}", e.message);
-        }
-        // Two positions with no separator are accepted: the separator is optional.
-        assert_eq!(
-            parse_ok(&source(PATCH, "- 'Patch' at (1,2) (3,4)\n"))
-                .objects
-                .len(),
-            6
-        );
-    }
-
-    #[test]
-    fn frontmatter_problems_are_errors() {
-        assert_eq!(error("# no frontmatter\n").line, 1);
+    fn a_missing_or_broken_front_matter_is_an_error() {
+        assert_eq!(error("# no front matter\n").line, 1);
         assert!(error("---\nmap: t\n").message.contains("not closed"));
+        let base = "origin: bottom-left\nsize: 1x1\n---\n";
         assert!(
-            error("---\ncell: 64\norigin: bottom-left\n---\n")
+            error(&format!("---\ncell: 16\n{base}"))
                 .message
                 .contains("`map`")
         );
         assert!(
-            error("---\nmap: t\norigin: bottom-left\n---\n")
+            error(&format!("---\nmap: t\n{base}"))
                 .message
                 .contains("`cell`")
         );
         assert!(
-            error("---\nmap: t\ncell: 64\n---\n")
+            error("---\nmap: t\ncell: 16\nsize: 1x1\n---\n")
                 .message
                 .contains("`origin`")
         );
-        let e = error("---\nmap: t\ncell: 64\norigin: top-left\n---\n");
-        assert_eq!(e.line, 4);
-        assert!(e.message.contains("bottom-left"));
-        let e = error("---\nmap: t\ncell: 64\norigin: bottom-left\nsize: 3\n---\n");
-        assert_eq!(e.line, 5);
-        assert!(e.message.contains("unknown key `size`"));
-        let e = error("---\nmap: t\ncell: -1\norigin: bottom-left\n---\n");
+        let head = "---\nmap: t\ncell: 16\norigin: bottom-left\n";
+        for (extra, line, text) in [
+            ("color: 3\n", 5, "unknown key `color`"),
+            ("pitch: 2\n", 5, "unknown key `pitch`"),
+            ("draw: 0\n", 5, "`draw`"),
+            ("jitter: -1\n", 5, "`jitter`"),
+        ] {
+            let e = error(&format!("{head}{extra}size: 1x1\n---\n"));
+            assert_eq!(e.line, line, "{extra}");
+            assert!(e.message.contains(text), "{e}");
+        }
+        let e = error("---\nmap: t\ncell: -1\norigin: bottom-left\nsize: 1x1\n---\n");
         assert_eq!(e.line, 3);
-        let e = error("---\nmap: t\ncell: 64\norigin: bottom-left\npitch: 0\n---\n");
-        assert_eq!(e.line, 5);
     }
 
     #[test]
     fn legend_problems_are_errors() {
-        let base = "---\nmap: t\ncell: 64\norigin: bottom-left\nlegend:\n";
+        let base = "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 1x1\nlegend:\n";
         let e = error(&format!("{base}  \"0\": boulder\n---\n"));
-        assert_eq!(e.line, 6);
-        assert!(e.message.contains("unknown kind `boulder`"));
-        let e = error(&format!("{base}  \"ab\": rock_0\n---\n"));
-        assert!(e.message.contains("exactly one character"));
-        let e = error(&format!("{base}  \".\": rock_0\n---\n"));
-        assert!(e.message.contains("always empty"));
-        assert!(
-            error("---\nmap: t\ncell: 64\norigin: bottom-left\n  \"0\": rock_0\n---\n")
-                .message
-                .contains("outside `legend`")
-        );
+        assert_eq!(e.line, 7);
+        assert!(e.message.contains("unknown kind `boulder`"), "{e}");
+        let e = error(&format!("{base}  \"ab\": tree_big\n---\n"));
+        assert!(e.message.contains("exactly one character"), "{e}");
+        let e = error(&format!("{base}  \".\": tree_big\n---\n"));
+        assert!(e.message.contains("always empty"), "{e}");
+        let e = error("---\nmap: t\ncell: 16\norigin: bottom-left\n  \"g\": tree_big\n---\n");
+        assert!(e.message.contains("outside `legend`"), "{e}");
+    }
+
+    /// The same drawing as `grid`, with rows labelled from the top for `origin: top-left`.
+    fn grid_top_left(rows: [&str; 4]) -> String {
+        format!(
+            "{}{RULERS} 0 |{}|\n 1 |{}|\n 2 |{}|\n 3 |{}|\n",
+            head("6x4").replace("bottom-left", "top-left"),
+            rows[0],
+            rows[1],
+            rows[2],
+            rows[3]
+        )
+    }
+
+    #[test]
+    fn top_left_rows_count_down_the_page_and_cells_stay_bottom_left() {
+        let rows = [". g . . . .", DOTS, DOTS, ". . . . @ ."];
+        let top = parse_ok(&grid_top_left(rows));
+        let bottom = parse_ok(&grid(rows));
+        assert_eq!(top.origin, Origin::TopLeft);
+        assert_eq!(bottom.origin, Origin::BottomLeft);
+        assert_eq!(top.objects, bottom.objects);
+        assert_eq!(cells(&top, "tree_big"), vec![(1, 3)]);
+        assert_eq!(cells(&top, "player_start"), vec![(4, 0)]);
+    }
+
+    #[test]
+    fn top_left_row_labels_are_checked() {
+        let wrong = grid([DOTS; 4]).replace("origin: bottom-left", "origin: top-left");
+        let e = error(&wrong);
+        assert_eq!(e.line, 13);
+        assert!(e.message.contains("expected 0"), "{e}");
+        let e = error(&grid_top_left([DOTS; 4]).replace(" 2 |", " 7 |"));
+        assert_eq!(e.line, 15);
+        assert!(e.message.contains("expected 2"), "{e}");
+    }
+
+    #[test]
+    fn an_unknown_origin_is_an_error() {
+        let e = error(&grid([DOTS; 4]).replace("bottom-left", "centre"));
+        assert_eq!(e.line, 4);
+        assert!(e.message.contains("`bottom-left` or `top-left`"), "{e}");
     }
 }

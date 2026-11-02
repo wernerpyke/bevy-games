@@ -7,7 +7,7 @@ games/long-way/
 ├── Cargo.toml
 ├── assets/
 │   ├── art/            .aseprite sources and the palette
-│   └── maps/           markdown map files
+│   └── maps/           text map files
 ├── docs/               this folder
 └── src/
     ├── main.rs         builds the App, adds plugins
