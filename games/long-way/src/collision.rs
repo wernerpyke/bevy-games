@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::outline::{self, Cluster, Edge, Orientation, TOLERANCE};
+use game_kit::outline::{self, Cluster, Edge, Orientation, TOLERANCE};
 
 /// Half the width of Guy's body. Guy's feet are blocked this far from a trunk's sides.
 pub const GUY_HALF_WIDTH: f32 = 20.0;

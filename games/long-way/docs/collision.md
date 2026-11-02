@@ -52,7 +52,7 @@ All in `collision.rs`.
 | `SLIDE_RANGE_CAP` | 64 | Upper limit of that range |
 | `SLIDE_CLEARANCE` | 192 | Free distance beyond an end. Assumes a 64 px cell |
 | `SLIDE_PAST_CORNER` | 0.5 | Overshoot when the way on is blocked |
-| `TOLERANCE` | 0.01 | In `outline.rs` |
+| `TOLERANCE` | 0.01 | In `outline.rs` (`game-kit`) |
 
 Accepted by the developer after play testing on 2026-11-02. Options not built: a 96 px cap, or the nearest outline corner with a cap.
 

@@ -182,7 +182,7 @@ fn mark_interior(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outline;
+    use game_kit::outline;
 
     fn map(draw_size: f32, jitter: f32) -> Map {
         Map {

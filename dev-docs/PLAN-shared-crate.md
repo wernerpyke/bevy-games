@@ -8,7 +8,7 @@ Trigger: R-Town is the second game (adr-w6). Steps marked **ASK** need developer
 
 | File | Lines | Generic? | Coupling to remove |
 |---|---|---|---|
-| `outline.rs` | 826 | Yes | None. Pure geometry on `Rect`, `Edge`, `Cluster` |
+| `outline.rs` | 826 | Yes | Moved to `crates/game-kit` (step 3). Its tests used `GUY_HALF_WIDTH`, now a local test constant |
 | `collision.rs` | 947 | Mostly | `GUY_*` constants and `Trunk` are Long Way specific. `CollisionWorld`, `resolve`, `move_feet`, `SlideAssist`, `CollisionPlugin` are generic. 60+ tests |
 | `depth.rs` | 84 | Mostly | Imports `WORLD_HALF_BAND` from `layers.rs` |
 | `layers.rs` | 52 | Pattern only | Constants are per game (R-Town needs its own layers) |
@@ -38,7 +38,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` and a Long Way scripted
 
 1. **Baseline.** Run `lint`, `test`, `web` and a scripted screenshot for Long Way. Save the screenshot to compare later.
 2. **Create the crate.** `crates/game-kit/Cargo.toml` and empty `lib.rs`. Add `crates/*` to workspace `members` in the root `Cargo.toml`. Add `game-kit` to `[workspace.dependencies]` with a path. Check `rust.sh` handles a crate that is not a game.
-3. **Move `outline.rs`.** No coupling. Long Way imports `game_kit::outline`. Tests move with the file.
+3. **Move `outline.rs`.** Done. Long Way imports `game_kit::outline`. The tests moved with the file. The only coupling was `GUY_HALF_WIDTH` in the tests, replaced by a local `ACTOR_HALF_WIDTH` of 20. Steps 1 to 3 also added an R-Town crate stub, because `members = ["games/*"]` fails without a manifest in `games/r-town`.
 4. **Split `collision.rs`.** Generic part to the kit: `CollisionWorld`, `resolve`, `move_feet`, `SlideAssist`, `CollisionSettings`, `CollisionPlugin`, the sliding constants and tests that use plain edges. Long Way keeps `Trunk`, `GUY_*` and the tests that use them. Decide where `Trunk`-style registration lives: a generic `Blocker` component with a `blocked_area` is the likely shape (ASK if the shape is unclear).
 5. **Move `depth.rs` and `layers.rs`.** `layers.rs` becomes the kit default layers. `DepthPlugin` takes `world_half_band` as a field with that default. Update adr-x9 text in `dev-docs/adr/EXTENSIONS.md` to point at adr-x14. Keep the compile-time check in the kit.
 6. **Make `map.rs` generic.** Replace `Kind` with string names (adr-x13). Add a resource for the map name and source. Long Way keeps its `Kind` enum and a `from_name` conversion. Update parser tests. Update `dev-docs/extensions/map-files.md`.

@@ -5,7 +5,6 @@ mod debug;
 mod depth;
 mod layers;
 mod map;
-mod outline;
 mod player;
 mod rocks;
 mod script;

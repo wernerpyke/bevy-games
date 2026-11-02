@@ -17,7 +17,7 @@ All code still lives inside `games/long-way/src/`. Extracting it into shared cod
 
 | Extension | What it gives | Code today | ADRs |
 |---|---|---|---|
-| [collision.md](collision.md) | Feet-point collision, merged outlines, forgiving sliding | `collision.rs`, `outline.rs` | lw4, lw10 (lw1, lw13 for Long Way) |
+| [collision.md](collision.md) | Feet-point collision, merged outlines, forgiving sliding | `collision.rs`, `game-kit` `outline.rs` | lw4, lw10 (lw1, lw13 for Long Way) |
 | [collision-research.md](collision-research.md) | Approaches compared, why outlines | none | lw1, lw10 |
 | [draw-order.md](draw-order.md) | Depth sort by feet, named layers | `depth.rs`, `layers.rs` | lw2, lw9 (lw12 for Long Way) |
 | [map-files.md](map-files.md) | Markdown map format and parser contract | `map.rs` | lw8, lw11 |

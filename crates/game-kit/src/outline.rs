@@ -315,7 +315,8 @@ fn flush(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collision::GUY_HALF_WIDTH;
+    /// Half the width of an actor, used to grow obstacles in the tests. Same value as Long Way's Guy.
+    const ACTOR_HALF_WIDTH: f32 = 20.0;
 
     fn rect(x0: f32, y0: f32, x1: f32, y1: f32) -> Rect {
         Rect::new(x0, y0, x1, y1)
@@ -366,9 +367,14 @@ mod tests {
         edges
     }
 
-    /// The blocked area of an obstacle `size` wide and high: the obstacle grown sideways by Guy's half width.
+    /// The blocked area of an obstacle `size` wide and high: the obstacle grown sideways by the actor's half width.
     fn grown(x: f32, y: f32, size: f32) -> Rect {
-        rect(x - GUY_HALF_WIDTH, y, x + size + GUY_HALF_WIDTH, y + size)
+        rect(
+            x - ACTOR_HALF_WIDTH,
+            y,
+            x + size + ACTOR_HALF_WIDTH,
+            y + size,
+        )
     }
 
     #[test]

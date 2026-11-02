@@ -6,3 +6,4 @@ edition.workspace = true
 [dependencies]
 bevy.workspace = true
 bevy_aseprite_ultra.workspace = true
+game-kit.workspace = true

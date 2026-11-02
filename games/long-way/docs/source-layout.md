@@ -16,7 +16,6 @@ games/long-way/
     ├── trees.rs        TreesPlugin: trees and their trunks from the map
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
     ├── map.rs          MapPlugin: parses the markdown map file
-    ├── outline.rs      merges blocked rectangles into clusters and outline edges
     ├── collision.rs    CollisionPlugin: CollisionWorld, resolve, sliding, Trunk, Guy constants
     ├── collision_debug.rs  collision overlay
     ├── debug.rs        DebugPlugin: grid and info box
@@ -29,7 +28,7 @@ games/long-way/
 
 | Extension | Files |
 |---|---|
-| [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` (plus the game specific `Trunk`, `GUY_*` and `rocks.rs`) |
+| [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `GUY_*` and `rocks.rs`) |
 | [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` |

@@ -14,7 +14,7 @@ Feet-point collision against merged outlines, with forgiving sliding. Top-down g
 
 | Part | Code today | Shared? |
 |---|---|---|
-| Outline: `build`, `Edge`, `Cluster` | `games/long-way/src/outline.rs` | Nearly standalone. Its tests import `GUY_HALF_WIDTH`. |
+| Outline: `build`, `Edge`, `Cluster` | `crates/game-kit/src/outline.rs` | Standalone, in the shared kit. |
 | `resolve`, `move_feet`, sliding | `games/long-way/src/collision.rs` | Needs an actor size parameter instead of `GUY_*` constants. |
 | `CollisionPlugin`, `CollisionWorld`, `SlideAssist` | `collision.rs` | Yes, after the split above. |
 | `Trunk`, rock blocked areas | `collision.rs`, `rocks.rs` | No. Game specific (see the Long Way collision doc). |
