@@ -6,7 +6,7 @@ This folder holds no test code. Long Way keeps its unit tests inline, at the bot
 
 Rust integration tests in `tests/` are compiled as a separate crate. They can only call the public API of a **library** crate. Long Way is a binary crate with no `src/lib.rs`, so a test in this folder could not reach `resolve`, `parse` or `build`. Inline tests are in the same module, so they can test private functions directly.
 
-Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, architecture guidance), so unit tests cover them well.
+Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, architecture defaults), so unit tests cover them well.
 
 ## Where the tests are
 

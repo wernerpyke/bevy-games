@@ -22,7 +22,7 @@
 
 **Rationale.** The library has 55 Aseprite files plus `.xcf`, `.tps` and `.jpg` files with two different palettes and no common size grid. Importing everything would carry unused and inconsistent art into the project. Choosing files one at a time keeps the project small and lets palette and size decisions follow real needs.
 
-**How to apply.** Claude never copies a file from the library without being told which one. After a copy, list the file in `CLAUDE.md` under "Files copied so far", under the game it belongs to. The game is for personal use and the developer owns a licence for "Forest Graveyard", the source of the environment sprites, so redistribution is not a concern.
+**How to apply.** Claude never copies a file from the library without being told which one. After a copy, list the file in `games/long-way/docs/art-pipeline.md` under "Files copied so far", under the game it belongs to. The game is for personal use and the developer owns a licence for "Forest Graveyard", the source of the environment sprites, so redistribution is not a concern.
 
 ## adr-a4. Project palette: `diodrama_palette.aseprite` (2026-10-31)
 

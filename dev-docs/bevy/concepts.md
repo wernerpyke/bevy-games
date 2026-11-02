@@ -256,7 +256,7 @@ transform.translation += direction.normalize() * WALK_SPEED * time.delta_secs();
 
 ## States
 
-**Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture notes in `CLAUDE.md` plan to use it for app flow (loading, menu, playing) and a sub-state for the play mode.
+**Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture defaults in `CLAUDE.md` plan to use it for app flow (loading, menu, playing) and a sub-state for the play mode.
 
 ## Cargo features and build profiles
 

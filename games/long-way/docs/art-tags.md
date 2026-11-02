@@ -1,6 +1,6 @@
 # Aseprite animation tags
 
-Tag names are the contract between art and code (`CLAUDE.md`, art pipeline rule 7). Names are case sensitive.
+Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Names are case sensitive.
 
 | File | Tags |
 |---|---|

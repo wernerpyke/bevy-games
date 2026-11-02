@@ -14,7 +14,7 @@ How art size on screen is set, and how Aseprite tags drive animation.
 | View height | `games/long-way/src/camera.rs` | Yes, one constant per game |
 | Tag switching | `games/long-way/src/player.rs` | Pattern only |
 
-Decision: `adr-e7` for the camera. Art pipeline: `CLAUDE.md`, and the game's `art-tags.md`.
+Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` and `art-tags.md`.
 
 ## Specification
 

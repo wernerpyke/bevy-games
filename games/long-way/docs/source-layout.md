@@ -1,6 +1,6 @@
 # Source layout
 
-One plugin per feature. Each plugin owns its components, resources and systems (`CLAUDE.md`, architecture guidance).
+One plugin per feature. Each plugin owns its components, resources and systems (`CLAUDE.md`, architecture defaults).
 
 ```
 games/long-way/
