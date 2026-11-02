@@ -13,9 +13,12 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::Controlled;
+use crate::camera::visible_rect;
 use crate::depth::DepthSort;
 use crate::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
 
+// Sizes in world units, tuned for a cell size of 64 (`DebugSettings::scale` scales them to the game's cell size, so they
+// look the same on screen at any art scale).
 const LINE_THICKNESS: f32 = 2.0;
 const LABEL_FONT_SIZE: f32 = 20.0;
 const LABEL_MARGIN: f32 = 3.0;
@@ -113,6 +116,13 @@ pub struct DebugSettings {
     pub show_info: bool,
 }
 
+impl DebugSettings {
+    /// How much to scale the debug sizes: the cell size over 64, the cell size they are tuned for.
+    pub fn scale(&self) -> f32 {
+        self.cell_size / 64.0
+    }
+}
+
 /// Ordered label and value rows shown in the info box.
 #[derive(Resource, Default)]
 pub struct DebugInfo {
@@ -189,21 +199,6 @@ fn toggle_tools(input: Res<ButtonInput<KeyCode>>, mut settings: ResMut<DebugSett
     }
 }
 
-/// The part of the world the camera shows. `None` for a camera that is not orthographic.
-fn visible_rect(camera: &GlobalTransform, projection: &Projection) -> Option<Rect> {
-    let Projection::Orthographic(orthographic) = projection else {
-        return None;
-    };
-    let area = orthographic.area;
-    if area.width() <= 0.0 || area.height() <= 0.0 {
-        return None;
-    }
-    Some(Rect::from_center_size(
-        camera.translation().truncate() + area.center(),
-        area.size(),
-    ))
-}
-
 /// Numbers of the grid lines that fall inside the visible range on one axis.
 /// `origin` is the world position of line 0, `low` and `high` are the visible range.
 fn line_range(origin: f32, low: f32, high: f32, cell: f32) -> RangeInclusive<i32> {
@@ -254,7 +249,10 @@ fn rebuild_grid(
     let y_to = origin.y + (*rows.end() + 1) as f32 * cell;
     let color = settings.grid_color;
     let z = settings.grid_z;
-    let font = TextFont::from_font_size(LABEL_FONT_SIZE);
+    let scale = settings.scale();
+    let thickness = LINE_THICKNESS * scale;
+    let margin = LABEL_MARGIN * scale;
+    let font = TextFont::from_font_size(LABEL_FONT_SIZE * scale);
     commands
         .entity(root)
         .despawn_children()
@@ -262,7 +260,7 @@ fn rebuild_grid(
             for i in columns {
                 let x = origin.x + i as f32 * cell;
                 parent.spawn((
-                    Sprite::from_color(color, Vec2::new(LINE_THICKNESS, y_to - y_from)),
+                    Sprite::from_color(color, Vec2::new(thickness, y_to - y_from)),
                     Transform::from_xyz(x, (y_from + y_to) / 2.0, z),
                 ));
                 parent.spawn((
@@ -271,13 +269,13 @@ fn rebuild_grid(
                     font.clone(),
                     TextColor(color),
                     Anchor::TOP_LEFT,
-                    Transform::from_xyz(x + LABEL_MARGIN, visible.max.y - LABEL_MARGIN, z),
+                    Transform::from_xyz(x + margin, visible.max.y - margin, z),
                 ));
             }
             for j in rows {
                 let y = origin.y + j as f32 * cell;
                 parent.spawn((
-                    Sprite::from_color(color, Vec2::new(x_to - x_from, LINE_THICKNESS)),
+                    Sprite::from_color(color, Vec2::new(x_to - x_from, thickness)),
                     Transform::from_xyz((x_from + x_to) / 2.0, y, z),
                 ));
                 parent.spawn((
@@ -286,7 +284,7 @@ fn rebuild_grid(
                     font.clone(),
                     TextColor(color),
                     Anchor::BOTTOM_LEFT,
-                    Transform::from_xyz(visible.min.x + LABEL_MARGIN, y + LABEL_MARGIN, z),
+                    Transform::from_xyz(visible.min.x + margin, y + margin, z),
                 ));
             }
         });
@@ -294,6 +292,7 @@ fn rebuild_grid(
 
 /// Keeps the column numbers on the top edge and the row numbers on the left edge of the view while the camera moves.
 fn pin_grid_labels(
+    settings: Res<DebugSettings>,
     camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
     mut columns: Query<(&ColumnLabel, &mut Transform), Without<RowLabel>>,
     mut rows: Query<(&RowLabel, &mut Transform), Without<ColumnLabel>>,
@@ -302,13 +301,14 @@ fn pin_grid_labels(
     let Some(visible) = visible_rect(transform, projection) else {
         return;
     };
+    let margin = LABEL_MARGIN * settings.scale();
     for (label, mut transform) in &mut columns {
-        transform.translation.x = label.x + LABEL_MARGIN;
-        transform.translation.y = visible.max.y - LABEL_MARGIN;
+        transform.translation.x = label.x + margin;
+        transform.translation.y = visible.max.y - margin;
     }
     for (label, mut transform) in &mut rows {
-        transform.translation.x = visible.min.x + LABEL_MARGIN;
-        transform.translation.y = label.y + LABEL_MARGIN;
+        transform.translation.x = visible.min.x + margin;
+        transform.translation.y = label.y + margin;
     }
 }
 
@@ -394,19 +394,6 @@ mod tests {
         assert_eq!(
             GridOrigin::World(Vec2::new(5.0, 6.0)).resolve(visible),
             Vec2::new(5.0, 6.0)
-        );
-    }
-
-    #[test]
-    fn the_visible_rect_follows_the_camera_position() {
-        let projection = Projection::Orthographic(OrthographicProjection {
-            area: Rect::new(-100.0, -50.0, 100.0, 50.0),
-            ..OrthographicProjection::default_2d()
-        });
-        let camera = GlobalTransform::from_xyz(30.0, -20.0, 0.0);
-        assert_eq!(
-            visible_rect(&camera, &projection),
-            Some(Rect::new(-70.0, -70.0, 130.0, 30.0))
         );
     }
 

@@ -8,6 +8,8 @@ Visual debug tools drawn in the game: a grid, an info box and a collision overla
 - **Info box.** A text box where any system shows live values.
 - **Collision overlay.** The collision outline, interior shapes and feet markers, drawn as sprites.
 
+The sizes of lines, ticks, labels and markers are tuned for a cell size of 64 and scale with `cell_size` (adr-x17), so the overlay looks the same at any art scale.
+
 All tools are sprites or UI on named layers ([draw-order.md](draw-order.md)), not gizmos, because gizmos always draw on top.
 
 ## Status

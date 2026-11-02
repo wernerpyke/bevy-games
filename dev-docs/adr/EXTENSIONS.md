@@ -129,3 +129,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **How to apply.** Keep game rules (which part of a tree blocks, actor size) in the game. Keep the kit free of game types.
 
 Refinement (2026-11-02): `parse` takes the list of kind names the game knows and reports an unknown legend name itself, with the file line, as before. The game's conversion from name to enum then cannot fail. This keeps the parser error messages and their tests in the kit. The `draw` key is optional (`Option<f32>`) and the game gives the default.
+
+## adr-x17. Camera follow in the kit, debug sizes scale with the cell size (2026-11-02)
+
+**Decision.** `CameraFollowPlugin` moves the `Camera2d` to the `Controlled` entity and stops it at `CameraBounds` (a resource a game inserts once the map size is known). The camera position is rounded to a whole world unit. The debug grid and the collision overlay take their line thickness, tick length, label size and feet marker size from base values tuned for a cell size of 64, multiplied by `DebugSettings::scale` (cell size over 64).
+
+**Rationale.** A scrolling camera is needed by every game with a map larger than the view, and rounding keeps pixel art from shimmering when it scrolls. The debug sizes were world units chosen for Long Way's 1200 unit view. At R-Town's 240 unit view they were five times too large on screen.
+
+**How to apply.** Insert `CameraBounds` in the plugin that loads the map. Do not move the camera elsewhere, or the follow system overwrites it each frame.

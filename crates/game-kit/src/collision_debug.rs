@@ -16,6 +16,7 @@ const OUTLINE_COLOR: Color = Color::srgb(1.0, 0.8, 0.1);
 const INTERIOR_COLOR: Color = Color::srgb(0.2, 0.9, 1.0);
 const FEET_COLOR: Color = Color::srgb(0.1, 1.0, 0.1);
 /// Length of the ticks that point to the blocked side.
+// Sizes in world units, tuned for a cell size of 64. `DebugSettings::scale` scales them to the game.
 const TICK_LENGTH: f32 = 12.0;
 /// Line thickness of the outline sprites, the same as the grid lines.
 const LINE_THICKNESS: f32 = 2.0;
@@ -73,7 +74,13 @@ struct OverlayRoot;
 struct FeetMarker(Entity);
 
 /// Runs after every blocked area is registered, so the outline includes trunks and rocks.
-fn draw_outline(mut commands: Commands, world: Res<CollisionWorld>, layers: Res<OverlayLayers>) {
+fn draw_outline(
+    mut commands: Commands,
+    world: Res<CollisionWorld>,
+    layers: Res<OverlayLayers>,
+    settings: Res<DebugSettings>,
+) {
+    let scale = settings.scale();
     let clusters = world.clusters();
     info!(
         "collision: {} clusters with {} outline edges",
@@ -92,12 +99,12 @@ fn draw_outline(mut commands: Commands, world: Res<CollisionWorld>, layers: Res<
         .spawn((OverlayRoot, Transform::default(), Visibility::default()))
         .with_children(|parent| {
             for edge in clusters.iter().flat_map(|c| &c.edges) {
-                for (centre, size) in edge_boxes(edge) {
+                for (centre, size) in edge_boxes(edge, scale) {
                     parent.spawn(line(OUTLINE_COLOR, layers.outline_z, centre, size));
                 }
             }
             for area in world.interior_areas() {
-                for (centre, size) in rect_boxes(area) {
+                for (centre, size) in rect_boxes(area, scale) {
                     parent.spawn(line(INTERIOR_COLOR, layers.interior_z, centre, size));
                 }
             }
@@ -112,53 +119,50 @@ fn line(color: Color, z: f32, centre: Vec2, size: Vec2) -> (Sprite, Transform) {
 }
 
 /// The boxes (centre and size) that draw an edge: the line, then the tick on its blocked side.
-fn edge_boxes(edge: &Edge) -> [(Vec2, Vec2); 2] {
+fn edge_boxes(edge: &Edge, scale: f32) -> [(Vec2, Vec2); 2] {
+    let thickness = LINE_THICKNESS * scale;
+    let tick = TICK_LENGTH * scale;
     let side = if edge.blocked_positive { 1.0 } else { -1.0 };
     let length = edge.to - edge.from;
     let middle = (edge.from + edge.to) / 2.0;
     match edge.orientation {
         Orientation::Vertical => [
+            (Vec2::new(edge.at, middle), Vec2::new(thickness, length)),
             (
-                Vec2::new(edge.at, middle),
-                Vec2::new(LINE_THICKNESS, length),
-            ),
-            (
-                Vec2::new(edge.at + side * TICK_LENGTH / 2.0, middle),
-                Vec2::new(TICK_LENGTH, LINE_THICKNESS),
+                Vec2::new(edge.at + side * tick / 2.0, middle),
+                Vec2::new(tick, thickness),
             ),
         ],
         Orientation::Horizontal => [
+            (Vec2::new(middle, edge.at), Vec2::new(length, thickness)),
             (
-                Vec2::new(middle, edge.at),
-                Vec2::new(length, LINE_THICKNESS),
-            ),
-            (
-                Vec2::new(middle, edge.at + side * TICK_LENGTH / 2.0),
-                Vec2::new(LINE_THICKNESS, TICK_LENGTH),
+                Vec2::new(middle, edge.at + side * tick / 2.0),
+                Vec2::new(thickness, tick),
             ),
         ],
     }
 }
 
 /// The four boxes (centre and size) that draw the border of a rectangle.
-fn rect_boxes(rect: Rect) -> [(Vec2, Vec2); 4] {
+fn rect_boxes(rect: Rect, scale: f32) -> [(Vec2, Vec2); 4] {
+    let thickness = LINE_THICKNESS * scale;
     let (centre, size) = (rect.center(), rect.size());
     [
         (
             Vec2::new(centre.x, rect.min.y),
-            Vec2::new(size.x, LINE_THICKNESS),
+            Vec2::new(size.x, thickness),
         ),
         (
             Vec2::new(centre.x, rect.max.y),
-            Vec2::new(size.x, LINE_THICKNESS),
+            Vec2::new(size.x, thickness),
         ),
         (
             Vec2::new(rect.min.x, centre.y),
-            Vec2::new(LINE_THICKNESS, size.y),
+            Vec2::new(thickness, size.y),
         ),
         (
             Vec2::new(rect.max.x, centre.y),
-            Vec2::new(LINE_THICKNESS, size.y),
+            Vec2::new(thickness, size.y),
         ),
     ]
 }
@@ -166,13 +170,14 @@ fn rect_boxes(rect: Rect) -> [(Vec2, Vec2); 4] {
 fn add_feet_markers(
     mut commands: Commands,
     layers: Res<OverlayLayers>,
+    settings: Res<DebugSettings>,
     new: Query<Entity, Added<DepthSort>>,
     root: Single<Entity, With<OverlayRoot>>,
 ) {
     for target in &new {
         commands.entity(*root).with_child((
             FeetMarker(target),
-            Sprite::from_color(FEET_COLOR, Vec2::splat(FEET_MARKER_SIZE)),
+            Sprite::from_color(FEET_COLOR, Vec2::splat(FEET_MARKER_SIZE * settings.scale())),
             Transform::from_xyz(0.0, 0.0, layers.feet_z),
         ));
     }
@@ -223,27 +228,43 @@ mod tests {
             from_concave: false,
             to_concave: false,
         };
-        let [line, tick] = edge_boxes(&edge(Orientation::Vertical, true));
+        let [line, tick] = edge_boxes(&edge(Orientation::Vertical, true), 1.0);
         assert_eq!(
             line,
             (Vec2::new(10.0, 40.0), Vec2::new(LINE_THICKNESS, 40.0))
         );
         assert_eq!(tick.0, Vec2::new(10.0 + TICK_LENGTH / 2.0, 40.0));
-        let [_, tick] = edge_boxes(&edge(Orientation::Vertical, false));
+        let [_, tick] = edge_boxes(&edge(Orientation::Vertical, false), 1.0);
         assert_eq!(tick.0, Vec2::new(10.0 - TICK_LENGTH / 2.0, 40.0));
-        let [line, tick] = edge_boxes(&edge(Orientation::Horizontal, true));
+        let [line, tick] = edge_boxes(&edge(Orientation::Horizontal, true), 1.0);
         assert_eq!(
             line,
             (Vec2::new(40.0, 10.0), Vec2::new(40.0, LINE_THICKNESS))
         );
         assert_eq!(tick.0, Vec2::new(40.0, 10.0 + TICK_LENGTH / 2.0));
-        let [_, tick] = edge_boxes(&edge(Orientation::Horizontal, false));
+        let [_, tick] = edge_boxes(&edge(Orientation::Horizontal, false), 1.0);
         assert_eq!(tick.0, Vec2::new(40.0, 10.0 - TICK_LENGTH / 2.0));
     }
 
     #[test]
+    fn the_sizes_scale_with_the_cell_size() {
+        let edge = Edge {
+            orientation: Orientation::Vertical,
+            at: 10.0,
+            from: 20.0,
+            to: 60.0,
+            blocked_positive: true,
+            from_concave: false,
+            to_concave: false,
+        };
+        let [line, tick] = edge_boxes(&edge, 0.25);
+        assert_eq!(line.1, Vec2::new(LINE_THICKNESS / 4.0, 40.0));
+        assert_eq!(tick.1, Vec2::new(TICK_LENGTH / 4.0, LINE_THICKNESS / 4.0));
+    }
+
+    #[test]
     fn a_rectangle_is_drawn_as_four_lines_on_its_border() {
-        let boxes = rect_boxes(Rect::new(0.0, 10.0, 40.0, 30.0));
+        let boxes = rect_boxes(Rect::new(0.0, 10.0, 40.0, 30.0), 1.0);
         assert!(boxes.contains(&(Vec2::new(20.0, 10.0), Vec2::new(40.0, LINE_THICKNESS))));
         assert!(boxes.contains(&(Vec2::new(20.0, 30.0), Vec2::new(40.0, LINE_THICKNESS))));
         assert!(boxes.contains(&(Vec2::new(0.0, 20.0), Vec2::new(LINE_THICKNESS, 20.0))));
