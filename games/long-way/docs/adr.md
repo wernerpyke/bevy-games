@@ -1,6 +1,6 @@
 # Long Way: game decisions
 
-Decisions that apply to Long Way only. Decisions about reusable code (collision, draw order, debug tools, map format) are in `dev-docs/adr/LONG-WAY.md` and are described in `dev-docs/extensions/`. The format and ID rules are in `dev-docs/adr/README.md`. IDs keep the `lw` prefix and are shared by both files, so `adr-lw1` to `adr-lw11` stay valid.
+Decisions that apply to Long Way only. Decisions about reusable code (collision, draw order, debug tools, map format) are in `dev-docs/adr/EXTENSIONS.md` with the prefix `x`, and are described in `dev-docs/extensions/`. The format and ID rules are in `dev-docs/adr/README.md`.
 
 | ID | Decision |
 |---|---|
@@ -32,7 +32,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 ## adr-lw8. Maps are markdown files, rocks come first (2026-11-01)
 
 **Decision.**
-1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The format is in `dev-docs/extensions/map-files.md` and `adr-lw11`.
+1. A human describes object layouts in a markdown file with frontmatter, a `# Features` section (one `## Name` heading and `cells` block per feature) and a `# Map` section (bullets such as `- 'Name' at (2,12), (2,3)`, changed 2026-11-01). Cells are painted as text, one character per 64 pixel cell, in the same cell numbers as the F2 grid (origin bottom left). The format is in `dev-docs/extensions/map-files.md` and `adr-x11`.
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`). Trees followed the same day: `green_tree` and `red_tree` are map kinds, placed from the map file with the trunk collision rule of `adr-lw1`.
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
@@ -47,7 +47,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw12. Long Way draw order layers (2026-11-01)
 
-**Decision.** Long Way uses six layers, from back to front, defined in `games/long-way/src/layers.rs`. The mechanism is `adr-lw9`.
+**Decision.** Long Way uses six layers, from back to front, defined in `games/long-way/src/layers.rs`. The mechanism is `adr-x9`.
 1. **Background** (sprite z `BACKGROUND_Z`)
 2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F2 grid
 3. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`
@@ -55,7 +55,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 5. **HUD** (UI `GlobalZIndex` `HUD_Z_INDEX`): the info box and other readouts that are always on screen
 6. **UI** (UI `GlobalZIndex` `UI_Z_INDEX`): dialogs and menus, above the HUD
 
-**Rationale.** The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-lw2`). The debug layer is above the world, so debug lines also draw over the player.
+**Rationale.** The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-x2`). The debug layer is above the world, so debug lines also draw over the player.
 
 **How to apply.** A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). The collision overlay in `collision_debug.rs` follows this rule.
 
@@ -63,6 +63,6 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Decision.** A rock's blocked area is its footprint inset by 10% on the left, right and top, and not at the bottom (`adr-lw8`), grown sideways by Guy's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (`SORT_BIAS`), so Guy standing at the rock is drawn in front.
 
-**Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-lw10`. With the footprint bottom as the sort line, Guy standing at the blocked bottom was drawn behind the rock and looked as if he had walked in (found by the developer, 2026-11-01).
+**Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-x10`. With the footprint bottom as the sort line, Guy standing at the blocked bottom was drawn behind the rock and looked as if he had walked in (found by the developer, 2026-11-01).
 
 **How to apply.** The numbers are in `games/long-way/docs/collision.md`. Rock `draw` and `cell` sizes must agree, or the sprite and the blocked area drift apart.

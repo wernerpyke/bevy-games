@@ -1,6 +1,6 @@
 # Collision in Long Way
 
-The numbers and object rules Long Way gives to the [collision extension](../../../dev-docs/extensions/collision.md). Decisions: `adr-lw1`, `adr-lw4`, `adr-lw8`, `adr-lw10`, `adr-lw13`.
+The numbers and object rules Long Way gives to the [collision extension](../../../dev-docs/extensions/collision.md). Decisions: `adr-lw1`, `adr-x4`, `adr-lw8`, `adr-x10`, `adr-lw13`.
 
 ## Guy
 

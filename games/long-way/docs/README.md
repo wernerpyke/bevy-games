@@ -13,5 +13,5 @@ Documentation for this game only. General rules that other games may reuse are e
 
 Related:
 - Extensions: `dev-docs/extensions/README.md`
-- Decisions: `adr.md` (game decisions) and `dev-docs/adr/LONG-WAY.md` (decisions about the extensions)
+- Decisions: `adr.md` (game decisions) and `dev-docs/adr/EXTENSIONS.md` (decisions about the extensions)
 - How to run the game: `docs/README.md`

@@ -1,6 +1,6 @@
 # Collision research
 
-Background for the [collision extension](collision.md): the approaches that were compared, why the outline approach was chosen, and the sources. The decisions are `adr-lw1`, `adr-lw4` and `adr-lw10`. Long Way's own geometry is in `games/long-way/docs/collision.md`.
+Background for the [collision extension](collision.md): the approaches that were compared, why the outline approach was chosen, and the sources. The decisions are `adr-lw1`, `adr-x4` and `adr-x10`. Long Way's own geometry is in `games/long-way/docs/collision.md`.
 
 ## Approaches compared
 
@@ -57,12 +57,12 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 - NPCs will use `move_feet` as well. Testing every outline edge per entity is fine for dozens of entities. A spatial hash is the later fix if it is not (static objects are inserted once).
 - The slide timer already uses `dt`, so no change is needed for real-time play.
 
-### Slide design options (settled in `adr-lw10`)
+### Slide design options (settled in `adr-x10`)
 
 - **Range rule.** 35% of a long cluster edge is too far, so the range has a cap. Not built: a 96 px cap, or the distance to the nearest outline corner with a cap.
 - **Give up distance.** Never slide past a limit, so the character is not carried round a corner onto the next face.
 - **Concave corners.** At an inside corner, never slide into it.
-- **Push direction.** The assist stores signs, not floats (`adr-lw5`). A merged face has one direction.
+- **Push direction.** The assist stores signs, not floats (`adr-x5`). A merged face has one direction.
 
 ## Sources
 

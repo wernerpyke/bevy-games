@@ -15,7 +15,7 @@ Two parts: sorting world sprites by their feet, and a fixed set of named layers.
 | `DepthSort`, `DepthPlugin` | `games/long-way/src/depth.rs` | Yes, no game specific code |
 | Layer constants | `games/long-way/src/layers.rs` | The idea yes, the list is per game |
 
-Decisions: `adr-lw2`, `adr-lw9`, and `adr-lw12` for the Long Way layers. The same feet line decides collision ([collision.md](collision.md)), so what is drawn matches where the character can walk.
+Decisions: `adr-x2`, `adr-x9`, and `adr-lw12` for the Long Way layers. The same feet line decides collision ([collision.md](collision.md)), so what is drawn matches where the character can walk.
 
 ## Specification
 

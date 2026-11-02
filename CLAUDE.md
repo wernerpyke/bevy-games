@@ -124,7 +124,7 @@ bevy/
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work
 │   ├── README.md            # Map of the five groups
-│   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, LONG-WAY
+│   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, EXTENSIONS
 │   ├── bevy/                # What we learned about Bevy
 │   │   ├── concepts.md      # Human-friendly guide to how Bevy works
 │   │   └── notes.md         # Verified Bevy 0.20 patterns
@@ -196,7 +196,7 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 - Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for the play mode (for example exploring, dialogue, menu).
 - Use events or messages to pass actions between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
-- Draw order comes from `games/long-way/src/layers.rs` (adr-lw9). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos, because gizmos are always on top.
+- Draw order comes from `games/long-way/src/layers.rs` (adr-x9). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos, because gizmos are always on top.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
 
 ## Candidate crates
@@ -265,7 +265,7 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
 - Run: `./dev-scripts/rust.sh run <game>`, for example `run long-way`
-- Run a game with scripted key presses and print its log: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only), for example `script long-way "wait:0.5;screenshot:start;quit"`. Commands are in `games/long-way/src/script.rs`. Use it to check behaviour in the real game (`dev-docs/adr/LONG-WAY.md` adr-lw5).
+- Run a game with scripted key presses and print its log: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only), for example `script long-way "wait:0.5;screenshot:start;quit"`. Commands are in `games/long-way/src/script.rs`. Use it to check behaviour in the real game (`dev-docs/adr/EXTENSIONS.md` adr-x5).
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)

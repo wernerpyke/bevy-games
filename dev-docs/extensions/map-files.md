@@ -16,7 +16,7 @@ A markdown file that a human edits to place objects. The game reads three parts 
 | Parser | `games/long-way/src/map.rs` | The format yes. Object kinds are per game. |
 | Spawning | `rocks.rs`, `trees.rs` | Per game |
 
-Decisions: `adr-lw8`, `adr-lw11`. How to write a map for Long Way: `games/long-way/docs/maps.md`. Other formats and a loader with hot reload: roadmap items 5 and 4.
+Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-way/docs/maps.md`. Other formats and a loader with hot reload: roadmap items 5 and 4.
 
 ## Specification
 

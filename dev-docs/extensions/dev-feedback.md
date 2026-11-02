@@ -9,7 +9,7 @@ How behaviour is checked when Claude cannot play the game: plain function tests,
 3. A scripted run presses keys in the real game and logs the result.
 4. A script command saves a screenshot that Claude opens.
 
-The order of work for a behaviour that fails in the real game is in `CLAUDE.md`, working rule 10 (`adr-lw5`).
+The order of work for a behaviour that fails in the real game is in `CLAUDE.md`, working rule 10 (`adr-x5`).
 
 ## Status
 

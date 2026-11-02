@@ -17,7 +17,7 @@ All tools are sprites or UI on named layers ([draw-order.md](draw-order.md)), no
 | Grid and info box | `games/long-way/src/debug.rs` | Yes, configured by `DebugPlugin` fields |
 | Collision overlay | `games/long-way/src/collision_debug.rs` | Needs the collision extension |
 
-Decisions: `adr-lw3`, `adr-lw6`, `adr-lw9`. They stay in the game until a second game needs them (`adr-w6`).
+Decisions: `adr-x3`, `adr-x6`, `adr-x9`. They stay in the game until a second game needs them (`adr-w6`).
 
 ## Specification
 

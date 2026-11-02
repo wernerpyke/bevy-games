@@ -29,7 +29,7 @@ Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, archit
 
 ## Checks in the real game
 
-Unit tests do not cover frame timing, drawing or input. Check those in the running game with the scripted input tool and screenshots (`adr-lw5`, `dev-docs/extensions/dev-feedback.md`):
+Unit tests do not cover frame timing, drawing or input. Check those in the running game with the scripted input tool and screenshots (`adr-x5`, `dev-docs/extensions/dev-feedback.md`):
 
 ```
 ./dev-scripts/rust.sh script long-way "teleport:460:-100;hold:up:3;quit"

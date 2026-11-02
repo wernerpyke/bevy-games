@@ -21,7 +21,7 @@ Feet-point collision against merged outlines, with forgiving sliding. Top-down g
 
 Extraction into a shared crate is roadmap item 2 and needs the developer's approval first (`adr-w6`).
 
-Decisions: `adr-lw4`, `adr-lw10`. Long Way rules: `adr-lw1`, `adr-lw13`. Background and alternatives: [collision-research.md](collision-research.md).
+Decisions: `adr-x4`, `adr-x10`. Long Way rules: `adr-lw1`, `adr-lw13`. Background and alternatives: [collision-research.md](collision-research.md).
 
 ## Terms
 
@@ -92,7 +92,7 @@ app.add_plugins(CollisionPlugin { allow_sliding: true });
 
 ## Pitfalls
 
-- Never compare normalised float vectors for equality between frames. `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction. Compare signs. Float comparison made the slide timer reset every few frames (`adr-lw5`).
+- Never compare normalised float vectors for equality between frames. `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction. Compare signs. Float comparison made the slide timer reset every few frames (`adr-x5`).
 - Positions stored in one form and recomputed in another drift by millionths: feet at `translation.y - 30` can come back as 76.800003 instead of 76.8. Never test exact equality against an edge or corner coordinate. Use `TOLERANCE`. `collision::crosses` and `Edge::covers` already apply it.
 
 ## Limits

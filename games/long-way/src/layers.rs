@@ -1,5 +1,5 @@
 //! Draw order of everything on screen, from the back to the front. This is the only place with z numbers: other
-//! files use these names. See `dev-docs/adr/LONG-WAY.md` adr-lw9.
+//! files use these names. See `dev-docs/adr/EXTENSIONS.md` adr-x9.
 //!
 //! Sprites are ordered by their z (`Transform`), UI nodes by `GlobalZIndex`. Bevy has no layer system of its own
 //! for this. Two sprites with the same z have no fixed order, so give overlapping sprites different z.
