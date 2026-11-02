@@ -1,29 +1,8 @@
-# Collision research and rock geometry
+# Collision research
 
-Background for the collision work in Long Way: the approaches that were compared, why the outline approach was chosen, the rock geometry, and the sources. Moved from the plan `PLAN-forest-collision.md` when it was completed (2026-11-01). The decisions are in `dev-docs/adr/LONG-WAY.md` (`adr-lw1` to `adr-lw11`). The rules the code follows are in `dev-docs/BEVY-ADDITIONS.md`, section "Collision and sliding rules". How to write a map is in `dev-docs/GAME-MAPS.md`.
+Background for the [collision extension](collision.md): the approaches that were compared, why the outline approach was chosen, and the sources. The decisions are `adr-lw1`, `adr-lw4` and `adr-lw10`. Long Way's own geometry is in `games/long-way/docs/collision.md`.
 
-Some statements below describe the state when the research was written, for example "Slide design to settle". The final values are in `adr-lw10`.
-
-## Rock geometry
-
-- Footprint: 2x2 cells = 128 x 128. Inset 10% on the left, right and top, and not at the bottom (changed on 2026-11-01, so the bottom line sits on the lowest art pixel): 102.4 wide and 115.2 high.
-- Blocked area for the feet: that rectangle grown sideways by Guy's half width (20). Result 142.4 wide.
-- Two rocks whose blocked areas touch or overlap join into one cluster. Rocks 3 or more cells apart leave a gap of about 50 pixels that Guy can walk through, so they are separate clusters.
-- Everything inside a cluster is unreachable, so interior rocks need no collision test.
-
-The vertical margin is 0: the blocked area ends at the inset rectangle above and at the footprint bottom below. Rocks sort by the bottom of the blocked area plus 1 (`SORT_BIAS`), not by the bottom of the footprint. With the footprint bottom, Guy standing at the blocked bottom (then 12.8 above the footprint bottom, now 0) was drawn behind the rock and looked as if he had walked in. Found by the developer on 2026-11-01. Guy standing below a rock has his upper body over the lower part of the sprite, as with trees.
-
-### Drawn overlap (facts from the art)
-
-- `rock_0.png` and `rock_1.png` are 32x32 pixel art scaled 8x to 256x256. Checked: every 8x8 block is one colour.
-- The opaque part of the rock is 232 x 208 of 256 (x 8 to 239, y 16 to 223): 90.6% of the width and 81% of the height.
-- Our `Rocks.aseprite` is 128x128, so one art pixel is 4 screen pixels. The rock is about 116 wide. At a pitch of 2 cells (128) two neighbours do **not** touch: 12 pixels of gap.
-- To overlap slightly at a pitch of 2 cells, draw the rock larger than its footprint. 160 pixels is exactly 5x the art, so pixels stay even. The rock is then about 145 wide and neighbours overlap by about 17 pixels (about 12%). 192 pixels (6x) overlaps by about 46 pixels.
-- `Rocks.aseprite` is therefore kept at the native 32x32 and scaled in the engine by `draw / 32`, which must be a whole number (4 = 128, 5 = 160, 6 = 192). Pixels stay even. Stretching a 128 pixel file to 160 would not (4x to 5x).
-- Drawing larger than the footprint does not change collision. The inset footprints are 25.6 apart at a pitch of 2 cells, and Guy's 20 pixel margin each side closes that gap, so the blocked areas join and a cluster has no gaps.
-
-
-## Collision approaches (research summary)
+## Approaches compared
 
 All blocked areas are axis-aligned rectangles, so the union is a rectilinear shape (horizontal and vertical edges only). The axis based slide rule keeps working on edge segments. Merging also removes seams, where a diagonal move catches on the inner edge between two touching rectangles.
 
@@ -74,16 +53,16 @@ The recommendation for **Guy's collision stays C with D**. The feet-point rule, 
 
 ### Real-time notes
 
-- Steps are small per frame (300 units per second, about 5 per frame), so tunnelling is not a risk. `resolve` still stops a move at the first edge it crosses.
+- Steps are small per frame (for example 300 units per second is about 5 per frame), so tunnelling is not a risk. `resolve` still stops a move at the first edge it crosses.
 - NPCs will use `move_feet` as well. Testing every outline edge per entity is fine for dozens of entities. A spatial hash is the later fix if it is not (static objects are inserted once).
 - The slide timer already uses `dt`, so no change is needed for real-time play.
 
-### Slide design options (settled in `adr-lw10`, values still to tune)
+### Slide design options (settled in `adr-lw10`)
 
-- **Range rule.** 35% of a long cluster edge is too far. Options: a cap of one cell (64 px) or 1.5 cells, or the distance to the nearest outline corner with the cap.
-- **Give up distance.** Never slide past a limit, so Guy is not carried round a corner onto the next face.
-- **Concave corners.** At an inside corner, slide away from the corner, never into it.
-- **Push direction.** The assist stores signs, not floats (`adr-lw5`). A merged face has one direction, so this stays.
+- **Range rule.** 35% of a long cluster edge is too far, so the range has a cap. Not built: a 96 px cap, or the distance to the nearest outline corner with a cap.
+- **Give up distance.** Never slide past a limit, so the character is not carried round a corner onto the next face.
+- **Concave corners.** At an inside corner, never slide into it.
+- **Push direction.** The assist stores signs, not floats (`adr-lw5`). A merged face has one direction.
 
 ## Sources
 

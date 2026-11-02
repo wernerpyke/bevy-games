@@ -29,6 +29,16 @@ Rust (game), Lua (Aseprite scripts), shell (launchers). No Python and no `uv`. A
 | `CLAUDE.md` | Machine-readable project reference | Claude |
 | `docs/` | User-facing guides, quick reference, consolidated troubleshooting | Humans |
 | `dev-docs/` | Architecture decisions, roadmap, plans, internal context | Contributors |
+| `games/<game>/docs/` | Documentation for one game: values, object kinds, source layout | Contributors |
+
+`dev-docs/` has five groups (`dev-docs/README.md`):
+1. `adr/`: decision records.
+2. `bevy/`: what we learned about Bevy itself (`concepts.md`, `notes.md`).
+3. `extensions/`: long-lived documents for our reusable additions on top of Bevy, one file per topic, in the template of `extensions/README.md`.
+4. The root: `ROADMAP.md` and `PLAN-*.md`.
+5. Game specific documents are not here. They are in `games/<game>/docs/`.
+
+Keep general rules in `extensions/` and game values (sizes, speeds, art pixels, object kinds) in the game's docs. Do not mix them in one file.
 
 - One file in `docs/` is the single entry point for human readers: quick start, common commands and all troubleshooting. `docs/README.md` is that file. Extra `docs/` files cover specific topics in depth.
 - `dev-docs/` is used instead of `notes/` so developer material stays out of any shipped web build. Do not create a `notes/` folder.
@@ -108,17 +118,17 @@ bevy/
 │       ├── src/             # Game code (Rust)
 │       ├── assets/          # This game's runtime assets (Bevy loads from here)
 │       │   └── art/         # .aseprite sources and palette
-│       └── tests/           # README only: unit tests are inline in src/ (see tests/README.md)
+│       ├── docs/            # Game docs: README, source-layout, collision, maps, art-tags, testing
+│       └── tests/           # README only: unit tests are inline in src/ (see docs/testing.md)
 ├── docs/                    # Human-facing docs (README.md is the entry point)
 ├── dev-docs/                # Developer docs
 │   ├── ROADMAP.md           # Future and completed work
-│   ├── GAME-MAPS.md         # How to write a map file (human guide)
-│   ├── COLLISION-RESEARCH.md # Collision approaches compared, rock geometry, sources
+│   ├── README.md            # Map of the five groups
 │   ├── adr/                 # Decision records: README, ENGINE, ART, WORKSPACE, LONG-WAY
-│   ├── bevy-notes.md        # Verified Bevy 0.20 patterns
-│   ├── BEVY-CONCEPTS.md     # Human-friendly guide to how Bevy works
-│   ├── BEVY-ADDITIONS.md    # Our own reusable design decisions built on Bevy
-│   ├── art-tags.md          # Aseprite animation tag names
+│   ├── bevy/                # What we learned about Bevy
+│   │   ├── concepts.md      # Human-friendly guide to how Bevy works
+│   │   └── notes.md         # Verified Bevy 0.20 patterns
+│   ├── extensions/          # Our reusable additions on top of Bevy (README is the index)
 │   └── PLAN-*.md            # Temporary plans
 ├── dev-scripts/             # Dev tooling
 │   ├── rust.sh              # cargo wrapper (allowlistable prefix)
@@ -128,7 +138,7 @@ bevy/
 
 ## Purpose
 
-A workspace for 2D pixel art games built with Bevy (Rust). Long Way is a real-time top-down RPG (`dev-docs/adr/LONG-WAY.md` adr-lw7). Several games are developed side by side. Claude writes all code. The user makes architectural decisions and does not hand-write code.
+A workspace for 2D pixel art games built with Bevy (Rust). Long Way is a real-time top-down RPG (`games/long-way/docs/adr.md` adr-lw7). Several games are developed side by side. Claude writes all code. The user makes architectural decisions and does not hand-write code.
 
 Game designs are not defined yet. Ask the user for design details before inventing mechanics.
 
@@ -136,7 +146,7 @@ Game designs are not defined yet. Ask the user for design details before inventi
 
 | Game | Crate and folder | Status |
 |---|---|---|
-| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys, stays on screen, and rocks and two animated trees placed from a markdown map file (`dev-docs/GAME-MAPS.md`) block him (F2 shows the grid and collision outline), with forgiving sliding past edges |
+| Long Way | `long-way`, `games/long-way/` | Walking test: Guy walks with the arrow keys, stays on screen, and rocks and two animated trees placed from a markdown map file (`games/long-way/docs/maps.md`) block him (F2 shows the grid and collision outline), with forgiving sliding past edges |
 
 Rules for the workspace (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/`, with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.
@@ -174,7 +184,7 @@ Both targets must keep working. Do not add a dependency that breaks `wasm32-unkn
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Check docs.rs and the official migration guide for the pinned version. Bundles such as `SpriteBundle` were removed in newer versions. Use required components.
 5. Use the Rust LSP (rust-analyzer) through the LSP tool for code navigation and checks: go to definition, find references, hover for types and signatures, and diagnostics. Prefer it over grep for Rust symbols in this project and in dependencies. Use grep for text search in examples and docs. The LSP tool is deferred: load it at the start of work with ToolSearch (`select:LSP`). The server needs about a minute to index on first use, so retry once if it says it is starting. Use it (goToDefinition, hover) to read Bevy and plugin source in `~/.cargo/registry/src/`, not `cat` or `sed`.
 6. Bevy reference material, in this order: (a) Bevy repo checked out at the pinned version's tag in `bevy-src/` (git-ignored, shallow clone of tag `v0.20.1`; update it when the Bevy version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on the dependency source; (c) docs.rs for the pinned version. Search these for the exact API needed. Do not read whole files.
-7. Record verified Bevy patterns for the pinned version in `dev-docs/bevy-notes.md` and read it before searching again. Keep it short. When the project uses a new Bevy concept for the first time, add or update its section in `dev-docs/BEVY-CONCEPTS.md` (plain language, project code as the example). The user is learning Bevy. Keep our own reusable, non-standard design decisions (such as `allow_sliding`) in `dev-docs/BEVY-ADDITIONS.md`, separate from plain Bevy concepts. Add an entry when we make such a decision, and link its ADR.
+7. Record verified Bevy patterns for the pinned version in `dev-docs/bevy/notes.md` and read it before searching again. Keep it short. When the project uses a new Bevy concept for the first time, add or update its section in `dev-docs/bevy/concepts.md` (plain language, project code as the example). The user is learning Bevy. Keep our own reusable, non-standard design decisions (such as `allow_sliding`) in `dev-docs/extensions/`, separate from plain Bevy concepts. Add an entry when we make such a decision, and link its ADR.
 8. Run `./dev-scripts/rust.sh lint` before reporting work as done. Run `./dev-scripts/rust.sh test` when tests exist.
 9. Run `./dev-scripts/rust.sh web` after adding dependencies, not only the native build.
 10. When behaviour does not work in the real game, reproduce it with `./dev-scripts/rust.sh script` first, write a failing test for the cause, fix it, then rerun the script. Do not report a fix as working from unit tests alone. Say which parts you did not see on screen.
@@ -239,7 +249,7 @@ Rules:
 4. Check each sprite visually: export a PNG scaled up with `--scale`, view it, fix, repeat. Stop after 3 rounds and ask the user if it still looks wrong.
 5. Claude draws placeholders, tiles, icons, UI, effects and simple animation. The user draws or refines characters and key art. Mark placeholders with the suffix `_placeholder` in the file name so they are easy to find.
 6. Load `.aseprite` files in the game through `bevy_aseprite_ultra` (verify it supports the pinned Bevy version). If it does not, export PNG sheets and JSON with `--sheet` and `--data` and load those.
-7. Use layers and animation tags as the contract between art and code. Keep a list of tag names in `dev-docs/art-tags.md`.
+7. Use layers and animation tags as the contract between art and code. Keep a list of tag names in `games/long-way/docs/art-tags.md`.
 
 ## Skill
 

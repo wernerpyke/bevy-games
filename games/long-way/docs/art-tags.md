@@ -11,7 +11,7 @@ Tag names are the contract between art and code (`CLAUDE.md`, art pipeline rule 
 
 ## Map kinds
 
-Kinds are the names a map legend uses (`dev-docs/GAME-MAPS.md`). Each is defined in code (`map.rs`).
+Kinds are the names a map legend uses (`maps.md`). Each is defined in code (`map.rs`).
 
 | Kind | Art | Tag used |
 |---|---|---|

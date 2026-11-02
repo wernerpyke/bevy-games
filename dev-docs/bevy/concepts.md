@@ -2,7 +2,12 @@
 
 How Bevy works, in plain terms, using this project's code as the examples. Written for someone who knows game engines but not Bevy. Version: Bevy 0.20.1.
 
-Sections marked **Not used yet** describe things Bevy offers that this project has not touched. They come from reading `bevy-src/`, not from running them here. Treat them as leads, not proven patterns. Short verified code snippets also live in `dev-docs/bevy-notes.md`. Our own reusable design decisions built on top of Bevy (such as `allow_sliding`) are in `dev-docs/BEVY-ADDITIONS.md`.
+This file explains Bevy only. Project code appears as examples, but design decisions do not belong here. Where they live:
+- Short verified code snippets and pitfalls: `dev-docs/bevy/notes.md`.
+- Our own reusable designs built on top of Bevy (collision, draw order, map files and others): `dev-docs/extensions/`.
+- Source files and values of one game: `games/<game>/docs/`.
+
+Sections marked **Not used yet** describe things Bevy offers that this project has not touched. They come from reading `bevy-src/`, not from running them here. Treat them as leads, not proven patterns.
 
 ## The big idea: ECS
 
@@ -194,39 +199,21 @@ Projection::Orthographic(OrthographicProjection {
 })
 ```
 
-`viewport_height` is how many world units fit vertically. Width follows the window shape. **A bigger window does not make Guy smaller. A bigger `viewport_height` does.** With `VIEW_HEIGHT = 1200` and Guy 60 pixels tall, Guy is one twentieth of the screen height.
+`viewport_height` is how many world units fit vertically. Width follows the window shape. **A bigger window does not make a sprite smaller. A bigger `viewport_height` does.**
 
-World units here equal art pixels, so a 60 pixel sprite is 60 units wide. Screen pixels only match art pixels when the window height equals `viewport_height`. Otherwise the art is scaled, and non-whole scales can make pixels uneven (see `adr-e7` in `dev-docs/adr/ENGINE.md`).
+World units here equal art pixels, so a 60 pixel sprite is 60 units wide. Screen pixels only match art pixels when the window height equals `viewport_height`. Otherwise the art is scaled, and non-whole scales can make pixels uneven (see `adr-e7` in `dev-docs/adr/ENGINE.md` and `dev-docs/extensions/pixel-art.md`).
 
 World coordinates: the centre is (0, 0), x grows right and y grows up.
 
 ## Draw order (z)
 
-In 2D, the `z` of a `Transform` decides what draws on top: a higher `z` draws in front. Bevy does not sort by `y` for you. For a top-down game, Guy should walk behind a tree when he is above it and in front when below. We do this ("y-sorting") with a small system in `depth.rs`:
-
-```rust
-fn sort_by_feet(mut query: Query<(&mut Transform, &DepthSort)>) {
-    for (mut transform, sort) in &mut query {
-        transform.translation.z = -sort.feet_y(transform.translation.y) * Z_PER_Y;
-    }
-}
-```
-
-Lower feet on screen give a higher `z`, so they draw in front. `DepthSort` is a component: any entity that has it (Guy, each tree) is sorted. Systems that read or write `Transform` do not need to know about drawing order.
+In 2D, the `z` of a `Transform` decides what draws on top: a higher `z` draws in front. Sprites with equal `z` have no fixed order and can flicker. Bevy does not sort by `y` for you, and has no layer system for 2D. `RenderLayers` only chooses which camera sees an entity. Our solution (sorting by feet and named layers) is in `dev-docs/extensions/draw-order.md`.
 
 ## Collision
 
-Bevy 0.20 has no built-in 2D collision, and we do not use a physics crate. Collision here is plain arithmetic in `collision.rs`:
+Bevy 0.20 has no built-in 2D collision. Physics crates such as `avian2d` and `bevy_rapier2d` exist and are not used yet (roadmap item 3). Our own collision is plain arithmetic on `Vec2` and `Rect`, with no Bevy types needed: `dev-docs/extensions/collision.md`.
 
-- Everything solid is a rectangle of blocked area for Guy's feet: a `Trunk` component for each tree (`adr-lw1`) and a rectangle for each rock (`rocks.rs`). The `CollisionWorld` resource collects them all.
-- `outline.rs` merges rectangles that touch into clusters and finds the outline: straight edges around each cluster. Guy collides with edges, not rectangles, so a pile of rocks is one shape.
-- `resolve(old, new, edges)` takes Guy's feet position before and after a move and returns where he may end up. It checks each axis on its own, so Guy slides along a face.
-- `move_feet(...)` wraps `resolve` and adds the forgiving behaviour (`allow_sliding`): after pushing into a face for 0.2 seconds, Guy is slid past a nearby edge, into a notch if needed (`adr-lw10`). The time he has been pushing is kept in a `SlideAssist` component on Guy.
-- The full rules are in `dev-docs/BEVY-ADDITIONS.md`, section "Collision and sliding rules".
-
-`move_player` calls `move_feet` with `world: Res<CollisionWorld>`, which holds every edge.
-
-The plugin takes a setting: `CollisionPlugin { allow_sliding: true }` in `main.rs`. A plugin can be a struct with fields, and `build` stores the setting as a resource (`CollisionSettings`) that systems read with `Res<CollisionSettings>`. This is how a game configures shared code. The rule is a plain function with unit tests, so `./dev-scripts/rust.sh test long-way` checks it without opening the game.
+Plugins can be structs with fields, so a game configures shared code with `CollisionPlugin { allow_sliding: true }`. See `dev-docs/extensions/plugin-configuration.md`.
 
 ## Gizmos (debug drawing)
 
@@ -236,7 +223,7 @@ The plugin takes a setting: `CollisionPlugin { allow_sliding: true }` in `main.r
 gizmos.rect_2d(Isometry2d::from_translation(centre), size, Color::srgb(1.0, 0.1, 0.1));
 ```
 
-Gizmos draw lines and shapes for one frame without entities. In 2D they are always drawn on top of everything, so they cannot sit in a layer. Long Way draws its debug overlays as sprites instead (`collision_debug.rs`).
+Gizmos draw lines and shapes for one frame without entities. In 2D they are always drawn on top of everything, so they cannot sit in a layer. Our debug overlays are sprites instead (`dev-docs/extensions/debug-tools.md`).
 
 ## Text
 
@@ -265,11 +252,11 @@ transform.translation += direction.normalize() * WALK_SPEED * time.delta_secs();
 
 ## Events and messages
 
-**Not used yet.** Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages (`MessageReader<T>`, as in `WindowResized` handling in the Bevy examples). The plugin also sends `AnimationEvents::Finished`. This is the likely tool for turn-based actions ("player moved", "enemy died").
+**Not used yet.** Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages (`MessageReader<T>`, as in `WindowResized` handling in the Bevy examples). The plugin also sends `AnimationEvents::Finished`. This is the likely tool for game events such as "player moved" or "enemy died", and for passing actions between plugins.
 
 ## States
 
-**Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture notes in `CLAUDE.md` plan to use it for app flow and turn phase.
+**Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture notes in `CLAUDE.md` plan to use it for app flow (loading, menu, playing) and a sub-state for the play mode.
 
 ## Cargo features and build profiles
 
@@ -281,36 +268,15 @@ bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
 
 This leaves out 3D and keeps the web build smaller. `bevy_aseprite_ultra` adds `bevy_ui` as a side effect.
 
-The dev profile builds Bevy itself with optimisation (`opt-level = 3`) and our own code lightly (`opt-level = 1`). Unoptimised Bevy is too slow to play. Build times are in `dev-docs/bevy-notes.md`: a small change builds in about 5 to 8 seconds, while adding a dependency takes minutes.
+The dev profile builds Bevy itself with optimisation (`opt-level = 3`) and our own code lightly (`opt-level = 1`). Unoptimised Bevy is too slow to play. A small change builds in seconds, while adding a dependency or changing features rebuilds Bevy and takes minutes.
 
-## Project layout
+## Workspace
 
-```
-Cargo.toml                 # workspace root
-games/long-way/
-├── Cargo.toml
-├── assets/
-└── src/
-    ├── main.rs        # builds the App, adds plugins
-    ├── camera.rs      # CameraPlugin: camera, background colour, VIEW_HEIGHT
-    ├── player.rs      # PlayerPlugin: Guy spawn, movement, animation
-    ├── trees.rs       # TreesPlugin: spawns the map's trees and their trunks
-    ├── rocks.rs       # RocksPlugin: spawns the map's rocks and their blocked areas
-    ├── map.rs         # MapPlugin: parses the markdown map file
-    ├── outline.rs     # merges blocked rectangles into clusters and outline edges
-    ├── collision.rs   # CollisionPlugin: CollisionWorld, resolve, sliding
-    ├── collision_debug.rs # collision overlay (F2), sprites on the feature debug layer
-    ├── debug.rs       # DebugPlugin: grid (F2) and info box (F3)
-    ├── layers.rs      # draw order layers
-    ├── script.rs      # scripted input and screenshots for testing
-    └── depth.rs       # DepthPlugin: draw order sorted by feet
-```
-
-One plugin per feature, each owning its components and systems, is the shape each game will grow in. The repo is a Cargo workspace: each game is a crate in `games/`, and they share one `target/` folder so Bevy compiles once.
+The repo is a Cargo workspace: each game is a crate in `games/`, and they share one `target/` folder so Bevy compiles once. One plugin per feature, each owning its components and systems, is the shape each game grows in. A game's file list is in `games/<game>/docs/source-layout.md`.
 
 ## Where to look things up
 
-1. `dev-docs/bevy-notes.md`: short verified snippets for this version.
+1. `dev-docs/bevy/notes.md`: short verified snippets for this version.
 2. `bevy-src/examples/`: official examples for exactly 0.20.1. Search with grep.
 3. `bevy-src/_release-content/migration-guides/`: what changed from the previous version.
 4. docs.rs for `bevy` 0.20.1, and the Rust LSP for signatures.

@@ -22,7 +22,7 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 
 **Rationale.** Latest stable gives the newest features and the longest time before a forced upgrade. Ecosystem plugins often lag one release, so each plugin is checked before use.
 
-**How to apply.** Check every Bevy ecosystem crate for 0.20 support before adding it. Record plugin results in this file. Upgrading Bevy means updating `bevy-src/` and `dev-docs/bevy-notes.md`.
+**How to apply.** Check every Bevy ecosystem crate for 0.20 support before adding it. Record plugin results in this file. Upgrading Bevy means updating `bevy-src/` and `dev-docs/bevy/notes.md`.
 
 ## adr-e3. Reference source in `bevy-src/` inside the project (2026-10-30)
 

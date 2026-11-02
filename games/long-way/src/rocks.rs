@@ -34,7 +34,7 @@ impl Plugin for RocksPlugin {
     }
 }
 
-/// Marker for a rock. The collision work (plan step 3 onward) queries it.
+/// Marker for a rock. The collision code queries it.
 #[derive(Component)]
 pub struct Rock;
 

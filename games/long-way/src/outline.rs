@@ -1,5 +1,5 @@
 //! Merges blocked rectangles into clusters and finds the outline of each cluster. Plain Rust with no Bevy
-//! types except `Rect`, so it is unit tested without a running app. See "Collision and sliding rules" in `dev-docs/BEVY-ADDITIONS.md`.
+//! types except `Rect`, so it is unit tested without a running app. See `dev-docs/extensions/collision.md`.
 //!
 //! All input rectangles are the areas Guy's feet may not enter, already grown by his half width, so the feet
 //! are a point. Rectangles that touch or overlap form one cluster. The edges of a cluster are the boundary of

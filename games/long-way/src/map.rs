@@ -1,5 +1,5 @@
 //! Map files: markdown with frontmatter, a `# Features` section and a `# Map` section. See
-//! `dev-docs/GAME-MAPS.md` for the format. The parser is plain Rust and
+//! `games/long-way/docs/maps.md` for the format. The parser is plain Rust and
 //! has no Bevy dependency except `IVec2`, so it is unit tested without a running app.
 //!
 //! Supported frontmatter (a small subset of YAML, one `key: value` per line):
