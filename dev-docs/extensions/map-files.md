@@ -126,4 +126,12 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 
 ## Tests
 
-Inline in `game-kit` `map.rs`: the parser and every error message. Each game tests that its own map file parses.
+Inline in `game-kit` `map.rs`. Each game tests that its own map file parses (counts of objects, size and the start marker). The parser tests cover:
+
+- Footprints: a dotted and a blank footprint give the same objects, one grid may mix both styles, a blank in the middle of a row does not shift later cells, and blanks before the closing `|` are kept.
+- Grid shape: rows run top to bottom and cells are numbered from the bottom left, the row count and the width must match `size`, a character at an odd offset must be a space, and a row needs both bars.
+- Labels and rulers: wrong row labels name their line (for both origins), and rulers are ignored at the top, at the bottom, at both ends or absent.
+- Origin: `top-left` and `bottom-left` files with the same drawing give the same objects, and an unknown origin is an error.
+- Legend: a character that is not in the legend names its line, reserved keys (`|`, `.`, space) are errors, and a marker such as `player_start` comes back as an ordinary object.
+- Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw`, `jitter` and `cell` values, an unknown kind, comments and optional keys.
+- Other: comments, blank lines and Windows line endings, and objects come back in a fixed order (top row first, then left to right).

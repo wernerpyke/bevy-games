@@ -1,6 +1,6 @@
 # Research: map layout formats
 
-Status: research only. No decision made. Date: 2026-11-02.
+Status: research done. The decisions are in `adr-x18` (`dev-docs/adr/EXTENSIONS.md`) and the format is in `dev-docs/extensions/map-files.md`. Section 1 describes the first draft of `test.txt`. The final file has rulers, row labels, `origin: top-left` and a `player_start` marker. Section 5 is done. Date: 2026-11-02.
 
 Goal: define a whole map in one plain text file, with no separate editor. Keep the door open for seeded random maps later.
 
@@ -113,7 +113,7 @@ Grid -> spawn objects                       (Bevy system, same for both)
 - Hand-drawn prefabs (a village, a ruin) can use the same text format and be stamped into a generated map. This is the "feature" idea from `rocks-test.md`, and the text format can hold it as a small grid.
 - Front matter can gain `seed: 12345` and `generator: forest` later, with no grid, or with a grid that holds fixed parts only.
 
-## 5. Suggested next steps (not started)
+## 5. Suggested next steps (done 2026-11-02)
 
 1. Decide the open questions in section 1: layers, multi-cell objects, notes.
 2. Write a parser for the text format in `crates/game-kit/` (ask first, per the shared code rule) and switch R-Town to `test.txt`.
