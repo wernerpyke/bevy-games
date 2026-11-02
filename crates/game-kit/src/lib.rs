@@ -1,5 +1,6 @@
 //! Code shared by the games in this workspace. See `dev-docs/adr/EXTENSIONS.md` adr-x12.
 
+pub mod camera;
 pub mod collision;
 pub mod collision_debug;
 pub mod debug;

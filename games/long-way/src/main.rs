@@ -13,7 +13,10 @@ fn main() {
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugins(AsepriteUltraPlugin)
         .add_plugins((
-            camera::CameraPlugin,
+            game_kit::camera::PixelCameraPlugin {
+                view_height: camera::VIEW_HEIGHT,
+                clear_color: camera::CLEAR_COLOR,
+            },
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

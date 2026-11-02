@@ -4,4 +4,4 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-bevy.workspace = true
+bevy = { workspace = true, features = ["ui_api"] }

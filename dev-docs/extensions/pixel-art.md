@@ -11,7 +11,8 @@ How art size on screen is set, and how Aseprite tags drive animation.
 
 | Part | Code today | Shared? |
 |---|---|---|
-| View height | `games/long-way/src/camera.rs` | Yes, one constant per game |
+| Camera: `PixelCameraPlugin { view_height, clear_color }`, `half_view` | `crates/game-kit/src/camera.rs` | Shared |
+| `VIEW_HEIGHT`, `CELL_SIZE`, `MAP_ORIGIN` | `games/long-way/src/camera.rs` | One set of values per game |
 | Tag switching | `games/long-way/src/player.rs` | Pattern only |
 
 Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` and `art-tags.md`.
@@ -36,7 +37,7 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 
 ## Usage
 
-- Change `VIEW_HEIGHT` in the camera module to change how large everything looks.
+- Add `PixelCameraPlugin { view_height, clear_color }` with the game's own `VIEW_HEIGHT` constant. Change that constant to change how large everything looks. The camera is spawned at the world origin. A game that scrolls moves the `Camera2d` entity itself (the kit has no follow system yet).
 - For a character, keep a `playing: &'static str` field and write `if wanted != player.playing { ase.animation.play_loop(wanted); ase.animation.speed = speed; player.playing = wanted; }`.
 
 ## Limits

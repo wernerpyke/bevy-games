@@ -11,7 +11,7 @@ games/long-way/
 ├── docs/               this folder
 └── src/
     ├── main.rs         builds the App, adds plugins
-    ├── camera.rs       CameraPlugin: camera, background colour, VIEW_HEIGHT, MAP_ORIGIN
+    ├── camera.rs       VIEW_HEIGHT, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, half_view (the camera is `game_kit::camera`)
     ├── player.rs       PlayerPlugin: Guy spawn, movement, animation
     ├── trees.rs        TreesPlugin: trees and their trunks from the map
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
@@ -29,7 +29,7 @@ games/long-way/
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
 | [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` in `crates/game-kit` |
 | [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
-| [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` |
+| [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
 Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.
 
