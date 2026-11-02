@@ -2,7 +2,7 @@
 
 Our own reusable design decisions, built on top of Bevy. They are not part of Bevy. They are choices that other games in this workspace may want to reuse.
 
-All code still lives inside `games/long-way/src/`. Extracting it into shared code is roadmap item 2 and needs the developer's approval first (`adr-w6`). These documents describe each extension as if it were already separate: the general rules are here, and the values and rules that belong to one game are in `games/<game>/docs/`.
+Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each document here describes one extension: the general rules are here, the code is named in the index below, and the values and rules that belong to one game are in `games/<game>/docs/`.
 
 ## Where things are documented
 

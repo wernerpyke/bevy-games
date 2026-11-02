@@ -45,7 +45,7 @@ When false, any blocked move leaves Guy where he was. There is no sliding of any
 
 ## adr-x6. Reusable visual debug tools in `debug.rs` (2026-11-01)
 
-**Decision.** `games/long-way/src/debug.rs` holds visual debug tools, one tool per system, added over time. `DebugPlugin { cell_size, grid_color }` is configured in `main.rs`. The first two tools:
+**Decision.** `crates/game-kit/src/debug.rs` (moved from Long Way on 2026-11-02, `adr-x12`) holds visual debug tools, one tool per system, added over time. `DebugPlugin { cell_size, grid_color }` is configured in `main.rs`. The first two tools:
 1. **Grid (F2).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below Guy and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
 2. **Info box (F3).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are Guy's feet x/y and grid cell (in grid coordinates, relative to the origin) and his raw world position.
 
@@ -86,7 +86,7 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
 
-**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 5 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 4 covers a sturdier loader.
+**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 4 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 4 covers a sturdier loader.
 
 ## adr-x12. Shared code lives in one kit crate, `crates/game-kit` (2026-11-02)
 

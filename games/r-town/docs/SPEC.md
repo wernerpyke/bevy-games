@@ -79,7 +79,7 @@ Deferred. Pack has 6 music themes and 20+ effects.
 
 ## 12. Scope
 
-- First playable (built, 2026-11-02): walk around a test map of 80x60 cells, like Long Way's `rocks-test.md`. Hero, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate from `dev-docs/PLAN-shared-crate.md`.
+- First playable (built, 2026-11-02): walk around a test map of 80x60 cells, like Long Way's `rocks-test.md`. Hero, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate `crates/game-kit` (adr-x12).
 - The real town layout is designed after the first playable.
 - Later: combat, interaction, progression, audio, UI.
 - Out of scope: public release.

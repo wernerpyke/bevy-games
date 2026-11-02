@@ -17,7 +17,7 @@ A markdown file that a human edits to place objects. The game reads three parts 
 | Loading and `Kind` | `games/long-way/src/map.rs` | Per game |
 | Spawning | `rocks.rs`, `trees.rs` | Per game |
 
-Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-way/docs/maps.md`. Other formats and a loader with hot reload: roadmap items 5 and 4.
+Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-way/docs/maps.md`. Other formats and a loader with hot reload: roadmap items 4 and 3.
 
 ## Specification
 
@@ -69,7 +69,7 @@ Decisions: `adr-lw8`, `adr-x11`. How to write a map for Long Way: `games/long-wa
 ## Limits
 
 - One map per game build.
-- Maps with many object kinds, triggers, paths or nested data may outgrow markdown (roadmap items 4 and 5).
+- Maps with many object kinds, triggers, paths or nested data may outgrow markdown (roadmap items 3 and 4).
 
 ## Tests
 

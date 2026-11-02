@@ -40,11 +40,11 @@
 
 **How to apply.** Accept some duplication. If it becomes painful, revisit with a shared assets decision.
 
-## adr-w6. No shared code crate until a second game needs it (2026-10-31)
+## adr-w6. No shared code crate until a second game needs it (2026-10-31, applied 2026-11-02)
 
 **Decision.** Each game keeps its own camera, player and other code. A shared crate (`crates/<name>/`) is created only when a second game needs code that an existing game already has, and only after asking the developer.
 
 **Rationale.** A shared API designed before a second game exists is likely to have the wrong shape. Copying and then extracting keeps the shared crate based on real use.
 
-**How to apply.** When starting a second game, list the code it could reuse from Long Way and propose what to extract.
+**How to apply.** When starting a second game, list the code it could reuse from Long Way and propose what to extract. Applied for R-Town: the shared crate is `crates/game-kit` (`adr-x12`). A game keeps its own values, kinds, art and rules, and the kit holds only what both games use.
 

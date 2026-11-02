@@ -5,6 +5,7 @@ A Cargo workspace of pixel art games built with Bevy. Each game lives in `games/
 | Game | Folder |
 |---|---|
 | Long Way | `games/long-way/` |
+| R-Town | `games/r-town/` |
 
 Single entry point for players and users: quick start, controls, common commands and troubleshooting.
 
@@ -12,6 +13,7 @@ Single entry point for players and users: quick start, controls, common commands
 
 ```
 ./dev-scripts/rust.sh run long-way
+./dev-scripts/rust.sh run r-town
 ```
 
 The first build takes several minutes.

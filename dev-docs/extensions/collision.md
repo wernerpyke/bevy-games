@@ -96,8 +96,8 @@ app.add_plugins(CollisionPlugin { allow_sliding: true });
 
 ## Limits
 
-- The outline is built once per call to `add_blocked`. Doors or destroyed objects need a rebuild of one cluster (roadmap item 4).
-- `outline::build` makes one grid over all rectangles, so large maps need chunking (roadmap item 4).
+- The outline is built once per call to `add_blocked`. Doors or destroyed objects need a rebuild of one cluster (roadmap item 3).
+- `outline::build` makes one grid over all rectangles, so large maps need chunking (roadmap item 3).
 - Every moving entity tests every edge. A spatial hash is the later fix.
 - A character placed inside a shape (for example by teleport) can walk freely inside it.
 - A game that clamps the character to the view after collision can move the feet into a shape.

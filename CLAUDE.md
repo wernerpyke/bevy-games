@@ -50,12 +50,14 @@ User context: knows common game engine architecture and mechanics, so do not exp
 | Game | Crate and folder |
 |---|---|
 | Long Way | `long-way`, `games/long-way/` |
+| R-Town | `r-town`, `games/r-town/` |
+| Shared code | `game-kit`, `crates/game-kit/` (a library, not a game) |
 
 Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/` with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.
 - Games are self-contained. A game never depends on another game's crate or reads another game's assets.
 - Art is copied into the game that uses it. A palette or sprite used by two games is copied twice.
-- Shared code stays in each game until a second game needs it. Then ask before creating a shared crate (`crates/<name>/`).
+- Shared code lives in `crates/game-kit/` (`adr-x12`): collision, outline, depth sort, layers, map parser, camera, debug tools and the script runner. Move code there only when two games use it, and ask first. A game keeps its own values, object kinds, art and rules. The kit has no assets and no game types. Build and test it alone with `./dev-scripts/rust.sh test game-kit`.
 - Dependency versions are set once in the root `Cargo.toml` under `[workspace.dependencies]`. Games use `bevy.workspace = true`. Build profiles are set only in the root `Cargo.toml`.
 - All commands name the game. When a request does not say which game, ask.
 
@@ -64,12 +66,12 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - macOS (native) and Web (WebAssembly). Both must keep working. Do not add a dependency that breaks `wasm32-unknown-unknown` without telling the user first.
 - 2D only. Disable unused Bevy default features where practical.
 - Pixel art rendering: nearest-neighbour sampling, integer scaling, fixed low-resolution camera.
-- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). Other games state their own timing model, so ask.
+- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (its `docs/SPEC.md`). Other games state their own timing model, so ask.
 
 ## Working rules
 
 1. Ask before making an architectural decision (state layout, plugin boundaries, save format, crate choice). Give a recommendation with a short trade-off.
-2. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate before roadmap item 3 is decided.
+2. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate before roadmap item 2 is decided.
 3. Bevy is pinned to 0.20.1 in the root `Cargo.toml`. Check every Bevy ecosystem crate for compatibility with that version before adding it.
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Bundles such as `SpriteBundle` are removed. Use required components.
 5. Bevy reference order: (a) `bevy-src/` (git-ignored shallow clone of tag `v0.20.1`; update it when the version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on dependency source; (c) docs.rs for the pinned version. Search for the exact API. Do not read whole files.

@@ -17,7 +17,7 @@ const KIND_NAMES: &[&str] = &["tree_big", "tree_dead"];
 /// Size of the map in cells. The map file lists objects only, so the size is set here.
 pub const MAP_CELLS: UVec2 = UVec2::new(80, 60);
 
-/// Placeholder ground colour, `#548058`, until tiled backgrounds exist (roadmap item 6).
+/// Placeholder ground colour, `#548058`, until tiled backgrounds exist (roadmap item 5).
 const GROUND_COLOR: Color = Color::srgb_u8(0x54, 0x80, 0x58);
 
 /// The map area in world units. Cell (0, 0) has its bottom left corner at the world origin.
