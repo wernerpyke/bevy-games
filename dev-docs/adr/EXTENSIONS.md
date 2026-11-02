@@ -87,3 +87,35 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
 
 **How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 5 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 4 covers a sturdier loader.
+
+## adr-x12. Shared code lives in one kit crate, `crates/game-kit` (2026-11-02)
+
+**Decision.** Code that more than one game uses moves into the library crate `crates/game-kit`. One crate, not several. Games depend on it through `[workspace.dependencies]`. The kit has no assets and no game values.
+
+**Rationale.** R-Town is the second game (adr-w6). One crate means one manifest and one import path. Splitting into small crates can happen later if compile times or dependencies demand it.
+
+**How to apply.** A game supplies its values through plugin fields and marker components, not generics or Cargo features (`dev-docs/extensions/plugin-configuration.md`). Ask before adding game specific code to the kit.
+
+## adr-x13. Map object kinds are strings in the kit (2026-11-02)
+
+**Decision.** The map parser returns each object's kind as the legend name (`String`). Each game converts names to its own enum.
+
+**Rationale.** The kit must not change when a game adds an object. A generic parser over the game's enum was rejected: it spreads generics through the parser and plugin for little gain. A shared enum was rejected: every new object in any game would edit the kit.
+
+**How to apply.** An unknown name is reported by the game's conversion with the map file line, as the parser reports it today.
+
+## adr-x14. Kit holds default layers, games override (2026-11-02)
+
+**Decision.** The kit has a `layers` module with the default z values. Plugins take the values from plugin fields that default to those constants. A game overrides a value or adds its own layers in its own module. This changes adr-x9, which said every z number is in one file per game.
+
+**Rationale.** Both games start with the same draw order without copying it. A game that needs another layer can add it.
+
+**How to apply.** Still never write a bare z number in game code: use a name from the kit or the game's layers module. Keep the compile-time ordering checks in the kit. A game that overrides a value must keep the checks true.
+
+## adr-x15. Scripted run tool is in the kit and extensible (2026-11-02)
+
+**Decision.** The kit owns the script parser and runner (teleport, hold, wait, screenshot, quit). The game marks its target entity with a `ScriptTarget` component and can register its own commands.
+
+**Rationale.** Both games get scripted runs and screenshots without copying (adr-x5). R-Town will need game commands such as attacks once combat exists.
+
+**How to apply.** Game commands are added through a registration API in the kit. Design that API with the first game command, not before.

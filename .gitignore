@@ -14,6 +14,10 @@ dist/
 # (see dev-docs/adr/ART.md adr-a1). Never edited by hand.
 games/*/assets/generated/
 
+# Raw third-party material dropped in by the developer (art packs, audio, references).
+# Never committed. Used assets are copied into games/<name>/assets/ on request.
+games/*/input/
+
 # IDE / Editor
 .vscode/
 .idea/
