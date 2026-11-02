@@ -15,11 +15,10 @@ Feet-point collision against merged outlines, with forgiving sliding. Top-down g
 | Part | Code today | Shared? |
 |---|---|---|
 | Outline: `build`, `Edge`, `Cluster` | `crates/game-kit/src/outline.rs` | Standalone, in the shared kit. |
-| `resolve`, `move_feet`, sliding | `games/long-way/src/collision.rs` | Needs an actor size parameter instead of `GUY_*` constants. |
-| `CollisionPlugin`, `CollisionWorld`, `SlideAssist` | `collision.rs` | Yes, after the split above. |
-| `Trunk`, rock blocked areas | `collision.rs`, `rocks.rs` | No. Game specific (see the Long Way collision doc). |
+| `resolve`, `move_feet`, sliding, `CollisionPlugin`, `CollisionWorld`, `SlideAssist`, `Blocker`, `SlideTuning` | `crates/game-kit/src/collision.rs` | Shared. The actor size is not in the code: the game grows each blocked area before it adds it. |
+| `Trunk`, rock blocked areas | `games/long-way/src/collision.rs`, `rocks.rs` | No. Game specific (see the Long Way collision doc). |
 
-Extraction into a shared crate is roadmap item 2 and needs the developer's approval first (`adr-w6`).
+The shared code is in the `game-kit` crate (adr-x12). A game adds `Blocker(Rect)` components or calls `CollisionWorld::add_blocked`.
 
 Decisions: `adr-x4`, `adr-x10`. Long Way rules: `adr-lw1`, `adr-lw13`. Background and alternatives: [collision-research.md](collision-research.md).
 
@@ -37,18 +36,19 @@ Decisions: `adr-x4`, `adr-x10`. Long Way rules: `adr-lw1`, `adr-lw13`. Backgroun
 
 | Parameter | Meaning | Long Way |
 |---|---|---|
-| Actor half width | Grows each blocked area sideways, so the body does not overlap it | 20 |
+| Actor half width | The game grows each blocked area sideways by this, so the body does not overlap it | 20 |
 | Actor height | Used by obstacle rules that overlap the body | 60 |
-| Obstacle rules | How a game object becomes a blocked area | Trunk and rock rules |
-| `SLIDE_DELAY` | Seconds of pushing before help starts | 0.2 |
-| `SLIDE_SPEED` | Slide speed in units per second | 120 |
-| `SLIDE_RANGE_FRACTION` | Share of the face length, from the nearer end, where help is given | 0.35 |
-| `SLIDE_RANGE_CAP` | Upper limit of that range in units | 64 |
-| `SLIDE_CLEARANCE` | Free distance beyond an end that lets the slide stop on the end | 192 |
-| `SLIDE_PAST_CORNER` | How far past an end a slide stops when the way on is blocked | 0.5 |
+| Obstacle rules | How a game object becomes a blocked area (`Blocker`) | Trunk and rock rules |
+| `cell_size` | `CollisionPlugin` field. The slide values below scale with it (`SlideTuning::for_cell_size`) | 64 |
+| `SlideTuning::delay` | Seconds of pushing before help starts | 0.2 |
+| `speed` | Slide speed in units per second | 120 |
+| `range_fraction` | Share of the face length, from the nearer end, where help is given | 0.35 |
+| `range_cap` | Upper limit of that range in units | 64 |
+| `clearance` | Free distance beyond an end that lets the slide stop on the end | 192 |
+| `past_corner` | How far past an end a slide stops when the way on is blocked | 0.5 |
 | `TOLERANCE` (in `outline.rs`) | Distance within which a position counts as being on an edge | 0.01 |
 
-`SLIDE_CLEARANCE` is written in units but assumes the game's cell size (Long Way: 64).
+Values are for a cell size of 64. `SlideTuning::for_cell_size` scales speed, range cap, clearance and past-corner with the game cell size (R-Town: 16).
 
 ## Specification
 
@@ -71,10 +71,10 @@ Decisions: `adr-x4`, `adr-x10`. Long Way rules: `adr-lw1`, `adr-lw13`. Backgroun
 ### C. Assisted sliding (`allow_sliding`)
 
 11. Help starts only when the input is straight along one axis. Pushing is tracked as the signs of the step, not as floats. The timer resets when the direction changes or when the character does not push.
-12. The character must push for `SLIDE_DELAY` before any help. The pause makes the collision visible first.
-13. The face is the edge that blocked the pushed axis. The range is the smaller of `SLIDE_RANGE_FRACTION` of the face and `SLIDE_RANGE_CAP`, measured from the nearer end. If the nearer end is outside the range there is no slide. The middle of a long face never slides.
+12. The character must push for `delay` before any help. The pause makes the collision visible first.
+13. The face is the edge that blocked the pushed axis. The range is the smaller of `range_fraction` of the face and `range_cap`, measured from the nearer end. If the nearer end is outside the range there is no slide. The middle of a long face never slides.
 14. A concave nearer end refuses the slide.
-15. At a convex end, the character slides along the face at `SLIDE_SPEED`. The target is the end itself if the way beyond is open for `SLIDE_CLEARANCE`. If the way is blocked, the target is `SLIDE_PAST_CORNER` beyond the end, so the character is off the face and walks on until the next face stops it.
+15. At a convex end, the character slides along the face at `speed`. The target is the end itself if the way beyond is open for `clearance`. If the way is blocked, the target is `past_corner` beyond the end, so the character is off the face and walks on until the next face stops it.
 16. The slide target goes through `resolve`, so a slide never ends inside another shape.
 17. After the slide, normal movement continues. The next stop may start a new slide.
 
@@ -106,4 +106,4 @@ app.add_plugins(CollisionPlugin { allow_sliding: true });
 
 ## Tests
 
-Inline in `collision.rs` and `outline.rs`. Collision: stops, crossing, slide range, pockets, notches, long faces, float noise. Outline: shapes, concave flags, interior (including a random brute force check).
+Inline in `game-kit` `collision.rs` and `outline.rs`. Long Way keeps the trunk rule tests in its own `collision.rs`. Collision: stops, crossing, slide range, pockets, notches, long faces, float noise. Outline: shapes, concave flags, interior (including a random brute force check).

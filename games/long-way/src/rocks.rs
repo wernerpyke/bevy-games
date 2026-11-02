@@ -6,9 +6,10 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
-use crate::collision::{CollisionWorld, GUY_HALF_WIDTH, register_trunks};
+use crate::collision::GUY_HALF_WIDTH;
 use crate::depth::DepthSort;
 use crate::map::{CurrentMap, Kind, Map, MapObject};
+use game_kit::collision::{CollisionWorld, register_blockers};
 
 /// Footprint of a rock in cells, in x and y.
 const FOOTPRINT_CELLS: f32 = 2.0;
@@ -30,7 +31,7 @@ pub struct RocksPlugin;
 impl Plugin for RocksPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_rocks)
-            .add_systems(PostStartup, mark_interior.after(register_trunks));
+            .add_systems(PostStartup, mark_interior.after(register_blockers));
     }
 }
 

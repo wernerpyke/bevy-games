@@ -16,7 +16,7 @@ games/long-way/
     ├── trees.rs        TreesPlugin: trees and their trunks from the map
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
     ├── map.rs          MapPlugin: parses the markdown map file
-    ├── collision.rs    CollisionPlugin: CollisionWorld, resolve, sliding, Trunk, Guy constants
+    ├── collision.rs    Trunk and Guy constants. The engine is `game_kit::collision`
     ├── collision_debug.rs  collision overlay
     ├── debug.rs        DebugPlugin: grid and info box
     ├── layers.rs       draw order layers

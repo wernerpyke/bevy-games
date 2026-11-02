@@ -65,7 +65,7 @@ fn spawn_tree(
 ) {
     let (centre, trunk) = placement(footprint_corner(object, map));
     commands.spawn((
-        trunk,
+        trunk.blocker(),
         DepthSort {
             feet_offset: TREE_SIZE / 2.0,
         },

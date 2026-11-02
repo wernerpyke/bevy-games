@@ -8,7 +8,7 @@ A plugin is a struct with public fields. Its `build` stores the settings as a re
 
 ## Status
 
-In use for `CollisionPlugin` in `games/long-way/src/collision.rs`. A pattern, not a module, so it needs no extraction.
+In use for `CollisionPlugin` in `crates/game-kit/src/collision.rs`. A pattern, not a module, so it needs no extraction.
 
 ## Specification
 
@@ -21,14 +21,14 @@ In use for `CollisionPlugin` in `games/long-way/src/collision.rs`. A pattern, no
 
 ```rust
 // main.rs
-app.add_plugins(CollisionPlugin { allow_sliding: true });
+app.add_plugins(CollisionPlugin { allow_sliding: true, cell_size: 64.0 });
 
-// collision.rs
-pub struct CollisionPlugin { pub allow_sliding: bool }
+// game-kit collision.rs
+pub struct CollisionPlugin { pub allow_sliding: bool, pub cell_size: f32 }
 
 impl Plugin for CollisionPlugin {
     fn build(&self, app: &mut App) {
-        app.insert_resource(CollisionSettings { allow_sliding: self.allow_sliding });
+        app.insert_resource(CollisionSettings { allow_sliding: self.allow_sliding, slide: SlideTuning::for_cell_size(self.cell_size) });
     }
 }
 ```

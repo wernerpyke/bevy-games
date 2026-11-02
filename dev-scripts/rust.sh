@@ -53,7 +53,7 @@ case "${1:-}" in
     # A 30 second limit stops a stuck game. Output is filtered to the lines that matter; set
     # LOG_FILTER to a different grep pattern to see more.
     env "$variable=$commands" CARGO_MANIFEST_DIR="$PWD/games/$game" \
-      RUST_LOG="${RUST_LOG:-info,$module=debug,wgpu=error,naga=warn}" \
+      RUST_LOG="${RUST_LOG:-info,$module=debug,game_kit=debug,wgpu=error,naga=warn}" \
       perl -e 'alarm 30; exec @ARGV' "./target/debug/$game" 2>&1 \
       | sed 's/\x1b\[[0-9;]*m//g' \
       | grep -E "${LOG_FILTER:-script:|collision:|WARN|ERROR|panicked}" || true

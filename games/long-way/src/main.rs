@@ -19,8 +19,9 @@ fn main() {
         .add_plugins(AsepriteUltraPlugin)
         .add_plugins((
             camera::CameraPlugin,
-            collision::CollisionPlugin {
+            game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
+                cell_size: camera::CELL_SIZE,
             },
             collision_debug::CollisionDebugPlugin,
             debug::DebugPlugin {

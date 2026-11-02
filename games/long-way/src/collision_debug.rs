@@ -6,10 +6,10 @@
 
 use bevy::prelude::*;
 
-use crate::collision::{CollisionWorld, register_trunks};
 use crate::debug::DebugSettings;
 use crate::depth::DepthSort;
 use crate::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
+use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::outline::{Edge, Orientation};
 
 const OUTLINE_COLOR: Color = Color::srgb(1.0, 0.8, 0.1);
@@ -26,7 +26,7 @@ pub struct CollisionDebugPlugin;
 
 impl Plugin for CollisionDebugPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(PostStartup, draw_outline.after(register_trunks))
+        app.add_systems(PostStartup, draw_outline.after(register_blockers))
             .add_systems(
                 Update,
                 (add_feet_markers, move_feet_markers, show_overlay).chain(),

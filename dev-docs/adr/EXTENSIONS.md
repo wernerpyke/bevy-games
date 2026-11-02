@@ -119,3 +119,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **Rationale.** Both games get scripted runs and screenshots without copying (adr-x5). R-Town will need game commands such as attacks once combat exists.
 
 **How to apply.** Game commands are added through a registration API in the kit. Design that API with the first game command, not before.
+
+## adr-x16. Collision blockers are a kit component, slide values scale with the cell size (2026-11-02)
+
+**Decision.** The kit has a `Blocker(Rect)` component. A game grows each blocked area by the actor's size and spawns it as a `Blocker`, or calls `CollisionWorld::add_blocked`. The slide values are `SlideTuning` fields, and `CollisionPlugin { allow_sliding, cell_size }` computes them with `SlideTuning::for_cell_size`, which scales speed, range cap, clearance and past-corner from the values tuned at a cell size of 64.
+
+**Rationale.** The kit does not need to know a game's obstacle types (Long Way `Trunk`, R-Town houses). The actor size is already applied when a game builds the area, so `resolve` and `move_feet` need no size parameter. Long Way at cell size 64 keeps its exact values. R-Town at 16 gets a quarter, so the slide feels the same relative to the art.
+
+**How to apply.** Keep game rules (which part of a tree blocks, actor size) in the game. Keep the kit free of game types.

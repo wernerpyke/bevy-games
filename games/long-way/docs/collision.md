@@ -42,16 +42,16 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 
 ## Slide values
 
-All in `collision.rs`.
+The values are `SlideTuning` fields in `crates/game-kit/src/collision.rs`. Long Way passes `cell_size` 64 to `CollisionPlugin`, which gives these values.
 
 | Constant | Value | Meaning |
 |---|---|---|
-| `SLIDE_DELAY` | 0.2 s | Push time before help (changed from 0.5 after play testing) |
-| `SLIDE_SPEED` | 120 units/s | Slide speed |
-| `SLIDE_RANGE_FRACTION` | 0.35 | Share of the face length, from the nearer end |
-| `SLIDE_RANGE_CAP` | 64 | Upper limit of that range |
-| `SLIDE_CLEARANCE` | 192 | Free distance beyond an end. Assumes a 64 px cell |
-| `SLIDE_PAST_CORNER` | 0.5 | Overshoot when the way on is blocked |
+| `delay` | 0.2 s | Push time before help (changed from 0.5 after play testing) |
+| `speed` | 120 units/s | Slide speed |
+| `range_fraction` | 0.35 | Share of the face length, from the nearer end |
+| `range_cap` | 64 | Upper limit of that range |
+| `clearance` | 192 | Free distance beyond an end. Assumes a 64 px cell |
+| `past_corner` | 0.5 | Overshoot when the way on is blocked |
 | `TOLERANCE` | 0.01 | In `outline.rs` (`game-kit`) |
 
 Accepted by the developer after play testing on 2026-11-02. Options not built: a 96 px cap, or the nearest outline corner with a cap.
@@ -66,4 +66,4 @@ Example: pushing up into the bottom face of the test cluster from world x 463, G
 
 ## Tests
 
-Collision tests are in `collision.rs`, outline tests in `outline.rs`, rock tests in `rocks.rs` (placement, blocked area, sort line). See [testing.md](testing.md).
+Trunk tests are in `collision.rs`. The engine tests (`collision.rs`, `outline.rs`) are in `crates/game-kit`. Rock tests are in rock tests in `rocks.rs` (placement, blocked area, sort line). See [testing.md](testing.md).

@@ -12,7 +12,8 @@ Game rules are plain functions with no running Bevy app (see `CLAUDE.md`, archit
 
 | File | What it tests |
 |---|---|
-| `src/collision.rs` | `resolve`, `move_feet`, sliding, the trunk and merged cluster cases, float noise at edges |
+| `src/collision.rs` | the trunk blocked area and its walk-behind rules |
+| `crates/game-kit/src/collision.rs` | `resolve`, `move_feet`, sliding, merged cluster cases, float noise at edges |
 | `crates/game-kit/src/outline.rs` | merging rectangles into clusters, outline edges, inward corners, `Edge::covers` |
 | `src/map.rs` | the markdown map parser, including every error message and the bundled map file |
 | `src/rocks.rs` | rock placement, blocked areas, jitter |
