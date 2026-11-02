@@ -101,7 +101,7 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
 - Run: `./dev-scripts/rust.sh run <game>`
-- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `games/long-way/src/script.rs` (adr-x5).
+- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)

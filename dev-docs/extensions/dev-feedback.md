@@ -15,7 +15,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 
 | Part | Code today | Shared? |
 |---|---|---|
-| Scripted input | `games/long-way/src/script.rs`, `dev-scripts/rust.sh` | Needs per-game keys, or a shared version |
+| Scripted input | `crates/game-kit/src/script.rs`, `dev-scripts/rust.sh` | Shared. Game specific commands are not supported yet (adr-x15) |
 | Logging | `collision.rs` and others | Pattern only |
 | Plain function tests | inline in each module | Pattern only |
 
@@ -36,15 +36,15 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 
 ### Scripted input
 
-8. An environment variable (`LONG_WAY_SCRIPT`) switches the plugin on. Without it the plugin does nothing.
+8. An environment variable (`<PREFIX>_SCRIPT`, for example `LONG_WAY_SCRIPT`, set by `ScriptPlugin { env_prefix }`) switches the plugin on. Without it the plugin does nothing.
 9. Commands are separated by `;`:
 
 | Command | Effect |
 |---|---|
-| `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Player` |
+| `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Controlled` (its feet come from its `DepthSort`) |
 | `hold:<keys>:<seconds>` | Holds keys, for example `hold:up+left:2` |
 | `wait:<seconds>` | Waits |
-| `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `LONG_WAY_SCREENSHOT_DIR`) |
+| `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `<PREFIX>_SCREENSHOT_DIR`) |
 | `quit` | Exits |
 
 10. The plugin logs the feet position every 0.25 seconds. It runs in `PreUpdate` after Bevy's input systems and writes keys with `press` and `release`.
@@ -67,6 +67,6 @@ The script run keeps log lines that match `script:|collision:|WARN|ERROR|panicke
 ## Limits
 
 - Arrow keys only.
-- It teleports the entity marked `Player`, so each game needs its own `script.rs` or a shared version.
+- It teleports the entity marked `Controlled`, which also needs a `DepthSort`. Moves use the arrow keys only. A game specific command needs a registration API in the kit (adr-x15).
 - Screenshots work on native builds only.
 - Unit tests do not cover frame timing, drawing or input.

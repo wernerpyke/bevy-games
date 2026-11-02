@@ -46,7 +46,7 @@ case "${1:-}" in
       exit 1
     fi
     game="$1"; commands="$2"
-    # The game reads <GAME>_SCRIPT, for example LONG_WAY_SCRIPT (see games/long-way/src/script.rs).
+    # The game reads <GAME>_SCRIPT, for example LONG_WAY_SCRIPT (see crates/game-kit/src/script.rs).
     variable="$(echo "$game" | tr 'a-z-' 'A-Z_')_SCRIPT"
     module="$(echo "$game" | tr '-' '_')"
     cargo build -p "$game" --quiet

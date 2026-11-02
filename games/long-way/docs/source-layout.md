@@ -17,7 +17,6 @@ games/long-way/
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
     ├── map.rs          MapPlugin, `Kind`: loads the map file and names its kinds. The parser is `game_kit::map`
     ├── collision.rs    Trunk and Guy constants. The engine is `game_kit::collision`
-    └── script.rs       scripted input and screenshots
 ```
 
 ## Which extension each file implements
@@ -28,7 +27,7 @@ games/long-way/
 | [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` in `crates/game-kit` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` (plus the parser in `crates/game-kit`) |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
-| [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` |
+| [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` in `crates/game-kit` |
 | [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` |
 

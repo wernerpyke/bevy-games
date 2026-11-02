@@ -1,17 +1,18 @@
-//! Debug tool: plays a scripted sequence of key presses into the running game and logs Guy's position,
-//! so behaviour can be checked without a person at the keyboard. Does nothing unless the
-//! `LONG_WAY_SCRIPT` environment variable is set.
+//! Debug tool: plays a scripted sequence of key presses into the running game and logs the position of the
+//! `Controlled` entity, so behaviour can be checked without a person at the keyboard. Does nothing unless the
+//! `<PREFIX>_SCRIPT` environment variable is set, for example `LONG_WAY_SCRIPT` (`ScriptPlugin::env_prefix`).
 //!
 //! Commands are separated by `;`:
-//! - `teleport:<feet_x>:<feet_y>`   put Guy's feet at a position
+//! - `teleport:<feet_x>:<feet_y>`   put the feet of the controlled entity at a position
 //! - `hold:<keys>:<seconds>`        hold arrow keys, for example `hold:up:3` or `hold:up+left:2`
 //! - `wait:<seconds>`
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
-//!   `LONG_WAY_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
+//!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
 //!   Add a `wait` before it after a `teleport`, so the frame shows the new position.
 //! - `quit`
 //!
-//! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`
+//! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`. Game specific commands
+//! are not supported yet (adr-x15): add the registration when a game needs its first one.
 
 use std::collections::VecDeque;
 
@@ -19,19 +20,23 @@ use bevy::input::InputSystems;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 
-use crate::collision::GUY_FEET_OFFSET;
-use crate::player::Player;
+use crate::Controlled;
+use crate::depth::DepthSort;
 
 /// Seconds to wait after start before the script runs, so the window and world are up.
 const START_DELAY: f32 = 1.0;
 /// Seconds between position log lines while a command runs.
 const LOG_INTERVAL: f32 = 0.25;
 
-pub struct ScriptPlugin;
+pub struct ScriptPlugin {
+    /// Prefix of the environment variables, in capitals with underscores, for example "LONG_WAY". `dev-scripts/rust.sh`
+    /// builds it from the game name.
+    pub env_prefix: &'static str,
+}
 
 impl Plugin for ScriptPlugin {
     fn build(&self, app: &mut App) {
-        let Ok(text) = std::env::var("LONG_WAY_SCRIPT") else {
+        let Ok(text) = std::env::var(format!("{}_SCRIPT", self.env_prefix)) else {
             return;
         };
         let commands = parse(&text);
@@ -42,6 +47,7 @@ impl Plugin for ScriptPlugin {
             since_log: 0.0,
             shot_requested: false,
             shot_saved: false,
+            screenshot_dir_variable: format!("{}_SCREENSHOT_DIR", self.env_prefix),
         })
         .add_systems(PreUpdate, run_script.after(InputSystems));
     }
@@ -65,6 +71,8 @@ struct Script {
     /// State of the current `screenshot` command.
     shot_requested: bool,
     shot_saved: bool,
+    /// Name of the environment variable that sets the screenshot folder.
+    screenshot_dir_variable: String,
 }
 
 fn parse(text: &str) -> VecDeque<Command> {
@@ -113,8 +121,11 @@ fn mark_saved(_: On<ScreenshotCaptured>, mut script: ResMut<Script>) {
     script.shot_saved = true;
 }
 
-fn feet_of(transform: &Transform) -> Vec2 {
-    transform.translation.truncate() - Vec2::new(0.0, GUY_FEET_OFFSET)
+fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
+    Vec2::new(
+        transform.translation.x,
+        sort.feet_y(transform.translation.y),
+    )
 }
 
 fn run_script(
@@ -122,14 +133,14 @@ fn run_script(
     mut script: ResMut<Script>,
     mut input: ResMut<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    mut player: Query<&mut Transform, With<Player>>,
+    mut target: Query<(&mut Transform, &DepthSort), With<Controlled>>,
     mut exit: MessageWriter<AppExit>,
 ) {
     script.elapsed += time.delta_secs();
     if script.elapsed < 0.0 {
         return;
     }
-    let Ok(mut transform) = player.single_mut() else {
+    let Ok((mut transform, sort)) = target.single_mut() else {
         return;
     };
 
@@ -141,7 +152,7 @@ fn run_script(
     let finished = match &command {
         Command::Teleport(position) => {
             transform.translation.x = position.x;
-            transform.translation.y = position.y + GUY_FEET_OFFSET;
+            transform.translation.y = position.y + sort.feet_offset;
             info!("script: teleport, feet now {:?}", position);
             true
         }
@@ -163,7 +174,7 @@ fn run_script(
         Command::Wait(seconds) => script.elapsed >= *seconds,
         Command::Screenshot(name) => {
             if !script.shot_requested {
-                let dir = std::env::var("LONG_WAY_SCREENSHOT_DIR")
+                let dir = std::env::var(&script.screenshot_dir_variable)
                     .unwrap_or_else(|_| "target/screenshots".to_string());
                 let path = std::path::Path::new(&dir).join(format!("{name}.png"));
                 if let Err(error) = std::fs::create_dir_all(&dir) {
@@ -197,13 +208,41 @@ fn run_script(
         info!(
             "script: t={:.2} feet {:?}",
             script.elapsed,
-            feet_of(&transform)
+            feet_of(&transform, sort)
         );
     }
     if finished {
-        info!("script: command done, feet {:?}", feet_of(&transform));
+        info!("script: command done, feet {:?}", feet_of(&transform, sort));
         script.commands.pop_front();
         script.elapsed = 0.0;
         script.shot_requested = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn commands_are_parsed_in_order() {
+        let commands = parse("teleport:225:-150; hold:up+left:2 ;wait:0.5;screenshot:a_1;quit");
+        assert_eq!(commands.len(), 5);
+        assert!(matches!(commands[0], Command::Teleport(p) if p == Vec2::new(225.0, -150.0)));
+        assert!(matches!(&commands[1], Command::Hold(keys, s) if keys.len() == 2 && *s == 2.0));
+        assert!(matches!(commands[2], Command::Wait(s) if s == 0.5));
+        assert!(matches!(&commands[3], Command::Screenshot(name) if name == "a_1"));
+        assert!(matches!(commands[4], Command::Quit));
+    }
+
+    #[test]
+    fn bad_commands_are_skipped() {
+        let commands = parse("teleport:1;hold:sideways:2;screenshot:bad/name;wait:x;quit");
+        assert_eq!(commands.len(), 1);
+        assert!(matches!(commands[0], Command::Quit));
+    }
+
+    #[test]
+    fn empty_parts_are_ignored() {
+        assert!(parse(";; ;").is_empty());
     }
 }

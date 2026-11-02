@@ -3,7 +3,6 @@ mod collision;
 mod map;
 mod player;
 mod rocks;
-mod script;
 mod trees;
 
 use bevy::prelude::*;
@@ -32,7 +31,9 @@ fn main() {
             map::MapPlugin,
             player::PlayerPlugin,
             rocks::RocksPlugin,
-            script::ScriptPlugin,
+            game_kit::script::ScriptPlugin {
+                env_prefix: "LONG_WAY",
+            },
             trees::TreesPlugin,
         ))
         .run();
