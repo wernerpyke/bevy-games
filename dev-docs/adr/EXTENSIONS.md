@@ -162,3 +162,11 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** The developer wanted reload first, then the info box, then the grid, in the order they use them while editing a map. A reload must redraw the overlay, or the yellow outline shows the old map.
 
 **How to apply.** A game that reloads a map despawns what the map spawned, replaces the resources, spawns again, then calls `clear` and `add_blocked` with the new blockers.
+
+## adr-x20. Neighbour groups in the kit (2026-11-03)
+
+**Decision.** `crates/game-kit/src/groups.rs` finds groups of touching items on a cell grid (`neighbour_groups`, `group_sizes`, 8 neighbours or 4). A game uses the group size to choose the blocked area of an item: a thin one when it stands alone, a full one in a group. The function was moved into the kit at once, although the rule "move code to the kit when two games use it" (`adr-x12`) was not met yet, because R-Town and Long Way adopted it together.
+
+**Rationale.** The grouping is a plain grid algorithm with no game types, so the kit can unit test it alone. Two games with the same logic would copy it. The game keeps the values: footprint sizes, bands and kinds.
+
+**How to apply.** See `dev-docs/extensions/groups.md`.

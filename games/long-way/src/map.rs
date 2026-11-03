@@ -1,7 +1,9 @@
 //! Long Way's map: loads the map file and names the object kinds. The parser is `game_kit::map`. See
 //! `games/long-way/docs/maps.md` for the kinds.
 
+use crate::rocks::FOOTPRINT_CELLS;
 use bevy::prelude::*;
+use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::map::{Map, MapObject, parse};
 
 /// The map file Long Way loads. Edit it and rebuild.
@@ -34,6 +36,52 @@ impl Plugin for MapPlugin {
 
 #[derive(Resource)]
 pub struct CurrentMap(pub Map);
+
+/// How a blocking object relates to its neighbours (`adr-lw14`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Group {
+    /// Number of blocking objects in its group. 1 is an object that stands alone.
+    pub size: usize,
+    /// Another object of the group has a footprint that overlaps or touches the top of this one. The blocked area
+    /// then reaches the top of the footprint, so the two shapes merge.
+    pub neighbour_above: bool,
+}
+
+impl Group {
+    #[cfg(test)]
+    pub const ALONE: Group = Group {
+        size: 1,
+        neighbour_above: false,
+    };
+
+    pub fn is_group(self) -> bool {
+        self.size > 1
+    }
+}
+
+/// The group of each object of the map, in the order of `map.objects`. Every kind of Long Way blocks, so every object
+/// counts. Footprints are 2x2 cells, so objects 2 cells apart touch and objects 3 cells apart do not. A new blocking
+/// kind must be counted here too.
+pub fn blocking_groups(map: &Map) -> Vec<Group> {
+    let anchors: Vec<IVec2> = map.objects.iter().map(|o| o.cell).collect();
+    let footprint = IVec2::splat(FOOTPRINT_CELLS as i32);
+    let sizes = group_sizes(&neighbour_groups(
+        &anchors,
+        footprint,
+        Adjacency::EdgesAndCorners,
+    ));
+    anchors
+        .iter()
+        .zip(sizes)
+        .map(|(cell, size)| Group {
+            size,
+            neighbour_above: anchors.iter().any(|other| {
+                let d = *other - *cell;
+                (1..=footprint.y).contains(&d.y) && d.x.abs() <= footprint.x
+            }),
+        })
+        .collect()
+}
 
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

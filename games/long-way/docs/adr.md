@@ -9,6 +9,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw8 | Maps are text grids, rocks come first |
 | adr-lw12 | Long Way draw order layers |
 | adr-lw13 | Rock blocked area and sort line |
+| adr-lw14 | A lone item blocks a band, a group blocks its footprint |
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
@@ -66,3 +67,14 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-x10`. With the footprint bottom as the sort line, Guy standing at the blocked bottom was drawn behind the rock and looked as if he had walked in (found by the developer, 2026-11-01).
 
 **How to apply.** The numbers are in `games/long-way/docs/collision.md`. Rock `draw` and `cell` sizes must agree, or the sprite and the blocked area drift apart.
+
+## adr-lw14. A lone item blocks a band, a group blocks its footprint (2026-11-03)
+
+**Decision.** This amends `adr-lw1` and `adr-lw13`. Footprints are 2x2 cells, so two objects touch when their anchor cells are at most 2 apart, also at a corner, and a rock and a tree can be in one group (`adr-x20`).
+- A tree that stands alone blocks its trunk band, as before.
+- A rock that stands alone blocks only the bottom 10% of its footprint height (`ALONE_BAND_FRACTION`), the same fraction a trunk uses. Guy walks behind the rest.
+- Every member of a group, tree or rock, blocks the rock footprint area of `adr-lw13`. A member with another member above it has no top inset, so the two shapes merge and no gap stays open.
+
+**Rationale.** The same rule as R-Town (`adr-rt9`): a lone item is passable from behind and a group is one solid shape. Trunks and rocks in one group get the same shape, so the outline has no step between them. With the 10% top inset, two rocks two cells apart in a column left a 12.8 px gap.
+
+**How to apply.** `blocking_groups` in `src/map.rs` finds the group of every object. A new blocking kind must go through it. The values are in `docs/collision.md`.

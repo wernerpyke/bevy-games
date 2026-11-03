@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{Blocker, CollisionWorld};
 use game_kit::debug::DebugSettings;
+use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, parse};
 
@@ -85,6 +86,17 @@ fn parse_map(name: &str, source: &str) -> Result<(Map, IVec2), String> {
 fn load_map() -> Result<(Map, IVec2), String> {
     let (name, source) = read_source()?;
     parse_map(&name, &source)
+}
+
+/// For each object of the map, the number of blocking objects in its group (`adr-rt9`). Every kind of R-Town blocks, so
+/// every object counts. A size of 1 is an object that stands alone. A new blocking kind must be counted here too.
+pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
+    let cells: Vec<IVec2> = map.objects.iter().map(|o| o.cell).collect();
+    group_sizes(&neighbour_groups(
+        &cells,
+        IVec2::ONE,
+        Adjacency::EdgesAndCorners,
+    ))
 }
 
 /// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The hero

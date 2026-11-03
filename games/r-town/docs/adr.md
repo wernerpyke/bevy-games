@@ -73,3 +73,11 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 **Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 3. The hero stays so the developer can check the same spot after an edit.
 
 **How to apply.** Everything a map spawns has the `MapEntity` component, so a reload removes it. A new map system must tag its entities with it and be run in `reload_map` (`src/map.rs`).
+
+## adr-rt9. A lone item blocks a band, a group blocks its cells (2026-11-03)
+
+**Decision.** This amends the base-only rule of `adr-rt5`. An item with no blocking neighbour in the 8 cells around it blocks only its base band, so the hero walks behind it. Items that touch, also at a corner and also of different kinds, form a group, and each member blocks its whole 16 px cell grown sideways by the feet half width. The members merge into one cluster with one outline (`adr-x10`). The rule applies to every blocking kind, and a new kind must be counted in `blocking_group_sizes` (`src/map.rs`). The kit finds the groups (`adr-x20`).
+
+**Rationale.** The developer wants a single tree to be passable from behind and a grove to be a solid wall with an outline, like the rock piles of Long Way. With a 4 px band the rows of a grove, 16 px apart, left 12 px gaps, so the group was one cluster per row.
+
+**How to apply.** Edit the map and press F1 to see the result. A reload recomputes the groups. The footprint rule is to be re-assessed after play testing (roadmap).

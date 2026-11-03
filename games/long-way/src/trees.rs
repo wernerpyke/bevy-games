@@ -5,8 +5,9 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
-use crate::map::{CurrentMap, Kind};
-use crate::rocks::{SORT_BIAS, footprint_corner};
+use crate::map::{CurrentMap, Group, Kind, blocking_groups};
+use crate::rocks::{SORT_BIAS, footprint_corner, group_area};
+use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
 
@@ -49,11 +50,21 @@ fn placement(corner: Vec2) -> (Vec2, Trunk) {
 
 fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
     let map = &map.0;
-    for object in &map.objects {
+    for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
         let Some(path) = art_path(Kind::of(object)) else {
             continue;
         };
-        spawn_tree(&mut commands, &server, path, object, map);
+        spawn_tree(&mut commands, &server, path, object, map, group);
+    }
+}
+
+/// A tree that stands alone blocks its trunk. A tree in a group blocks like a rock in a group, so trees and rocks
+/// that touch merge into one shape (`adr-lw14`).
+fn tree_blocker(trunk: &Trunk, object: &MapObject, map: &Map, group: Group) -> Blocker {
+    if group.is_group() {
+        Blocker(group_area(object, map, group.neighbour_above))
+    } else {
+        trunk.blocker()
     }
 }
 
@@ -63,10 +74,11 @@ fn spawn_tree(
     path: &'static str,
     object: &MapObject,
     map: &Map,
+    group: Group,
 ) {
     let (centre, trunk) = placement(footprint_corner(object, map));
     commands.spawn((
-        trunk.blocker(),
+        tree_blocker(&trunk, object, map, group),
         DepthSort {
             feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,
         },
@@ -82,6 +94,7 @@ fn spawn_tree(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game_kit::map::Map;
 
     #[test]
     fn only_tree_kinds_have_tree_art() {
@@ -97,6 +110,59 @@ mod tests {
         assert_eq!(centre, Vec2::new(164.0, 264.0));
         assert_eq!(trunk.base_y, 200.0);
         assert_eq!(trunk.height, 128.0);
+    }
+
+    fn object(kind: &str, x: i32, y: i32) -> MapObject {
+        MapObject {
+            kind: kind.to_string(),
+            cell: IVec2::new(x, y),
+        }
+    }
+
+    fn test_map(objects: Vec<MapObject>) -> Map {
+        Map {
+            name: "t".into(),
+            cell_size: 64.0,
+            origin: game_kit::map::Origin::BottomLeft,
+            size: IVec2::ZERO,
+            draw_size: Some(128.0),
+            jitter: 0.0,
+            objects,
+        }
+    }
+
+    #[test]
+    fn a_tree_alone_blocks_its_trunk_and_a_tree_in_a_group_blocks_like_a_rock() {
+        let m = test_map(vec![object("green_tree", 0, 0)]);
+        let (_, trunk) = placement(footprint_corner(&m.objects[0], &m));
+        let alone = tree_blocker(&trunk, &m.objects[0], &m, Group::ALONE);
+        assert_eq!(alone.0, trunk.blocker().0);
+        let group = Group {
+            size: 2,
+            neighbour_above: false,
+        };
+        let grouped = tree_blocker(&trunk, &m.objects[0], &m, group);
+        assert_eq!(grouped.0, group_area(&m.objects[0], &m, false));
+    }
+
+    #[test]
+    fn a_grove_of_trees_and_rocks_two_cells_apart_is_one_cluster() {
+        let m = test_map(vec![
+            object("green_tree", 12, 2),
+            object("red_tree", 14, 2),
+            object("rock_0", 12, 4),
+            object("green_tree", 14, 4),
+        ]);
+        let areas: Vec<Rect> = m
+            .objects
+            .iter()
+            .zip(blocking_groups(&m))
+            .map(|(o, g)| {
+                let (_, trunk) = placement(footprint_corner(o, &m));
+                tree_blocker(&trunk, o, &m, g).0
+            })
+            .collect();
+        assert_eq!(game_kit::outline::build(&areas).len(), 1);
     }
 
     #[test]

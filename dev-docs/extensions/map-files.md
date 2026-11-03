@@ -113,6 +113,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 ## Usage
 
 - Add a new object kind to the game's name list and `Kind` enum, to the module that spawns it, and to the legend.
+- Items that touch form a solid group in R-Town and Long Way, and an item that stands alone can be walked behind (`groups.md`).
 - Keep rows in a fixed-width font and turn off word wrap. Large maps have long rows.
 - Write blank cells as spaces inside the bars. The closing `|` keeps blanks at the end of a row safe from editors that remove trailing spaces.
 - Long Way reads the map with `include_str!`, so a change needs a rebuild. R-Town reads the file from disk and reloads it on F1 (`adr-rt8`).

@@ -40,6 +40,14 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 - At 128 px (4x) the rock is about 116 wide, so two neighbours at a pitch of 2 cells do not touch (12 px gap). At 160 px they overlap by about 17 px. At 192 px they overlap by about 46 px.
 - Long Way draws at 128 with no jitter (`adr-lw8`).
 
+## Groups (`adr-lw14`)
+
+Objects whose 2x2 footprints overlap or touch (anchors at most 2 cells apart, also at a corner) form a group, whatever the kinds.
+
+- A tree alone: the trunk band above. A rock alone: the bottom 10% of the footprint height (12.8 at a cell size of 64), with the rock sides (inset 10%, grown by 20).
+- In a group, a tree or rock blocks the rock footprint area above. A member with a member above it (`Group::neighbour_above`) has no top inset, so the shapes merge.
+- Footprints 3 cells apart do not touch, so they stay separate.
+
 ## Slide values
 
 The values are `SlideTuning` fields in `crates/game-kit/src/collision.rs`. Long Way passes `cell_size` 64 to `CollisionPlugin`, which gives these values.

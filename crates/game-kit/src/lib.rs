@@ -5,6 +5,7 @@ pub mod collision;
 pub mod collision_debug;
 pub mod debug;
 pub mod depth;
+pub mod groups;
 pub mod layers;
 pub mod map;
 pub mod outline;

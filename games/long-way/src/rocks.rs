@@ -7,13 +7,13 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::GUY_HALF_WIDTH;
-use crate::map::{CurrentMap, Kind};
+use crate::map::{CurrentMap, Group, Kind, blocking_groups};
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
 
 /// Footprint of a rock in cells, in x and y.
-const FOOTPRINT_CELLS: f32 = 2.0;
+pub const FOOTPRINT_CELLS: f32 = 2.0;
 /// Size of `Rocks.aseprite` in art pixels. Drawn size must be a whole multiple of this.
 const ART_PIXELS: f32 = 32.0;
 /// Empty rows at the bottom of the rock art, as a fraction of its height (4 of 32 art pixels). The rock is
@@ -23,6 +23,9 @@ const BOTTOM_MARGIN: f32 = 0.125;
 const INSET_FRACTION: f32 = 0.1;
 /// Part of the footprint inset at the bottom. 0 puts the bottom line on the lowest pixel of the art, not inside it.
 const BOTTOM_INSET_FRACTION: f32 = 0.0;
+/// Part of the footprint height a rock blocks when it stands alone: its bottom, as a trunk blocks the bottom 10% of a tree
+/// (`adr-lw14`). Guy walks behind the rest.
+const ALONE_BAND_FRACTION: f32 = 0.1;
 /// Drawn size of a rock in pixels when the map file has no `draw` key.
 const DEFAULT_DRAW_SIZE: f32 = 128.0;
 /// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
@@ -87,17 +90,35 @@ pub fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
     MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
 }
 
-/// The area Guy's feet may not enter: the footprint inset by `INSET_FRACTION` on the left, right and top and by
-/// `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by Guy's half width. There is no vertical margin.
-fn blocked_area(object: &MapObject, map: &Map) -> Rect {
+/// The area Guy's feet may not enter for an object in a group: the footprint inset by `INSET_FRACTION` on the left, right
+/// and top and by `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by Guy's half width. With `open_top` there
+/// is no inset at the top, so it merges with the object above (`Group::neighbour_above`). There is no vertical margin.
+pub fn group_area(object: &MapObject, map: &Map, open_top: bool) -> Rect {
     let corner = footprint_corner(object, map);
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let inset = INSET_FRACTION * footprint;
+    let top_inset = if open_top { 0.0 } else { inset };
     Rect::new(
         corner.x + inset - GUY_HALF_WIDTH,
         corner.y + BOTTOM_INSET_FRACTION * footprint,
         corner.x + footprint - inset + GUY_HALF_WIDTH,
-        corner.y + footprint - inset,
+        corner.y + footprint - top_inset,
+    )
+}
+
+/// The blocked area of a rock: the band at its bottom when it stands alone, the group area when it is in a group.
+fn blocked_area(object: &MapObject, map: &Map, group: Group) -> Rect {
+    let full = group_area(object, map, group.neighbour_above);
+    if group.is_group() {
+        return full;
+    }
+    let corner = footprint_corner(object, map);
+    let footprint = FOOTPRINT_CELLS * map.cell_size;
+    Rect::new(
+        full.min.x,
+        full.min.y,
+        full.max.x,
+        corner.y + ALONE_BAND_FRACTION * footprint,
     )
 }
 
@@ -136,15 +157,19 @@ fn spawn_rocks(
             (draw_size(map) / ART_PIXELS).round().max(1.0) * ART_PIXELS
         );
     }
-    let rocks: Vec<&MapObject> = map
+    let rocks: Vec<(&MapObject, Group)> = map
         .objects
         .iter()
-        .filter(|o| Kind::of(o).is_rock())
+        .zip(blocking_groups(map))
+        .filter(|(o, _)| Kind::of(o).is_rock())
         .collect();
-    let areas: Vec<Rect> = rocks.iter().map(|o| blocked_area(o, map)).collect();
+    let areas: Vec<Rect> = rocks
+        .iter()
+        .map(|(o, group)| blocked_area(o, map, *group))
+        .collect();
     let first_area = world.add_blocked(&areas);
 
-    for (index, object) in rocks.into_iter().enumerate() {
+    for (index, (object, _)) in rocks.into_iter().enumerate() {
         let tag = match Kind::of(object) {
             Kind::Rock0 => "rock_0",
             Kind::Rock1 => "rock_1",
@@ -233,7 +258,7 @@ mod tests {
             let o = rock(4, 2);
             let p = placement(&o, &m);
             let sort_y = p.centre.y - p.feet_offset;
-            let bottom = blocked_area(&o, &m).min.y;
+            let bottom = blocked_area(&o, &m, Group::ALONE).min.y;
             assert!(
                 (sort_y - (bottom + SORT_BIAS)).abs() < 0.001,
                 "draw {draw}: sort {sort_y}, blocked bottom {bottom}"
@@ -267,7 +292,7 @@ mod tests {
 
     #[test]
     fn the_blocked_area_is_the_inset_footprint_grown_sideways_by_guys_half_width() {
-        let a = blocked_area(&rock(0, 0), &map(128.0, 0.0));
+        let a = group_area(&rock(0, 0), &map(128.0, 0.0), false);
         // Footprint 128, inset 12.8 left, right and top, none at the bottom, then 20 wider on each side.
         assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - 20.0, 0.0));
         assert_eq!(a.max, MAP_ORIGIN + Vec2::new(115.2 + 20.0, 115.2));
@@ -275,12 +300,12 @@ mod tests {
 
     #[test]
     fn the_blocked_area_follows_the_cell_and_the_jitter() {
-        let plain = blocked_area(&rock(3, 2), &map(128.0, 0.0));
+        let plain = group_area(&rock(3, 2), &map(128.0, 0.0), false);
         assert_eq!(
             plain.min,
             MAP_ORIGIN + Vec2::new(192.0 + 12.8 - 20.0, 128.0)
         );
-        let jittered = blocked_area(&rock(3, 2), &map(128.0, 8.0));
+        let jittered = group_area(&rock(3, 2), &map(128.0, 8.0), false);
         assert_eq!(jittered.size(), plain.size());
         assert!((jittered.min - plain.min).abs().max_element() <= 8.0);
     }
@@ -291,7 +316,7 @@ mod tests {
         let rocks: Vec<MapObject> = (0..5)
             .flat_map(|y| (0..5).map(move |x| rock(x, y)))
             .collect();
-        let areas: Vec<Rect> = rocks.iter().map(|o| blocked_area(o, &m)).collect();
+        let areas: Vec<Rect> = rocks.iter().map(|o| group_area(o, &m, false)).collect();
         let clusters = outline::build(&areas);
         assert_eq!(clusters.len(), 1);
         let interior = &clusters[0].interior;
@@ -306,16 +331,60 @@ mod tests {
         let m = map(128.0, 0.0);
         let pile: Vec<Rect> = [rock(0, 0), rock(1, 0), rock(0, 1), rock(1, 1)]
             .iter()
-            .map(|o| blocked_area(o, &m))
+            .map(|o| group_area(o, &m, false))
             .collect();
         assert_eq!(outline::build(&pile).len(), 1);
         // Rocks 3 cells apart leave a gap Guy can walk through, 4 cells apart certainly.
         let apart: Vec<Rect> = [rock(0, 0), rock(3, 0)]
             .iter()
-            .map(|o| blocked_area(o, &m))
+            .map(|o| group_area(o, &m, false))
             .collect();
         assert_eq!(outline::build(&apart).len(), 2);
     }
+    #[test]
+    fn a_rock_alone_blocks_only_its_bottom_tenth() {
+        let m = map(128.0, 0.0);
+        let a = blocked_area(&rock(0, 0), &m, Group::ALONE);
+        let full = group_area(&rock(0, 0), &m, false);
+        assert_eq!((a.min, a.max.x), (full.min, full.max.x));
+        assert_eq!(a.max.y, MAP_ORIGIN.y + 12.8);
+    }
+
+    #[test]
+    fn a_rock_with_a_neighbour_above_reaches_the_top_of_its_footprint() {
+        let m = map(128.0, 0.0);
+        let closed = group_area(&rock(0, 0), &m, false);
+        let open = group_area(&rock(0, 0), &m, true);
+        assert_eq!(closed.max.y, MAP_ORIGIN.y + 115.2);
+        assert_eq!(open.max.y, MAP_ORIGIN.y + 128.0);
+    }
+
+    #[test]
+    fn rocks_two_cells_apart_form_one_cluster_in_every_direction_and_three_apart_do_not() {
+        let m = Map {
+            objects: vec![rock(0, 0), rock(2, 0), rock(0, 2), rock(2, 2)],
+            ..map(128.0, 0.0)
+        };
+        let areas: Vec<Rect> = m
+            .objects
+            .iter()
+            .zip(blocking_groups(&m))
+            .map(|(o, g)| blocked_area(o, &m, g))
+            .collect();
+        assert_eq!(outline::build(&areas).len(), 1);
+        let lone = Map {
+            objects: vec![rock(0, 0), rock(3, 0)],
+            ..map(128.0, 0.0)
+        };
+        let areas: Vec<Rect> = lone
+            .objects
+            .iter()
+            .zip(blocking_groups(&lone))
+            .map(|(o, g)| blocked_area(o, &lone, g))
+            .collect();
+        assert_eq!(outline::build(&areas).len(), 2);
+    }
+
     #[test]
     fn jitter_is_zero_when_off() {
         assert_eq!(jitter_offset(&rock(7, 3), 0.0), Vec2::ZERO);

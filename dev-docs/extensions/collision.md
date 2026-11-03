@@ -89,6 +89,10 @@ app.add_plugins(CollisionPlugin { allow_sliding: true });
 - Call `assist.reset()` on frames where the entity does not try to move.
 - Read the setting from `Res<CollisionSettings>`. See [plugin-configuration.md](plugin-configuration.md).
 
+## Groups
+
+A game may give an item a thin blocked area when it stands alone and a full footprint when it touches other items. The merge into one outline is the one described here. How groups are found is in `groups.md`.
+
 ## Pitfalls
 
 - Never compare normalised float vectors for equality between frames. `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction. Compare signs. Float comparison made the slide timer reset every few frames (`adr-x5`).

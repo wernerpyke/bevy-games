@@ -30,6 +30,10 @@ Considerations. The editor reads and writes the same files as the game, and a ro
 
 Known issues. The file has no footprint data, so the editor needs the sizes from the game (`Kind` and its art) to draw footprints. Layers and objects bigger than one cell were left out of the format on purpose, and an editor may bring them back (item 4). Seeded generated maps (item 4) would need a way to save a generated result and then edit it as a normal map.
 
+### 7. Re-assess the group footprint rule
+
+An item that stands alone blocks a thin band and a member of a group blocks its whole footprint (`adr-x20`, `adr-rt9`, `adr-lw14`). Check by playing whether this feels right and whether the area per member should change. Considerations: a thinner footprint for tall trees so the hero can walk closer behind a grove; a footprint per kind; corner contact linking items (8 neighbours) so that a single diagonal neighbour turns a passable tree into a solid one; a deliberate gap size; and the Long Way top inset that is dropped when a member sits above (`Group::neighbour_above`). Known issue: a lone rock in Long Way now has a 12.8 px band, which the developer has not yet tried in play.
+
 ### 99. Debug grid: overlapping corner labels (low priority, cosmetic)
 
 With the grid origin at the bottom left, the column "0" label (top edge) and the highest row label (left edge) overlap in the top left corner. Found in a screenshot on 2026-11-01. This is cosmetic and has low priority. Fix by moving the row labels, for example to the bottom of each cell, or by hiding the row label that sits on the top edge. The info box also covers the top left row labels, but F2 and F3 toggle each tool, so that needs no fix.

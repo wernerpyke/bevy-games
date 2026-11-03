@@ -32,6 +32,7 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 - The camera shows 240 art pixels of height (15 cells), so the view is 26.7 cells wide at 16:9 (adr-rt4).
 - Maps are text grid files from the shared kit (adr-x13, adr-x18). The test map is `assets/maps/test.txt`: 60x60 cells with `origin: top-left`. It starts blank, with the hero start marked `@` (`player_start`) at column 10 on row 2 (file numbers, counted from the top, same as the F3 grid), and is filled in by hand. The ground is a flat placeholder colour. The map size is the `size` key in the file (adr-rt7).
 - Blocking: water, houses, trees, walls, fences, wells, barrels, crates and chests all block the hero.
+- Groups (adr-rt9): items that touch, also at a corner, form a group. An item alone blocks the base band. A member of a group blocks its whole cell. See `dev-docs/extensions/groups.md`.
 - Footprints: houses and trees block at the base only. The hero walks behind the top and may overlap from below, as in Long Way (adr-lw1). Other objects use whole-tile footprints.
 - Scaling: fractional scale is allowed, as in Long Way (adr-rt4). On 1080p the scale is 4.5.
 - Structure beyond the town (connected screens, one large map, hub plus maps): not yet decided.
