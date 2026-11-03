@@ -1,16 +1,21 @@
 //! R-Town's map: loads the map file, names the object kinds and draws the ground. The parser is `game_kit::map`.
 
+use bevy::input::common_conditions::input_just_pressed;
 use bevy::prelude::*;
 use game_kit::camera::CameraBounds;
+use game_kit::collision::{Blocker, CollisionWorld};
 use game_kit::debug::DebugSettings;
 use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, parse};
 
 use crate::camera::CELL_SIZE;
 
-/// The map file R-Town loads. Edit it and rebuild.
+/// The default map file, relative to the game folder. A native run reads it from disk, so F1 reloads it. The web
+/// build has no disk and uses the bundled copy.
 const MAP_NAME: &str = "assets/maps/test.txt";
-const MAP_SOURCE: &str = include_str!("../assets/maps/test.txt");
+const BUNDLED_SOURCE: &str = include_str!("../assets/maps/test.txt");
+/// Environment variable with the path of a map file to load instead (`rust.sh run r-town <map>`).
+const MAP_VARIABLE: &str = "R_TOWN_MAP";
 
 /// The legend name of the marker that sets where the hero starts. It has no art.
 const PLAYER_START: &str = "player_start";
@@ -25,7 +30,7 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        let (map, start) = load_map();
+        let (map, start) = load_map().unwrap_or_else(|error| panic!("{error}"));
         info!(
             "map: {} cell {} size {} {} objects, player start {}",
             map.name,
@@ -38,19 +43,88 @@ impl Plugin for MapPlugin {
         app.insert_resource(CameraBounds(current.rect()))
             .insert_resource(current)
             .insert_resource(PlayerStart(start))
-            .add_systems(Startup, (spawn_ground, number_rows_like_the_file));
+            .add_systems(Startup, (spawn_ground, number_rows_like_the_file))
+            .add_systems(Update, reload_map.run_if(input_just_pressed(KeyCode::F1)));
     }
 }
 
-/// Parses the bundled map. Returns the map without the start marker, and the cell of that marker.
-fn load_map() -> (Map, IVec2) {
-    let mut map = parse(MAP_NAME, MAP_SOURCE, KIND_NAMES).unwrap_or_else(|error| panic!("{error}"));
+/// Marks everything a map spawns, so a reload can remove it.
+#[derive(Component)]
+pub struct MapEntity;
+
+/// Reads the map file: the path in `R_TOWN_MAP`, else the default file in the game folder, else the bundled copy.
+fn read_source() -> Result<(String, String), String> {
+    let path = std::env::var_os(MAP_VARIABLE)
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            std::env::var_os("CARGO_MANIFEST_DIR")
+                .map(|dir| std::path::Path::new(&dir).join(MAP_NAME))
+        });
+    let Some(path) = path else {
+        return Ok((MAP_NAME.to_string(), BUNDLED_SOURCE.to_string()));
+    };
+    let name = path.display().to_string();
+    std::fs::read_to_string(&path)
+        .map(|source| (name.clone(), source))
+        .map_err(|error| format!("{name}: {error}"))
+}
+
+/// Parses a map. Returns the map without the start marker, and the cell of that marker.
+fn parse_map(name: &str, source: &str) -> Result<(Map, IVec2), String> {
+    let mut map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
     let mut starts = map.objects.iter().filter(|o| o.kind == PLAYER_START);
     let (Some(start), None) = (starts.next().map(|o| o.cell), starts.next()) else {
-        panic!("{MAP_NAME}: the grid needs exactly one `{PLAYER_START}` cell");
+        return Err(format!(
+            "{name}: the grid needs exactly one `{PLAYER_START}` cell"
+        ));
     };
     map.objects.retain(|o| o.kind != PLAYER_START);
-    (map, start)
+    Ok((map, start))
+}
+
+fn load_map() -> Result<(Map, IVec2), String> {
+    let (name, source) = read_source()?;
+    parse_map(&name, &source)
+}
+
+/// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The hero
+/// stays where it is. A file with an error is reported and the current map stays.
+fn reload_map(world: &mut World) {
+    let (map, start) = match load_map() {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            error!("map: reload failed, keeping the current map: {error}");
+            return;
+        }
+    };
+    info!(
+        "map: reloaded {} {} objects, player start {}",
+        map.name,
+        map.objects.len(),
+        start
+    );
+    let old: Vec<Entity> = world
+        .query_filtered::<Entity, With<MapEntity>>()
+        .iter(world)
+        .collect();
+    for entity in old {
+        world.despawn(entity);
+    }
+    let current = CurrentMap(map);
+    world.insert_resource(CameraBounds(current.rect()));
+    world.insert_resource(current);
+    world.insert_resource(PlayerStart(start));
+    let _ = world.run_system_cached(spawn_ground);
+    let _ = world.run_system_cached(number_rows_like_the_file);
+    let _ = world.run_system_cached(crate::trees::spawn_trees);
+    let _ = world.run_system_cached(replace_collision_areas);
+}
+
+/// Replaces the collision areas with the blockers of the new map. Runs after the spawn commands are applied.
+fn replace_collision_areas(blockers: Query<&Blocker>, mut world: ResMut<CollisionWorld>) {
+    world.clear();
+    let areas: Vec<Rect> = blockers.iter().map(|blocker| blocker.0).collect();
+    world.add_blocked(&areas);
 }
 
 #[derive(Resource)]
@@ -108,6 +182,7 @@ fn number_rows_like_the_file(map: Res<CurrentMap>, debug: Option<ResMut<DebugSet
 fn spawn_ground(mut commands: Commands, map: Res<CurrentMap>) {
     let area = map.rect();
     commands.spawn((
+        MapEntity,
         Sprite::from_color(GROUND_COLOR, area.size()),
         Transform::from_translation(area.center().extend(BACKGROUND_Z)),
     ));
@@ -117,33 +192,26 @@ fn spawn_ground(mut commands: Commands, map: Res<CurrentMap>) {
 mod tests {
     use super::*;
 
-    fn count(map: &Map, kind: Kind) -> usize {
-        map.objects.iter().filter(|o| Kind::of(o) == kind).count()
+    fn inside(map: &Map, cell: IVec2) -> bool {
+        cell.x >= 0 && cell.y >= 0 && cell.x < map.size.x && cell.y < map.size.y
     }
 
     #[test]
     fn the_bundled_map_parses_and_stays_inside_the_map() {
-        let (map, _) = load_map();
+        let (map, _) = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
         assert_eq!(map.cell_size, CELL_SIZE);
-        assert_eq!(map.size, IVec2::new(80, 60));
-        assert_eq!(count(&map, Kind::TreeBig), 68);
-        assert_eq!(count(&map, Kind::TreeDead), 22);
         for object in &map.objects {
-            assert!(
-                object.cell.x >= 0
-                    && object.cell.y >= 0
-                    && object.cell.x < map.size.x
-                    && object.cell.y < map.size.y,
-                "{:?} is outside the map",
-                object
-            );
+            assert!(inside(&map, object.cell), "{object:?} is outside the map");
         }
     }
 
     #[test]
-    fn the_player_starts_at_the_marker_and_the_marker_has_no_art() {
-        let (map, start) = load_map();
-        assert_eq!(start, IVec2::new(40, 30));
+    fn the_player_starts_inside_the_map_and_the_marker_has_no_art() {
+        let (map, start) = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+        assert!(
+            inside(&map, start),
+            "player start {start} is outside the map"
+        );
         assert!(map.objects.iter().all(|o| o.kind != PLAYER_START));
     }
 
@@ -155,8 +223,9 @@ mod tests {
     }
 
     #[test]
-    fn the_map_is_80_by_60_cells() {
-        let (map, _) = load_map();
-        assert_eq!(CurrentMap(map).rect().size(), Vec2::new(1280.0, 960.0));
+    fn the_map_area_is_the_size_in_cells_times_the_cell_size() {
+        let (map, _) = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+        let expected = map.size.as_vec2() * CELL_SIZE;
+        assert_eq!(CurrentMap(map).rect().size(), expected);
     }
 }

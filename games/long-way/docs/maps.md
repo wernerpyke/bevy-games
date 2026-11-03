@@ -4,7 +4,7 @@ How to write a map file for Long Way. The file format itself is the [map files e
 
 - Files are in `games/long-way/assets/maps/`. The current example is `rocks-test.txt`, a 32 by 18 cell map.
 - The game loads one map. Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
-- The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F2 grid. Press F2 to show the grid with cell numbers.
+- The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F3 grid. Press F3 to show the grid with cell numbers.
 - Cell size is 64 pixels (`cell: 64`).
 - Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells (`adr-lw8`). A map of 32 by 18 cells fills that view.
 - Use a fixed-width font and turn off word wrap. Each cell takes two characters, so a row of 32 cells is 63 characters between the bars.
@@ -59,7 +59,7 @@ This places two rocks at (4,1) and (5,1), and two more at (9,1) and (10,1). Each
 
 ## Checking the result
 
-1. Run the game and press F2.
+1. Run the game and press F3.
 2. The red grid shows cell numbers. Check that each object is where you expect.
 3. Yellow lines show the edge that Guy collides with. Cyan lines show rocks in the middle of a cluster. Green squares show the feet of every object.
 4. For a picture without the window, run `./dev-scripts/rust.sh script long-way "wait:0.5;screenshot:map;quit"`. The picture is saved in `target/screenshots/map.png`.

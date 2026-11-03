@@ -19,7 +19,7 @@
 
 /// Ground and tiles. Sublayers go between this and `GRID_DEBUG_Z` when a background exists.
 pub const BACKGROUND_Z: f32 = -500.0;
-/// The F2 grid lines and their numbers.
+/// The F3 grid lines and their numbers.
 pub const GRID_DEBUG_Z: f32 = -200.0;
 /// The world layer spans z from `-WORLD_HALF_BAND` to `WORLD_HALF_BAND`. With `depth.rs` at 0.001 per unit of
 /// y, that holds feet from y -99000 to 99000 (checked in `depth.rs`).

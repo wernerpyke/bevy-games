@@ -23,7 +23,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw7. Long Way is a real-time top-down RPG (2026-11-01)
 
-**Decision.** Long Way is a real-time, top-down RPG. It is not turn-based and not locked to a grid. Movement, sliding and animation use frame time. The 64 pixel cell is a tool for placing things (the F2 grid and map files), not a movement rule.
+**Decision.** Long Way is a real-time, top-down RPG. It is not turn-based and not locked to a grid. Movement, sliding and animation use frame time. The 64 pixel cell is a tool for placing things (the F3 grid and map files), not a movement rule.
 
 **Rationale.** The developer chose this direction on 2026-11-01. It replaces the earlier workspace default of turn-based play for this game. Walking, collision and the slide delay were already real-time, so no existing code changes.
 
@@ -32,13 +32,13 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 ## adr-lw8. Maps are text grids, rocks come first (2026-11-01, format changed 2026-11-02)
 
 **Decision.**
-1. A human draws object layouts in one text file: front matter, then a grid with one character per 64 pixel cell. Long Way uses `origin: bottom-left`, so row labels match the F2 grid. The format is in `dev-docs/extensions/map-files.md` and `adr-x18`. It replaced the markdown format with `# Features` and `# Map` sections (`adr-x11`).
+1. A human draws object layouts in one text file: front matter, then a grid with one character per 64 pixel cell. Long Way uses `origin: bottom-left`, so row labels match the F3 grid. The format is in `dev-docs/extensions/map-files.md` and `adr-x18`. It replaced the markdown format with `# Features` and `# Map` sections (`adr-x11`).
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`). Trees followed the same day: `green_tree` and `red_tree` are map kinds, placed from the map file with the trunk collision rule of `adr-lw1`.
 3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
 5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `draw` and `jitter` stay as optional front matter keys (`pitch` went with the markdown format). Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
 6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 3.
-7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F2 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
+7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F3 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
 8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).
 
 **Rationale.** The developer wants simple, human editable map making in the first iteration, and wants to give Claude a layout in a form that is easy to write and review. Rocks are a simpler shape than trees (no walk-behind part), so they test merged collision first.
@@ -49,7 +49,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Decision.** Long Way uses six layers, from back to front, use the kit defaults in `crates/game-kit/src/layers.rs` (`adr-x9`, `adr-x14`).
 1. **Background** (sprite z `BACKGROUND_Z`)
-2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F2 grid
+2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F3 grid
 3. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`
 4. **Feature debug** (sprite z `FEATURE_DEBUG_Z`): the yellow rock outline and other debug drawings of features
 5. **HUD** (UI `GlobalZIndex` `HUD_Z_INDEX`): the info box and other readouts that are always on screen

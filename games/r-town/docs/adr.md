@@ -32,11 +32,11 @@
 
 **How to apply.** Replace the code animation with drawn frames later without changing the hero's size or collision. The camera view height must keep an integer scale at a 16 px cell (open question in `SPEC.md`).
 
-## adr-rt4. 240 px view height and an 80x60 town (2026-11-02)
+## adr-rt4. 240 px view height and a 60x60 town (2026-11-02, map size changed the same day)
 
-**Decision.** The camera shows 240 art pixels of height, which is 15 cells of 16 px. The first town map is 80x60 cells. Water blocks the hero.
+**Decision.** The camera shows 240 art pixels of height, which is 15 cells of 16 px. The first town map is 60x60 cells (it was 80x60 at first, and became a blank 60x60 map filled in by hand, `adr-rt7`). Water blocks the hero.
 
-**Rationale.** 240 is exactly 15 cells, so the view always holds whole cells vertically. It scales by a whole number on 720p (3x), 1440p (6x) and 2160p (9x). On 1080p the scale is 4.5, not a whole number. Fractional scale is accepted, as in Long Way, so the view stays exactly 15 cells tall without letterboxing. 80x60 cells is about three screens wide and four tall, enough to need a scrolling camera.
+**Rationale.** 240 is exactly 15 cells, so the view always holds whole cells vertically. It scales by a whole number on 720p (3x), 1440p (6x) and 2160p (9x). On 1080p the scale is 4.5, not a whole number. Fractional scale is accepted, as in Long Way, so the view stays exactly 15 cells tall without letterboxing. 60x60 cells is about two screens wide and four tall, enough to need a scrolling camera.
 
 Walk speed is 80 art pixels per second (5 cells per second). Houses and trees block the hero, as water does.
 
@@ -52,7 +52,7 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt6. Art file layout, tags and map conventions (2026-11-02)
 
-**Decision.** Pack PNGs are packed by `dev-scripts/aseprite/pack_pngs.lua` into `assets/art/characters/characters.aseprite` (tags `char_<n>`) and `assets/art/features/background-elements.aseprite` (tags `bg_<n>`). Files are named after the pack folder, not the category names in adr-rt1. Images sit at the bottom centre of a shared canvas. The catalogue of frames and tags is `games/r-town/docs/art-tags.md`, in `docs/` and not in `assets/`, so it is not shipped in a web build. A map object stands on its cell: the bottom centre of its art is the bottom centre of the cell. The hero entity is at the feet, with the sprite as a child. The test map has no size key: the size is `MAP_CELLS` in `src/map.rs` (80x60), and cell (0, 0) is at the world origin.
+**Decision.** Pack PNGs are packed by `dev-scripts/aseprite/pack_pngs.lua` into `assets/art/characters/characters.aseprite` (tags `char_<n>`) and `assets/art/features/background-elements.aseprite` (tags `bg_<n>`). Files are named after the pack folder, not the category names in adr-rt1. Images sit at the bottom centre of a shared canvas. The catalogue of frames and tags is `games/r-town/docs/art-tags.md`, in `docs/` and not in `assets/`, so it is not shipped in a web build. A map object stands on its cell: the bottom centre of its art is the bottom centre of the cell. The hero entity is at the feet, with the sprite as a child. The map size is the `size` key in the map file (`adr-rt7`), and cell (0, 0) is at the world origin.
 
 **Rationale.** A shared canvas with a common bottom line means one anchor rule for every sprite, and feet or tree bases never need per-sprite offsets. A child sprite lets the walking bob move the picture and not the collision feet. The tags are the contract with code, and a catalogue next to the ADRs keeps developer material out of shipped assets.
 
@@ -60,8 +60,16 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt7. R-Town map: top-left grid, size and hero start in the file (2026-11-02)
 
-**Decision.** `assets/maps/test.txt` uses `origin: top-left`, so row labels count down the page from 0, like rows of text. The file holds the map size (`size: 80x60`) and the hero start, a legend marker `"@": player_start`. The code has no `MAP_CELLS` constant, and the hero spawns at the marker cell. The F2 grid numbers rows from the top to match the file (`DebugSettings::rows_from_top`).
+**Decision.** `assets/maps/test.txt` uses `origin: top-left`, so row labels count down the page from 0, like rows of text. The file holds the map size (`size: 60x60`) and the hero start, a legend marker `"@": player_start` at file cell (10, 2). The code has no `MAP_CELLS` constant, and the hero spawns at the marker cell. The F3 grid numbers rows from the top to match the file (`DebugSettings::rows_from_top`).
 
 **Rationale.** The developer wanted to read the map like a page, with cell (0, 0) at the top left. The size and the start belong to the map, so they live in the file. The parser still returns cells numbered from the bottom left with y up, so collision, camera and spawn code did not change.
 
-**How to apply.** Read cell numbers from the file for editing, and from F2 for play. Both use the same numbers. A marker has no art and no `Kind`: `load_map` in `map.rs` removes it from the object list. The file needs exactly one `player_start`. The format is in `dev-docs/extensions/map-files.md` (`adr-x18`).
+**How to apply.** Read cell numbers from the file for editing, and from the F3 grid for play. Both use the same numbers. A marker has no art and no `Kind`: `load_map` in `map.rs` removes it from the object list. The file needs exactly one `player_start`. The format is in `dev-docs/extensions/map-files.md` (`adr-x18`).
+
+## adr-rt8. Map file is read from disk and reloads on F1 (2026-11-03)
+
+**Decision.** A native run reads the map file from disk, not from `include_str!`. `./dev-scripts/rust.sh run r-town [map]` takes a path or a name in `assets/maps/` and passes it in `R_TOWN_MAP`. With no argument the game reads `assets/maps/test.txt` through `CARGO_MANIFEST_DIR`. F1 reads the file again and rebuilds the ground, trees, collision, camera limits and grid row numbers. The hero stays where it is. A file with an error is logged and the current map stays. The web build and a binary with no environment use the bundled copy, so F1 has no new content there.
+
+**Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 3. The hero stays so the developer can check the same spot after an edit.
+
+**How to apply.** Everything a map spawns has the `MapEntity` component, so a reload removes it. A new map system must tag its entities with it and be run in `reload_map` (`src/map.rs`).

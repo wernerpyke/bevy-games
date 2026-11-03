@@ -12,7 +12,7 @@ Decisions about reusable code that Long Way implements first. They were `adr-lw2
 
 ## adr-x3. Collision debug overlay (2026-10-31, changed 2026-11-01)
 
-**Decision.** A debug overlay shows the collision. First version: F1, gizmos, red trunk boxes and green feet circles. Now (`collision_debug.rs`): it follows the F2 grid switch and is drawn as sprites on the feature debug layer (`adr-x9`). Yellow lines are every outline edge (with a tick on the blocked side), cyan boxes are interior rocks, green squares are the feet of every depth-sorted entity. The red trunk boxes are gone because the yellow outline already covers trunks. F1 does nothing now.
+**Decision.** A debug overlay shows the collision. First version: F1, gizmos, red trunk boxes and green feet circles. Now (`collision_debug.rs`): it follows the F3 grid switch and is drawn as sprites on the feature debug layer (`adr-x9`). Yellow lines are every outline edge (with a tick on the blocked side), cyan boxes are interior rocks, green squares are the feet of every depth-sorted entity. The red trunk boxes are gone because the yellow outline already covers trunks. F1 does nothing in the kit. R-Town uses F1 to reload its map (`adr-x19`).
 
 **Rationale.** Collision rules are hard to check by eye, and Claude cannot watch the window.
 
@@ -46,10 +46,10 @@ When false, any blocked move leaves Guy where he was. There is no sliding of any
 ## adr-x6. Reusable visual debug tools in `debug.rs` (2026-11-01)
 
 **Decision.** `crates/game-kit/src/debug.rs` (moved from Long Way on 2026-11-02, `adr-x12`) holds visual debug tools, one tool per system, added over time. `DebugPlugin { cell_size, grid_color }` is configured in `main.rs`. The first two tools:
-1. **Grid (F2).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below Guy and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
-2. **Info box (F3).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are Guy's feet x/y and grid cell (in grid coordinates, relative to the origin) and his raw world position.
+1. **Grid (F3).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below Guy and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
+2. **Info box (F2).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are Guy's feet x/y and grid cell (in grid coordinates, relative to the origin) and his raw world position.
 
-Both start visible. The collision overlay is in `collision_debug.rs` and follows F2 (`adr-x3`).
+Both start visible. The collision overlay is in `collision_debug.rs` and follows F3 (`adr-x3`).
 
 **Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. Guy's feet are shown, not the sprite centre, because collision uses the feet.
 
@@ -83,7 +83,7 @@ The blocked area and sort line of a rock are game rules, in `adr-lw13` (`games/l
 
 **Decision.** A map file is markdown with frontmatter and two sections the game reads (`dev-docs/extensions/map-files.md`):
 1. `# Features`: each `## Name` heading defines a feature with exactly one `cells` block. The bottom left character is the anchor.
-2. `# Map`: a bulleted list that places features, `- 'Name' at (x,y), (x,y) and (x,y)`. Positions are the anchor cell, in F2 grid numbers.
+2. `# Map`: a bulleted list that places features, `- 'Name' at (x,y), (x,y) and (x,y)`. Positions are the anchor cell, in F3 grid numbers.
 Everything else in the file is notes for people. Trees are map kinds (`green_tree`, `red_tree`) placed the same way as rocks. Every format error stops loading and names the file and line.
 
 **Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
@@ -148,9 +148,17 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 3. A character marks the anchor cell (bottom left) of an object. The footprint size belongs to the game. There are no layers, and one cell holds one object.
 4. `size: WxH` is in the file. `origin` is `bottom-left` or `top-left` and only sets how rows are labelled. `parse` always returns cells numbered from the bottom left, with y up.
 5. A legend entry may be a marker (R-Town `"@": player_start`). It is an ordinary object that the game reads and does not draw.
-6. The F2 grid can number rows from the top (`DebugSettings::rows_from_top`) so that it matches a `top-left` file.
+6. The F3 grid can number rows from the top (`DebugSettings::rows_from_top`) so that it matches a `top-left` file.
 7. Parsing stays a small hand parser in `game-kit` with no new dependency. Every error names the file and line.
 
 **Rationale.** The developer wanted to see a whole map in one file, edit it in a text editor, and not install an editor or tool. A drawn grid shows gaps and clusters at a glance. The markdown format split a map into features and a placement list, so no one place showed the map. Research found no standard text map format (`dev-docs/RESEARCH-map-layouts.md`), and editor formats (Tiled, LDtk, Ogmo) need their editors. A seeded generator can later return the same `Map` value as the parser, so the format does not block generated maps.
 
 **How to apply.** Add a new kind to the game's name list and `Kind` enum and to the legend. Use fixed-width font and turn off word wrap when editing wide maps. Layers, larger objects with own settings, chunk files and a visual editor are roadmap items. The visual editor must keep this format as the source of truth.
+
+## adr-x19. Debug keys F2 info, F3 grid, F1 map reload (2026-11-03)
+
+**Decision.** The kit debug keys are F2 for the info box and F3 for the grid and the collision overlay (they were the other way round). F1 is kept for the game: R-Town reloads its map on F1. The kit does not read F1. The collision overlay redraws when `CollisionWorld` changes, and `CollisionWorld::clear` lets a game replace its blocked areas. The script runner accepts `f1` to `f3` in `hold`, so a reload can be tested in a scripted run.
+
+**Rationale.** The developer wanted reload first, then the info box, then the grid, in the order they use them while editing a map. A reload must redraw the overlay, or the yellow outline shows the old map.
+
+**How to apply.** A game that reloads a map despawns what the map spawned, replaces the resources, spawns again, then calls `clear` and `add_blocked` with the new blockers.

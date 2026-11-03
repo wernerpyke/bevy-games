@@ -1,5 +1,5 @@
-//! Reusable visual debug tools. F2 toggles the grid, F3 toggles the info box.
-//! The collision overlay lives in `collision_debug.rs` and follows F2.
+//! Reusable visual debug tools. F2 toggles the info box, F3 toggles the grid.
+//! The collision overlay lives in `collision_debug.rs` and follows F3.
 //!
 //! The grid and the info box follow the camera (`Camera2d` with an orthographic projection), so they work for a fixed
 //! or a scrolling view. The info box reports on the entity with the `Controlled` component.
@@ -208,10 +208,10 @@ fn spawn_info_box(mut commands: Commands, settings: Res<DebugSettings>) {
 
 fn toggle_tools(input: Res<ButtonInput<KeyCode>>, mut settings: ResMut<DebugSettings>) {
     if input.just_pressed(KeyCode::F2) {
-        settings.show_grid = !settings.show_grid;
+        settings.show_info = !settings.show_info;
     }
     if input.just_pressed(KeyCode::F3) {
-        settings.show_info = !settings.show_info;
+        settings.show_grid = !settings.show_grid;
     }
 }
 

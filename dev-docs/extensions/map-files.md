@@ -84,7 +84,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 ### Grid rows
 
 6. The label is the row number, right-aligned and zero-based. The parser checks every label. The first row on the page is the top row. Which number it has depends on `origin`:
-   - `bottom-left`: the top row is `H-1` and the last row is 0, so labels count down the page. Labels match the F2 grid in a game that numbers cells from the bottom left.
+   - `bottom-left`: the top row is `H-1` and the last row is 0, so labels count down the page. Labels match the F3 grid in a game that numbers cells from the bottom left.
    - `top-left`: the top row is 0 and the last row is `H-1`, so labels count down the page from 0, like rows of text.
 
    `origin` only changes how a file is written. `parse` always returns cells numbered from the bottom left with y up (`MapObject.cell`), so a game does not change when a file changes its origin. `Map.origin` says which one the file used, for tools that label cells.
@@ -115,7 +115,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 - Add a new object kind to the game's name list and `Kind` enum, to the module that spawns it, and to the legend.
 - Keep rows in a fixed-width font and turn off word wrap. Large maps have long rows.
 - Write blank cells as spaces inside the bars. The closing `|` keeps blanks at the end of a row safe from editors that remove trailing spaces.
-- The map is read with `include_str!`, so a change needs a rebuild.
+- Long Way reads the map with `include_str!`, so a change needs a rebuild. R-Town reads the file from disk and reloads it on F1 (`adr-rt8`).
 
 ## Limits
 

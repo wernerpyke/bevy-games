@@ -28,9 +28,9 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 ## 5. World and maps
 
 - Grid cell is 16x16 art pixels (adr-rt3). The tileset is 320x192, so 20x12 tiles.
-- The first playable is one town map of 80x60 cells (1280x960 art pixels) that scrolls. The camera follows the hero and stops at the map edges.
+- The first playable is one town map of 60x60 cells (960x960 art pixels) that scrolls. The camera follows the hero and stops at the map edges.
 - The camera shows 240 art pixels of height (15 cells), so the view is 26.7 cells wide at 16:9 (adr-rt4).
-- Maps are text grid files from the shared kit (adr-x13, adr-x18). The test map is `assets/maps/test.txt`: 80x60 cells with `origin: top-left`, about 90 big and dead trees scattered over open ground, and the hero start marked `@` (`player_start`) at cell (40, 30), with the area around it kept free. The ground is a flat placeholder colour. The map size is the `size` key in the file (adr-rt7).
+- Maps are text grid files from the shared kit (adr-x13, adr-x18). The test map is `assets/maps/test.txt`: 60x60 cells with `origin: top-left`. It starts blank, with the hero start marked `@` (`player_start`) at column 10 on row 2 (file numbers, counted from the top, same as the F3 grid), and is filled in by hand. The ground is a flat placeholder colour. The map size is the `size` key in the file (adr-rt7).
 - Blocking: water, houses, trees, walls, fences, wells, barrels, crates and chests all block the hero.
 - Footprints: houses and trees block at the base only. The hero walks behind the top and may overlap from below, as in Long Way (adr-lw1). Other objects use whole-tile footprints.
 - Scaling: fractional scale is allowed, as in Long Way (adr-rt4). On 1080p the scale is 4.5.
@@ -79,7 +79,7 @@ Deferred. Pack has 6 music themes and 20+ effects.
 
 ## 12. Scope
 
-- First playable (built, 2026-11-02): walk around a test map of 80x60 cells, like the Long Way test map. Hero, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate `crates/game-kit` (adr-x12).
+- First playable (built, 2026-11-02): walk around a test map like the Long Way test map (first 80x60 cells with scattered trees, from 2026-11-02 a blank 60x60 map that is filled in by hand). Hero, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate `crates/game-kit` (adr-x12).
 - The real town layout is designed after the first playable.
 - Later: combat, interaction, progression, audio, UI.
 - Out of scope: public release.

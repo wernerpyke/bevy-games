@@ -70,6 +70,13 @@ pub struct CollisionWorld {
 }
 
 impl CollisionWorld {
+    /// Removes every blocked area, for a game that reloads its map. Add the new areas with `add_blocked`.
+    pub fn clear(&mut self) {
+        self.areas.clear();
+        self.clusters.clear();
+        self.edges.clear();
+    }
+
     /// Adds blocked areas and rebuilds every cluster and edge. Returns the number of the first added area, which
     /// is the number `is_interior` takes.
     pub fn add_blocked(&mut self, areas: &[Rect]) -> usize {

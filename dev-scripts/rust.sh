@@ -7,7 +7,7 @@
 # Usage:
 #   ./dev-scripts/rust.sh build [game]        # build one game, or all
 #   ./dev-scripts/rust.sh test [game]         # test one game, or all
-#   ./dev-scripts/rust.sh run <game>          # run a game, for example: run long-way
+#   ./dev-scripts/rust.sh run <game> [map-file]   # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map)
 #   ./dev-scripts/rust.sh lint                # cargo fmt --check + clippy -D warnings (all games)
 #   ./dev-scripts/rust.sh web [game]          # cargo check for wasm32-unknown-unknown
 #   ./dev-scripts/rust.sh script <game> "<commands>"
@@ -33,10 +33,22 @@ case "${1:-}" in
   run)
     shift
     if [ -z "${1:-}" ]; then
-      echo "✗ Usage: ./dev-scripts/rust.sh run <game>" >&2
+      echo "✗ Usage: ./dev-scripts/rust.sh run <game> [map-file] [cargo args]" >&2
       exit 1
     fi
     game="$1"; shift
+    # An optional map file: a path, or a name in games/<game>/assets/maps/. The game reads it from
+    # <GAME>_MAP (only R-Town does so far). F1 in the game reloads it.
+    if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then
+      map="$1"; shift
+      if [ ! -f "$map" ]; then map="games/$game/assets/maps/$map"; fi
+      if [ ! -f "$map" ]; then
+        echo "✗ Map file not found: $map" >&2
+        exit 1
+      fi
+      variable="$(echo "$game" | tr 'a-z-' 'A-Z_')_MAP"
+      export "$variable=$(cd "$(dirname "$map")" && pwd)/$(basename "$map")"
+    fi
     cargo run -p "$game" "$@"
     ;;
   script)

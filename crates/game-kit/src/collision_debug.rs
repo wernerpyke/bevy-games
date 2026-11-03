@@ -1,12 +1,12 @@
 //! The collision debug overlay, drawn as sprites on the feature debug layers (`layers.rs`), not as gizmos, which
-//! are always on top. It follows the F2 grid switch (`DebugSettings::show_grid`). It shows:
+//! are always on top. It follows the F3 grid switch (`DebugSettings::show_grid`). It shows:
 //! - yellow: every outline edge the actor collides with, with a tick on the blocked side
 //! - cyan: the blocked area of every interior rock, which has no outline edge of its own
 //! - green: the feet of every depth-sorted entity
 
 use bevy::prelude::*;
 
-use crate::collision::{CollisionWorld, register_blockers};
+use crate::collision::CollisionWorld;
 use crate::debug::DebugSettings;
 use crate::depth::DepthSort;
 use crate::layers::{FEATURE_DEBUG_FEET_Z, FEATURE_DEBUG_INTERIOR_Z, FEATURE_DEBUG_Z};
@@ -57,10 +57,16 @@ impl Plugin for CollisionDebugPlugin {
             interior_z: self.interior_z,
             feet_z: self.feet_z,
         })
-        .add_systems(PostStartup, draw_outline.after(register_blockers))
+        .add_systems(Startup, spawn_overlay_root)
         .add_systems(
             Update,
-            (add_feet_markers, move_feet_markers, show_overlay).chain(),
+            (
+                draw_outline.run_if(resource_changed::<CollisionWorld>),
+                add_feet_markers,
+                move_feet_markers,
+                show_overlay,
+            )
+                .chain(),
         );
     }
 }
@@ -69,13 +75,24 @@ impl Plugin for CollisionDebugPlugin {
 #[derive(Component)]
 struct OverlayRoot;
 
+/// An outline or interior line. They are replaced when the collision world changes.
+#[derive(Component)]
+struct OutlineSprite;
+
 /// A green square that follows the feet of `0`.
 #[derive(Component)]
 struct FeetMarker(Entity);
 
-/// Runs after every blocked area is registered, so the outline includes trunks and rocks.
+fn spawn_overlay_root(mut commands: Commands) {
+    commands.spawn((OverlayRoot, Transform::default(), Visibility::default()));
+}
+
+/// Draws the outline of the collision world. Runs when it changes: after the blocked areas are registered at
+/// startup, and after a map reload.
 fn draw_outline(
     mut commands: Commands,
+    old: Query<Entity, With<OutlineSprite>>,
+    root: Single<Entity, With<OverlayRoot>>,
     world: Res<CollisionWorld>,
     layers: Res<OverlayLayers>,
     settings: Res<DebugSettings>,
@@ -95,20 +112,27 @@ fn draw_outline(
             cluster.edges.len()
         );
     }
-    commands
-        .spawn((OverlayRoot, Transform::default(), Visibility::default()))
-        .with_children(|parent| {
-            for edge in clusters.iter().flat_map(|c| &c.edges) {
-                for (centre, size) in edge_boxes(edge, scale) {
-                    parent.spawn(line(OUTLINE_COLOR, layers.outline_z, centre, size));
-                }
+    for entity in &old {
+        commands.entity(entity).despawn();
+    }
+    commands.entity(*root).with_children(|parent| {
+        for edge in clusters.iter().flat_map(|c| &c.edges) {
+            for (centre, size) in edge_boxes(edge, scale) {
+                parent.spawn((
+                    OutlineSprite,
+                    line(OUTLINE_COLOR, layers.outline_z, centre, size),
+                ));
             }
-            for area in world.interior_areas() {
-                for (centre, size) in rect_boxes(area, scale) {
-                    parent.spawn(line(INTERIOR_COLOR, layers.interior_z, centre, size));
-                }
+        }
+        for area in world.interior_areas() {
+            for (centre, size) in rect_boxes(area, scale) {
+                parent.spawn((
+                    OutlineSprite,
+                    line(INTERIOR_COLOR, layers.interior_z, centre, size),
+                ));
             }
-        });
+        }
+    });
 }
 
 fn line(color: Color, z: f32, centre: Vec2, size: Vec2) -> (Sprite, Transform) {
