@@ -8,7 +8,7 @@ use game_kit::depth::DepthSort;
 use game_kit::map::MapObject;
 
 use crate::camera::CELL_SIZE;
-use crate::collision::{BASE_BAND, FEET_HALF_WIDTH};
+use crate::collision::{BASE_BAND, FEET_HALF_WIDTH, cell_area};
 use crate::map::{CurrentMap, Kind, MapEntity, blocking_group_sizes};
 
 /// Both art files are packed with the same canvas: 30 wide and 39 high, each tree at the bottom centre
@@ -33,10 +33,10 @@ struct TreeArt {
     base: (f32, f32),
 }
 
-fn art(kind: Kind) -> TreeArt {
-    match kind {
-        // `bg_18`: the base of the big tree is columns 6 to 22 of 30.
-        Kind::TreeBig => TreeArt {
+fn art(kind: Kind) -> Option<TreeArt> {
+    Some(match kind {
+        // `bg_18`: the base of the giant tree is columns 6 to 22 of 30.
+        Kind::TreeGiant => TreeArt {
             tag: "bg_18",
             base: (-9.0, 8.0),
         },
@@ -45,7 +45,18 @@ fn art(kind: Kind) -> TreeArt {
             tag: "bg_19",
             base: (-4.0, 3.0),
         },
-    }
+        // `bg_6`: the base of the green tree is columns 2 to 11 of 14.
+        Kind::TreeGreen => TreeArt {
+            tag: "bg_6",
+            base: (-5.0, 5.0),
+        },
+        // `bg_20`: the base of the dark tree is columns 3 to 10 of 14.
+        Kind::TreeDark => TreeArt {
+            tag: "bg_20",
+            base: (-4.0, 4.0),
+        },
+        Kind::Water(_) => return None,
+    })
 }
 
 /// The world position of the bottom centre of the cell an object stands on.
@@ -64,22 +75,10 @@ fn blocked_area(base: Vec2, edges: (f32, f32)) -> Rect {
     )
 }
 
-/// The area the hero's feet may not enter for a tree in a group: its whole cell grown sideways by the feet half
-/// width, so the group is one solid shape (`adr-rt9`).
-fn group_area(cell: IVec2) -> Rect {
-    let corner = cell.as_vec2() * CELL_SIZE;
-    Rect::new(
-        corner.x - FEET_HALF_WIDTH,
-        corner.y,
-        corner.x + CELL_SIZE + FEET_HALF_WIDTH,
-        corner.y + CELL_SIZE,
-    )
-}
-
 /// The blocked area of an object: the base band when it stands alone, the whole cell when it is in a group.
 fn area_of(object: &MapObject, art: &TreeArt, group_size: usize) -> Rect {
     if group_size > 1 {
-        group_area(object.cell)
+        cell_area(object.cell)
     } else {
         blocked_area(base_of(object), art.base)
     }
@@ -88,7 +87,9 @@ fn area_of(object: &MapObject, art: &TreeArt, group_size: usize) -> Rect {
 pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
     let sizes = blocking_group_sizes(&map.0);
     for (object, group_size) in map.0.objects.iter().zip(sizes) {
-        let art = art(Kind::of(object));
+        let Some(art) = art(Kind::of(object)) else {
+            continue;
+        };
         let base = base_of(object);
         commands
             .spawn((
@@ -134,20 +135,20 @@ mod tests {
         let areas: Vec<Rect> = objects
             .iter()
             .zip(sizes)
-            .map(|(o, size)| area_of(o, &art(Kind::of(o)), size))
+            .map(|(o, size)| area_of(o, &art(Kind::of(o)).unwrap(), size))
             .collect();
         game_kit::outline::build(&areas).len()
     }
 
     #[test]
     fn a_tree_alone_blocks_its_base_band_and_a_grouped_tree_its_cell() {
-        let alone = tree("tree_big", 2, 3);
+        let alone = tree("tree_giant", 2, 3);
         assert_eq!(
-            area_of(&alone, &art(Kind::TreeBig), 1),
+            area_of(&alone, &art(Kind::TreeGiant).unwrap(), 1),
             Rect::new(26.0, 48.0, 53.0, 52.0)
         );
         assert_eq!(
-            area_of(&alone, &art(Kind::TreeBig), 2),
+            area_of(&alone, &art(Kind::TreeGiant).unwrap(), 2),
             Rect::new(27.0, 48.0, 53.0, 64.0)
         );
     }
@@ -156,7 +157,7 @@ mod tests {
     fn a_solid_group_is_one_cluster_and_lone_trees_stay_apart() {
         let group: Vec<MapObject> = [(10, 1), (11, 1), (12, 1), (12, 2), (13, 3), (14, 4)]
             .iter()
-            .map(|&(x, y)| tree("tree_big", x, y))
+            .map(|&(x, y)| tree("tree_giant", x, y))
             .collect();
         assert_eq!(clusters(&group), 1);
         let lone = [tree("tree_dead", 21, 1), tree("tree_dead", 24, 4)];
@@ -166,13 +167,13 @@ mod tests {
     #[test]
     fn a_mixture_with_notches_is_one_cluster_through_a_corner() {
         let mixed = [
-            tree("tree_big", 33, 1),
-            tree("tree_big", 34, 1),
-            tree("tree_big", 35, 1),
+            tree("tree_giant", 33, 1),
+            tree("tree_giant", 34, 1),
+            tree("tree_giant", 35, 1),
             tree("tree_dead", 34, 2),
-            tree("tree_big", 33, 3),
+            tree("tree_giant", 33, 3),
             tree("tree_dead", 35, 3),
-            tree("tree_big", 36, 3),
+            tree("tree_giant", 36, 3),
         ];
         assert_eq!(clusters(&mixed), 1);
     }
@@ -180,7 +181,7 @@ mod tests {
     #[test]
     fn a_tree_stands_on_the_bottom_centre_of_its_cell() {
         let object = MapObject {
-            kind: "tree_big".to_string(),
+            kind: "tree_giant".to_string(),
             cell: IVec2::new(2, 3),
         };
         assert_eq!(base_of(&object), Vec2::new(40.0, 48.0));

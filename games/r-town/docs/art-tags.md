@@ -62,13 +62,46 @@ Canvas 30x39, 21 frames, prefix `bg_`. Source: `medieval-fantasy-1/background-el
 
 The descriptions come from looking at a scaled contact sheet. Check a sprite on screen before relying on its description.
 
+## `features/water.aseprite`
+
+Canvas 16x16, 9 frames, prefix `water_`. One pond of 3x3 tiles cut from `0-tileset.png` at x=256, y=0 (the outer ring is the edge, the middle is open water). The legend keys follow the number pad: the top row is `7 8 9`, the middle row `4 5 6` and the bottom row `1 2 3`. A bigger pond repeats the edge and centre tiles.
+
+| Tag | Key | Tile in the pond |
+|---|---|---|
+| `water_nw` | `7` | top left corner |
+| `water_n` | `8` | top edge |
+| `water_ne` | `9` | top right corner |
+| `water_w` | `4` | left edge |
+| `water_c` | `5` | open water |
+| `water_e` | `6` | right edge |
+| `water_sw` | `1` | bottom left corner |
+| `water_s` | `2` | bottom edge |
+| `water_se` | `3` | bottom right corner |
+
+To rebuild (the tiles go to the gitignored `input/` folder first):
+
+```
+aseprite -b --script-param src=games/r-town/input/medieval-fantasy-1/background-elements/0-tileset.png \
+  --script-param x=256 --script-param y=0 --script-param tile=16 --script-param cols=3 --script-param rows=3 \
+  --script-param names=nw,n,ne,w,c,e,sw,s,se --script-param outdir=games/r-town/input/medieval-fantasy-1/background-elements/water \
+  --script dev-scripts/aseprite/cut_tiles.lua
+
+aseprite -b --script-param out=games/r-town/assets/art/features/water.aseprite --script-param prefix=water_ \
+  --script-param files=<water/nw.png,water/n.png,...,water/se.png in that order> --script dev-scripts/aseprite/pack_pngs.lua
+```
+
 ## Map kinds
 
 Kinds are the names a map legend uses (`assets/maps/test.txt`). Each is defined in code (`src/map.rs`, `src/trees.rs`). A tree stands on its cell: the bottom centre of the art is the bottom centre of the cell.
 
 | Kind | Tag | Blocking base (pixels from the tree centre) | Source of the numbers |
 |---|---|---|---|
-| `tree_big` | `bg_18` | -9 to 8 (columns 6 to 22 of 30) | bottom rows of `18.png` |
-| `tree_dead` | `bg_19` | -4 to 3 (trunk columns 3 to 9 of 14) | bottom rows of `19.png` |
+| `tree_giant` (`G`) | `bg_18` | -9 to 8 (columns 6 to 22 of 30) | bottom rows of `18.png` |
+| `tree_dead` (`d`) | `bg_19` | -4 to 3 (trunk columns 3 to 9 of 14) | bottom rows of `19.png` |
+| `tree_green` (`g`) | `bg_6` | -5 to 5 (columns 2 to 11 of 14) | bottom row of `6.png` |
+| `tree_dark` (`t`) | `bg_20` | -4 to 4 (columns 3 to 10 of 14) | bottom row of `20.png` |
+| `water_nw` to `water_se` (`7 8 9 4 5 6 1 2 3`) | `water_<part>` | the whole cell | see the water section |
+
+Water fills its cell and always blocks the whole cell grown sideways by 5. It does not count as a neighbour in the tree groups (`adr-rt9`, `adr-rt10`).
 
 The blocked area is the base grown sideways by 5 (the hero's feet half width) and 4 deep (`adr-rt5`, `adr-rt6`). Above it the hero walks behind the tree.

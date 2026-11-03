@@ -10,6 +10,7 @@ use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, parse};
 
 use crate::camera::CELL_SIZE;
+use crate::water::Part;
 
 /// The default map file, relative to the game folder. A native run reads it from disk, so F1 reloads it. The web
 /// build has no disk and uses the bundled copy.
@@ -22,7 +23,22 @@ const MAP_VARIABLE: &str = "R_TOWN_MAP";
 const PLAYER_START: &str = "player_start";
 
 /// The legend names the parser accepts.
-const KIND_NAMES: &[&str] = &[PLAYER_START, "tree_big", "tree_dead"];
+const KIND_NAMES: &[&str] = &[
+    PLAYER_START,
+    "tree_giant",
+    "tree_dead",
+    "tree_green",
+    "tree_dark",
+    "water_nw",
+    "water_n",
+    "water_ne",
+    "water_w",
+    "water_c",
+    "water_e",
+    "water_sw",
+    "water_s",
+    "water_se",
+];
 
 /// Placeholder ground colour, `#548058`, until tiled backgrounds exist (roadmap item 5).
 const GROUND_COLOR: Color = Color::srgb_u8(0x54, 0x80, 0x58);
@@ -88,15 +104,31 @@ fn load_map() -> Result<(Map, IVec2), String> {
     parse_map(&name, &source)
 }
 
-/// For each object of the map, the number of blocking objects in its group (`adr-rt9`). Every kind of R-Town blocks, so
-/// every object counts. A size of 1 is an object that stands alone. A new blocking kind must be counted here too.
+/// For each object of the map, the number of trees in its group (`adr-rt9`). A size of 1 is a tree that stands alone.
+/// Water is not counted and gets 1: it always blocks its whole cell. A new kind with tall art must be counted here.
 pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
-    let cells: Vec<IVec2> = map.objects.iter().map(|o| o.cell).collect();
-    group_sizes(&neighbour_groups(
+    let cells: Vec<IVec2> = map
+        .objects
+        .iter()
+        .filter(|o| Kind::of(o).is_tree())
+        .map(|o| o.cell)
+        .collect();
+    let mut tree_sizes = group_sizes(&neighbour_groups(
         &cells,
         IVec2::ONE,
         Adjacency::EdgesAndCorners,
     ))
+    .into_iter();
+    map.objects
+        .iter()
+        .map(|o| {
+            if Kind::of(o).is_tree() {
+                tree_sizes.next().unwrap_or(1)
+            } else {
+                1
+            }
+        })
+        .collect()
 }
 
 /// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The hero
@@ -129,6 +161,7 @@ fn reload_map(world: &mut World) {
     let _ = world.run_system_cached(spawn_ground);
     let _ = world.run_system_cached(number_rows_like_the_file);
     let _ = world.run_system_cached(crate::trees::spawn_trees);
+    let _ = world.run_system_cached(crate::water::spawn_water);
     let _ = world.run_system_cached(replace_collision_areas);
 }
 
@@ -161,17 +194,30 @@ pub struct PlayerStart(pub IVec2);
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {
-    TreeBig,
+    TreeGiant,
     TreeDead,
+    TreeGreen,
+    TreeDark,
+    Water(Part),
 }
 
 impl Kind {
     fn from_name(name: &str) -> Option<Kind> {
         match name {
-            "tree_big" => Some(Kind::TreeBig),
+            "tree_giant" => Some(Kind::TreeGiant),
             "tree_dead" => Some(Kind::TreeDead),
-            _ => None,
+            "tree_green" => Some(Kind::TreeGreen),
+            "tree_dark" => Some(Kind::TreeDark),
+            _ => Part::ALL
+                .iter()
+                .find(|part| part.name() == name)
+                .map(|&part| Kind::Water(part)),
         }
+    }
+
+    /// Trees have tall art, so the hero walks behind a lone one. Water fills its cell.
+    pub fn is_tree(self) -> bool {
+        !matches!(self, Kind::Water(_))
     }
 
     /// The kind of a parsed object. The parser only accepts the names in `KIND_NAMES` and `load_map` removes the

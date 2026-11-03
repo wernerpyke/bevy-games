@@ -3,6 +3,7 @@ mod collision;
 mod hero;
 mod map;
 mod trees;
+mod water;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -36,6 +37,7 @@ fn main() {
             },
             map::MapPlugin,
             trees::TreesPlugin,
+            water::WaterPlugin,
             hero::HeroPlugin,
         ))
         .run();
