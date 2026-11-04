@@ -80,7 +80,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 3. A legend character is one character, in quotes. `.` always means empty and is written `".": empty`. The keys `.`, `|` and a space are reserved and cannot name an object kind.
 4. The game defines the set of kinds. It passes the names it knows to `parse`, which reports any other name with its line. Objects carry the name as a `String`, and the game converts it to its own enum (adr-x13).
 5. A legend entry can be a marker, such as `"@": player_start`. A marker is an ordinary object with that kind. The game reads its cell and does not spawn art for it.
-   A legend entry may have parameters after the kind: `"S": spawn_skeleton every=10 strategy=patrol radius=120`. Each parameter is `key=value` with no spaces, the key has letters, digits and `_`, and a key is not given twice. The parser reads them into `MapObject.params` (`Params`: `get`, `f32`) and does not know what they mean. The game checks the keys it needs and reports problems. An entry without parameters is unchanged.
+   A legend entry may have parameters after the kind: `"S": spawn_skeleton every=10 strategy=patrol radius=120`. Each parameter is `key=value` with no spaces, the key has letters, digits and `_`, and a key is not given twice. The parser reads them into `MapObject.params` (`Params`: `get`, `f32`, `line`) and does not know what they mean. The game checks the keys it needs and reports problems. An entry without parameters is unchanged.
 
 ### Grid rows
 

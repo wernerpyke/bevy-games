@@ -38,6 +38,7 @@ Back to front:
 | Grid debug | sprite z | `GRID_DEBUG_Z` |
 | World | sprite z within `WORLD_HALF_BAND` of 0 | features and characters, sorted together |
 | Feature debug | sprite z | `FEATURE_DEBUG_Z`, `FEATURE_DEBUG_INTERIOR_Z`, `FEATURE_DEBUG_FEET_Z` |
+| Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 | HUD | `GlobalZIndex` | `HUD_Z_INDEX` |
 | UI | `GlobalZIndex` | `UI_Z_INDEX` |
 

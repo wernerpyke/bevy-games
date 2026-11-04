@@ -41,18 +41,19 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 
 | Command | Effect |
 |---|---|
-| `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Controlled` (its feet come from its `DepthSort`) |
+| `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Controlled` (its feet come from its `DepthSort`). Skipped with a log line when there is no such entity |
 | `hold:<keys>:<seconds>` | Holds keys (`up`, `down`, `left`, `right`, `x`, `f1` to `f3`), for example `hold:up+left:2`. `hold:x:0.1` is one key press |
 | `wait:<seconds>` | Waits |
 | `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `<PREFIX>_SCREENSHOT_DIR`) |
 | `quit` | Exits |
 
-10. The plugin logs the feet position every 0.25 seconds. It runs in `PreUpdate` after Bevy's input systems and writes keys with `press` and `release`.
+10. The plugin logs the feet position every 0.25 seconds. When the controlled entity is gone (the player died) it logs `none` and the script goes on. It runs in `PreUpdate` after Bevy's input systems and writes keys with `press` and `release`.
 11. Add a `wait` before `screenshot` after a `teleport`.
+12. The wrapper `rust.sh script` shows only log lines that match `LOG_FILTER` (default: `script:`, `collision:`, warnings and errors). Set `LOG_FILTER="projectile:|enemy:|script:"` to see the lines of a feature. `<PREFIX>_SEED` (for example `R_TOWN_SEED=3`) fixes the random numbers of the game (`adr-x26`). A run that needs more than the 30 s limit of the wrapper can start the binary directly with `CARGO_MANIFEST_DIR` set to the game folder and `perl -e 'alarm 60; exec @ARGV'`.
 
 ### Flicker check
 
-12. Take 12 screenshots in a row (`screenshot:` with `wait:0.05` between) and count changed pixels between neighbours. Any non zero count in a static area is a flicker.
+13. Take 12 screenshots in a row (`screenshot:` with `wait:0.05` between) and count changed pixels between neighbours. Any non zero count in a static area is a flicker.
 
 ## Usage
 

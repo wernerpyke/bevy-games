@@ -68,9 +68,9 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt8. Map file is read from disk and reloads on F1 (2026-11-03)
 
-**Decision.** A native run reads the map file from disk, not from `include_str!`. `./dev-scripts/rust.sh run r-town [map]` takes a path or a name in `assets/maps/` and passes it in `R_TOWN_MAP`. With no argument the game reads `assets/maps/test.txt` through `CARGO_MANIFEST_DIR`. F1 reads the file again and rebuilds the ground, trees, collision, camera limits and grid row numbers. The player stays where it is. A file with an error is logged and the current map stays. The web build and a binary with no environment use the bundled copy, so F1 has no new content there.
+**Decision.** A native run reads the map file from disk, not from `include_str!`. `./dev-scripts/rust.sh run r-town [map]` takes a path or a name in `assets/maps/` and passes it in `R_TOWN_MAP`. With no argument the game reads `assets/maps/test.txt` through `CARGO_MANIFEST_DIR`. F1 reads the file again and rebuilds the ground, trees, collision, camera limits and grid row numbers. Amended by `adr-rt13`: F1 also resets the player, the projectiles and the enemies. A file with an error is logged and the current map stays. The web build and a binary with no environment use the bundled copy, so F1 has no new content there.
 
-**Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 3. The player stays so the developer can check the same spot after an edit.
+**Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 3. 
 
 **How to apply.** Everything a map spawns has the `MapEntity` component, so a reload removes it. A new map system must tag its entities with it and be run in `reload_map` (`src/map.rs`).
 
@@ -92,8 +92,24 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt11. The X key fires a projectile along the player's facing (2026-11-04)
 
-**Decision.** X fires one projectile per key press (`just_pressed`), with no cooldown and no range limit. It flies in the direction the player faces at 160 art px/s, twice the walk speed, and disappears at a blocked area or the map edge (`adr-x21`). The player's facing is the last non-zero move direction as a unit vector in 8 directions, and right at the start. The sprite is `proj_8` (7x6, resized from 13x11 and drawn pointing right) and the kit turns it along the flight direction. The projectile starts at the player's feet and its sprite is 8 px above the ground. Projectiles in flight are not despawned when the map reloads on F1.
+**Decision.** X fires one projectile per key press (`just_pressed`), with no cooldown and no range limit. It flies in the direction the player faces at 160 art px/s, twice the walk speed, and disappears at a blocked area or the map edge (`adr-x21`). The player's facing is the last non-zero move direction as a unit vector in 8 directions, and right at the start. The sprite is `proj_8` (7x6, resized from 13x11 and drawn pointing right) and the kit turns it along the flight direction. The projectile starts at the player's feet and its sprite is 8 px above the ground. Amended by `adr-rt13`: projectiles in flight are removed when the map reloads on F1.
 
-**Rationale.** The player only flips left and right, so facing needs its own value. Eight directions give a correct shot after a diagonal walk. Cooldown, range and damage are weapon values for a later plan. F1 is a development tool and a stray shot is harmless, so it needs no hook in the reload.
+**Rationale.** The player only flips left and right, so facing needs its own value. Eight directions give a correct shot after a diagonal walk. Cooldown, range and damage are weapon values for a later plan.
 
 **How to apply.** Values are in `src/weapon.rs` (`PROJECTILE_SPEED`, `PROJECTILE_HEIGHT`). Facing is `Player::facing` in `src/player.rs`. Input is `PlayerInput` in `src/input.rs` (`adr-x22`).
+
+## adr-rt12. Skeleton and goblin: values, collision and animation (2026-11-04)
+
+**Decision.** Two enemies from `monsters/skeleton.png` and `goblin.png` (`art/characters/monsters.aseprite`, tags `mon_skeleton`, `mon_goblin`). The skeleton patrols a random place within 120 px and walks at 0.5 x the player's speed (40 px/s). The goblin pursues the player at 0.2 x (16 px/s). Both speeds are shares of `WALK_SPEED`. A map spawner makes each one: the skeleton every 10 s and the goblin every 15 s, the first at game start, with no limit of live enemies. Enemies use the same blocked areas and feet width as the player (`adr-rt5`, `adr-rt9`) and do not collide with each other. They move and animate like the player (flip and a one pixel bob), with the code shared in `src/walk_animation.rs` (`adr-rt3`). A shot kills an enemy at once. Hit boxes: the sprite without its bottom 2 px for an enemy, 8x12 for the player. An enemy that touches the player kills it.
+
+**Rationale.** The skeleton was first set to 0.8 x and looked far too fast on screen, so the developer chose 0.5 x. One set of areas keeps the path grid simple (`adr-x23`). Overlapping pursuers are accepted until they look wrong. The walk animation stays in the game until a second game needs it.
+
+**How to apply.** Values are in `src/enemy.rs` (`EnemyKind`), the player's hit box in `src/player.rs`. The spawners and their strategies are in the legend of `assets/maps/test.txt` (`adr-x25`, `dev-docs/extensions/spawners.md`).
+
+## adr-rt13. F1 resets the whole game state, and death removes the player (2026-11-04)
+
+**Decision.** F1 reads the map again and resets the game: everything with `MapEntity` is removed (map objects, the player, the enemies, the spawners and the projectiles in flight), the player is created again at the start cell, and the spawners are created again. The path grid is built again because the collision areas change. This replaces "the player stays where it is" (`adr-rt8`) and "projectiles in flight are not despawned" (`adr-rt11`). When an enemy touches the player, the player entity and its sprite are removed. There is no death screen and no state yet.
+
+**Rationale.** A full reset is simple and safe: no old path, shot or enemy outlives its map, and F1 is also the way back after a death. Hit points and a death screen come later and will need a game state.
+
+**How to apply.** Put `MapEntity` (`src/map.rs`) on every new kind of game object that the reset must remove. Systems that need the player use `Single`, so they skip their work when it is gone (`dev-docs/bevy/notes.md`).

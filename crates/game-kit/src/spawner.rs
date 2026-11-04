@@ -1,6 +1,6 @@
 //! Spawners: an entity that asks the game for a new entity every so many seconds. The kit keeps the timer and the
 //! limit and sends `SpawnRequest`. The game reads it, spawns what it wants at the position and adds `SpawnedBy` to
-//! it, so the spawner can count its live entities for `max`. See `dev-docs/PLAN-enemies.md`.
+//! it, so the spawner can count its live entities for `max`. See `dev-docs/extensions/spawners.md`.
 
 use bevy::prelude::*;
 

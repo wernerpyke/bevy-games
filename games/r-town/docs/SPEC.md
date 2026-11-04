@@ -25,6 +25,7 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 - Feet box: 10 px wide and 4 px tall at the bottom of the sprite. It fits through a one-cell gap.
 - Facing: the last move direction, 8 directions, right at the start (adr-rt11).
 - Weapon: X fires a projectile along the facing at 160 art px per second (twice the walk speed). It disappears at a blocked area or the map edge. One shot per key press, no cooldown, no range limit, no damage yet (adr-rt11).
+- Hit box (what enemies touch): 8 px wide and 12 px high, from 2 px above the feet (`adr-rt12`).
 - Other abilities and stats: not yet decided.
 
 ## 5. World and maps
@@ -45,7 +46,13 @@ Deferred: NPC dialogue, chests, doors, shops.
 
 ## 7. Combat
 
-Not yet decided. Pack material that fits: weapons, projectiles, hearts HUD, nine monsters.
+First slice (2026-11-04, `adr-rt11` to `adr-rt13`):
+
+- The player fires projectiles with X (section 4).
+- Two enemies, the skeleton and the goblin, come from spawners in the map file: the skeleton every 10 s walks a random patrol within 120 px at 0.5 x the player's speed, the goblin every 15 s pursues the player at 0.2 x. The first of each appears at game start. They walk around trees and water with path finding (`dev-docs/extensions/nav.md`).
+- A projectile kills the enemy it hits. An enemy that touches the player kills the player: the player entity is removed. F1 resets everything and puts the player back at the start.
+
+Not yet decided: hit points, damage, a death screen and restart flow, hearts HUD, more enemies and weapons, enemy attacks. The pack has seven more monsters (bat, cyclop, dragon, king skeleton, leonard, slim, snake) that are not packed yet.
 
 ## 8. Progression and save
 

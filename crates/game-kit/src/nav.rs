@@ -1,7 +1,7 @@
 //! Path finding over the collision outlines. A grid of walk points covers the map. Two neighbouring points are linked
 //! when a straight move between them crosses no outline edge from its free side, which is the same rule that
 //! `collision::resolve` uses for feet. A* (`pathfinding` crate) searches the links, and the path is then smoothed
-//! to the fewest straight legs that cross no edge. See `dev-docs/PLAN-enemies.md`.
+//! to the fewest straight legs that cross no edge. See `dev-docs/extensions/nav.md`.
 //!
 //! The grid is built from the edges alone, so it fits any actor whose blocked areas are in the `CollisionWorld`.
 //! A point inside a blocked area has no way in: a goal there has no path. An actor that starts inside a blocked

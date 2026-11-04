@@ -252,6 +252,14 @@ transform.translation += direction.normalize() * WALK_SPEED * time.delta_secs();
 
 `normalize()` keeps diagonal speed equal to straight speed. `delta_secs()` makes speed independent of frame rate. The edge limit is `clamp` on the position, using half the visible size computed from the window shape.
 
+## Headless tests
+
+A test can run a small Bevy app without a window: `App::new().add_plugins(MinimalPlugins)`, the resources and plugins under test, and `TimeUpdateStrategy::ManualDuration` so that every `app.update()` adds 16 ms. The kit tests movement, strategies, spawners and projectile hits this way (`crates/game-kit/src/movement.rs`). The first update only sets the start time.
+
+## Systems that need one entity
+
+A system with `Single<...>` runs only while exactly one entity matches. Otherwise Bevy skips it without a warning. R-Town relies on this: when the player is removed, the camera, the weapon and the info box simply stop (`games/r-town/src/weapon.rs`). A system that must act when the entity is missing uses a `Query` and handles the empty case (`strategies.rs`, `pursue`).
+
 ## Events and messages
 
 Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages. Define one with `#[derive(Message)]`, register it with `app.add_message::<T>()`, send with `MessageWriter<T>::write` and read with `MessageReader<T>::read`. The kit sends `ProjectileHit` when a projectile is removed (`crates/game-kit/src/projectile.rs`), and the game can read it for effects or damage. The Aseprite plugin also sends `AnimationEvents::Finished`. Use messages for game events such as "enemy died" and for passing actions between plugins.

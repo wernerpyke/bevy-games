@@ -6,7 +6,7 @@ A projectile flies in a straight line over the ground and disappears when it rea
 
 ## Status
 
-`crates/game-kit/src/projectile.rs`, used by R-Town (`adr-rt11`). Decision: `adr-x21`. Ready to share. Nothing reads `ProjectileHit` yet.
+`crates/game-kit/src/projectile.rs`, used by R-Town (`adr-rt11`). Decision: `adr-x21`. Ready to share. R-Town reads `ProjectileHit` to remove enemies.
 
 ## Terms
 
@@ -21,7 +21,7 @@ A projectile flies in a straight line over the ground and disappears when it rea
 | Speed | 160 art px/s, twice the walk speed |
 | Direction | the way the player faces, 8 directions (`adr-rt11`) |
 | Start point | the player's feet |
-| Sprite height above the ground | 8 px |
+| Sprite height above the ground, also the height at which a shot hits a body | 8 px (`Projectile::at_height`) |
 | Art | `proj_8` in `features/projectiles.aseprite`, 7x6, drawn pointing to the right |
 | Collision areas | the ones the `CollisionWorld` holds (the player's, see Limits) |
 | Map rectangle | `CameraBounds` |
@@ -34,7 +34,8 @@ A projectile flies in a straight line over the ground and disappears when it rea
 4. On a hit the kit sends `ProjectileHit { position, cause }`, logs a `debug!` line and despawns the entity. The sprite child goes with it.
 5. The game spawns the entity with `Projectile::new(direction, speed)`, `DepthSort { feet_offset: 0.0 }`, a `Transform` at the ground point and `Visibility`. It adds the sprite as a child with `ProjectileSprite`. The projectile is in the world layer, so it passes behind trees like a character does (`draw-order.md`).
 6. The kit turns the `ProjectileSprite` child to point along the velocity. The art must point along +x. Only the child turns, so its lift above the ground does not change.
-7. Spawn the projectile at the shooter's feet, which are never inside a blocked area. A spawn point inside a blocked area is not a hit, because only crossing an edge counts.
+7. A `ProjectileTarget` entity with a `HitBox` is hit when the path of the shot, lifted by `Projectile::height`, enters the box. The path is cut at the point where a blocked area stops the shot, so a target behind a tree is safe. The first target on the path is hit. The hit is `HitCause::Target(entity)` and the game removes the target (`adr-x27`).
+8. Spawn the projectile at the shooter's feet, which are never inside a blocked area. A spawn point inside a blocked area is not a hit, because only crossing an edge counts.
 
 ## Usage
 
@@ -46,7 +47,7 @@ A projectile flies in a straight line over the ground and disappears when it rea
 ## Limits
 
 - The edges are the ones built for the shooter's feet, grown sideways by the feet half width. A projectile stops up to that far before the side of a blocked area. A lone tree blocks only its base band, so a shot hits it only where its ground line crosses that band (`adr-x21`).
-- No range limit, no cooldown, no damage, no hit effects. A projectile in flight when a map reloads keeps flying against the new edges (`adr-rt11`).
+- No range limit, no cooldown, no hit points, no hit effects. R-Town removes projectiles in flight when the map reloads (`adr-rt13`).
 - Straight flight only. There is no gravity, homing or bounce.
 
 ## Tests

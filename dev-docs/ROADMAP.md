@@ -12,7 +12,7 @@ Spike `avian2d` 0.8.0 (declares `bevy ^0.20`) in a separate game under `games/` 
 
 ### 3. Robust map and collision pipeline
 
-R-Town already reloads its map from disk on F1 on native (`adr-rt8`); Long Way and the web build do not. The maps use `include_str!` and an own parser for the front matter and the drawn grid (`adr-lw8`, `adr-x18`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
+R-Town already reloads its map from disk on F1 on native (`adr-rt8`); Long Way and the web build do not. The kit now has an occupancy grid and A* path finding built from the collision outlines (`adr-x23`), which covers the first part of the navigation idea below. The maps use `include_str!` and an own parser for the front matter and the drawn grid (`adr-lw8`, `adr-x18`). For a real-time RPG with many areas, plan a sturdier approach. Considerations: a Bevy asset loader with hot reload (edit a map and see it without a rebuild, also on the web build); a real YAML parser or Tiled maps (`bevy_ecs_tiled`) instead of the own subset; validation with clear errors; one map file per area with chunked collision; dynamic obstacles (doors, destroyed objects) that rebuild one cluster; a broad phase for many moving entities; and a navigation mesh or occupancy grid for NPC pathfinding built from the same outline. Decide when the second map or the first NPC appears.
 
 ### 4. Map data beyond one grid
 
@@ -40,7 +40,7 @@ Input handling starts as a game-local module in R-Town: a `PlayerInput` resource
 
 ### 9. Combat basics
 
-Projectiles fly and disappear, but nothing is hit. Considerations: a reader for `ProjectileHit` (impact effect, sound), enemies as targets with health and damage, weapon values in one place (speed, cooldown, range, damage) and more than one weapon, and exact blocked shapes for projectiles if the 5 px early stop at tree sides is a problem (`adr-x21`). Decide when the first enemy is designed. Ask the developer for the design before inventing mechanics.
+Projectiles and enemies exist (`### Enemies (R-Town)` under completed items), but there are no hit points. Considerations: hit points and damage, an impact effect and sound, a death screen and a restart flow with a game state (`States`), enemy attacks, weapon values in one place (speed, cooldown, range, damage) and more than one weapon, and exact blocked shapes for projectiles if the 5 px early stop at tree sides is a problem (`adr-x21`). Decide when the first enemy is designed. Ask the developer for the design before inventing mechanics.
 
 ### 99. Debug grid: overlapping corner labels (low priority, cosmetic)
 
@@ -48,9 +48,13 @@ With the grid origin at the bottom left, the column "0" label (top edge) and the
 
 ## Completed Items
 
+### Enemies (R-Town)
+
+Done 2026-11-04. A skeleton (random patrol within 120 px) and a goblin (pursues the player) spawn from legend entries of `test.txt` (`every=` and `strategy=` parameters), walk around trees and water with grid path finding, die when a projectile hits them, and kill the player on a touch. F1 resets the whole game state. The kit has the nav grid, goal movement, strategies, spawners, hit boxes, a seedable random number generator and a movement debug view (`dev-docs/extensions/nav.md`, `enemy-movement.md`, `spawners.md`, `adr-x23` to `adr-x27`, `adr-rt12`, `adr-rt13`). Known issues and follow-ups: the screens were not seen by Claude (the display was black during the scripted runs), no hit points or death screen, enemies may overlap, no check that a spawner stands on free ground, no rule against spawning next to the player, a fixed spawn interval only, and the sprites are one front view each.
+
 ### Projectile weapons (R-Town)
 
-Done 2026-11-04. X fires a projectile along the player's facing at twice the walk speed. It disappears at blocked areas and the map edge (`dev-docs/extensions/projectiles.md`, `adr-x21`, `adr-rt11`). The flight, hit message and sprite turning are in `game-kit`. Input went through a game-local `PlayerInput` resource (`adr-x22`, roadmap item 8). Known issues and follow-ups: no damage or hit effects yet (nothing reads `ProjectileHit`), no cooldown or range, a shot stops up to 5 px before the side of a tree because it uses the player's collision areas, and projectiles in flight are not despawned on an F1 reload.
+Done 2026-11-04. X fires a projectile along the player's facing at twice the walk speed. It disappears at blocked areas and the map edge (`dev-docs/extensions/projectiles.md`, `adr-x21`, `adr-rt11`). The flight, hit message and sprite turning are in `game-kit`. Input went through a game-local `PlayerInput` resource (`adr-x22`, roadmap item 8). Known issues and follow-ups: no damage or hit effects yet (nothing reads `ProjectileHit`), no cooldown or range, a shot stops up to 5 px before the side of a tree because it uses the player's collision areas.
 
 ### Text map files
 

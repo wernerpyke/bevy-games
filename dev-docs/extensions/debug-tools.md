@@ -7,6 +7,7 @@ Visual debug tools drawn in the game: a grid, an info box and a collision overla
 - **Grid.** A red grid with one line per cell, numbered along the edges.
 - **Info box.** A text box where any system shows live values.
 - **Collision overlay.** The collision outline, interior shapes and feet markers, drawn as sprites.
+- **Movement debug.** Magenta paths and goal squares of every mover and orange squares at the spawners (`movement_debug.rs`), on `MOVEMENT_DEBUG_Z`. It follows the F3 switch.
 
 The sizes of lines, ticks, labels and markers are tuned for a cell size of 64 and scale with `cell_size` (adr-x17), so the overlay looks the same at any art scale.
 
@@ -18,6 +19,7 @@ All tools are sprites or UI on named layers ([draw-order.md](draw-order.md)), no
 |---|---|---|
 | Grid and info box | `crates/game-kit/src/debug.rs` | Shared, configured by `DebugPlugin` fields |
 | Collision overlay | `crates/game-kit/src/collision_debug.rs` | Shared, uses the collision extension |
+| Movement debug | `crates/game-kit/src/movement_debug.rs` | Shared, uses the enemy movement extension |
 
 Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`.
 

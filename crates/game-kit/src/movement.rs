@@ -1,7 +1,7 @@
 //! Moves an entity to a goal. A strategy (patrol, pursue, or one a game writes) only sets `MoveGoal`. This module
 //! finds a path with `NavGrid`, walks it with `collision::move_feet` (so the sliding rules of the player apply), and
 //! reports in `MoveState` whether the entity is walking, which way it faces, and whether it arrived or the goal is
-//! unreachable. See `dev-docs/PLAN-enemies.md`.
+//! unreachable. See `dev-docs/extensions/enemy-movement.md`.
 //!
 //! The entity's `Transform` x and y are its feet, as for the player (`DepthSort { feet_offset: 0.0 }`).
 

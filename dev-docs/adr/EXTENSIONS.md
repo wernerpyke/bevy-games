@@ -186,3 +186,43 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** The resource isolates the device, so a mouse becomes a second writer of the same resource. A kit module now would have one user and a guessed API. The later move is a file move.
 
 **How to apply.** Read `PlayerInput` with `.after(InputSet)`. The scripted run tool still works, because it writes key presses into `ButtonInput<KeyCode>` before the game reads them.
+
+## adr-x23. Path finding on a grid built from the collision edges (2026-11-04)
+
+**Decision.** `crates/game-kit/src/nav.rs` builds a grid of walk points (R-Town: every 4 px) and links two neighbours when a straight move crosses no outline edge from its free side. A* from the `pathfinding` crate (4.16.0, compiles for `wasm32-unknown-unknown`) searches it, and the path is smoothed to straight legs. The grid is built again when the collision areas or the map rectangle change.
+
+**Rationale.** The grid reuses the exact outlines, thin tree bands included, so there is no second description of the obstacles and paths follow the rule the walker follows. It is easy to test without a running world. A navigation mesh crate (`bevy_northstar` and others in `adr-e4`) is heavier and tied to a Bevy version. The cost is memory and a build time of about 9 ms for a 60x60 map, once per map load.
+
+**How to apply.** See `dev-docs/extensions/nav.md`. It is the first part of roadmap item 3.
+
+## adr-x24. Strategies are components that write a goal (2026-11-04)
+
+**Decision.** A movement strategy is a component with a system in `StrategySet` that writes `MoveGoal`. One kit system (`movement.rs`) turns the goal into a path and steps. The kit provides `RandomPatrol` and `Pursue`. A game adds its own strategy the same way.
+
+**Rationale.** It is the normal ECS style and needs no trait objects or boxed state. A strategy stays small and its pure parts are unit tested. The kit does not need to know the strategies of a game. A strategy can only say "go there": a special movement needs its own mover.
+
+**How to apply.** See `dev-docs/extensions/enemy-movement.md`.
+
+## adr-x25. Spawner settings are legend parameters (2026-11-04)
+
+**Decision.** A legend entry of a map file may have `key=value` parameters after its kind, for example `"S": spawn_skeleton every=10 strategy=patrol radius=120`. The parser keeps them in `MapObject.params` and the line number in `Params::line`. The game decides what they mean and reports errors with the file and the line. `Spawner` (`spawner.rs`) reads `every` and `max`.
+
+**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into roadmap item 4 (objects with settings).
+
+**How to apply.** See `dev-docs/extensions/spawners.md` and `map-files.md`.
+
+## adr-x26. A seedable random number generator in the kit (2026-11-04)
+
+**Decision.** `crates/game-kit/src/rng.rs` has `Rng` (SplitMix64) and `RngPlugin`, which adds `GameRng`. The seed is `<PREFIX>_SEED` when set, else the clock. The web build has no clock at start, so it starts from a constant and mixes in the time of the first frame.
+
+**Rationale.** The `rand` crate needs `getrandom` and extra setup for the web build. About 60 lines with no dependency are enough. A seed that we control makes scripted runs repeatable.
+
+**How to apply.** Take `ResMut<GameRng>` and call `f32`, `range` or `point_in_disc`. Set `R_TOWN_SEED=7` for a repeatable run.
+
+## adr-x27. Hit boxes, and projectiles hit at their flight height (2026-11-04)
+
+**Decision.** `HitBox { offset, half_size }` (`hitbox.rs`) is a body rectangle relative to the ground point, and it is not the feet box. A projectile hits an entity with `ProjectileTarget` and a `HitBox`, tested along its path (not only at its end point) and at its flight height (`Projectile::height`), and it stops at a blocked area first. The hit is `ProjectileHit` with `HitCause::Target(entity)`, and the game removes the target.
+
+**Rationale.** A body sits above the feet. A shot that flies at hand height along the ground line of the shooter hits a body that stands on the same line. Testing the ground line would miss it, as the first scripted run showed. Testing the path stops a long step from jumping over a thin target.
+
+**How to apply.** See `dev-docs/extensions/projectiles.md` and `enemy-movement.md`.

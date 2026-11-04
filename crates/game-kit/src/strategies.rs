@@ -1,6 +1,6 @@
 //! The movement strategies of the kit. A strategy only chooses a goal and writes it to `MoveGoal`: `movement.rs`
 //! walks there. A game adds a strategy of its own the same way: a component and a system in `StrategySet` that writes
-//! `MoveGoal`. See `dev-docs/PLAN-enemies.md`.
+//! `MoveGoal`. See `dev-docs/extensions/enemy-movement.md`.
 //!
 //! - `RandomPatrol`: pick a random reachable place within a radius of the current place, walk there, pick again.
 //! - `Pursue`: walk to the player (the `Controlled` entity), or to another entity.
