@@ -126,6 +126,11 @@ fn mark_saved(_: On<ScreenshotCaptured>, mut script: ResMut<Script>) {
     script.shot_saved = true;
 }
 
+/// The feet as text for the log, or `none` when there is no controlled entity.
+fn feet_text(feet: Option<Vec2>) -> String {
+    feet.map_or_else(|| "none".to_string(), |feet| format!("{feet:?}"))
+}
+
 fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
     Vec2::new(
         transform.translation.x,
@@ -145,9 +150,8 @@ fn run_script(
     if script.elapsed < 0.0 {
         return;
     }
-    let Ok((mut transform, sort)) = target.single_mut() else {
-        return;
-    };
+    // The controlled entity may be gone (the player died). The script goes on without it.
+    let mut target = target.single_mut().ok();
 
     let Some(command) = script.commands.front().cloned() else {
         exit.write(AppExit::Success);
@@ -156,9 +160,13 @@ fn run_script(
 
     let finished = match &command {
         Command::Teleport(position) => {
-            transform.translation.x = position.x;
-            transform.translation.y = position.y + sort.feet_offset;
-            info!("script: teleport, feet now {:?}", position);
+            if let Some((transform, sort)) = &mut target {
+                transform.translation.x = position.x;
+                transform.translation.y = position.y + sort.feet_offset;
+                info!("script: teleport, feet now {:?}", position);
+            } else {
+                info!("script: teleport skipped, there is no controlled entity");
+            }
             true
         }
         Command::Hold(keys, seconds) => {
@@ -211,13 +219,24 @@ fn run_script(
     if script.since_log >= LOG_INTERVAL {
         script.since_log = 0.0;
         info!(
-            "script: t={:.2} feet {:?}",
+            "script: t={:.2} feet {}",
             script.elapsed,
-            feet_of(&transform, sort)
+            feet_text(
+                target
+                    .as_ref()
+                    .map(|(transform, sort)| feet_of(transform, sort))
+            )
         );
     }
     if finished {
-        info!("script: command done, feet {:?}", feet_of(&transform, sort));
+        info!(
+            "script: command done, feet {}",
+            feet_text(
+                target
+                    .as_ref()
+                    .map(|(transform, sort)| feet_of(transform, sort))
+            )
+        );
         script.commands.pop_front();
         script.elapsed = 0.0;
         script.shot_requested = false;

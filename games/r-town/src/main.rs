@@ -1,5 +1,6 @@
 mod camera;
 mod collision;
+mod death;
 mod enemy;
 mod input;
 mod map;
@@ -51,6 +52,7 @@ fn main() {
             game_kit::spawner::SpawnerPlugin,
             game_kit::strategies::StrategiesPlugin,
             enemy::EnemyPlugin,
+            death::DeathPlugin,
             map::MapPlugin,
             trees::TreesPlugin,
             water::WaterPlugin,

@@ -7,11 +7,18 @@ use game_kit::Controlled;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
+use game_kit::hitbox::HitBox;
 
 use crate::collision::FEET_HALF_WIDTH;
 use crate::input::{InputSet, PlayerInput};
 use crate::map::{MapEntity, PlayerStart};
 use crate::walk_animation::{WalkAnimation, WalkSprite, WalkStateSet};
+
+/// The body that enemies touch: 8 px wide and 12 px high, from 2 px above the feet.
+const HIT_BOX: HitBox = HitBox {
+    offset: Vec2::new(0.0, 8.0),
+    half_size: Vec2::new(4.0, 6.0),
+};
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
 pub const WALK_SPEED: f32 = 80.0;
@@ -58,6 +65,7 @@ pub(crate) fn spawn_player(
             Controlled,
             Player::default(),
             WalkAnimation::default(),
+            HIT_BOX,
             MapEntity,
             SlideAssist::default(),
             DepthSort { feet_offset: 0.0 },
