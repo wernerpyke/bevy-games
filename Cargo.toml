@@ -10,6 +10,7 @@ edition = "2024"
 bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
 bevy_aseprite_ultra = "=0.10.0"
 game-kit = { path = "crates/game-kit" }
+pathfinding = "=4.16.0"
 
 # Compile dependencies (Bevy) with optimisation even in dev builds. Game code stays fast to rebuild.
 [profile.dev.package."*"]

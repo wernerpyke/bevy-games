@@ -28,6 +28,9 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 
 - Messages between systems (`examples/ecs/message.rs`): `#[derive(Message)] struct Hit { .. }`, `app.add_message::<Hit>()`, send with `MessageWriter<Hit>` and `.write(Hit { .. })`, read with `MessageReader<Hit>` and `.read()`.
 - One keypress: `input.just_pressed(KeyCode::KeyX)`. System set: `#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)] struct MySet;`, then `app.configure_sets(Update, MySet)` and `.in_set(MySet)` / `.after(MySet)` (`examples/ecs/ecs_guide.rs`).
+- Headless test (no window): `App::new().add_plugins(MinimalPlugins)`, `app.insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(16)))`, then `app.update()` adds 16 ms to `Time` per call (`bevy_time` `TimeUpdateStrategy`). Note the first update only sets the start time.
+- A system with `Single<..>` is skipped without a warning when no entity matches or when there is more than one (`SystemParamValidationError::skipped`, `system_param.rs`). Removing the player is therefore safe for systems that use `Single` for it. A `Query` is empty and needs no care.
+- `Timer::from_seconds(10.0, TimerMode::Repeating)` works as a field of a component. Call `timer.tick(time.delta())` and read `timer.just_finished()`.
 
 ## Pitfalls
 
