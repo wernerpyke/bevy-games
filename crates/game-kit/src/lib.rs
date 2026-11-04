@@ -10,6 +10,7 @@ pub mod hitbox;
 pub mod layers;
 pub mod map;
 pub mod movement;
+pub mod movement_debug;
 pub mod nav;
 pub mod outline;
 pub mod projectile;

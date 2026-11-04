@@ -10,6 +10,7 @@
 //! | Grid debug | sprite z | `GRID_DEBUG_Z` |
 //! | World | sprite z | within `WORLD_HALF_BAND` of 0, set by `depth.rs` from the feet |
 //! | Feature debug | sprite z | `FEATURE_DEBUG_Z` |
+//! | Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 //! | HUD | UI `GlobalZIndex` | `HUD_Z_INDEX` |
 //! | UI (dialogs) | UI `GlobalZIndex` | `UI_Z_INDEX` |
 //!
@@ -26,6 +27,8 @@ pub const GRID_DEBUG_Z: f32 = -200.0;
 pub const WORLD_HALF_BAND: f32 = 100.0;
 /// Debug outlines of features, above everything in the world.
 pub const FEATURE_DEBUG_Z: f32 = 200.0;
+/// The movement debug view (goals, paths and spawners), above the collision overlay.
+pub const MOVEMENT_DEBUG_Z: f32 = 203.0;
 /// Sublayers of the feature debug layer, so overlapping debug sprites never share a z: the outline of interior
 /// areas, then the feet markers.
 pub const FEATURE_DEBUG_INTERIOR_Z: f32 = 201.0;
@@ -37,6 +40,7 @@ pub const UI_Z_INDEX: i32 = 100;
 
 // Checked when the game is compiled.
 const _: () = {
+    assert!(FEATURE_DEBUG_FEET_Z < MOVEMENT_DEBUG_Z);
     assert!(BACKGROUND_Z < GRID_DEBUG_Z);
     assert!(GRID_DEBUG_Z < -WORLD_HALF_BAND);
     assert!(WORLD_HALF_BAND < FEATURE_DEBUG_Z);
@@ -45,6 +49,6 @@ const _: () = {
             && FEATURE_DEBUG_INTERIOR_Z < FEATURE_DEBUG_FEET_Z
     );
     // `OrthographicProjection::default_2d` shows z from -1000 to 1000.
-    assert!(BACKGROUND_Z > -1000.0 && FEATURE_DEBUG_FEET_Z < 1000.0);
+    assert!(BACKGROUND_Z > -1000.0 && MOVEMENT_DEBUG_Z < 1000.0);
     assert!(HUD_Z_INDEX < UI_Z_INDEX);
 };

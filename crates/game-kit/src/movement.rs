@@ -121,6 +121,11 @@ pub struct PathFollower {
 }
 
 impl PathFollower {
+    /// The points still to walk to, nearest first, for the debug view.
+    pub fn points(&self) -> impl Iterator<Item = Vec2> + '_ {
+        self.path.iter().copied()
+    }
+
     fn clear(&mut self) {
         self.path.clear();
         self.searched_for = None;

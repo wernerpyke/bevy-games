@@ -46,6 +46,7 @@ fn main() {
         ))
         .add_plugins((
             game_kit::movement::MovementPlugin::default(),
+            game_kit::movement_debug::MovementDebugPlugin,
             game_kit::rng::RngPlugin {
                 env_prefix: "R_TOWN",
             },
