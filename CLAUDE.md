@@ -102,8 +102,8 @@ Pipeline, palette rules and the list of copied files: `games/long-way/docs/art-p
 Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all of them. Call it bare: no pipes, `;` or `$(...)`.
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
-- Run: `./dev-scripts/rust.sh run <game>`
-- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
+- Run: `./dev-scripts/rust.sh run <game>` (add `--debug` to start with the F2 info box and the F3 grid visible; the flag is not passed to cargo)
+- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>"`, for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the F2 info box, the F3 grid and the collision and movement overlays are drawn. Without the flag they start hidden (F2 and F3 still toggle them). Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)

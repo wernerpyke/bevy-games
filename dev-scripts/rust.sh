@@ -7,10 +7,12 @@
 # Usage:
 #   ./dev-scripts/rust.sh build [game]        # build one game, or all
 #   ./dev-scripts/rust.sh test [game]         # test one game, or all
-#   ./dev-scripts/rust.sh run <game> [map-file]   # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map)
+#   ./dev-scripts/rust.sh run <game> [map-file] [--debug]
+#                                             # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map).
+#                                             # --debug turns on the F2 info box and the F3 grid (off without it)
 #   ./dev-scripts/rust.sh lint                # cargo fmt --check + clippy -D warnings (all games)
 #   ./dev-scripts/rust.sh web [game]          # cargo check for wasm32-unknown-unknown
-#   ./dev-scripts/rust.sh script <game> "<commands>"
+#   ./dev-scripts/rust.sh script <game> "<commands>" [--debug]
 #                                             # run a game with scripted key presses and print its log,
 #                                             # for example: script long-way "teleport:225:-150;hold:up:3;quit"
 #                                             # add screenshot:<name> to save target/screenshots/<name>.png,
@@ -32,6 +34,13 @@ case "${1:-}" in
     ;;
   run)
     shift
+    # --debug is not a cargo argument: it sets GAME_KIT_DEBUG, which the kit debug tools read.
+    args=(); debug=0
+    for arg in "$@"; do
+      if [ "$arg" = "--debug" ]; then debug=1; else args+=("$arg"); fi
+    done
+    set -- ${args[@]+"${args[@]}"}
+    if [ "$debug" = 1 ]; then export GAME_KIT_DEBUG=1; fi
     if [ -z "${1:-}" ]; then
       echo "✗ Usage: ./dev-scripts/rust.sh run <game> [map-file] [cargo args]" >&2
       exit 1
@@ -53,6 +62,12 @@ case "${1:-}" in
     ;;
   script)
     shift
+    args=(); debug=0
+    for arg in "$@"; do
+      if [ "$arg" = "--debug" ]; then debug=1; else args+=("$arg"); fi
+    done
+    set -- ${args[@]+"${args[@]}"}
+    if [ "$debug" = 1 ]; then export GAME_KIT_DEBUG=1; fi
     if [ -z "${1:-}" ] || [ -z "${2:-}" ]; then
       echo "✗ Usage: ./dev-scripts/rust.sh script <game> \"<commands>\"" >&2
       exit 1

@@ -157,7 +157,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 ## adr-x19. Debug keys F2 info, F3 grid, F1 map reload (2026-11-03)
 
-**Decision.** The kit debug keys are F2 for the info box and F3 for the grid and the collision overlay (they were the other way round). F1 is kept for the game: R-Town reloads its map on F1. The kit does not read F1. The collision overlay redraws when `CollisionWorld` changes, and `CollisionWorld::clear` lets a game replace its blocked areas. The script runner accepts `f1` to `f3` in `hold`, so a reload can be tested in a scripted run.
+**Decision.** The kit debug keys are F2 for the info box and F3 for the grid and the collision overlay (they were the other way round). (Revised by `adr-x28`: the kit now reads F1 and sends `ReloadMap`.) The collision overlay redraws when `CollisionWorld` changes, and `CollisionWorld::clear` lets a game replace its blocked areas. The script runner accepts `f1` to `f3` in `hold`, so a reload can be tested in a scripted run.
 
 **Rationale.** The developer wanted reload first, then the info box, then the grid, in the order they use them while editing a map. A reload must redraw the overlay, or the yellow outline shows the old map.
 
@@ -226,3 +226,11 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** A body sits above the feet. A shot that flies at hand height along the ground line of the shooter hits a body that stands on the same line. Testing the ground line would miss it, as the first scripted run showed. Testing the path stops a long step from jumping over a thin target.
 
 **How to apply.** See `dev-docs/extensions/projectiles.md` and `enemy-movement.md`.
+
+## adr-x28. F1 sends `ReloadMap` from the kit, and `--debug` turns the debug tools on (2026-11-04)
+
+**Decision.** `game_kit::reload::ReloadPlugin` reads F1 and sends a `ReloadMap` message. The game reads it (R-Town: `reload_map.run_if(on_message::<ReloadMap>)`) and decides what a reload resets. The kit does not reload anything itself. The debug tools (F2 info box, F3 grid, collision and movement overlays) are off unless the run starts with `--debug`: `rust.sh run|script <game> --debug` sets `GAME_KIT_DEBUG=1`, and `DebugPlugin::start_visible` reads it. Without the flag the overlays start hidden, and F2 and F3 still toggle them.
+
+**Rationale.** The key belongs with the other debug keys, and a second game can reuse it without copying the binding. What a reload resets is game state (R-Town removes enemies and projectiles), so a message keeps the kit free of game types. Screens and screenshots are clean by default, and Claude asks for the overlays when it needs them. The keys keep working so the developer can still show them in a normal run. An environment variable fits the existing `<GAME>_SCRIPT` and `<GAME>_MAP` pattern and needs no argument parsing in the games.
+
+**How to apply.** A game adds `ReloadPlugin` and a system that runs on `ReloadMap`. Long Way has none yet. Claude adds `--debug` when testing or taking screenshots (`CLAUDE.md`). A web build has no environment, so the tools start hidden there and F2 and F3 show them. This replaces the part of `adr-x19` that left F1 to the game.

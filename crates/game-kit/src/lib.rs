@@ -14,6 +14,7 @@ pub mod movement_debug;
 pub mod nav;
 pub mod outline;
 pub mod projectile;
+pub mod reload;
 pub mod rng;
 pub mod script;
 pub mod spawner;

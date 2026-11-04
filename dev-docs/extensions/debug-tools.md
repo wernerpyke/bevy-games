@@ -21,7 +21,7 @@ All tools are sprites or UI on named layers ([draw-order.md](draw-order.md)), no
 | Collision overlay | `crates/game-kit/src/collision_debug.rs` | Shared, uses the collision extension |
 | Movement debug | `crates/game-kit/src/movement_debug.rs` | Shared, uses the enemy movement extension |
 
-Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`.
+Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`, `adr-x28`.
 
 ## Specification
 
@@ -44,6 +44,7 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`.
 
 ## Usage
 
+- Run with `./dev-scripts/rust.sh run <game> --debug` (also `script`). The flag sets `GAME_KIT_DEBUG=1`, and `DebugPlugin::new` reads it into `DebugPlugin::start_visible`. Without it the tools start hidden. F2 and F3 toggle them either way. A web build has no flag, so the tools are off there (`adr-x28`).
 - Add `Controlled` to the player entity. Add `DebugPlugin::new(cell_size, grid_color, grid_origin)` (set `target_name`, `grid_z` or `hud_z_index` with struct update syntax) and `CollisionDebugPlugin::default()` (fields `outline_z`, `interior_z`, `feet_z`).
 - Report a value from any system through `DebugInfo`.
 - Add a new tool as a new system in the kit `debug.rs`, with a key toggle in `toggle_tools` and a field in `DebugSettings`.

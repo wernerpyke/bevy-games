@@ -63,10 +63,21 @@ pub struct DebugPlugin {
     pub grid_z: f32,
     /// `GlobalZIndex` of the info box. Defaults to the kit layer.
     pub hud_z_index: i32,
+    /// Whether the info box and the grid start visible. F2 and F3 toggle them either way. `new` sets it from `debug_requested`.
+    pub start_visible: bool,
+}
+
+/// The environment variable that turns the debug tools on. `rust.sh run <game> --debug` sets it.
+pub const DEBUG_VARIABLE: &str = "GAME_KIT_DEBUG";
+
+/// True when the run was started with `--debug` (`GAME_KIT_DEBUG` is set and is not `0`). A web build has no
+/// environment, so it is always false there.
+pub fn debug_requested() -> bool {
+    std::env::var_os(DEBUG_VARIABLE).is_some_and(|value| value != "0")
 }
 
 impl DebugPlugin {
-    /// A plugin with the default target name "player" and the kit layers.
+    /// A plugin with the default target name "player" and the kit layers. The tools start visible only with `--debug`.
     pub fn new(cell_size: f32, grid_color: Color, grid_origin: GridOrigin) -> Self {
         DebugPlugin {
             cell_size,
@@ -75,6 +86,7 @@ impl DebugPlugin {
             target_name: "player",
             grid_z: GRID_DEBUG_Z,
             hud_z_index: HUD_Z_INDEX,
+            start_visible: debug_requested(),
         }
     }
 }
@@ -89,8 +101,8 @@ impl Plugin for DebugPlugin {
             grid_z: self.grid_z,
             hud_z_index: self.hud_z_index,
             rows_from_top: None,
-            show_grid: true,
-            show_info: true,
+            show_grid: self.start_visible,
+            show_info: self.start_visible,
         })
         .init_resource::<DebugInfo>()
         .add_systems(Startup, (spawn_grid_root, spawn_info_box))

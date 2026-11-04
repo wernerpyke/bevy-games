@@ -1,6 +1,5 @@
 //! R-Town's map: loads the map file, names the object kinds and draws the ground. The parser is `game_kit::map`.
 
-use bevy::input::common_conditions::input_just_pressed;
 use bevy::prelude::*;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{Blocker, CollisionWorld};
@@ -8,6 +7,7 @@ use game_kit::debug::DebugSettings;
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, parse};
+use game_kit::reload::ReloadMap;
 
 use crate::camera::CELL_SIZE;
 use crate::enemy::{EnemyKind, SpawnerDef, spawner_def};
@@ -75,7 +75,7 @@ impl Plugin for MapPlugin {
             .insert_resource(PlayerStart(start))
             .insert_resource(MapSpawners(spawners))
             .add_systems(Startup, (spawn_ground, number_rows_like_the_file))
-            .add_systems(Update, reload_map.run_if(input_just_pressed(KeyCode::F1)));
+            .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
 
@@ -164,7 +164,7 @@ pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
         .collect()
 }
 
-/// F1: reads the map file again and resets the game state: the ground, trees, collision, camera limits and row numbers
+/// Runs on `ReloadMap` (F1, sent by the kit): reads the map file again and resets the game state: the ground, trees, collision, camera limits and row numbers
 /// are rebuilt, everything marked `MapEntity` (also the player and the projectiles) is removed, and the player is
 /// created again at the start cell. A file with an error is reported and nothing changes.
 fn reload_map(world: &mut World) {

@@ -14,13 +14,16 @@ Single entry point for players and users: quick start, controls, common commands
 ```
 ./dev-scripts/rust.sh run long-way
 ./dev-scripts/rust.sh run r-town
+
+# starts with the F2 info box and the F3 grid visible
+./dev-scripts/rust.sh run r-town --debug
 ```
 
 The first build takes several minutes.
 
 ## Controls
 
-- Arrow keys: walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug. Enemies (R-Town) kill the player on a touch: press F1 to start again.
+- Arrow keys: walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug (they start hidden unless the game runs with `--debug`). Enemies (R-Town) kill the player on a touch: press F1 to start again.
 
 ## Troubleshooting
 
