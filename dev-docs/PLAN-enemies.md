@@ -1,6 +1,6 @@
 # PLAN: enemies in R-Town
 
-Status: in progress (steps 1 to 8 done). The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
+Status: in progress (steps 1 to 9 done). The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
 
 ## 1. Goal
 

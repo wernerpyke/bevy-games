@@ -32,6 +32,23 @@ Canvas 16x17, 10 frames, prefix `char_`. Source: `medieval-fantasy-1/characters/
 
 Every character is one static pose (`adr-rt3`). The player is animated in code: flip for left and right, a one pixel bob while walking.
 
+## `characters/monsters.aseprite`
+
+Canvas 13x11, 2 frames, prefix `mon_`. Source: `medieval-fantasy-1/monsters/skeleton.png` and `goblin.png`. The other monsters of the folder (bat, cyclop, dragon, king skeleton, leonard, slim, snake) are not in the file. Like the characters, each image sits at the bottom centre of its frame, so the feet share one line, and each is one static front view that the code flips left and right (`adr-rt3`).
+
+| Tag | Image | Position in frame | What it shows (read from a scaled export) |
+|---|---|---|---|
+| `mon_skeleton` | 13x11 | 0,0 | skeleton with a white skull, a brown shield and a club |
+| `mon_goblin` | 13x10 | 0,1 | green goblin with a brown club and a blue loincloth |
+
+To rebuild:
+
+```
+aseprite -b --script-param out=games/r-town/assets/art/characters/monsters.aseprite --script-param prefix=mon_ \
+  --script-param files=games/r-town/input/medieval-fantasy-1/monsters/skeleton.png,games/r-town/input/medieval-fantasy-1/monsters/goblin.png \
+  --script dev-scripts/aseprite/pack_pngs.lua
+```
+
 ## `features/background-elements.aseprite`
 
 Canvas 30x39, 21 frames, prefix `bg_`. Source: `medieval-fantasy-1/background-elements/1.png` to `21.png`. The terrain sheet `0-tileset.png` (320x192) is not in the file.
