@@ -55,6 +55,16 @@ pub struct GameRng {
     fixed: bool,
 }
 
+impl GameRng {
+    /// A generator with a fixed seed, for tests.
+    pub fn seeded(seed: u64) -> Self {
+        Self {
+            rng: Rng::new(seed),
+            fixed: true,
+        }
+    }
+}
+
 impl std::ops::Deref for GameRng {
     type Target = Rng;
     fn deref(&self) -> &Rng {
