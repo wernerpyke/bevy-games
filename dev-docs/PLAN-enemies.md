@@ -37,7 +37,7 @@ Enemies appear at spawn points on the map, walk by a movement strategy, kill the
 
 1. **Player death.** The player entity and its sprite are removed (D10). Hit points come later.
 2. **Strategies and speeds.** The player walks at 80 px/s.
-   - Skeleton: random patrol within 120 px, speed 0.8 x the player = 64 px/s.
+   - Skeleton: random patrol within 120 px, speed 0.5 x the player = 40 px/s (changed from 0.8 x by the developer after seeing it).
    - Goblin: pursue, speed 0.2 x the player = 16 px/s (one cell per second).
    - The code states both as a factor of the player's `WALK_SPEED`, so they follow when it changes.
 3. **Spawners.** One spawner per enemy kind, in `test.txt`: skeleton every 10 s, goblin every 15 s. Each legend entry also names the movement strategy: `strategy=patrol radius=120` for the skeleton, `strategy=pursue` for the goblin. Speed stays in the game code, per enemy kind (answer 2). The first enemy appears at game start. No limit of live enemies, no distance rule, no on-screen rule. A fixed interval only (`every=<seconds>`). The first test positions are in step 12.

@@ -64,7 +64,7 @@ impl EnemyKind {
     pub fn speed(self) -> f32 {
         WALK_SPEED
             * match self {
-                EnemyKind::Skeleton => 0.8,
+                EnemyKind::Skeleton => 0.5,
                 EnemyKind::Goblin => 0.2,
             }
     }
@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn speeds_are_shares_of_the_player_speed() {
-        assert_eq!(EnemyKind::Skeleton.speed(), 0.8 * WALK_SPEED);
+        assert_eq!(EnemyKind::Skeleton.speed(), 0.5 * WALK_SPEED);
         assert_eq!(EnemyKind::Goblin.speed(), 0.2 * WALK_SPEED);
     }
 
