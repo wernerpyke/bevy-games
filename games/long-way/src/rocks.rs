@@ -238,6 +238,7 @@ mod tests {
         MapObject {
             kind: "rock_0".to_string(),
             cell: IVec2::new(x, y),
+            params: Default::default(),
         }
     }
 

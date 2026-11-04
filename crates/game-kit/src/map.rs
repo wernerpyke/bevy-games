@@ -10,7 +10,8 @@
 //! - `size`: width and height in cells, written `WxH`. Required.
 //! - `draw`: drawn size of an object in pixels. Optional, the game gives the default.
 //! - `jitter`: largest random offset in pixels. Default 0.
-//! - `legend`: indented `char: kind` lines. `.` is always empty. Quote the character
+//! - `legend`: indented `char: kind` lines. A kind may be followed by `key=value` parameters, for example
+//!   `"S": spawn_skeleton every=10 radius=120` (`Params`). The game reads them by name. `.` is always empty. Quote the character
 //!   (for example `"#"`), because an unquoted `#` starts a comment.
 //!
 //! Grid: rows of the form `<label>|<cells>|`. Cell k is the character at offset 2k between the bars, and a
@@ -29,6 +30,54 @@ pub struct MapObject {
     /// The legend name of the object, for example `rock_0`.
     pub kind: String,
     pub cell: IVec2,
+    /// The `key=value` parameters that follow the kind in the legend. Empty for most objects.
+    pub params: Params,
+}
+
+/// Parameters written after a kind name in the legend, in file order. Values are text, and the game says what each
+/// key means.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Params(Vec<(String, String)>);
+
+impl Params {
+    pub fn from_pairs(pairs: &[(&str, &str)]) -> Self {
+        Self(
+            pairs
+                .iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect(),
+        )
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.0
+            .iter()
+            .map(|(key, value)| (key.as_str(), value.as_str()))
+    }
+
+    /// The text of a parameter, if the legend entry has it.
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.iter()
+            .find(|(name, _)| *name == key)
+            .map(|(_, value)| value)
+    }
+
+    /// A parameter as a number. `Ok(None)` when it is absent. An error message when it is not a number.
+    pub fn f32(&self, key: &str) -> Result<Option<f32>, String> {
+        match self.get(key) {
+            None => Ok(None),
+            Some(text) => text
+                .parse::<f32>()
+                .ok()
+                .filter(|number| number.is_finite())
+                .map(Some)
+                .ok_or_else(|| format!("parameter `{key}` must be a number, found `{text}`")),
+        }
+    }
 }
 
 /// The corner of the grid where the row labels start at 0. It only changes how a file is written. Cells in
@@ -78,7 +127,7 @@ struct Header {
     size: Option<IVec2>,
     draw_size: Option<f32>,
     jitter: Option<f32>,
-    legend: HashMap<char, String>,
+    legend: HashMap<char, (String, Params)>,
 }
 
 /// Reads the frontmatter. Returns the index of the closing `---` line, the header, the map name and the cell size.
@@ -151,7 +200,7 @@ fn parse_grid(
     first: usize,
     size: IVec2,
     origin: Origin,
-    legend: &HashMap<char, String>,
+    legend: &HashMap<char, (String, Params)>,
     fail: &Fail,
 ) -> Result<Vec<MapObject>, MapError> {
     let width = size.x as usize;
@@ -221,7 +270,7 @@ fn parse_grid(
             if character == ' ' || character == '.' {
                 continue;
             }
-            let Some(kind) = legend.get(&character) else {
+            let Some((kind, params)) = legend.get(&character) else {
                 return Err(fail(
                     line,
                     format!("character `{character}` is not in the legend"),
@@ -230,6 +279,7 @@ fn parse_grid(
             objects.push(MapObject {
                 kind: kind.clone(),
                 cell: IVec2::new(x as i32, y),
+                params: params.clone(),
             });
         }
     }
@@ -315,13 +365,14 @@ fn parse_header(
                 }
                 continue;
             }
-            if !kinds.contains(&value) {
+            let (kind, params) = legend_value(value, line, fail)?;
+            if !kinds.contains(&kind) {
                 return Err(fail(
                     line,
-                    format!("unknown kind `{value}` (known: {})", kinds.join(", ")),
+                    format!("unknown kind `{kind}` (known: {})", kinds.join(", ")),
                 ));
             }
-            header.legend.insert(character, value.to_string());
+            header.legend.insert(character, (kind.to_string(), params));
             continue;
         }
         in_legend = false;
@@ -384,6 +435,39 @@ fn parse_header(
         }
     }
     Ok(header)
+}
+
+/// Splits a legend value into the kind and its `key=value` parameters.
+fn legend_value<'a>(
+    value: &'a str,
+    line: usize,
+    fail: &Fail,
+) -> Result<(&'a str, Params), MapError> {
+    let mut words = value.split_whitespace();
+    let kind = words.next().unwrap_or("");
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    for word in words {
+        let Some((key, text)) = word.split_once('=') else {
+            return Err(fail(
+                line,
+                format!("expected `key=value` after the kind, found `{word}`"),
+            ));
+        };
+        let key_ok = !key.is_empty() && key.chars().all(|c| c.is_ascii_alphanumeric() || c == '_');
+        if !key_ok || text.is_empty() {
+            return Err(fail(
+                line,
+                format!(
+                    "bad parameter `{word}`: use `key=value` with letters, digits and `_` in the key"
+                ),
+            ));
+        }
+        if pairs.iter().any(|(name, _)| name == key) {
+            return Err(fail(line, format!("parameter `{key}` is given twice")));
+        }
+        pairs.push((key.to_string(), text.to_string()));
+    }
+    Ok((kind, Params(pairs)))
 }
 
 fn positive(value: &str, key: &str, line: usize, fail: &Fail) -> Result<f32, MapError> {
@@ -694,6 +778,48 @@ mod text_tests {
         assert!(e.message.contains("always empty"), "{e}");
         let e = error("---\nmap: t\ncell: 16\norigin: bottom-left\n  \"g\": tree_big\n---\n");
         assert!(e.message.contains("outside `legend`"), "{e}");
+    }
+
+    fn legend_map(entries: &str) -> String {
+        format!(
+            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 2x1\nlegend:\n  \".\": empty\n{entries}---\n   |0 1|\n 0 |a b|\n"
+        )
+    }
+
+    #[test]
+    fn legend_parameters_are_read_and_default_to_none() {
+        let kinds = ["spawn_a", "tree_big"];
+        let source = legend_map(
+            "  \"a\": spawn_a every=10 strategy=patrol radius=120.5\n  \"b\": tree_big\n",
+        );
+        let map = parse("t.txt", &source, &kinds).unwrap();
+        assert_eq!(map.objects.len(), 2);
+        let spawner = &map.objects[0];
+        assert_eq!(spawner.kind, "spawn_a");
+        assert_eq!(spawner.params.get("every"), Some("10"));
+        assert_eq!(spawner.params.get("strategy"), Some("patrol"));
+        assert_eq!(spawner.params.f32("radius"), Ok(Some(120.5)));
+        assert_eq!(spawner.params.f32("missing"), Ok(None));
+        assert!(spawner.params.f32("strategy").is_err());
+        assert!(map.objects[1].params.is_empty());
+    }
+
+    #[test]
+    fn bad_legend_parameters_are_errors_with_their_line() {
+        let kinds = ["spawn_a", "tree_big"];
+        for (entry, text) in [
+            ("spawn_a every", "expected `key=value`"),
+            ("spawn_a =5", "bad parameter"),
+            ("spawn_a every=", "bad parameter"),
+            ("spawn_a ev-ery=5", "bad parameter"),
+            ("spawn_a every=5 every=6", "given twice"),
+            ("nope every=5", "unknown kind `nope`"),
+        ] {
+            let source = legend_map(&format!("  \"a\": {entry}\n  \"b\": tree_big\n"));
+            let e = parse("t.txt", &source, &kinds).unwrap_err();
+            assert_eq!(e.line, 8, "{entry}");
+            assert!(e.message.contains(text), "{entry}: {e}");
+        }
     }
 
     /// The same drawing as `grid`, with rows labelled from the top for `origin: top-left`.

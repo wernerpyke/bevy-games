@@ -121,6 +121,7 @@ mod tests {
         MapObject {
             kind: kind.to_string(),
             cell: IVec2::new(x, y),
+            params: Default::default(),
         }
     }
 
@@ -183,6 +184,7 @@ mod tests {
         let object = MapObject {
             kind: "tree_giant".to_string(),
             cell: IVec2::new(2, 3),
+            params: Default::default(),
         };
         assert_eq!(base_of(&object), Vec2::new(40.0, 48.0));
     }
