@@ -1,5 +1,5 @@
 //! Projectiles that fly in a straight line over the ground and disappear when they hit something blocked or leave
-//! the map. See `dev-docs/PLAN-projectiles.md`.
+//! the map. See `dev-docs/extensions/projectiles.md`.
 //!
 //! A projectile is a point on the ground, like the feet of a character, and uses the same collision edges
 //! (`collision::resolve`). `step` is plain Rust with no Bevy world, so it is unit tested without a running app.
