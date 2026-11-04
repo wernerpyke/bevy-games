@@ -10,7 +10,7 @@ use game_kit::depth::DepthSort;
 
 use crate::collision::FEET_HALF_WIDTH;
 use crate::input::{InputSet, PlayerInput};
-use crate::map::PlayerStart;
+use crate::map::{MapEntity, PlayerStart};
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
 pub const WALK_SPEED: f32 = 80.0;
@@ -61,12 +61,18 @@ fn next_facing(current: Vec2, direction: Vec2) -> Vec2 {
 #[derive(Component)]
 struct PlayerSprite;
 
-fn spawn_player(mut commands: Commands, server: Res<AssetServer>, player_start: Res<PlayerStart>) {
+/// Creates the player at the start cell. Also run again when the map is reloaded (F1).
+pub(crate) fn spawn_player(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    player_start: Res<PlayerStart>,
+) {
     let start = player_start.0.as_vec2() * crate::camera::CELL_SIZE;
     commands
         .spawn((
             Controlled,
             Player::default(),
+            MapEntity,
             SlideAssist::default(),
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(start.extend(0.0)),

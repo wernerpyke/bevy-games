@@ -65,7 +65,8 @@ impl Plugin for MapPlugin {
     }
 }
 
-/// Marks everything a map spawns, so a reload can remove it.
+/// Marks everything that an F1 reload removes: the objects of the map and also the player, the projectiles in flight
+/// and the enemies. The reload creates the player and the spawners again. Putting it on a new kind of game object makes the object part of the reset.
 #[derive(Component)]
 pub struct MapEntity;
 
@@ -131,8 +132,9 @@ pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
         .collect()
 }
 
-/// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The player
-/// stays where it is. A file with an error is reported and the current map stays.
+/// F1: reads the map file again and resets the game state: the ground, trees, collision, camera limits and row numbers
+/// are rebuilt, everything marked `MapEntity` (also the player and the projectiles) is removed, and the player is
+/// created again at the start cell. A file with an error is reported and nothing changes.
 fn reload_map(world: &mut World) {
     let (map, start) = match load_map() {
         Ok(loaded) => loaded,
@@ -159,6 +161,7 @@ fn reload_map(world: &mut World) {
     world.insert_resource(current);
     world.insert_resource(PlayerStart(start));
     let _ = world.run_system_cached(spawn_ground);
+    let _ = world.run_system_cached(crate::player::spawn_player);
     let _ = world.run_system_cached(number_rows_like_the_file);
     let _ = world.run_system_cached(crate::trees::spawn_trees);
     let _ = world.run_system_cached(crate::water::spawn_water);

@@ -7,6 +7,7 @@ use game_kit::depth::DepthSort;
 use game_kit::projectile::{Projectile, ProjectileSprite};
 
 use crate::input::{InputSet, PlayerInput};
+use crate::map::MapEntity;
 use crate::player::{Player, WALK_SPEED};
 
 /// Projectile speed in art pixels per second: twice the walk speed.
@@ -37,6 +38,7 @@ fn fire(
     commands
         .spawn((
             Projectile::new(player.facing, PROJECTILE_SPEED),
+            MapEntity,
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(transform.translation.truncate().extend(0.0)),
             Visibility::default(),
