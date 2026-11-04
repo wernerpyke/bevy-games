@@ -19,7 +19,7 @@ const BUNDLED_SOURCE: &str = include_str!("../assets/maps/test.txt");
 /// Environment variable with the path of a map file to load instead (`rust.sh run r-town <map>`).
 const MAP_VARIABLE: &str = "R_TOWN_MAP";
 
-/// The legend name of the marker that sets where the hero starts. It has no art.
+/// The legend name of the marker that sets where the player starts. It has no art.
 const PLAYER_START: &str = "player_start";
 
 /// The legend names the parser accepts.
@@ -131,7 +131,7 @@ pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
         .collect()
 }
 
-/// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The hero
+/// F1: reads the map file again and rebuilds the ground, trees, collision, camera limits and row numbers. The player
 /// stays where it is. A file with an error is reported and the current map stays.
 fn reload_map(world: &mut World) {
     let (map, start) = match load_map() {
@@ -187,7 +187,7 @@ impl CurrentMap {
     }
 }
 
-/// The cell where the hero starts, from the `player_start` marker in the map file.
+/// The cell where the player starts, from the `player_start` marker in the map file.
 #[derive(Resource)]
 pub struct PlayerStart(pub IVec2);
 
@@ -215,7 +215,7 @@ impl Kind {
         }
     }
 
-    /// Trees have tall art, so the hero walks behind a lone one. Water fills its cell.
+    /// Trees have tall art, so the player walks behind a lone one. Water fills its cell.
     pub fn is_tree(self) -> bool {
         !matches!(self, Kind::Water(_))
     }

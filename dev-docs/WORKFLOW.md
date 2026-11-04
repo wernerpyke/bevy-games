@@ -6,12 +6,12 @@ Repeatable steps for the start of a game. This file is built from real use. The 
 
 1. **Create the game folder.** `games/<name>/` in kebab-case, with `input/` and `docs/`. Add a minimal `Cargo.toml` and `src/main.rs` at once: `members = ["games/*"]` makes every cargo command fail for a folder without a manifest. `games/*/input/` is gitignored (root `.gitignore`), so raw packs never reach git.
 2. **Drop material in `input/`.** Art, audio, references. The game never reads `input/`. Used files are copied into `assets/` on request (adr-w5).
-3. **Review `input/`.** List the files. View the key sheets. Read the license text. Report sizes, tile grids, animation frames and gaps. Check for facing sprites and walk frames before choosing a hero.
+3. **Review `input/`.** List the files. View the key sheets. Read the license text. Report sizes, tile grids, animation frames and gaps. Check for facing sprites and walk frames before choosing a player.
 4. **Interview.** Rounds of up to 4 questions on one topic each. Offer a recommended option first. "Defer" and "decide later" are valid answers: record them as open questions and do not invent the design. If the developer does not understand a question, stop and explain it with examples, then ask again.
 5. **Write the spec as you go.** `games/<name>/docs/SPEC.md`. Update it after every round, so it is always current. Template below.
 6. **Record each decision.** One ADR per decision in `games/<name>/docs/adr.md` (prefix in `dev-docs/adr/README.md`). Say why, not how it is coded.
 7. **Check the license.** Ask early whether the repo and any web build are public. Record the result in an ADR.
-8. **Set the first playable.** Pick the smallest slice that proves the base: hero, map, collision, camera. A test map comes before the real level.
+8. **Set the first playable.** Pick the smallest slice that proves the base: player, map, collision, camera. A test map comes before the real level.
 9. **List reusable code.** Compare the spec with existing games. Write or update a plan for shared code (`dev-docs/PLAN-*.md`). Ask the developer about each design choice one at a time. Record the answers in `dev-docs/adr/EXTENSIONS.md`.
 10. **Scaffold the crate.** Use the shared kit `crates/game-kit` (section below). Run `./dev-scripts/rust.sh lint`, `test` and `web`.
 11. **Write the build plan.** `dev-docs/PLAN-<name>-<topic>.md`, small runnable steps. The last step migrates lasting content to docs and deletes the plan.

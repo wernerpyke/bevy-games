@@ -18,9 +18,9 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 
 ## 4. Player
 
-- One fixed hero: pack character 9 (`characters/9.png`, 14x16 px).
+- One fixed player: pack character 9 (`characters/9.png`, 14x16 px).
 - Animation is done in code on the one sprite (adr-rt3): flip left and right and a one pixel bob while walking. The idle squash is not built yet. Up and down use the same sprite.
-- The hero entity is at the feet and the sprite is a child (adr-rt6). Arrow keys and WASD move the hero.
+- The player entity is at the feet and the sprite is a child (adr-rt6). Arrow keys and WASD move the player.
 - Walk speed: 80 art pixels per second (5 cells per second), the same pace as Guy in Long Way in body heights.
 - Feet box: 10 px wide and 4 px tall at the bottom of the sprite. It fits through a one-cell gap.
 - Abilities and stats: not yet decided.
@@ -28,12 +28,12 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 ## 5. World and maps
 
 - Grid cell is 16x16 art pixels (adr-rt3). The tileset is 320x192, so 20x12 tiles.
-- The first playable is one town map of 60x60 cells (960x960 art pixels) that scrolls. The camera follows the hero and stops at the map edges.
+- The first playable is one town map of 60x60 cells (960x960 art pixels) that scrolls. The camera follows the player and stops at the map edges.
 - The camera shows 240 art pixels of height (15 cells), so the view is 26.7 cells wide at 16:9 (adr-rt4).
-- Maps are text grid files from the shared kit (adr-x13, adr-x18). The test map is `assets/maps/test.txt`: 60x60 cells with `origin: top-left`. It starts blank, with the hero start marked `@` (`player_start`) at column 10 on row 2 (file numbers, counted from the top, same as the F3 grid), and is filled in by hand. The ground is a flat placeholder colour. The map size is the `size` key in the file (adr-rt7).
-- Blocking: water, houses, trees, walls, fences, wells, barrels, crates and chests all block the hero.
+- Maps are text grid files from the shared kit (adr-x13, adr-x18). The test map is `assets/maps/test.txt`: 60x60 cells with `origin: top-left`. It starts blank, with the player start marked `@` (`player_start`) at column 10 on row 2 (file numbers, counted from the top, same as the F3 grid), and is filled in by hand. The ground is a flat placeholder colour. The map size is the `size` key in the file (adr-rt7).
+- Blocking: water, houses, trees, walls, fences, wells, barrels, crates and chests all block the player.
 - Groups (adr-rt9): items that touch, also at a corner, form a group. An item alone blocks the base band. A member of a group blocks its whole cell. See `dev-docs/extensions/groups.md`.
-- Footprints: houses and trees block at the base only. The hero walks behind the top and may overlap from below, as in Long Way (adr-lw1). Other objects use whole-tile footprints.
+- Footprints: houses and trees block at the base only. The player walks behind the top and may overlap from below, as in Long Way (adr-lw1). Other objects use whole-tile footprints.
 - Scaling: fractional scale is allowed, as in Long Way (adr-rt4). On 1080p the scale is 4.5.
 - Structure beyond the town (connected screens, one large map, hub plus maps): not yet decided.
 
@@ -59,7 +59,7 @@ Source pack: "Superpowers Medieval Fantasy Asset Pack (part 1)" by Pixel-boy, in
 
 | Folder | Contents |
 |---|---|
-| `characters/` | `0-characters.png` is 176x17 with 11 characters. Singles 1 to 10 are static, 9 to 16 px (hero is 9: 14x16) |
+| `characters/` | `0-characters.png` is 176x17 with 11 characters. Singles 1 to 10 are static, 9 to 16 px (player is 9: 14x16) |
 | `monsters/` | bat, cyclop, dragon, goblin, king skeleton, leonard, skeleton, slim, snake. Single sprites, 6 to 51 px |
 | `background-elements/` | `0-tileset.png` 320x192 with grass, wood, stone and water tiles, houses, trees, gates, wells. Singles 1 to 21 |
 | `items/` | weapon, element, food and potion, projectile, gold and gem, emblem, chests, barrels, crates |
@@ -80,18 +80,18 @@ Deferred. Pack has 6 music themes and 20+ effects.
 
 ## 12. Scope
 
-- First playable (built, 2026-11-02): walk around a test map like the Long Way test map (first 80x60 cells with scattered trees, from 2026-11-02 a blank 60x60 map that is filled in by hand). Hero, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate `crates/game-kit` (adr-x12).
+- First playable (built, 2026-11-02): walk around a test map like the Long Way test map (first 80x60 cells with scattered trees, from 2026-11-02 a blank 60x60 map that is filled in by hand). Player, tile map, collision, scrolling pixel camera. It proves collision, scrolling and art. No enemies, no dialogue, no UI, no audio. Built on the shared crate `crates/game-kit` (adr-x12).
 - The real town layout is designed after the first playable.
 - Later: combat, interaction, progression, audio, UI.
 - Out of scope: public release.
 
 ## 13. Open questions
 
-- The hero's feet box is 10x4 but the kit collision works on a point: only the 5 px half width is used, and the 4 px is the depth of the blocked band at a tree base. Decide whether a real box is needed.
-- Idle squash for the hero (adr-rt3) is not built.
+- The player's feet box is 10x4 but the kit collision works on a point: only the 5 px half width is used, and the 4 px is the depth of the blocked band at a tree base. Decide whether a real box is needed.
+- Idle squash for the player (adr-rt3) is not built.
 - The pack's other categories (monsters, items, hud, animals) are not packed into `.aseprite` files yet. The terrain sheet `0-tileset.png` is not either, and the ground is a flat colour.
 - The real town layout (after the first playable). The first playable uses a test map.
 - Exact base footprint size of each house and tree kind (in cells).
-- Overlap from below: Long Way removed it on 2026-11-02 (trees stop at the base line, like rocks). Section 5 and adr-rt5 say the hero "may overlap from below", so decide whether R-Town keeps that.
+- Overlap from below: Long Way removed it on 2026-11-02 (trees stop at the base line, like rocks). Section 5 and adr-rt5 say the player "may overlap from below", so decide whether R-Town keeps that.
 - Collision geometry: Long Way's `Trunk` and `GUY_*` values are in 60 px art units, so they need R-Town values (shared-crate plan step 4).
 - Combat model, world structure beyond the town, progression and save, interaction features, audio, UI.

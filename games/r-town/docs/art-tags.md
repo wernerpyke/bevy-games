@@ -27,10 +27,10 @@ Canvas 16x17, 10 frames, prefix `char_`. Source: `medieval-fantasy-1/characters/
 | `char_6` | 12x12 | 2,5 | person in an orange cone hat, pink robe |
 | `char_7` | 16x17 | 0,0 | witch in black with a broom |
 | `char_8` | 13x12 | 1,5 | pink hooded figure with a tool |
-| `char_9` | 14x16 | 1,1 | **the hero**: blue wizard with a staff |
+| `char_9` | 14x16 | 1,1 | **the player**: blue wizard with a staff |
 | `char_10` | 13x16 | 1,1 | dark wizard with an orb staff |
 
-Every character is one static pose (`adr-rt3`). The hero is animated in code: flip for left and right, a one pixel bob while walking.
+Every character is one static pose (`adr-rt3`). The player is animated in code: flip for left and right, a one pixel bob while walking.
 
 ## `features/background-elements.aseprite`
 
@@ -104,4 +104,4 @@ Kinds are the names a map legend uses (`assets/maps/test.txt`). Each is defined 
 
 Water fills its cell and always blocks the whole cell grown sideways by 5. It does not count as a neighbour in the tree groups (`adr-rt9`, `adr-rt10`).
 
-The blocked area is the base grown sideways by 5 (the hero's feet half width) and 4 deep (`adr-rt5`, `adr-rt6`). Above it the hero walks behind the tree.
+The blocked area is the base grown sideways by 5 (the player's feet half width) and 4 deep (`adr-rt5`, `adr-rt6`). Above it the player walks behind the tree.

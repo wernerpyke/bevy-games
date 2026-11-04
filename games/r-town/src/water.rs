@@ -1,4 +1,4 @@
-//! Spawns the water of the current map (`map.rs`). Water is a 16 px tile that fills its cell and blocks the hero on
+//! Spawns the water of the current map (`map.rs`). Water is a 16 px tile that fills its cell and blocks the player on
 //! the whole cell. It lies on the ground, so it has no depth sort and no walking behind it.
 
 use bevy::prelude::*;

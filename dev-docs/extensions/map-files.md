@@ -42,7 +42,7 @@ legend:
  0 |. . . . . .|
 ```
 
-The tree is at (1,1). Its 2x2 footprint is drawn with blanks. The hero starts at (4,1).
+The tree is at (1,1). Its 2x2 footprint is drawn with blanks. The player starts at (4,1).
 
 The same map with `origin: top-left` has the same drawing and different row labels:
 

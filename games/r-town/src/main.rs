@@ -1,7 +1,7 @@
 mod camera;
 mod collision;
-mod hero;
 mod map;
+mod player;
 mod trees;
 mod water;
 
@@ -24,7 +24,7 @@ fn main() {
             },
             game_kit::collision_debug::CollisionDebugPlugin::default(),
             game_kit::debug::DebugPlugin {
-                target_name: "hero",
+                target_name: "player",
                 ..game_kit::debug::DebugPlugin::new(
                     camera::CELL_SIZE,
                     Color::srgb(1.0, 0.1, 0.1),
@@ -38,7 +38,7 @@ fn main() {
             map::MapPlugin,
             trees::TreesPlugin,
             water::WaterPlugin,
-            hero::HeroPlugin,
+            player::PlayerPlugin,
         ))
         .run();
 }

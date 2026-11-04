@@ -1,5 +1,5 @@
 //! Spawns the trees of the current map (`map.rs`). A tree stands on its cell: the bottom centre of its art is the
-//! bottom centre of the cell. Only the base blocks the hero (`adr-rt5`), so the hero walks behind the rest.
+//! bottom centre of the cell. Only the base blocks the player (`adr-rt5`), so the player walks behind the rest.
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
@@ -14,7 +14,7 @@ use crate::map::{CurrentMap, Kind, MapEntity, blocking_group_sizes};
 /// Both art files are packed with the same canvas: 30 wide and 39 high, each tree at the bottom centre
 /// (`dev-scripts/aseprite/pack_pngs.lua`).
 const CANVAS_HEIGHT: f32 = 39.0;
-/// A tree sorts this far above its base, so the hero standing on the base line is drawn in front (as `adr-lw13`).
+/// A tree sorts this far above its base, so the player standing on the base line is drawn in front (as `adr-lw13`).
 const SORT_BIAS: f32 = 1.0;
 
 pub struct TreesPlugin;
@@ -64,8 +64,8 @@ fn base_of(object: &MapObject) -> Vec2 {
     object.cell.as_vec2() * CELL_SIZE + Vec2::new(CELL_SIZE / 2.0, 0.0)
 }
 
-/// The area the hero's feet may not enter for a tree that stands alone: the base of the tree grown sideways by the
-/// feet half width, 4 px deep. The hero walks behind the rest (`adr-rt5`).
+/// The area the player's feet may not enter for a tree that stands alone: the base of the tree grown sideways by the
+/// feet half width, 4 px deep. The player walks behind the rest (`adr-rt5`).
 fn blocked_area(base: Vec2, edges: (f32, f32)) -> Rect {
     Rect::new(
         base.x + edges.0 - FEET_HALF_WIDTH,

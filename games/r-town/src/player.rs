@@ -1,4 +1,4 @@
-//! The hero: pack character 9, animated in code (`adr-rt3`). The root entity is at the hero's feet. The sprite is a
+//! The player: pack character 9, animated in code (`adr-rt3`). The root entity is at the player's feet. The sprite is a
 //! child, so the walking bob moves the sprite and not the feet that collision uses.
 
 use bevy::prelude::*;
@@ -13,22 +13,22 @@ use crate::map::PlayerStart;
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
 const WALK_SPEED: f32 = 80.0;
-/// Height of the hero's canvas in `characters.aseprite` (16 wide, 17 high).
+/// Height of the player's canvas in `characters.aseprite` (16 wide, 17 high).
 const CANVAS_HEIGHT: f32 = 17.0;
 /// Walking bob: the sprite lifts one pixel, this many times a second.
 const BOB_RATE: f32 = 6.0;
 
-pub struct HeroPlugin;
+pub struct PlayerPlugin;
 
-impl Plugin for HeroPlugin {
+impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_hero)
-            .add_systems(Update, (move_hero, animate_hero).chain());
+        app.add_systems(Startup, spawn_player)
+            .add_systems(Update, (move_player, animate_player).chain());
     }
 }
 
 #[derive(Component, Default)]
-struct Hero {
+struct Player {
     facing_left: bool,
     walking: bool,
     /// Seconds spent walking, for the bob.
@@ -36,21 +36,21 @@ struct Hero {
 }
 
 #[derive(Component)]
-struct HeroSprite;
+struct PlayerSprite;
 
-fn spawn_hero(mut commands: Commands, server: Res<AssetServer>, player_start: Res<PlayerStart>) {
+fn spawn_player(mut commands: Commands, server: Res<AssetServer>, player_start: Res<PlayerStart>) {
     let start = player_start.0.as_vec2() * crate::camera::CELL_SIZE;
     commands
         .spawn((
             Controlled,
-            Hero::default(),
+            Player::default(),
             SlideAssist::default(),
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(start.extend(0.0)),
             Visibility::default(),
         ))
         .with_child((
-            HeroSprite,
+            PlayerSprite,
             AseAnimation {
                 aseprite: server.load("art/characters/characters.aseprite"),
                 animation: Animation::tag("char_9"),
@@ -78,23 +78,23 @@ fn input_direction(input: &ButtonInput<KeyCode>) -> Vec2 {
     direction
 }
 
-fn move_hero(
+fn move_player(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
     bounds: Res<CameraBounds>,
-    hero: Single<(&mut Transform, &mut Hero, &mut SlideAssist)>,
+    player: Single<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
-    let (mut transform, mut hero, mut assist) = hero.into_inner();
+    let (mut transform, mut player, mut assist) = player.into_inner();
     let direction = input_direction(&input);
-    hero.walking = direction != Vec2::ZERO;
-    if !hero.walking {
+    player.walking = direction != Vec2::ZERO;
+    if !player.walking {
         assist.reset();
         return;
     }
     if direction.x != 0.0 {
-        hero.facing_left = direction.x < 0.0;
+        player.facing_left = direction.x < 0.0;
     }
     let dt = time.delta_secs();
     let old = transform.translation.truncate();
@@ -109,20 +109,20 @@ fn move_hero(
     transform.translation.y = feet.y;
 }
 
-fn animate_hero(
+fn animate_player(
     time: Res<Time>,
-    mut hero: Single<&mut Hero>,
-    mut sprite: Single<(&mut Sprite, &mut Transform), With<HeroSprite>>,
+    mut player: Single<&mut Player>,
+    mut sprite: Single<(&mut Sprite, &mut Transform), With<PlayerSprite>>,
 ) {
-    if hero.walking {
-        hero.walk_time += time.delta_secs();
+    if player.walking {
+        player.walk_time += time.delta_secs();
     } else {
-        hero.walk_time = 0.0;
+        player.walk_time = 0.0;
     }
     let (sprite, transform) = &mut *sprite;
-    sprite.flip_x = hero.facing_left;
-    let lift = if hero.walking {
-        (hero.walk_time * BOB_RATE) as i32 % 2
+    sprite.flip_x = player.facing_left;
+    let lift = if player.walking {
+        (player.walk_time * BOB_RATE) as i32 % 2
     } else {
         0
     };
