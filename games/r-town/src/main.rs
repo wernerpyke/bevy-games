@@ -34,6 +34,7 @@ fn main() {
                 )
             },
             game_kit::depth::DepthPlugin::default(),
+            game_kit::nav::NavPlugin { step: 4.0 },
             game_kit::projectile::ProjectilePlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "R_TOWN",

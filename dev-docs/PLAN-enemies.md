@@ -1,6 +1,6 @@
 # PLAN: enemies in R-Town
 
-Status: draft. The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
+Status: in progress (steps 1 to 4 done). The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
 
 ## 1. Goal
 
@@ -83,7 +83,7 @@ Each step ends with `./dev-scripts/rust.sh lint` and `test`. Ask before any comm
 1. **Checks.** Compile `pathfinding` for `wasm32-unknown-unknown`, and check its version and licence (workspace rule 2). Verify the Bevy 0.20.1 APIs: `Timer` in a component, how `Single` skips a system when its entity is gone, running a headless `App` in a test. Look at both PNGs for the direction the sprites face. Record in `dev-docs/bevy/notes.md`.
 2. **Kit: `rng.rs`** and tests (same seed gives the same numbers, ranges, points inside the disc).
 3. **Kit: legend parameters in `map.rs`** and tests (no parameters, one, several, a bad pair gives an error with its line). Update `map-files.md`.
-4. **Kit: `nav.rs`.** Tests on built edges: open ground, around a thin band, around a grove, through a 6 px gap, a goal inside a blocked area (no path), a start inside one, smoothing keeps the path legal. Measure the build time and the path time for the 60x60 test map and write both numbers in the plan.
+4. **Kit: `nav.rs`.** Tests on built edges: open ground, around a thin band, around a grove, through a 6 px gap, a goal inside a blocked area (no path), a start inside one, smoothing keeps the path legal. Measure the build time and the path time for the 60x60 test map and write both numbers in the plan. Done: the grid for `test.txt` (58,081 points at 4 px) builds in about 9 ms. On a random town-sized test map with 536 edges, 50 long paths took 64 to 91 ms in total (about 1.5 ms each), and a search for an unreachable goal explores the whole grid, so repath requests need a budget (step 6).
 5. **Kit: `hitbox.rs`** and the projectile target step. Tests: a hit from each side, a diagonal, a long step through a box, a miss beside it.
 6. **Kit: `movement.rs`** and a headless App test: an entity with a `MoveGoal` reaches a point behind a blocked band.
 7. **Kit: `strategies.rs`.** Tests for the pure parts and for `from_params` (valid, missing radius, bad number). A headless test that a custom strategy of the test (a component and a system that writes `MoveGoal`) moves an entity: this shows that a game can add its own.

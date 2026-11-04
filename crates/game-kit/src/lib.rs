@@ -8,6 +8,7 @@ pub mod depth;
 pub mod groups;
 pub mod layers;
 pub mod map;
+pub mod nav;
 pub mod outline;
 pub mod projectile;
 pub mod rng;
