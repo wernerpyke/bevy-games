@@ -29,6 +29,9 @@ impl Plugin for ProjectilePlugin {
 pub struct Projectile {
     /// Ground velocity in world units per second.
     pub velocity: Vec2,
+    /// How high above the ground point the projectile flies, as the sprite child is lifted. A `HitBox` covers a body
+    /// above the feet of its owner, so a target is tested at this height. Blocked areas are tested on the ground.
+    pub height: f32,
 }
 
 impl Projectile {
@@ -36,7 +39,14 @@ impl Projectile {
     pub fn new(direction: Vec2, speed: f32) -> Self {
         Self {
             velocity: direction.normalize_or_zero() * speed,
+            height: 0.0,
         }
+    }
+
+    /// The height at which the projectile flies and hits targets.
+    pub fn at_height(mut self, height: f32) -> Self {
+        self.height = height;
+        self
     }
 }
 
@@ -126,8 +136,9 @@ fn move_projectiles(
             Step::Flying(point) | Step::HitBlocked(point) | Step::LeftMap(point) => point,
         };
         // A target counts only up to the point where the shot stopped, so a target behind a tree is safe.
-        let cause = if let Some((index, point)) = target_hit(old, reached, &rects) {
-            (point, HitCause::Target(boxes[index].0))
+        let lift = Vec2::new(0.0, projectile.height);
+        let cause = if let Some((index, point)) = target_hit(old + lift, reached + lift, &rects) {
+            (point - lift, HitCause::Target(boxes[index].0))
         } else {
             match stepped {
                 Step::Flying(point) => {
@@ -250,6 +261,72 @@ mod tests {
 
     fn target() -> Vec<Rect> {
         vec![Rect::new(100.0, 50.0, 110.0, 62.0)]
+    }
+
+    #[derive(Resource, Default)]
+    struct Seen(Vec<ProjectileHit>);
+
+    fn collect(mut reader: MessageReader<ProjectileHit>, mut seen: ResMut<Seen>) {
+        seen.0.extend(reader.read().copied());
+    }
+
+    fn app() -> App {
+        use bevy::time::TimeUpdateStrategy;
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(TimeUpdateStrategy::ManualDuration(
+                std::time::Duration::from_millis(16),
+            ))
+            .init_resource::<CollisionWorld>()
+            .init_resource::<Seen>()
+            .add_plugins(ProjectilePlugin)
+            .add_systems(Update, collect.after(move_projectiles));
+        app
+    }
+
+    #[test]
+    fn a_shot_at_hand_height_hits_a_body_at_the_same_feet_height() {
+        let body = HitBox {
+            offset: Vec2::new(0.0, 6.0),
+            half_size: Vec2::new(5.0, 4.0),
+        };
+        let mut app = app();
+        let target = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(100.0, 50.0, 0.0),
+                body,
+                ProjectileTarget,
+            ))
+            .id();
+        let low = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(60.0, 50.0, 0.0),
+                Projectile::new(Vec2::X, 160.0).at_height(6.0),
+            ))
+            .id();
+        let flat = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(60.0, 50.0, 0.0),
+                Projectile::new(Vec2::X, 160.0),
+            ))
+            .id();
+        for _ in 0..60 {
+            app.update();
+        }
+        let seen = &app.world().resource::<Seen>().0;
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].cause, HitCause::Target(target));
+        assert!(
+            app.world().get_entity(low).is_err(),
+            "the shot at body height is removed"
+        );
+        assert!(
+            app.world().get_entity(flat).is_ok(),
+            "the shot along the ground passes under the body"
+        );
     }
 
     #[test]

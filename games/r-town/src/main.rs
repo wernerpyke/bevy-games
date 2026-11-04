@@ -1,5 +1,6 @@
 mod camera;
 mod collision;
+mod enemy;
 mod input;
 mod map;
 mod player;
@@ -43,6 +44,13 @@ fn main() {
             input::InputPlugin,
         ))
         .add_plugins((
+            game_kit::movement::MovementPlugin::default(),
+            game_kit::rng::RngPlugin {
+                env_prefix: "R_TOWN",
+            },
+            game_kit::spawner::SpawnerPlugin,
+            game_kit::strategies::StrategiesPlugin,
+            enemy::EnemyPlugin,
             map::MapPlugin,
             trees::TreesPlugin,
             water::WaterPlugin,

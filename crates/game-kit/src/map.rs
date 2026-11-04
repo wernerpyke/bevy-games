@@ -37,24 +37,33 @@ pub struct MapObject {
 /// Parameters written after a kind name in the legend, in file order. Values are text, and the game says what each
 /// key means.
 #[derive(Clone, Debug, Default, PartialEq)]
-pub struct Params(Vec<(String, String)>);
+pub struct Params {
+    pairs: Vec<(String, String)>,
+    line: usize,
+}
 
 impl Params {
     pub fn from_pairs(pairs: &[(&str, &str)]) -> Self {
-        Self(
-            pairs
+        Self {
+            pairs: pairs
                 .iter()
                 .map(|(key, value)| (key.to_string(), value.to_string()))
                 .collect(),
-        )
+            line: 0,
+        }
+    }
+
+    /// The line of the legend entry in the file, 0 when the parameters were not read from a file.
+    pub fn line(&self) -> usize {
+        self.line
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.pairs.is_empty()
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
-        self.0
+        self.pairs
             .iter()
             .map(|(key, value)| (key.as_str(), value.as_str()))
     }
@@ -467,7 +476,7 @@ fn legend_value<'a>(
         }
         pairs.push((key.to_string(), text.to_string()));
     }
-    Ok((kind, Params(pairs)))
+    Ok((kind, Params { pairs, line }))
 }
 
 fn positive(value: &str, key: &str, line: usize, fail: &Fail) -> Result<f32, MapError> {

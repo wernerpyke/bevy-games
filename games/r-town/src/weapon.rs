@@ -37,7 +37,7 @@ fn fire(
     let (transform, player) = *player;
     commands
         .spawn((
-            Projectile::new(player.facing, PROJECTILE_SPEED),
+            Projectile::new(player.facing, PROJECTILE_SPEED).at_height(PROJECTILE_HEIGHT),
             MapEntity,
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(transform.translation.truncate().extend(0.0)),
