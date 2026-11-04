@@ -1,6 +1,6 @@
 # PLAN: enemies in R-Town
 
-Status: in progress (steps 1 to 14 done). The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
+Status: in progress (steps 1 to 15 done). The developer answered the design questions (section 3). The recommendations in section 2 are accepted unless changed below. Waiting for the go-ahead for step 1.
 
 ## 1. Goal
 
@@ -94,7 +94,7 @@ Each step ends with `./dev-scripts/rust.sh lint` and `test`. Ask before any comm
 12. **R-Town: `enemy.rs`, spawners in the map, `test.txt`.** Add the two legend entries and cells (section 4.2). Check that a wrong strategy name and a `patrol` without `radius` stop the load with the line number. Scripted runs and screenshots: an enemy spawns at the start and then at its interval, a skeleton walks to new places within 120 px and never stands still for long, the goblin goes around the pond, a shot kills an enemy, F1 removes the enemies and they spawn again.
 13. **R-Town: `death.rs`.** A touch removes the player and its sprite. Scripted run: the player stands still and the goblin arrives (about 25 s at 16 px/s from 400 px, so use a `teleport` close to a spawner). After the death the log shows no error or warning from systems that need the player (camera, info box, weapon, enemy strategies). Then F1: the player is back at the start, the old enemies are gone, and the spawners start again.
 14. **Debug view.** F3 shows spawners, goals and paths as thin sprites on the feature debug layer (`adr-x9`).
-15. **Load test.** 30 enemies at once: frame time stays near 60 fps. If not, tune the repath budget or the grid step.
+15. **Load test.** 30 enemies at once: frame time stays near 60 fps. If not, tune the repath budget or the grid step. Done: with both spawners at 0.3 s (a test copy of `test.txt`), 114 enemies were alive after 16 s (about 57 skeletons patrolling and 57 goblins pursuing the player). The frame time stayed at about 16.7 ms (60 fps, the display limit), apart from one 32 ms frame. No tuning was needed.
 16. **Lint, test, web** for the whole workspace.
 17. **Commit.** Ask first. Do not push unless asked.
 18. **Migrate lasting content, then delete this plan.**
