@@ -6,6 +6,7 @@ pub mod collision_debug;
 pub mod debug;
 pub mod depth;
 pub mod groups;
+pub mod hitbox;
 pub mod layers;
 pub mod map;
 pub mod nav;

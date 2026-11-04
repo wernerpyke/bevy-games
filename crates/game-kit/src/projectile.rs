@@ -8,6 +8,7 @@ use bevy::prelude::*;
 
 use crate::camera::CameraBounds;
 use crate::collision::{CollisionWorld, resolve};
+use crate::hitbox::HitBox;
 use crate::outline::Edge;
 
 /// Moves every `Projectile`, removes the ones that hit something and sends `ProjectileHit`. Needs `CollisionPlugin`
@@ -38,6 +39,11 @@ impl Projectile {
         }
     }
 }
+
+/// Marks an entity with a `HitBox` that projectiles hit. The projectile is removed and `ProjectileHit` carries the
+/// entity in `HitCause::Target`. The kit does not remove the target: the game reads the message and decides.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct ProjectileTarget;
 
 /// Marks the sprite entity of a projectile, a child of the `Projectile` entity. The kit turns it to point along the
 /// flight direction, so the art must be drawn pointing to the right (along +x). Only the sprite turns, not the
@@ -71,6 +77,8 @@ pub enum HitCause {
     Blocked,
     /// It reached the edge of the map.
     MapEdge,
+    /// It reached the hit box of this entity (`ProjectileTarget`).
+    Target(Entity),
 }
 
 /// Sent when a projectile has been removed, for impact effects or damage. `position` is the ground point.
@@ -80,31 +88,56 @@ pub struct ProjectileHit {
     pub cause: HitCause,
 }
 
+/// The entities that projectiles can hit.
+type TargetQuery<'w, 's> = Query<
+    'w,
+    's,
+    (Entity, &'static Transform, &'static HitBox),
+    (With<ProjectileTarget>, Without<Projectile>),
+>;
+
 fn move_projectiles(
     mut commands: Commands,
     time: Res<Time>,
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
     mut projectiles: Query<(Entity, &mut Transform, &Projectile)>,
+    targets: TargetQuery,
     mut hits: MessageWriter<ProjectileHit>,
 ) {
+    let boxes: Vec<(Entity, Rect)> = targets
+        .iter()
+        .map(|(entity, transform, hit_box)| {
+            (entity, hit_box.rect_at(transform.translation.truncate()))
+        })
+        .collect();
+    let rects: Vec<Rect> = boxes.iter().map(|(_, rect)| *rect).collect();
     let area = bounds.map_or(Rect::new(f32::MIN, f32::MIN, f32::MAX, f32::MAX), |b| b.0);
     for (entity, mut transform, projectile) in &mut projectiles {
         let old = transform.translation.truncate();
-        let cause = match step(
+        let stepped = step(
             old,
             projectile.velocity,
             time.delta_secs(),
             world.edges(),
             area,
-        ) {
-            Step::Flying(point) => {
-                transform.translation.x = point.x;
-                transform.translation.y = point.y;
-                continue;
+        );
+        let reached = match stepped {
+            Step::Flying(point) | Step::HitBlocked(point) | Step::LeftMap(point) => point,
+        };
+        // A target counts only up to the point where the shot stopped, so a target behind a tree is safe.
+        let cause = if let Some((index, point)) = target_hit(old, reached, &rects) {
+            (point, HitCause::Target(boxes[index].0))
+        } else {
+            match stepped {
+                Step::Flying(point) => {
+                    transform.translation.x = point.x;
+                    transform.translation.y = point.y;
+                    continue;
+                }
+                Step::HitBlocked(point) => (point, HitCause::Blocked),
+                Step::LeftMap(point) => (point, HitCause::MapEdge),
             }
-            Step::HitBlocked(point) => (point, HitCause::Blocked),
-            Step::LeftMap(point) => (point, HitCause::MapEdge),
         };
         debug!("projectile: removed at {:?} ({:?})", cause.0, cause.1);
         hits.write(ProjectileHit {
@@ -113,6 +146,44 @@ fn move_projectiles(
         });
         commands.entity(entity).despawn();
     }
+}
+
+/// The first of the `targets` that the segment from `old` to `new` enters: its index and the entry point. A segment
+/// that starts inside a target hits it at `old`. The segment, not the end point, is tested, so a long step cannot
+/// jump over a thin target.
+pub fn target_hit(old: Vec2, new: Vec2, targets: &[Rect]) -> Option<(usize, Vec2)> {
+    let delta = new - old;
+    let mut best: Option<(usize, f32)> = None;
+    for (index, rect) in targets.iter().enumerate() {
+        let Some(t) = entry_time(old, delta, *rect) else {
+            continue;
+        };
+        if best.is_none_or(|(_, earliest)| t < earliest) {
+            best = Some((index, t));
+        }
+    }
+    best.map(|(index, t)| (index, old + delta * t))
+}
+
+/// When (0 to 1) the segment `start + delta * t` is first inside `rect`. The slab method on each axis.
+fn entry_time(start: Vec2, delta: Vec2, rect: Rect) -> Option<f32> {
+    let mut enter = 0.0f32;
+    let mut leave = 1.0f32;
+    for (from, change, low, high) in [
+        (start.x, delta.x, rect.min.x, rect.max.x),
+        (start.y, delta.y, rect.min.y, rect.max.y),
+    ] {
+        if change == 0.0 {
+            if from < low || from > high {
+                return None;
+            }
+            continue;
+        }
+        let (a, b) = ((low - from) / change, (high - from) / change);
+        enter = enter.max(a.min(b));
+        leave = leave.min(a.max(b));
+    }
+    (enter <= leave).then_some(enter)
 }
 
 /// What one frame of flight did to a projectile.
@@ -175,6 +246,80 @@ mod tests {
         let diagonal = turned(Vec2::new(3.0, 3.0));
         assert!((diagonal - Vec3::new(1.0, 1.0, 0.0).normalize()).length() < 1e-5);
         assert_eq!(sprite_rotation(Vec2::ZERO), None);
+    }
+
+    fn target() -> Vec<Rect> {
+        vec![Rect::new(100.0, 50.0, 110.0, 62.0)]
+    }
+
+    #[test]
+    fn a_target_is_hit_from_each_side() {
+        let cases = [
+            (
+                Vec2::new(90.0, 56.0),
+                Vec2::new(105.0, 56.0),
+                Vec2::new(100.0, 56.0),
+            ),
+            (
+                Vec2::new(120.0, 56.0),
+                Vec2::new(105.0, 56.0),
+                Vec2::new(110.0, 56.0),
+            ),
+            (
+                Vec2::new(105.0, 40.0),
+                Vec2::new(105.0, 56.0),
+                Vec2::new(105.0, 50.0),
+            ),
+            (
+                Vec2::new(105.0, 70.0),
+                Vec2::new(105.0, 56.0),
+                Vec2::new(105.0, 62.0),
+            ),
+        ];
+        for (old, new, expected) in cases {
+            let (index, point) = target_hit(old, new, &target()).unwrap();
+            assert_eq!(index, 0);
+            assert!(point.distance(expected) < 1e-4, "{old:?}: {point:?}");
+        }
+    }
+
+    #[test]
+    fn a_diagonal_shot_hits_a_target() {
+        let hit = target_hit(Vec2::new(90.0, 40.0), Vec2::new(110.0, 60.0), &target());
+        assert!(hit.is_some());
+    }
+
+    #[test]
+    fn a_long_step_cannot_jump_over_a_target() {
+        let hit = target_hit(Vec2::new(0.0, 56.0), Vec2::new(300.0, 56.0), &target());
+        assert_eq!(hit.map(|(_, point)| point.x), Some(100.0));
+    }
+
+    #[test]
+    fn shots_beside_or_short_of_a_target_miss() {
+        let miss = |old: Vec2, new: Vec2| target_hit(old, new, &target());
+        assert_eq!(miss(Vec2::new(90.0, 70.0), Vec2::new(120.0, 70.0)), None);
+        assert_eq!(miss(Vec2::new(90.0, 56.0), Vec2::new(99.0, 56.0)), None);
+        assert_eq!(miss(Vec2::new(120.0, 56.0), Vec2::new(130.0, 56.0)), None);
+        assert_eq!(miss(Vec2::new(90.0, 56.0), Vec2::new(90.0, 56.0)), None);
+    }
+
+    #[test]
+    fn a_shot_that_starts_inside_hits_at_once() {
+        let (_, point) =
+            target_hit(Vec2::new(105.0, 56.0), Vec2::new(120.0, 56.0), &target()).unwrap();
+        assert_eq!(point, Vec2::new(105.0, 56.0));
+    }
+
+    #[test]
+    fn the_nearest_of_several_targets_is_hit() {
+        let targets = vec![
+            Rect::new(200.0, 50.0, 210.0, 62.0),
+            Rect::new(100.0, 50.0, 110.0, 62.0),
+        ];
+        let (index, _) =
+            target_hit(Vec2::new(0.0, 56.0), Vec2::new(300.0, 56.0), &targets).unwrap();
+        assert_eq!(index, 1);
     }
 
     #[test]
