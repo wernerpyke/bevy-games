@@ -20,7 +20,7 @@ The first build takes several minutes.
 
 ## Controls
 
-- Arrow keys: walk. F1 reloads the map (R-Town), F2 toggles the info box, F3 toggles the grid.
+- Arrow keys: walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map (R-Town), F2 toggles the info box, F3 toggles the grid.
 
 ## Troubleshooting
 

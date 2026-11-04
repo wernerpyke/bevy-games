@@ -38,11 +38,19 @@ An item that stands alone blocks a thin band and a member of a group blocks its 
 
 Input handling starts as a game-local module in R-Town: a `PlayerInput` resource (move direction, fire) filled from the keyboard, read by the player and weapon code (`dev-docs/PLAN-projectiles.md`, D2). Move it to the kit when the mouse is added or a second game needs it. Considerations: one resource that games read, so no game code reads `KeyCode` or mouse buttons directly; keyboard and mouse as two sources that write the same resource, with the last used device winning; mouse aim converted from window position to world position through the pixel camera (integer scaling and the letterbox), and an aim direction that can replace the facing direction; named actions with default key bindings that a game can override, and later rebinding and gamepads; the scripted run tool (`script.rs`) must keep working by writing key presses into `ButtonInput`, and may need a way to place the mouse; wasm differences (pointer lock, touch). Keep game specific actions out of the kit, as for the other modules (`adr-x12`).
 
+### 9. Combat basics
+
+Projectiles fly and disappear, but nothing is hit. Considerations: a reader for `ProjectileHit` (impact effect, sound), enemies as targets with health and damage, weapon values in one place (speed, cooldown, range, damage) and more than one weapon, and exact blocked shapes for projectiles if the 5 px early stop at tree sides is a problem (`adr-x21`). Decide when the first enemy is designed. Ask the developer for the design before inventing mechanics.
+
 ### 99. Debug grid: overlapping corner labels (low priority, cosmetic)
 
 With the grid origin at the bottom left, the column "0" label (top edge) and the highest row label (left edge) overlap in the top left corner. Found in a screenshot on 2026-11-01. This is cosmetic and has low priority. Fix by moving the row labels, for example to the bottom of each cell, or by hiding the row label that sits on the top edge. The info box also covers the top left row labels, but F2 and F3 toggle each tool, so that needs no fix.
 
 ## Completed Items
+
+### Projectile weapons (R-Town)
+
+Done 2026-11-04. X fires a projectile along the player's facing at twice the walk speed. It disappears at blocked areas and the map edge (`dev-docs/extensions/projectiles.md`, `adr-x21`, `adr-rt11`). The flight, hit message and sprite turning are in `game-kit`. Input went through a game-local `PlayerInput` resource (`adr-x22`, roadmap item 8). Known issues and follow-ups: no damage or hit effects yet (nothing reads `ProjectileHit`), no cooldown or range, a shot stops up to 5 px before the side of a tree because it uses the player's collision areas, and projectiles in flight are not despawned on an F1 reload.
 
 ### Text map files
 

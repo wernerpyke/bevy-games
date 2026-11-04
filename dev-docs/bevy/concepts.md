@@ -98,6 +98,8 @@ Systems in the same schedule may run in any order, and in parallel, unless they 
 
 Bevy works out parallelism from the function arguments. A system that takes `&mut Transform` cannot run at the same time as another that touches `Transform`. You do not write locks.
 
+**System sets.** A system set names a group of systems so others can run after it. `InputSet` (`games/r-town/src/input.rs`) is the set that fills `PlayerInput`. The player and weapon systems run `.after(InputSet)`, so they always see this frame's input.
+
 ## Components: data on entities
 
 Any Rust struct or enum can be a component by deriving `Component`:
@@ -236,7 +238,7 @@ Size and colour come from `TextFont::from_font_size(16.0)` and `TextColor(color)
 
 ## Input
 
-Read the keyboard from `Res<ButtonInput<KeyCode>>`. `pressed` is true while held. The same resource also offers `just_pressed` and `just_released` (seen in Bevy examples, not used by us yet).
+Read the keyboard from `Res<ButtonInput<KeyCode>>`. `pressed` is true while held. The same resource also offers `just_pressed` and `just_released` (`just_pressed` fires the X key once per press, `games/r-town/src/input.rs`).
 
 Use `pressed` for walking, which should continue while the key is held (Long Way is real-time). Use `just_pressed` when one key press should be one action, such as opening a menu or advancing dialogue.
 
@@ -252,7 +254,7 @@ transform.translation += direction.normalize() * WALK_SPEED * time.delta_secs();
 
 ## Events and messages
 
-**Not used yet.** Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages (`MessageReader<T>`, as in `WindowResized` handling in the Bevy examples). The plugin also sends `AnimationEvents::Finished`. This is the likely tool for game events such as "player moved" or "enemy died", and for passing actions between plugins.
+Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages. Define one with `#[derive(Message)]`, register it with `app.add_message::<T>()`, send with `MessageWriter<T>::write` and read with `MessageReader<T>::read`. The kit sends `ProjectileHit` when a projectile is removed (`crates/game-kit/src/projectile.rs`), and the game can read it for effects or damage. The Aseprite plugin also sends `AnimationEvents::Finished`. Use messages for game events such as "enemy died" and for passing actions between plugins.
 
 ## States
 

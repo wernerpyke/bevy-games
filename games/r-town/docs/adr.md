@@ -89,3 +89,11 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 **Rationale.** Water must block now, and the map format has one object per cell. Counting water as a neighbour would turn a lone tree at the shore into a full cell block for no visible reason. Water is on the ground, so the depth sort and walk-behind do not apply.
 
 **How to apply.** Draw ponds in the map file. Item 5 may replace these kinds with a tile layer.
+
+## adr-rt11. The X key fires a projectile along the player's facing (2026-11-04)
+
+**Decision.** X fires one projectile per key press (`just_pressed`), with no cooldown and no range limit. It flies in the direction the player faces at 160 art px/s, twice the walk speed, and disappears at a blocked area or the map edge (`adr-x21`). The player's facing is the last non-zero move direction as a unit vector in 8 directions, and right at the start. The sprite is `proj_8` (7x6, resized from 13x11 and drawn pointing right) and the kit turns it along the flight direction. The projectile starts at the player's feet and its sprite is 8 px above the ground. Projectiles in flight are not despawned when the map reloads on F1.
+
+**Rationale.** The player only flips left and right, so facing needs its own value. Eight directions give a correct shot after a diagonal walk. Cooldown, range and damage are weapon values for a later plan. F1 is a development tool and a stray shot is harmless, so it needs no hook in the reload.
+
+**How to apply.** Values are in `src/weapon.rs` (`PROJECTILE_SPEED`, `PROJECTILE_HEIGHT`). Facing is `Player::facing` in `src/player.rs`. Input is `PlayerInput` in `src/input.rs` (`adr-x22`).

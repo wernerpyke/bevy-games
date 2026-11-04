@@ -170,3 +170,19 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** The grouping is a plain grid algorithm with no game types, so the kit can unit test it alone. Two games with the same logic would copy it. The game keeps the values: footprint sizes, bands and kinds.
 
 **How to apply.** See `dev-docs/extensions/groups.md`.
+
+## adr-x21. Projectiles are in the kit and collide as a ground point (2026-11-04)
+
+**Decision.** `crates/game-kit/src/projectile.rs` has the projectile component, the plugin that moves it, the hit message and the turning of the sprite. It was written in the kit from the start, although the rule "move code to the kit when two games use it" (`adr-x12`) was not met yet, because it holds no game types and no assets and the developer asked for it. A projectile is a point on the ground that uses the same outline edges as a character's feet (`collision::resolve`). It does not have its own, exact blocked shapes.
+
+**Rationale.** Weapons are a general need for the games in this workspace, and the movement and removal rules are plain geometry that the kit can unit test alone. Reusing the edges needs no second set of areas. The cost is that the areas are grown sideways by the shooter's feet half width, so a shot stops up to 5 px early at the side of a tree, and a lone tree stops a shot only at its base band. This matches how the player meets trees. Exact shapes can be added if play testing shows a problem.
+
+**How to apply.** See `dev-docs/extensions/projectiles.md`.
+
+## adr-x22. Input starts in the game and moves to the kit later (2026-11-04)
+
+**Decision.** Input handling is a module of the game for now. R-Town has `src/input.rs` with a `PlayerInput` resource (move direction, fire) that is filled from the keyboard in `InputSet`. Gameplay systems read the resource and never `KeyCode`. The module moves to the kit when the mouse is added or a second game needs it (roadmap item 8).
+
+**Rationale.** The resource isolates the device, so a mouse becomes a second writer of the same resource. A kit module now would have one user and a guessed API. The later move is a file move.
+
+**How to apply.** Read `PlayerInput` with `.after(InputSet)`. The scripted run tool still works, because it writes key presses into `ButtonInput<KeyCode>` before the game reads them.

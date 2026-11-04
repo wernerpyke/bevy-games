@@ -23,7 +23,9 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 - The player entity is at the feet and the sprite is a child (adr-rt6). Arrow keys and WASD move the player.
 - Walk speed: 80 art pixels per second (5 cells per second), the same pace as Guy in Long Way in body heights.
 - Feet box: 10 px wide and 4 px tall at the bottom of the sprite. It fits through a one-cell gap.
-- Abilities and stats: not yet decided.
+- Facing: the last move direction, 8 directions, right at the start (adr-rt11).
+- Weapon: X fires a projectile along the facing at 160 art px per second (twice the walk speed). It disappears at a blocked area or the map edge. One shot per key press, no cooldown, no range limit, no damage yet (adr-rt11).
+- Other abilities and stats: not yet decided.
 
 ## 5. World and maps
 
