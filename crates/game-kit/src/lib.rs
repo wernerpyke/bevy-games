@@ -15,6 +15,7 @@ pub mod outline;
 pub mod projectile;
 pub mod rng;
 pub mod script;
+pub mod spawner;
 pub mod strategies;
 
 use bevy::prelude::Component;
