@@ -11,22 +11,19 @@ use game_kit::depth::DepthSort;
 use crate::collision::FEET_HALF_WIDTH;
 use crate::input::{InputSet, PlayerInput};
 use crate::map::{MapEntity, PlayerStart};
+use crate::walk_animation::{WalkAnimation, WalkSprite, WalkStateSet};
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
 pub const WALK_SPEED: f32 = 80.0;
 /// Height of the player's canvas in `characters.aseprite` (16 wide, 17 high).
 const CANVAS_HEIGHT: f32 = 17.0;
-/// Walking bob: the sprite lifts one pixel, this many times a second.
-const BOB_RATE: f32 = 6.0;
 
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player).add_systems(
-            Update,
-            (move_player, animate_player).chain().after(InputSet),
-        );
+        app.add_systems(Startup, spawn_player)
+            .add_systems(Update, move_player.in_set(WalkStateSet).after(InputSet));
     }
 }
 
@@ -35,20 +32,11 @@ pub struct Player {
     /// The way the player looks, a unit vector in one of 8 directions. The last non-zero move direction, right at
     /// the start. Weapons fire along it.
     pub facing: Vec2,
-    facing_left: bool,
-    walking: bool,
-    /// Seconds spent walking, for the bob.
-    walk_time: f32,
 }
 
 impl Default for Player {
     fn default() -> Self {
-        Self {
-            facing: Vec2::X,
-            facing_left: false,
-            walking: false,
-            walk_time: 0.0,
-        }
+        Self { facing: Vec2::X }
     }
 }
 
@@ -57,9 +45,6 @@ impl Default for Player {
 fn next_facing(current: Vec2, direction: Vec2) -> Vec2 {
     direction.try_normalize().unwrap_or(current)
 }
-
-#[derive(Component)]
-struct PlayerSprite;
 
 /// Creates the player at the start cell. Also run again when the map is reloaded (F1).
 pub(crate) fn spawn_player(
@@ -72,6 +57,7 @@ pub(crate) fn spawn_player(
         .spawn((
             Controlled,
             Player::default(),
+            WalkAnimation::default(),
             MapEntity,
             SlideAssist::default(),
             DepthSort { feet_offset: 0.0 },
@@ -79,7 +65,9 @@ pub(crate) fn spawn_player(
             Visibility::default(),
         ))
         .with_child((
-            PlayerSprite,
+            WalkSprite {
+                canvas_height: CANVAS_HEIGHT,
+            },
             AseAnimation {
                 aseprite: server.load("art/characters/characters.aseprite"),
                 animation: Animation::tag("char_9"),
@@ -95,19 +83,22 @@ fn move_player(
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
     bounds: Res<CameraBounds>,
-    player: Single<(&mut Transform, &mut Player, &mut SlideAssist)>,
+    player: Single<(
+        &mut Transform,
+        &mut Player,
+        &mut WalkAnimation,
+        &mut SlideAssist,
+    )>,
 ) {
-    let (mut transform, mut player, mut assist) = player.into_inner();
+    let (mut transform, mut player, mut walk, mut assist) = player.into_inner();
     let direction = input.move_dir;
-    player.walking = direction != Vec2::ZERO;
-    if !player.walking {
+    walk.walking = direction != Vec2::ZERO;
+    if !walk.walking {
         assist.reset();
         return;
     }
     player.facing = next_facing(player.facing, direction);
-    if direction.x != 0.0 {
-        player.facing_left = direction.x < 0.0;
-    }
+    walk.face(direction);
     let dt = time.delta_secs();
     let old = transform.translation.truncate();
     let step = direction.normalize() * WALK_SPEED * dt;
@@ -119,26 +110,6 @@ fn move_player(
     );
     transform.translation.x = feet.x;
     transform.translation.y = feet.y;
-}
-
-fn animate_player(
-    time: Res<Time>,
-    mut player: Single<&mut Player>,
-    mut sprite: Single<(&mut Sprite, &mut Transform), With<PlayerSprite>>,
-) {
-    if player.walking {
-        player.walk_time += time.delta_secs();
-    } else {
-        player.walk_time = 0.0;
-    }
-    let (sprite, transform) = &mut *sprite;
-    sprite.flip_x = player.facing_left;
-    let lift = if player.walking {
-        (player.walk_time * BOB_RATE) as i32 % 2
-    } else {
-        0
-    };
-    transform.translation.y = CANVAS_HEIGHT / 2.0 + lift as f32;
 }
 
 #[cfg(test)]

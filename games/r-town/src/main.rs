@@ -4,6 +4,7 @@ mod input;
 mod map;
 mod player;
 mod trees;
+mod walk_animation;
 mod water;
 mod weapon;
 
@@ -40,10 +41,13 @@ fn main() {
                 env_prefix: "R_TOWN",
             },
             input::InputPlugin,
+        ))
+        .add_plugins((
             map::MapPlugin,
             trees::TreesPlugin,
             water::WaterPlugin,
             player::PlayerPlugin,
+            walk_animation::WalkAnimationPlugin,
             weapon::WeaponPlugin,
         ))
         .run();
