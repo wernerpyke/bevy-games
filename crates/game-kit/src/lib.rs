@@ -10,6 +10,7 @@ pub mod layers;
 pub mod map;
 pub mod outline;
 pub mod projectile;
+pub mod rng;
 pub mod script;
 
 use bevy::prelude::Component;
