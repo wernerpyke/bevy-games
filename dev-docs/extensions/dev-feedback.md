@@ -42,7 +42,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 | Command | Effect |
 |---|---|
 | `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Controlled` (its feet come from its `DepthSort`) |
-| `hold:<keys>:<seconds>` | Holds keys, for example `hold:up+left:2` |
+| `hold:<keys>:<seconds>` | Holds keys (`up`, `down`, `left`, `right`, `x`, `f1` to `f3`), for example `hold:up+left:2`. `hold:x:0.1` is one key press |
 | `wait:<seconds>` | Waits |
 | `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `<PREFIX>_SCREENSHOT_DIR`) |
 | `quit` | Exits |

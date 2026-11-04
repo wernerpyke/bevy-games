@@ -4,7 +4,8 @@
 //!
 //! Commands are separated by `;`:
 //! - `teleport:<feet_x>:<feet_y>`   put the feet of the controlled entity at a position
-//! - `hold:<keys>:<seconds>`        hold arrow keys or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`
+//! - `hold:<keys>:<seconds>`        hold arrow keys, `x` or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`. A
+//!   short hold of `x` (`hold:x:0.1`) is one key press
 //! - `wait:<seconds>`
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
 //!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
@@ -112,6 +113,7 @@ fn key(name: &str) -> Option<KeyCode> {
         "down" => Some(KeyCode::ArrowDown),
         "left" => Some(KeyCode::ArrowLeft),
         "right" => Some(KeyCode::ArrowRight),
+        "x" => Some(KeyCode::KeyX),
         "f1" => Some(KeyCode::F1),
         "f2" => Some(KeyCode::F2),
         "f3" => Some(KeyCode::F3),

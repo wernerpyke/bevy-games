@@ -26,6 +26,9 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Let chains work in this edition: `else if cond && let Some(x) = value { .. }`.
 - Exiting from a system: `MessageWriter<AppExit>` then `exit.write(AppExit::Success)`.
 
+- Messages between systems (`examples/ecs/message.rs`): `#[derive(Message)] struct Hit { .. }`, `app.add_message::<Hit>()`, send with `MessageWriter<Hit>` and `.write(Hit { .. })`, read with `MessageReader<Hit>` and `.read()`.
+- One keypress: `input.just_pressed(KeyCode::KeyX)`. System set: `#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)] struct MySet;`, then `app.configure_sets(Update, MySet)` and `.in_set(MySet)` / `.after(MySet)` (`examples/ecs/ecs_guide.rs`).
+
 ## Pitfalls
 
 - `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction depending on the length, so comparing normalised vectors between frames fires randomly. Compare signs or an enum.

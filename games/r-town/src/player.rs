@@ -9,10 +9,11 @@ use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_f
 use game_kit::depth::DepthSort;
 
 use crate::collision::FEET_HALF_WIDTH;
+use crate::input::{InputSet, PlayerInput};
 use crate::map::PlayerStart;
 
 /// Walk speed in art pixels per second: 5 cells per second (`adr-rt4`).
-const WALK_SPEED: f32 = 80.0;
+pub const WALK_SPEED: f32 = 80.0;
 /// Height of the player's canvas in `characters.aseprite` (16 wide, 17 high).
 const CANVAS_HEIGHT: f32 = 17.0;
 /// Walking bob: the sprite lifts one pixel, this many times a second.
@@ -22,17 +23,39 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
-            .add_systems(Update, (move_player, animate_player).chain());
+        app.add_systems(Startup, spawn_player).add_systems(
+            Update,
+            (move_player, animate_player).chain().after(InputSet),
+        );
     }
 }
 
-#[derive(Component, Default)]
-struct Player {
+#[derive(Component)]
+pub struct Player {
+    /// The way the player looks, a unit vector in one of 8 directions. The last non-zero move direction, right at
+    /// the start. Weapons fire along it.
+    pub facing: Vec2,
     facing_left: bool,
     walking: bool,
     /// Seconds spent walking, for the bob.
     walk_time: f32,
+}
+
+impl Default for Player {
+    fn default() -> Self {
+        Self {
+            facing: Vec2::X,
+            facing_left: false,
+            walking: false,
+            walk_time: 0.0,
+        }
+    }
+}
+
+/// The facing after the player asked for `direction` this frame: that direction as a unit vector, or `current`
+/// when no key is down.
+fn next_facing(current: Vec2, direction: Vec2) -> Vec2 {
+    direction.try_normalize().unwrap_or(current)
 }
 
 #[derive(Component)]
@@ -60,26 +83,8 @@ fn spawn_player(mut commands: Commands, server: Res<AssetServer>, player_start: 
         ));
 }
 
-/// The direction the arrow keys or WASD give, not normalised.
-fn input_direction(input: &ButtonInput<KeyCode>) -> Vec2 {
-    let mut direction = Vec2::ZERO;
-    if input.any_pressed([KeyCode::ArrowLeft, KeyCode::KeyA]) {
-        direction.x -= 1.0;
-    }
-    if input.any_pressed([KeyCode::ArrowRight, KeyCode::KeyD]) {
-        direction.x += 1.0;
-    }
-    if input.any_pressed([KeyCode::ArrowUp, KeyCode::KeyW]) {
-        direction.y += 1.0;
-    }
-    if input.any_pressed([KeyCode::ArrowDown, KeyCode::KeyS]) {
-        direction.y -= 1.0;
-    }
-    direction
-}
-
 fn move_player(
-    input: Res<ButtonInput<KeyCode>>,
+    input: Res<PlayerInput>,
     time: Res<Time>,
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
@@ -87,12 +92,13 @@ fn move_player(
     player: Single<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
     let (mut transform, mut player, mut assist) = player.into_inner();
-    let direction = input_direction(&input);
+    let direction = input.move_dir;
     player.walking = direction != Vec2::ZERO;
     if !player.walking {
         assist.reset();
         return;
     }
+    player.facing = next_facing(player.facing, direction);
     if direction.x != 0.0 {
         player.facing_left = direction.x < 0.0;
     }
@@ -127,4 +133,27 @@ fn animate_player(
         0
     };
     transform.translation.y = CANVAS_HEIGHT / 2.0 + lift as f32;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_new_player_faces_right() {
+        assert_eq!(Player::default().facing, Vec2::X);
+    }
+
+    #[test]
+    fn facing_follows_the_move_direction_as_a_unit_vector() {
+        assert_eq!(next_facing(Vec2::X, Vec2::new(0.0, -1.0)), Vec2::NEG_Y);
+        let diagonal = next_facing(Vec2::X, Vec2::new(-1.0, 1.0));
+        assert!((diagonal.length() - 1.0).abs() < 1e-5);
+        assert!(diagonal.x < 0.0 && diagonal.y > 0.0);
+    }
+
+    #[test]
+    fn facing_is_kept_when_no_key_is_down() {
+        assert_eq!(next_facing(Vec2::NEG_X, Vec2::ZERO), Vec2::NEG_X);
+    }
 }

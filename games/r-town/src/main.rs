@@ -1,9 +1,11 @@
 mod camera;
 mod collision;
+mod input;
 mod map;
 mod player;
 mod trees;
 mod water;
+mod weapon;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -32,13 +34,16 @@ fn main() {
                 )
             },
             game_kit::depth::DepthPlugin::default(),
+            game_kit::projectile::ProjectilePlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "R_TOWN",
             },
+            input::InputPlugin,
             map::MapPlugin,
             trees::TreesPlugin,
             water::WaterPlugin,
             player::PlayerPlugin,
+            weapon::WeaponPlugin,
         ))
         .run();
 }

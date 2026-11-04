@@ -90,6 +90,24 @@ aseprite -b --script-param out=games/r-town/assets/art/features/water.aseprite -
   --script-param files=<water/nw.png,water/n.png,...,water/se.png in that order> --script dev-scripts/aseprite/pack_pngs.lua
 ```
 
+## `features/projectiles.aseprite`
+
+Canvas 7x6, 1 frame, prefix `proj_`. Source: `medieval-fantasy-1/items/projectile/8.png` (13x11), resized to 7x6 with `dev-scripts/aseprite/resize.lua` (about half size, nearest neighbour). The folder holds `1.png` to `8.png`: the others are not in the file.
+
+| Tag | Image | Position in frame | What it shows (read from the PNG) |
+|---|---|---|---|
+| `proj_8` | 7x6 | 0,0 | pink fireball with its tail on the left: the art points to the right and the kit turns it along the flight direction (`ProjectileSprite`) |
+
+To rebuild:
+
+```
+aseprite -b --script-param out=games/r-town/assets/art/features/projectiles.aseprite --script-param prefix=proj_ \
+  --script-param files=games/r-town/input/medieval-fantasy-1/items/projectile/8.png --script dev-scripts/aseprite/pack_pngs.lua
+
+aseprite -b games/r-town/assets/art/features/projectiles.aseprite --script-param width=7 --script-param height=6 \
+  --script dev-scripts/aseprite/resize.lua
+```
+
 ## Map kinds
 
 Kinds are the names a map legend uses (`assets/maps/test.txt`). Each is defined in code (`src/map.rs`, `src/trees.rs`). A tree stands on its cell: the bottom centre of the art is the bottom centre of the cell.
