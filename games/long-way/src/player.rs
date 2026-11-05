@@ -3,6 +3,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::half_view;
 use crate::collision::GUY_FEET_OFFSET;
+use crate::map::MapEntity;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 
@@ -39,8 +40,9 @@ pub struct Player {
     playing: &'static str,
 }
 
-fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
+pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
     commands.spawn((
+        MapEntity,
         game_kit::Controlled,
         Player {
             facing: Facing::Down,

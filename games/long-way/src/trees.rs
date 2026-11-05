@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
-use crate::map::{CurrentMap, Group, Kind, blocking_groups};
+use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
 use crate::rocks::{SORT_BIAS, footprint_corner, group_area};
 use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
@@ -48,7 +48,7 @@ fn placement(corner: Vec2) -> (Vec2, Trunk) {
     )
 }
 
-fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
+pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
     let map = &map.0;
     for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
         let Some(path) = art_path(Kind::of(object)) else {
@@ -78,6 +78,7 @@ fn spawn_tree(
 ) {
     let (centre, trunk) = placement(footprint_corner(object, map));
     commands.spawn((
+        MapEntity,
         tree_blocker(&trunk, object, map, group),
         DepthSort {
             feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,

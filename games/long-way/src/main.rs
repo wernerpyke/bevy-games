@@ -34,6 +34,7 @@ fn main() {
             map::MapPlugin,
             player::PlayerPlugin,
             rocks::RocksPlugin,
+            game_kit::reload::ReloadPlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "LONG_WAY",
             },

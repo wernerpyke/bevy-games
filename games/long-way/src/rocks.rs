@@ -7,7 +7,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::GUY_HALF_WIDTH;
-use crate::map::{CurrentMap, Group, Kind, blocking_groups};
+use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
@@ -141,7 +141,7 @@ fn jitter_offset(object: &MapObject, jitter: f32) -> Vec2 {
     Vec2::new(unit(1), unit(2)) * jitter
 }
 
-fn spawn_rocks(
+pub fn spawn_rocks(
     mut commands: Commands,
     server: Res<AssetServer>,
     map: Res<CurrentMap>,
@@ -178,6 +178,7 @@ fn spawn_rocks(
         let placement = placement(object, map);
         commands.spawn((
             Rock,
+            MapEntity,
             BlockedArea(first_area + index),
             AseAnimation {
                 aseprite: server.load("art/features/Rocks.aseprite"),
@@ -195,10 +196,10 @@ fn spawn_rocks(
 
 /// Number of the rock's blocked area in `CollisionWorld`.
 #[derive(Component)]
-struct BlockedArea(usize);
+pub struct BlockedArea(usize);
 
 /// Runs after every blocked area is registered, so a rock next to a trunk is judged with the trunk in place.
-fn mark_interior(
+pub fn mark_interior(
     mut commands: Commands,
     world: Res<CollisionWorld>,
     rocks: Query<(Entity, &BlockedArea), With<Rock>>,
