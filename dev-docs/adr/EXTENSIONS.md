@@ -6,7 +6,7 @@ Decisions about reusable code that Long Way implements first. They were `adr-lw2
 
 **Decision.** Entities with a `DepthSort` component get their z set from the y position of their feet: the lower the feet on screen, the closer to the camera.
 
-**Rationale.** Guy must draw behind a tree when his feet are above its base and in front when below. A fixed z cannot do both. The same sort line also decides collision, so what the player sees matches where he can walk.
+**Rationale.** The player must draw behind a tree when its feet are above its base and in front when below. A fixed z cannot do both. The same sort line also decides collision, so what the player sees matches where it can walk.
 
 **How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), because equal z flickers (found with the rock rows, 2026-11-01). The sort runs in `Update` with no ordering against movement, so z can lag one frame.
 
@@ -21,12 +21,12 @@ Decisions about reusable code that Long Way implements first. They were `adr-lw2
 ## adr-x4. Forgiving collision: `allow_sliding` (2026-10-31)
 
 **Decision.** `CollisionPlugin` takes an `allow_sliding` flag. Long Way sets it to `true`. When true:
-1. Guy slides along a trunk when walking diagonally into it.
-2. Walking straight into a face stops Guy, which shows the collision.
-3. If he keeps pushing for 0.2 seconds (first 0.5, shortened on 2026-10-31 after the developer tried it) and his feet are within 35% of the face length from an edge (capped at 64 pixels, see `adr-x10`, which also covers faces of merged outlines and notches), he is slid sideways at 120 units per second to that edge, then walks on past the trunk. This works from below (slide left or right), from above, and into the trunk sides (slide up or down).
-Pushing into the middle of a face never slides him, so he must walk around.
+1. The player slides along a trunk when walking diagonally into it.
+2. Walking straight into a face stops the player, which shows the collision.
+3. If the player keeps pushing for 0.2 seconds (first 0.5, shortened on 2026-10-31 after the developer tried it) and its feet are within 35% of the face length from an edge (capped at 64 pixels, see `adr-x10`, which also covers faces of merged outlines and notches), it is slid sideways at 120 units per second to that edge, then walks on past the trunk. This works from below (slide left or right), from above, and into the trunk sides (slide up or down).
+Pushing into the middle of a face never slides the player, so it must walk around.
 
-When false, any blocked move leaves Guy where he was. There is no sliding of any kind.
+When false, any blocked move leaves the player where it was. There is no sliding of any kind.
 
 **Rationale.** Hitting a trunk by a few pixels should not make the player back off and line up again. The pause makes the collision visible before the game helps. Pushing into the middle is a clear signal that the player means to reach the trunk, so no help is given there.
 
@@ -46,12 +46,12 @@ When false, any blocked move leaves Guy where he was. There is no sliding of any
 ## adr-x6. Reusable visual debug tools in `debug.rs` (2026-11-01)
 
 **Decision.** `crates/game-kit/src/debug.rs` (moved from Long Way on 2026-11-02, `adr-x12`) holds visual debug tools, one tool per system, added over time. `DebugPlugin { cell_size, grid_color }` is configured in `main.rs`. The first two tools:
-1. **Grid (F3).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below Guy and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
-2. **Info box (F2).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are Guy's feet x/y and grid cell (in grid coordinates, relative to the origin) and his raw world position.
+1. **Grid (F3).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below the player and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
+2. **Info box (F2).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are the player's feet x/y and grid cell (in grid coordinates, relative to the origin) and its raw world position.
 
 Both start visible. The collision overlay is in `collision_debug.rs` and follows F3 (`adr-x3`).
 
-**Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. Guy's feet are shown, not the sprite centre, because collision uses the feet.
+**Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. The player's feet are shown, not the sprite centre, because collision uses the feet.
 
 **How to apply.** Add a new tool as a new system in `DebugPlugin`, with a key toggle in `toggle_tools` and a field in `DebugSettings`. Report values from any system through `DebugInfo`. The code stays in the game crate until a second game needs it (`adr-w6`). Remove or gate the tools behind a debug feature before a release build.
 
@@ -65,15 +65,15 @@ Both start visible. The collision overlay is in `collision_debug.rs` and follows
 
 ## adr-x10. Sliding along merged outlines, into notches (2026-11-01)
 
-**Decision.** Blocked rectangles that touch or overlap are merged into one outline per cluster (`outline.rs`). Guy collides with the outline edges only, and `allow_sliding` (`adr-x4`) works on those edges. The slide rules for an outline are:
+**Decision.** Blocked rectangles that touch or overlap are merged into one outline per cluster (`outline.rs`). The player collides with the outline edges only, and `allow_sliding` (`adr-x4`) works on those edges. The slide rules for an outline are:
 1. The range is the smaller of 35% of the face and 64 pixels (`SLIDE_RANGE_CAP`), measured from the nearer end.
-2. An end at an inward (concave) corner never slides Guy. Past it there is only solid ground.
-3. At a convex end, Guy always slides. If the way on is open for 192 pixels (`SLIDE_CLEARANCE`) he stops exactly on the end. If a face blocks it (a notch or an overhang), he stops 0.5 pixels past the end (`SLIDE_PAST_CORNER`) and walks on until that face stops him. Example: pushing up into the bottom face of the test cluster from world x 463, Guy slides to x 440.3 and walks up to y 64.
+2. An end at an inward (concave) corner never slides the player. Past it there is only solid ground.
+3. At a convex end, the player always slides. If the way on is open for 192 pixels (`SLIDE_CLEARANCE`) it stops exactly on the end. If a face blocks it (a notch or an overhang), it stops 0.5 pixels past the end (`SLIDE_PAST_CORNER`) and walks on until that face stops it. Example: pushing up into the bottom face of the test cluster from world x 463, the player slides to x 440.3 and walks up to y 64.
 4. All blocked areas (trunks and rocks) are merged by one `outline::build`, so a trunk touching a rock is one cluster. Two rectangles that touch only at a corner leave no gap: that vertex counts as an inward corner. A slide target is passed through `resolve`, so it never ends inside another shape.
 
 The blocked area and sort line of a rock are game rules, in `adr-lw13` (`games/long-way/docs/adr.md`).
 
-**Rationale.** The first version refused to slide when the way past the end was blocked within 192 pixels, to avoid pushing Guy into pockets. The developer tried it at a notch under an overhang and wanted him to slide to the corner and walk on, stopping at the back of the notch (2026-11-01). Sliding into an inward corner is still refused, because it only puts Guy inside the next rock.
+**Rationale.** The first version refused to slide when the way past the end was blocked within 192 pixels, to avoid pushing the player into pockets. The developer tried it at a notch under an overhang and wanted the player to slide to the corner and walk on, stopping at the back of the notch (2026-11-01). Sliding into an inward corner is still refused, because it only puts the player inside the next rock.
 
 **How to apply.** The rules are in `slide_to_nearest_edge` in `collision.rs`, with tests for pockets, notches and long faces. The numbers were accepted by the developer after play testing (2026-11-02). The full rules are in `dev-docs/extensions/collision.md`, the Long Way values in `games/long-way/docs/collision.md`.
 

@@ -29,11 +29,11 @@ Characters that are next to each other overlap by one cell. This is on purpose: 
 
 ## Trees
 
-A tree is one character, for example `g` for `green_tree`. The trunk blocks Guy. He can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster. Four trees two cells apart in both directions touch and form a grove (see `rocks-test.txt`, cells (12,2) to (14,4)).
+A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster. Four trees two cells apart in both directions touch and form a grove (see `rocks-test.txt`, cells (12,2) to (14,4)).
 
 ## Rocks and collision
 
-Guy cannot walk through a rock. The game joins the rocks of a cluster, and Guy walks around the edge of the whole cluster. Rocks in the middle of a cluster have no edge and cost no extra work. The rules and numbers are in [collision.md](collision.md).
+The player cannot walk through a rock. The game joins the rocks of a cluster, and the player walks around the edge of the whole cluster. Rocks in the middle of a cluster have no edge and cost no extra work. The rules and numbers are in [collision.md](collision.md).
 
 ## A small complete example
 
@@ -61,7 +61,7 @@ This places two rocks at (4,1) and (5,1), and two more at (9,1) and (10,1). Each
 
 1. Run the game and press F3.
 2. The red grid shows cell numbers. Check that each object is where you expect.
-3. Yellow lines show the edge that Guy collides with. Cyan lines show rocks in the middle of a cluster. Green squares show the feet of every object.
+3. Yellow lines show the edge that the player collides with. Cyan lines show rocks in the middle of a cluster. Green squares show the feet of every object.
 4. For a picture without the window, run `./dev-scripts/rust.sh script long-way "wait:0.5;screenshot:map;quit"`. The picture is saved in `target/screenshots/map.png`.
 
 If the file has a mistake, the game stops when it starts and names the file and line.

@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-/// Height of the game view in art pixels. Guy is 60 pixels tall, so 1200 makes him one twentieth of the screen height.
+/// Height of the game view in art pixels. The player is 60 pixels tall, so 1200 makes it one twentieth of the screen height.
 pub const VIEW_HEIGHT: f32 = 1200.0;
 
 /// Background colour behind the world.

@@ -12,18 +12,18 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       VIEW_HEIGHT, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, half_view (the camera is `game_kit::camera`)
-    ├── player.rs       PlayerPlugin: Guy spawn, movement, animation
+    ├── player.rs       PlayerPlugin: player spawn, movement, animation
     ├── trees.rs        TreesPlugin: trees and their trunks from the map
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
     ├── map.rs          MapPlugin, `Kind`: loads the map file and names its kinds. The parser is `game_kit::map`
-    ├── collision.rs    Trunk and Guy constants. The engine is `game_kit::collision`
+    ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
 
 ## Which extension each file implements
 
 | Extension | Files |
 |---|---|
-| [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `GUY_*` and `rocks.rs`) |
+| [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `PLAYER_*` and `rocks.rs`) |
 | [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` in `crates/game-kit` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` (plus the parser in `crates/game-kit`) |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
@@ -35,6 +35,6 @@ Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.
 
 ## Long Way values for the pixel art extension
 
-- `VIEW_HEIGHT` is 1200 world units. Guy is 60 pixels tall, so he is one twentieth of the screen height.
+- `VIEW_HEIGHT` is 1200 world units. The player is 60 pixels tall, so it is one twentieth of the screen height.
 - Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
-- Guy's tags: `Idle`, `Walk`, `Up`, `Down`. See [art-tags.md](art-tags.md).
+- The player's tags: `Idle`, `Walk`, `Up`, `Down`. See [art-tags.md](art-tags.md).

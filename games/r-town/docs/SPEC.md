@@ -21,7 +21,7 @@ Zelda-like adventure: explore, fight monsters, collect items, unlock areas. Only
 - One fixed player: pack character 9 (`characters/9.png`, 14x16 px).
 - Animation is done in code on the one sprite (adr-rt3): flip left and right and a one pixel bob while walking. The idle squash is not built yet. Up and down use the same sprite.
 - The player entity is at the feet and the sprite is a child (adr-rt6). Arrow keys and WASD move the player.
-- Walk speed: 80 art pixels per second (5 cells per second), the same pace as Guy in Long Way in body heights.
+- Walk speed: 80 art pixels per second (5 cells per second), the same pace as the player in Long Way in body heights.
 - Feet box: 10 px wide and 4 px tall at the bottom of the sprite. It fits through a one-cell gap.
 - Facing: the last move direction, 8 directions, right at the start (adr-rt11).
 - Weapon: X fires a projectile along the facing at 160 art px per second (twice the walk speed). It disappears at a blocked area or the map edge. One shot per key press, no cooldown, no range limit, no damage yet (adr-rt11).
@@ -102,5 +102,5 @@ Deferred. Pack has 6 music themes and 20+ effects.
 - The real town layout (after the first playable). The first playable uses a test map.
 - Exact base footprint size of each house and tree kind (in cells).
 - Overlap from below: Long Way removed it on 2026-11-02 (trees stop at the base line, like rocks). Section 5 and adr-rt5 say the player "may overlap from below", so decide whether R-Town keeps that.
-- Collision geometry: Long Way's `Trunk` and `GUY_*` values are in 60 px art units, so they need R-Town values (shared-crate plan step 4).
+- Collision geometry: Long Way's `Trunk` and `PLAYER_*` values are in 60 px art units, so they need R-Town values (shared-crate plan step 4).
 - Combat model, world structure beyond the town, progression and save, interaction features, audio, UI.

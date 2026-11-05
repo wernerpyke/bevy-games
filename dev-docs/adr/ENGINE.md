@@ -72,7 +72,7 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 
 **Decision.** The 2D camera shows a fixed 1200 art pixels of height (`ScalingMode::FixedVertical`), with nearest sampling and no MSAA. Width follows the window aspect ratio. The value is `VIEW_HEIGHT` in `games/long-way/src/camera.rs`.
 
-**Rationale.** Guy is 60 pixels tall and should be one twentieth of the screen height (60 x 20 = 1200). The developer does not want to resize the art in Aseprite or scale sprites when drawing, so the view size sets the on-screen size. This replaced an earlier value of 180.
+**Rationale.** The player is 60 pixels tall and should be one twentieth of the screen height (60 x 20 = 1200). The developer does not want to resize the art in Aseprite or scale sprites when drawing, so the view size sets the on-screen size. This replaced an earlier value of 180.
 
 **How to apply.** Art pixels map 1:1 to screen pixels only when the window is 1200 high. At smaller windows (a 720 high window gives 0.6x) the art is downscaled, which can make nearest-neighbour pixels uneven. If that looks bad, try linear sampling for downscaling, or a render-to-texture pixel camera. Revisit when the game design sets the screen layout.
 

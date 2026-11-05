@@ -34,7 +34,7 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`, `adr-x28`.
 
 ### Info box (key F2)
 
-4. A text box at the top left, in the HUD layer (`hud_z_index`). It shows the grid position, cell and world position of the feet of the entity with the `Controlled` component, named by `target_name` (Long Way: "guy").
+4. A text box at the top left, in the HUD layer (`hud_z_index`). It shows the grid position, cell and world position of the feet of the entity with the `Controlled` component, named by `target_name` (Long Way: "player").
 5. A system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use.
 
 ### Collision overlay (follows F3)

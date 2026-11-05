@@ -23,7 +23,7 @@ fn main() {
             },
             game_kit::collision_debug::CollisionDebugPlugin::default(),
             game_kit::debug::DebugPlugin {
-                target_name: "guy",
+                target_name: "player",
                 ..game_kit::debug::DebugPlugin::new(
                     camera::CELL_SIZE,
                     Color::srgb(1.0, 0.1, 0.1),

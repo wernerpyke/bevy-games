@@ -165,7 +165,7 @@ pub struct Resolved {
     pub blocked_y: Option<Edge>,
 }
 
-/// Moves Guy's feet from `old` towards `new`, stopping at the first outline edge it crosses. A blocked region
+/// Moves the player's feet from `old` towards `new`, stopping at the first outline edge it crosses. A blocked region
 /// is on one side of each edge (`blocked_positive`), so an edge only stops a move coming from the free side. Each
 /// axis is resolved on its own, and a move is stopped when it crosses an edge, so a large step cannot jump over a
 /// shape. An edge covers the range between its ends, including an end at an inward corner (`Edge::covers`), so
@@ -213,14 +213,14 @@ fn crosses(blocked_positive: bool, old: f32, new: f32, at: f32) -> bool {
     }
 }
 
-/// Moves Guy's feet by `step` for one frame of `dt` seconds, applying the sliding setting.
+/// Moves the player's feet by `step` for one frame of `dt` seconds, applying the sliding setting.
 ///
-/// With `allow_sliding` off, a blocked move leaves Guy where he was.
+/// With `allow_sliding` off, a blocked move leaves the player where it was.
 ///
 /// With it on:
 /// 1. A diagonal move into a trunk slides along it (each axis is resolved separately).
-/// 2. A move straight into a face stops Guy, which shows the collision.
-/// 3. If Guy keeps pushing for `SlideTuning::delay` seconds and is close to an edge of that face, he is slid
+/// 2. A move straight into a face stops the player, which shows the collision.
+/// 3. If the player keeps pushing for `SlideTuning::delay` seconds and is close to an edge of that face, it is slid
 ///    sideways to that edge, then continues past the trunk.
 pub fn move_feet(
     settings: &CollisionSettings,
@@ -320,9 +320,9 @@ fn clear_beyond(from: Vec2, probe: Vec2, edges: &[Edge]) -> bool {
 
 /// Moves `feet` along the face towards the nearer end. Returns `None` when the nearer end is out of range (the
 /// smaller of `range_fraction` of the face and `range_cap`). When the way past the end is blocked
-/// (a notch shallower than `clearance`), Guy still slides to just past the end and walks on
-/// until the next face blocks him.
-/// `pushing_vertically` is true when Guy pushes up or down, so the face is horizontal and he slides along x.
+/// (a notch shallower than `clearance`), the player still slides to just past the end and walks on
+/// until the next face blocks it.
+/// `pushing_vertically` is true when the player pushes up or down, so the face is horizontal and it slides along x.
 /// `push` is the push direction as signs.
 fn slide_to_nearest_edge(
     tuning: &SlideTuning,
@@ -353,8 +353,8 @@ fn slide_to_nearest_edge(
     } else {
         Vec2::new(feet.x, end)
     };
-    // Past an inward corner there is only solid ground, so Guy is not slid there. Past a convex end that leads into
-    // a notch, he still slides to just past the end and walks on until the next face stops him.
+    // Past an inward corner there is only solid ground, so the player is not slid there. Past a convex end that leads into
+    // a notch, it still slides to just past the end and walks on until the next face stops it.
     if concave {
         return None;
     }
@@ -433,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn near_the_left_edge_guy_stops_first_then_slides_past_after_the_delay() {
+    fn near_the_left_edge_player_stops_first_then_slides_past_after_the_delay() {
         let start = Vec2::new(-10.0, -100.0);
         let up = Vec2::new(0.0, STEP);
 
@@ -449,20 +449,20 @@ mod tests {
     }
 
     #[test]
-    fn near_the_right_edge_guy_slides_to_the_right() {
+    fn near_the_right_edge_player_slides_to_the_right() {
         let past = simulate(&SLIDING, Vec2::new(40.0, -100.0), Vec2::new(0.0, STEP), 200);
         assert_eq!(past.x, 50.0);
         assert!(past.y > 12.8);
     }
 
     #[test]
-    fn in_the_middle_of_the_trunk_guy_stays_stopped() {
+    fn in_the_middle_of_the_trunk_player_stays_stopped() {
         let end = simulate(&SLIDING, Vec2::new(15.0, -100.0), Vec2::new(0.0, STEP), 300);
         assert_eq!(end, Vec2::new(15.0, -30.0));
     }
 
     #[test]
-    fn without_sliding_guy_stays_stopped_even_near_the_edge() {
+    fn without_sliding_player_stays_stopped_even_near_the_edge() {
         let end = simulate(
             &NOT_SLIDING,
             Vec2::new(-10.0, -100.0),
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn walking_along_a_wall_cannot_slip_into_the_shape_at_an_inward_corner() {
         // Two rocks, the upper one shifted left. The wall x 40 (y 0 to 20) ends at an inward corner at (40, 20),
-        // where the upper rock's bottom face (x 0 to 40, y 20) starts. Guy stopped on the wall line pushes up.
+        // where the upper rock's bottom face (x 0 to 40, y 20) starts. The player stopped on the wall line pushes up.
         let edges = edges_of(&[
             Rect::new(40.0, 0.0, 100.0, 20.0),
             Rect::new(0.0, 20.0, 80.0, 60.0),
@@ -590,7 +590,7 @@ mod tests {
     #[test]
     fn walking_along_a_floor_cannot_slip_into_the_shape_at_an_inward_corner() {
         // The same shape as above turned on its side: the face y 40 (x 0 to 20) ends at an inward corner at
-        // (20, 40), where the vertical wall x 20 (y 40 to 80) starts. Guy stopped on the line pushes right.
+        // (20, 40), where the vertical wall x 20 (y 40 to 80) starts. The player stopped on the line pushes right.
         let edges = edges_of(&[
             Rect::new(0.0, 40.0, 20.0, 100.0),
             Rect::new(20.0, 0.0, 60.0, 80.0),
@@ -600,9 +600,9 @@ mod tests {
     }
 
     #[test]
-    fn rounding_noise_on_the_stop_line_does_not_let_guy_into_a_shape() {
+    fn rounding_noise_on_the_stop_line_does_not_let_player_into_a_shape() {
         let edges = edges_of(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
-        // Guy was stopped at y 0 below the rectangle, and the recomputed feet came out a hair high.
+        // The player was stopped at y 0 below the rectangle, and the recomputed feet came out a hair high.
         let end = resolve(Vec2::new(5.0, 0.000_005), Vec2::new(5.0, 3.0), &edges).feet;
         assert_eq!(end.y, 0.0);
         let end = resolve(Vec2::new(-0.000_005, 5.0), Vec2::new(3.0, 5.0), &edges).feet;
@@ -638,7 +638,7 @@ mod tests {
     }
 
     #[test]
-    fn the_notch_walls_and_floor_stop_guy_inside_it() {
+    fn the_notch_walls_and_floor_stop_player_inside_it() {
         let edges = notch();
         let from = Vec2::new(20.0, 25.0);
         assert_eq!(resolve(from, Vec2::new(-50.0, 25.0), &edges).feet.x, 10.0);
@@ -649,7 +649,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cluster_stops_guy_from_every_side_and_a_big_step_cannot_jump_it() {
+    fn a_cluster_stops_player_from_every_side_and_a_big_step_cannot_jump_it() {
         let edges = notch();
         let at = |from: Vec2, to: Vec2| resolve(from, to, &edges).feet;
         assert_eq!(at(Vec2::new(-100.0, 20.0), Vec2::new(500.0, 20.0)).x, 0.0);
@@ -697,9 +697,9 @@ mod tests {
     }
 
     #[test]
-    fn guy_is_not_slid_into_the_seam_between_two_touching_rocks() {
+    fn player_is_not_slid_into_the_seam_between_two_touching_rocks() {
         // Feet at x 50 are 10 from the seam at x 60, but the seam is not an edge. The nearest end is 50 away,
-        // out of range, so Guy stays stopped. Per rock he would have been slid to x 60 and walked up the seam.
+        // out of range, so the player stays stopped. Per rock it would have been slid to x 60 and walked up the seam.
         let end = simulate_edges(
             Vec2::new(50.0, -10.0),
             Vec2::new(0.0, STEP),
@@ -721,7 +721,7 @@ mod tests {
     #[test]
     fn the_slide_range_is_capped_on_a_long_face() {
         let edges = edges_of(&[Rect::new(0.0, 0.0, 400.0, 20.0)]);
-        // 80 from the left end is inside 35% of the 400 long face, but beyond the cap: Guy stays stopped.
+        // 80 from the left end is inside 35% of the 400 long face, but beyond the cap: the player stays stopped.
         let end = simulate_edges(Vec2::new(80.0, -10.0), Vec2::new(0.0, STEP), 90, &edges);
         assert_eq!(end, Vec2::new(80.0, 0.0));
         // 50 from the end is inside the cap: slid to the end, then walks on up.
@@ -731,20 +731,20 @@ mod tests {
     }
 
     #[test]
-    fn guy_slides_into_a_pocket_under_an_overhang_and_stops_at_its_back() {
+    fn player_slides_into_a_pocket_under_an_overhang_and_stops_at_its_back() {
         let edges = pocket();
-        // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket. He slides to just
-        // below the overhang and walks on until the bottom rock stops him. The inward corner there never slides him.
+        // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket. It slides to just
+        // below the overhang and walks on until the bottom rock stops it. The inward corner there never slides it.
         let end = simulate_edges(Vec2::new(300.0, 100.0), Vec2::new(STEP, 0.0), 120, &edges);
         assert_eq!(end, Vec2::new(440.8, 76.3));
-        // Pushing up into the bottom face near its left end: he slides left past the end, walks up the wall and is
+        // Pushing up into the bottom face near its left end: it slides left past the end, walks up the wall and is
         // stopped under the overhang.
         let end = simulate_edges(Vec2::new(460.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
         assert_eq!(end, Vec2::new(440.3, 76.8));
     }
 
     #[test]
-    fn guy_slides_into_a_shallow_notch_between_rocks() {
+    fn player_slides_into_a_shallow_notch_between_rocks() {
         // The right side of the test cluster: a bottom rock, a middle rock further left and an upper rock shifted
         // right. Under the upper rock is a notch 25.6 high and 128 deep, closed at the back by the middle rock.
         let edges = edges_of(&[
@@ -752,16 +752,16 @@ mod tests {
             Rect::new(376.8, 76.8, 583.2, 179.2),
             Rect::new(583.2, 140.8, 711.2, 243.2),
         ]);
-        // Pushing up under the bottom rock's right end: he slides right past it and walks up until the upper rock stops him.
+        // Pushing up under the bottom rock's right end: it slides right past it and walks up until the upper rock stops it.
         let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
         assert_eq!(end, Vec2::new(647.7, 140.8));
         let end = simulate_edges(Vec2::new(900.0, 160.0), Vec2::new(-STEP, 0.0), 120, &edges);
-        // Pushing left into the upper rock near its bottom end: he slides into the notch and walks to its back.
+        // Pushing left into the upper rock near its bottom end: it slides into the notch and walks to its back.
         assert_eq!(end, Vec2::new(583.2, 140.3));
     }
 
     #[test]
-    fn guy_is_slid_past_a_free_corner_of_a_cluster() {
+    fn player_is_slid_past_a_free_corner_of_a_cluster() {
         let edges = edges_of(&[Rect::new(440.8, 12.8, 647.2, 115.2)]);
         let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
         assert_eq!(end.x, 647.2);
@@ -848,7 +848,7 @@ mod tests {
 
     #[test]
     fn a_second_slide_can_follow_the_first() {
-        // Under the base, near its left end. After sliding left past the base, Guy walks up to the underside of a
+        // Under the base, near its left end. After sliding left past the base, the player walks up to the underside of a
         // second rectangle and slides again, this time to its right end.
         let edges = edges_of(&[
             Rect::new(0.0, 0.0, 100.0, 10.0),

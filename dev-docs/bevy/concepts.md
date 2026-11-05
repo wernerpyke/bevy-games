@@ -15,12 +15,12 @@ Bevy has no "game object" class with behaviour. It uses an Entity Component Syst
 
 | Term | What it is | Example here |
 |---|---|---|
-| **Entity** | An ID. It has no data or behaviour of its own. | Guy, the camera |
+| **Entity** | An ID. It has no data or behaviour of its own. | The player, the camera |
 | **Component** | A plain piece of data attached to an entity. | `Player`, `Transform`, `Sprite` |
 | **System** | A normal Rust function that reads and changes components. All behaviour lives here. | `move_player`, `animate_player` |
 | **Resource** | One global value, not tied to an entity. | `Time`, `ButtonInput<KeyCode>`, `AssetServer` |
 
-An entity is defined by which components it has. Guy is "an entity with `Player`, `AseAnimation`, `Sprite` and `Transform`". There is no `Guy` class. If you add a `Health` component to an entity, every system that asks for `Health` now sees it.
+An entity is defined by which components it has. The player is "an entity with `Player`, `AseAnimation`, `Sprite` and `Transform`". There is no `Player` class. If you add a `Health` component to an entity, every system that asks for `Health` now sees it.
 
 ## App: the application shell
 
@@ -72,7 +72,7 @@ You never call a system yourself. You register it in a **schedule**, and Bevy ru
 
 | Schedule | When | Used for |
 |---|---|---|
-| `Startup` | Once, before the first frame | Spawning Guy and the camera |
+| `Startup` | Once, before the first frame | Spawning the player and the camera |
 | `Update` | Every frame | Input, movement, animation |
 
 ```mermaid
@@ -115,7 +115,7 @@ struct Player {
 
 Built-in components we use:
 
-- `Transform`: position, rotation and scale. Guy's `translation` is his world position, and `scale.x = -1.0` flips him sideways.
+- `Transform`: position, rotation and scale. The player's `translation` is its world position, and `scale.x = -1.0` flips it sideways.
 - `Sprite`: draws an image. Our Aseprite plugin fills in the image.
 - `Camera2d`: marks an entity as the 2D camera.
 

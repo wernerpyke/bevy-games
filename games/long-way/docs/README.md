@@ -5,7 +5,7 @@ Documentation for this game only. General rules that other games may reuse are e
 | Document | Contents |
 |---|---|
 | [source-layout.md](source-layout.md) | Source files and which extension each one implements |
-| [collision.md](collision.md) | Guy's size, tree and rock rules, rock geometry, slide values, known issues |
+| [collision.md](collision.md) | The player's size, tree and rock rules, rock geometry, slide values, known issues |
 | [maps.md](maps.md) | How to write a map file for Long Way |
 | [art-tags.md](art-tags.md) | Aseprite tags and map kinds |
 | [adr.md](adr.md) | Decisions that apply to Long Way only |

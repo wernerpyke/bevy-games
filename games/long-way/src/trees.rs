@@ -34,7 +34,7 @@ fn art_path(kind: Kind) -> Option<&'static str> {
     }
 }
 
-/// Where the canvas is centred and which trunk blocks Guy, for a tree whose footprint corner is `corner`.
+/// Where the canvas is centred and which trunk blocks the player, for a tree whose footprint corner is `corner`.
 /// The base of the tree is the bottom of the footprint.
 fn placement(corner: Vec2) -> (Vec2, Trunk) {
     (

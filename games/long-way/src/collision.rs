@@ -3,15 +3,15 @@
 use bevy::prelude::*;
 use game_kit::collision::Blocker;
 
-/// Half the width of Guy's body. Guy's feet are blocked this far from a trunk's sides.
-pub const GUY_HALF_WIDTH: f32 = 20.0;
-/// Distance from the centre of Guy's canvas down to his feet.
-pub const GUY_FEET_OFFSET: f32 = 30.0;
+/// Half the width of the player's body. The player's feet are blocked this far from a trunk's sides.
+pub const PLAYER_HALF_WIDTH: f32 = 20.0;
+/// Distance from the centre of the player's canvas down to its feet.
+pub const PLAYER_FEET_OFFSET: f32 = 30.0;
 
-/// How much of the tree's bottom Guy may not enter when walking down from above, as a fraction of the tree height.
+/// How much of the tree's bottom the player may not enter when walking down from above, as a fraction of the tree height.
 const BLOCKED_BOTTOM: f32 = 0.1;
 
-/// A tree trunk Guy cannot walk through. All values are in world coordinates.
+/// A tree trunk the player cannot walk through. All values are in world coordinates.
 #[derive(Clone, Copy)]
 pub struct Trunk {
     pub left: f32,
@@ -23,23 +23,23 @@ pub struct Trunk {
 }
 
 impl Trunk {
-    /// Lowest feet y that is blocked: the base of the tree. Guy walking up from below stops on this line, as he
+    /// Lowest feet y that is blocked: the base of the tree. The player walking up from below stops on this line, as it
     /// does at the bottom of a rock (`adr-lw13`).
     fn y_low(&self) -> f32 {
         self.base_y
     }
 
-    /// Highest feet y that is blocked. Above this Guy is behind the tree.
+    /// Highest feet y that is blocked. Above this the player is behind the tree.
     fn y_high(&self) -> f32 {
         self.base_y + BLOCKED_BOTTOM * self.height
     }
 
-    /// The area Guy's feet may not enter, as a rectangle.
+    /// The area the player's feet may not enter, as a rectangle.
     fn blocked_area(&self) -> Rect {
         Rect::new(
-            self.left - GUY_HALF_WIDTH,
+            self.left - PLAYER_HALF_WIDTH,
             self.y_low(),
-            self.right + GUY_HALF_WIDTH,
+            self.right + PLAYER_HALF_WIDTH,
             self.y_high(),
         )
     }

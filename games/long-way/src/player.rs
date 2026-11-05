@@ -2,7 +2,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::half_view;
-use crate::collision::GUY_FEET_OFFSET;
+use crate::collision::PLAYER_FEET_OFFSET;
 use crate::map::MapEntity;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
@@ -55,7 +55,7 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
         },
         Sprite::default(),
         DepthSort {
-            feet_offset: GUY_FEET_OFFSET,
+            feet_offset: PLAYER_FEET_OFFSET,
         },
         SlideAssist::default(),
         Transform::default(),
@@ -93,8 +93,8 @@ fn move_player(
             continue;
         }
         let step = direction.normalize() * WALK_SPEED * time.delta_secs();
-        // Collision works on Guy's feet, not the centre of his canvas.
-        let old_feet = transform.translation.truncate() - Vec2::new(0.0, GUY_FEET_OFFSET);
+        // Collision works on the player's feet, not the centre of its canvas.
+        let old_feet = transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET);
         let feet = move_feet(
             &settings,
             &mut assist,
@@ -104,7 +104,7 @@ fn move_player(
             world.edges(),
         );
         transform.translation.x = feet.x;
-        transform.translation.y = feet.y + GUY_FEET_OFFSET;
+        transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
         transform.translation.x = transform.translation.x.clamp(-limit.x, limit.x);
         transform.translation.y = transform.translation.y.clamp(-limit.y, limit.y);
 

@@ -71,4 +71,4 @@ Topics covered for R-Town, in the order that worked:
 - A scripted screenshot can come out completely black when the display is asleep or locked, even though the log looks fine. Check one screenshot of a known good build before trusting a visual check.
 - Debug and overlay sizes that are fixed in world units look wrong at another art scale. Scale them by the cell size from the start.
 - Write the kit first only when a second game exists (adr-w6). R-Town's plan moved the code of Long Way in 13 small steps, each with lint, tests, the web check and a scripted run, and each committed on its own. That kept Long Way working throughout.
-- Game values from the first game (such as `GUY_*`) are in that game's art units. A new game needs its own values.
+- Game values from the first game (such as `PLAYER_*`) are in that game's art units. A new game needs its own values.

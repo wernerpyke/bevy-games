@@ -1,7 +1,7 @@
 //! Merges blocked rectangles into clusters and finds the outline of each cluster. Plain Rust with no Bevy
 //! types except `Rect`, so it is unit tested without a running app. See `dev-docs/extensions/collision.md`.
 //!
-//! All input rectangles are the areas Guy's feet may not enter, already grown by his half width, so the feet
+//! All input rectangles are the areas the player's feet may not enter, already grown by its half width, so the feet
 //! are a point. Rectangles that touch or overlap form one cluster. The edges of a cluster are the boundary of
 //! the union of its rectangles. Edges between two rectangles of the same cluster do not exist.
 
@@ -11,7 +11,7 @@ use bevy::math::Rect;
 /// two rectangles that are meant to touch.
 pub const EPSILON: f32 = 0.001;
 
-/// Slack for positions that sit on an edge line. Guy's feet are recomputed from his sprite centre every frame
+/// Slack for positions that sit on an edge line. The player's feet are recomputed from its sprite centre every frame
 /// (add 30, subtract 30), which can move a coordinate by a few millionths. Far above that and far below a pixel.
 pub const TOLERANCE: f32 = 0.01;
 
@@ -315,7 +315,7 @@ fn flush(
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// Half the width of an actor, used to grow obstacles in the tests. Same value as Long Way's Guy.
+    /// Half the width of an actor, used to grow obstacles in the tests. Same value as Long Way's player.
     const ACTOR_HALF_WIDTH: f32 = 20.0;
 
     fn rect(x0: f32, y0: f32, x1: f32, y1: f32) -> Rect {
@@ -557,14 +557,14 @@ mod tests {
     }
 
     #[test]
-    fn a_gap_just_wide_enough_for_guy_keeps_two_clusters() {
+    fn a_gap_just_wide_enough_for_player_keeps_two_clusters() {
         // Obstacles 41 apart: after growing by 20 each side, 1 unit is left for the feet.
         let clusters = build(&[grown(0.0, 0.0, 100.0), grown(141.0, 0.0, 100.0)]);
         assert_eq!(clusters.len(), 2);
     }
 
     #[test]
-    fn a_gap_of_exactly_guys_width_is_closed() {
+    fn a_gap_of_exactly_players_width_is_closed() {
         // Obstacles 40 apart: the grown areas touch, so there is no room for the feet.
         let clusters = build(&[grown(0.0, 0.0, 100.0), grown(140.0, 0.0, 100.0)]);
         assert_eq!(clusters.len(), 1);
@@ -572,7 +572,7 @@ mod tests {
     }
 
     #[test]
-    fn a_gap_too_narrow_for_guy_is_closed() {
+    fn a_gap_too_narrow_for_player_is_closed() {
         let clusters = build(&[grown(0.0, 0.0, 100.0), grown(139.0, 0.0, 100.0)]);
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].edges.len(), 4);

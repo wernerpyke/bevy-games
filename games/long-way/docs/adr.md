@@ -13,14 +13,14 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
-**Decision.** Trees block Guy with a hand-written rule, not a physics engine. Guy's feet are blocked from entering a rectangle around each trunk. The rectangle is:
-- **Sides:** the trunk's left and right edges, widened by Guy's half width (20), so his body cannot overlap the trunk from left or right.
-- **Bottom:** the tree's base. Walking up from below, Guy stops with his feet on the base line, like at the bottom of a rock (`adr-lw13`). Changed 2026-11-02: before this the bottom was the base minus half of Guy's height (30), with a 50% body overlap. Trees now sort at the base plus 1, as rocks do.
-- **Top:** the tree's base plus 10% of the tree height. Walking down from above, Guy stops before the bottom 10% of the tree. Above this line he can walk behind the tree, overlapping the trunk and canopy freely.
+**Decision.** Trees block the player with a hand-written rule, not a physics engine. The player's feet are blocked from entering a rectangle around each trunk. The rectangle is:
+- **Sides:** the trunk's left and right edges, widened by the player's half width (20), so its body cannot overlap the trunk from left or right.
+- **Bottom:** the tree's base. Walking up from below, the player stops with its feet on the base line, like at the bottom of a rock (`adr-lw13`). Changed 2026-11-02: before this the bottom was the base minus half of the player's height (30), with a 50% body overlap. Trees now sort at the base plus 1, as rocks do.
+- **Top:** the tree's base plus 10% of the tree height. Walking down from above, the player stops before the bottom 10% of the tree. Above this line the player can walk behind the tree, overlapping the trunk and canopy freely.
 
 **Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (roadmap item 2 evaluates `avian2d`).
 
-**How to apply.** The rule lives in `games/long-way/src/collision.rs` (the trunk shape) and in `crates/game-kit/src/collision.rs` (`resolve`, `move_feet`) as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`GUY_HALF_WIDTH`, `GUY_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). Each axis is resolved separately so Guy slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk. The values are listed in `games/long-way/docs/collision.md`.
+**How to apply.** The rule lives in `games/long-way/src/collision.rs` (the trunk shape) and in `crates/game-kit/src/collision.rs` (`resolve`, `move_feet`) as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`PLAYER_HALF_WIDTH`, `PLAYER_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). Each axis is resolved separately so the player slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk. The values are listed in `games/long-way/docs/collision.md`.
 
 ## adr-lw7. Long Way is a real-time top-down RPG (2026-11-01)
 
@@ -35,7 +35,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Decision.**
 1. A human draws object layouts in one text file: front matter, then a grid with one character per 64 pixel cell. Long Way uses `origin: bottom-left`, so row labels match the F3 grid. The format is in `dev-docs/extensions/map-files.md` and `adr-x18`. It replaced the markdown format with `# Features` and `# Map` sections (`adr-x11`).
 2. Rocks come before trees. `Rocks.aseprite` has two frames (tags `rock_0`, `rock_1`). Trees followed the same day: `green_tree` and `red_tree` are map kinds, placed from the map file with the trunk collision rule of `adr-lw1`.
-3. A rock is solid on all sides. Guy walks only around the outline of a rock cluster.
+3. A rock is solid on all sides. The player walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
 5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `draw` and `jitter` stay as optional front matter keys (`pitch` went with the markdown format). Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
 6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 3.
@@ -62,9 +62,9 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw13. Rock blocked area and sort line (2026-11-01)
 
-**Decision.** A rock's blocked area is its footprint inset by 10% on the left, right and top, and not at the bottom (`adr-lw8`), grown sideways by Guy's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (`SORT_BIAS`), so Guy standing at the rock is drawn in front.
+**Decision.** A rock's blocked area is its footprint inset by 10% on the left, right and top, and not at the bottom (`adr-lw8`), grown sideways by the player's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (`SORT_BIAS`), so the player standing at the rock is drawn in front.
 
-**Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-x10`. With the footprint bottom as the sort line, Guy standing at the blocked bottom was drawn behind the rock and looked as if he had walked in (found by the developer, 2026-11-01).
+**Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-x10`. With the footprint bottom as the sort line, the player standing at the blocked bottom was drawn behind the rock and looked as if it had walked in (found by the developer, 2026-11-01).
 
 **How to apply.** The numbers are in `games/long-way/docs/collision.md`. Rock `draw` and `cell` sizes must agree, or the sprite and the blocked area drift apart.
 
@@ -72,7 +72,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Decision.** This amends `adr-lw1` and `adr-lw13`. Footprints are 2x2 cells, so two objects touch when their anchor cells are at most 2 apart, also at a corner, and a rock and a tree can be in one group (`adr-x20`).
 - A tree that stands alone blocks its trunk band, as before.
-- A rock that stands alone blocks only the bottom 10% of its footprint height (`ALONE_BAND_FRACTION`), the same fraction a trunk uses. Guy walks behind the rest.
+- A rock that stands alone blocks only the bottom 10% of its footprint height (`ALONE_BAND_FRACTION`), the same fraction a trunk uses. The player walks behind the rest.
 - Every member of a group, tree or rock, blocks the rock footprint area of `adr-lw13`. A member with another member above it has no top inset, so the two shapes merge and no gap stays open.
 
 **Rationale.** The same rule as R-Town (`adr-rt9`): a lone item is passable from behind and a group is one solid shape. Trunks and rocks in one group get the same shape, so the outline has no step between them. With the 10% top inset, two rocks two cells apart in a column left a 12.8 px gap.

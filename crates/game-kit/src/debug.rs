@@ -57,7 +57,7 @@ pub struct DebugPlugin {
     pub cell_size: f32,
     pub grid_color: Color,
     pub grid_origin: GridOrigin,
-    /// Name in the info box rows for the `Controlled` entity, for example "guy" gives "guy x/y".
+    /// Name in the info box rows for the `Controlled` entity, for example "player" gives "player x/y".
     pub target_name: &'static str,
     /// Draw order of the grid. Defaults to the kit layer (`layers.rs`, adr-x14).
     pub grid_z: f32,

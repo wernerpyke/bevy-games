@@ -6,7 +6,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
-use crate::collision::GUY_HALF_WIDTH;
+use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::depth::DepthSort;
@@ -19,17 +19,17 @@ const ART_PIXELS: f32 = 32.0;
 /// Empty rows at the bottom of the rock art, as a fraction of its height (4 of 32 art pixels). The rock is
 /// placed so that its visible bottom, not the canvas bottom, sits on the bottom of the footprint.
 const BOTTOM_MARGIN: f32 = 0.125;
-/// Part of the footprint, on the left, right and top, that Guy may overlap. Gives the rock a softer edge than the full 128 box.
+/// Part of the footprint, on the left, right and top, that the player may overlap. Gives the rock a softer edge than the full 128 box.
 const INSET_FRACTION: f32 = 0.1;
 /// Part of the footprint inset at the bottom. 0 puts the bottom line on the lowest pixel of the art, not inside it.
 const BOTTOM_INSET_FRACTION: f32 = 0.0;
 /// Part of the footprint height a rock blocks when it stands alone: its bottom, as a trunk blocks the bottom 10% of a tree
-/// (`adr-lw14`). Guy walks behind the rest.
+/// (`adr-lw14`). The player walks behind the rest.
 const ALONE_BAND_FRACTION: f32 = 0.1;
 /// Drawn size of a rock in pixels when the map file has no `draw` key.
 const DEFAULT_DRAW_SIZE: f32 = 128.0;
-/// How far above the bottom of the blocked area a rock sorts. Guy stops exactly on that line, so without a bias the
-/// draw order of the two would be a tie. With it Guy is drawn in front when he stands at the rock or below it.
+/// How far above the bottom of the blocked area a rock sorts. The player stops exactly on that line, so without a bias the
+/// draw order of the two would be a tie. With it the player is drawn in front when it stands at the rock or below it.
 pub const SORT_BIAS: f32 = 1.0;
 
 pub struct RocksPlugin;
@@ -90,8 +90,8 @@ pub fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
     MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
 }
 
-/// The area Guy's feet may not enter for an object in a group: the footprint inset by `INSET_FRACTION` on the left, right
-/// and top and by `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by Guy's half width. With `open_top` there
+/// The area the player's feet may not enter for an object in a group: the footprint inset by `INSET_FRACTION` on the left, right
+/// and top and by `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by the player's half width. With `open_top` there
 /// is no inset at the top, so it merges with the object above (`Group::neighbour_above`). There is no vertical margin.
 pub fn group_area(object: &MapObject, map: &Map, open_top: bool) -> Rect {
     let corner = footprint_corner(object, map);
@@ -99,9 +99,9 @@ pub fn group_area(object: &MapObject, map: &Map, open_top: bool) -> Rect {
     let inset = INSET_FRACTION * footprint;
     let top_inset = if open_top { 0.0 } else { inset };
     Rect::new(
-        corner.x + inset - GUY_HALF_WIDTH,
+        corner.x + inset - PLAYER_HALF_WIDTH,
         corner.y + BOTTOM_INSET_FRACTION * footprint,
-        corner.x + footprint - inset + GUY_HALF_WIDTH,
+        corner.x + footprint - inset + PLAYER_HALF_WIDTH,
         corner.y + footprint - top_inset,
     )
 }
@@ -254,7 +254,7 @@ mod tests {
 
     #[test]
     fn rocks_sort_just_above_the_bottom_of_their_blocked_area() {
-        // Guy is stopped at the bottom of the blocked area, or walks below it. Both must draw in front of the rock.
+        // The player is stopped at the bottom of the blocked area, or walks below it. Both must draw in front of the rock.
         for draw in [128.0, 160.0] {
             let m = map(draw, 0.0);
             let o = rock(4, 2);
@@ -293,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn the_blocked_area_is_the_inset_footprint_grown_sideways_by_guys_half_width() {
+    fn the_blocked_area_is_the_inset_footprint_grown_sideways_by_players_half_width() {
         let a = group_area(&rock(0, 0), &map(128.0, 0.0), false);
         // Footprint 128, inset 12.8 left, right and top, none at the bottom, then 20 wider on each side.
         assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - 20.0, 0.0));
@@ -336,7 +336,7 @@ mod tests {
             .map(|o| group_area(o, &m, false))
             .collect();
         assert_eq!(outline::build(&pile).len(), 1);
-        // Rocks 3 cells apart leave a gap Guy can walk through, 4 cells apart certainly.
+        // Rocks 3 cells apart leave a gap the player can walk through, 4 cells apart certainly.
         let apart: Vec<Rect> = [rock(0, 0), rock(3, 0)]
             .iter()
             .map(|o| group_area(o, &m, false))
