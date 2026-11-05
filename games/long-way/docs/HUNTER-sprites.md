@@ -23,6 +23,7 @@ The Hunter is the player in Long Way. The user has drawn the up and down walk fr
 - No code plays `Hurt` or `Die`. No code uses `Block`.
 
 **Facts for drawing the up and down frames**
+- The art does not set the feet or the hitbox. They come from `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH` and `PLAYER_BODY_HEIGHT` in `collision.rs`. The user moved the sprites in `Up` and `Down` up and down to make a bobbing motion like `Run`, so the visible feet row there is 111 to 116 and not 120. That is intended and changes no game value.
 - Canvas 128x128. Feet on row y=120. Body centred on x=64. The cloak is about 20 px wide, the hat about 30, the whole body about 50 tall. Every art pixel in the pack art is 2x2, so drawing at 1x pixel detail is possible but looks finer than the rest.
 - `Run` has 8 frames of 100 ms. The placeholder `Up` has 6 frames (75, 75, 75, 125, 125, 125 ms) and `Down` has 6 frames of 100 ms. The real frame counts are open.
 - Only colours from the game palette (32 colours; indexes 19 to 31 are the Hunter's). Index 0 is transparent.

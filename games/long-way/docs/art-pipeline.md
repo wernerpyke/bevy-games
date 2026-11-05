@@ -30,6 +30,7 @@ Tools:
 - Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes. `tagged_sheets.lua` builds one file from several sprite sheets (one tag per sheet, durations from the Aseprite JSON, body re-centred on a new canvas).
 
 Rules:
+- The art never sets game mechanics. Feet, hitbox and collision come from constants in code (Long Way: `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH`, `PLAYER_BODY_HEIGHT` in `collision.rs`), not from the pixels. Moving or bobbing a sprite inside a frame is a visual change only. The `check` script reports bounds and a feet row from the pixels, so read those as a visual check, not a game value.
 1. Write one shared helper first (`dev-scripts/aseprite/lib.lua`): new sprite, load palette, draw tile, outline, shade, tag frames, save. Sprite scripts call the helper. Do not repeat drawing code per sprite.
 2. Use one fixed palette per game. Long Way: `games/long-way/assets/art/diodrama_palette.aseprite` (32 colours, index 0 is transparent black `#000000a0`). Scripts must not use colours outside it.
 3. Use one tile and sprite size grid (open question: size not chosen, for example 16x16 or 32x32). All sprites are multiples of it.
