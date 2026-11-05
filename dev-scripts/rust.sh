@@ -17,6 +17,8 @@
 #                                             # for example: script long-way "teleport:225:-150;hold:up:3;quit"
 #                                             # add screenshot:<name> to save target/screenshots/<name>.png,
 #                                             # for example: script long-way "wait:0.5;screenshot:start;quit"
+#   ./dev-scripts/rust.sh size                # disk use of target/ and its biggest folders
+#   ./dev-scripts/rust.sh prune               # delete the incremental cache and stale binaries (see CLAUDE.md, "Disk use")
 #   ./dev-scripts/rust.sh <other> [args...]   # passed straight to cargo
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -94,8 +96,27 @@ case "${1:-}" in
     # shellcheck disable=SC2046
     cargo check $(scope "${1:-}") --target wasm32-unknown-unknown
     ;;
+  size)
+    # Disk use of target/ and its folders. The limit is in CLAUDE.md ("Disk use").
+    du -sh target target/* target/debug/* 2>/dev/null | sort -rh | head -12
+    ;;
+  prune)
+    # Deletes what a build makes again on demand: the incremental cache and binaries of crates that no longer
+    # exist in games/. Then cargo-sweep (optional, if installed) removes outputs not used for 14 days.
+    rm -rf target/debug/incremental target/release/incremental
+    for file in target/debug/* target/release/*; do
+      [ -f "$file" ] && [ -x "$file" ] || continue
+      name="$(basename "$file")"
+      if [ ! -d "games/$name" ]; then
+        echo "removed stale binary $file"
+        rm -f "$file" "$file.d"
+      fi
+    done
+    if command -v cargo-sweep >/dev/null 2>&1; then cargo sweep --time 14; fi
+    ./dev-scripts/rust.sh size
+    ;;
   "")
-    echo "✗ Usage: ./dev-scripts/rust.sh <build|test|run|lint|web|cargo-args>" >&2
+    echo "✗ Usage: ./dev-scripts/rust.sh <build|test|run|lint|web|size|prune|cargo-args>" >&2
     exit 1
     ;;
   *)

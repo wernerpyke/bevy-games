@@ -62,7 +62,7 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 
 ## adr-e6. Bevy features and build profiles (2026-10-31)
 
-**Decision.** Depend on `bevy` with `default-features = false` and `features = ["2d"]`, pinned with `=0.20.1`. Dev builds compile dependencies at `opt-level = 3`. Web release builds use the `wasm-release` profile (size optimised, fat LTO).
+**Decision.** Depend on `bevy` with `default-features = false` and `features = ["2d"]`, pinned with `=0.20.1`. Dev builds compile dependencies at `opt-level = 3` (debug info: `adr-e8`). Web release builds use the `wasm-release` profile (size optimised, fat LTO).
 
 **Rationale.** Bevy's defaults include 3D and UI, which add compile time and web size for a 2D game. The `2d` profile includes WebGL2. Unoptimised Bevy runs too slowly to develop against.
 
@@ -75,3 +75,11 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 **Rationale.** Guy is 60 pixels tall and should be one twentieth of the screen height (60 x 20 = 1200). The developer does not want to resize the art in Aseprite or scale sprites when drawing, so the view size sets the on-screen size. This replaced an earlier value of 180.
 
 **How to apply.** Art pixels map 1:1 to screen pixels only when the window is 1200 high. At smaller windows (a 720 high window gives 0.6x) the art is downscaled, which can make nearest-neighbour pixels uneven. If that looks bad, try linear sampling for downscaling, or a render-to-texture pixel camera. Revisit when the game design sets the screen layout.
+
+## adr-e8. No debug info for dependencies, line tables for our crates (2026-11-05)
+
+**Decision.** `[profile.dev.package."*"]` sets `debug = false` and `[profile.dev]` sets `debug = "line-tables-only"` in the root `Cargo.toml`. `target/` is kept under 8 GB with a short routine (`CLAUDE.md`, "Disk use"): `rust.sh size`, then `rust.sh prune`, then ask before `cargo clean`. Further savings are roadmap item 90.
+
+**Rationale.** The developer does not review or debug Rust code by hand, and Claude does not use a debugger. Debug info was most of the size: `target/` was 25 GB, and 2.2 GB after a clean build without it (3.2 GB with `lint`, `test` and `web`). Panics still show file and line, because line tables stay. Only stepping through code in a debugger is lost. The limit of 8 GB is about twice the normal size, so it signals stale outputs.
+
+**How to apply.** Do not add `debug = true` or `bevy/dynamic_linking` as a default without asking. After a Bevy version or feature change, run `cargo clean` once: the old outputs are never used again. Run the routine at the start of a session that builds Rust, and after any `Cargo.toml` change.

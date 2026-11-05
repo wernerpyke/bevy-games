@@ -108,3 +108,17 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)
 - Web release build (to define): record the chosen method in `dev-docs/adr/ENGINE.md`.
+- Disk use: `./dev-scripts/rust.sh size` (sizes of `target/`) and `./dev-scripts/rust.sh prune` (see "Disk use")
+
+## Disk use
+
+`target/` must stay under **8 GB**. A clean build of both games is 2.2 GB, and 3.2 GB with `lint`, `test` and `web` (`dev-docs/adr/ENGINE.md` adr-e8). Run this routine at the start of a session that builds Rust, and after any change to `Cargo.toml`.
+
+1. Run `./dev-scripts/rust.sh size`.
+2. Over 8 GB: tell the user, then run `./dev-scripts/rust.sh prune`.
+3. Still over 8 GB after the prune: ask before `cargo clean`. A clean build takes about 10 minutes.
+4. After a Bevy version or feature change, run `cargo clean` once. The old outputs are never used again.
+5. Do not add `debug = true` or `bevy/dynamic_linking` as a default to a profile without asking. The user does not debug Rust by hand, so dependencies have no debug info and our crates have line tables only.
+6. Delete files in `target/screenshots/` when the check that needed them is done.
+
+`cargo-sweep` is optional and not installed. Other savings are roadmap item 90.
