@@ -6,12 +6,15 @@ Purpose: replace `Guy.aseprite` as the player sprite. This file lists what the p
 
 ## Status (2026-11-05) and handoff
 
-The Hunter is the player in Long Way. Next work: draw the real up and down animations (see "Next steps"), in a new session.
+The Hunter is the player in Long Way. The user has drawn the up and down walk frames (2026-11-05). Next work: test them in motion, then settle the open questions (see "Next steps").
 
 **Done**
 - The pack is analysed (below) and built into `characters/Hunter.aseprite`: 128x128, 46 frames, tags `Idle`, `Run`, `Hurt`, `Die` (from the pack) and `Up`, `Down` (placeholders from the jump frames, red tags). Palette is the game palette, grown to 32 colours (`adr-a5`).
 - `player.rs` and `collision.rs` use the Hunter (`adr-lw15`): `Run` is the sideways walk, the art faces right (`WALK_ART_FACES_RIGHT = true`), the sprite is flipped with `transform.scale.x`, `HALF_SIZE` 64, `PLAYER_FEET_OFFSET` 56, `PLAYER_HALF_WIDTH` 14.
 - Checked in the real game with `script --debug` and zoomed screenshots: the face points the way the player walks, and the cloak is centred on the feet marker in both directions.
+- The user drew the `Up` and `Down` frames (still 6 frames each, same durations as the placeholders), and added two layers: `Weapon` (the blade, split from the body) and `background` (a backdrop for the user's own viewing). Layers are now `background`, `Weapon`, `Body`.
+- The game loads `Hunter.aseprite` with a layer mask by name (`hunter_layers` in `player.rs`). `Body` is always drawn. `Weapon` is drawn only when `SHOW_WEAPON` is `true` (now `false`, for the first test). `background` is never drawn, whatever its visibility in Aseprite.
+- Checked in the real game (zoomed screenshots): no weapon and no background in the up, down and right views. The up view is a back view and the down view shows the face. Feet are on the marker. Not seen yet: the animations in motion.
 
 **What the player code does now** (`animate_player` in `player.rs`)
 - Standing plays `Idle` for every facing. Walking plays `Run` (sideways), `Up` or `Down`. Horizontal input wins on a diagonal.
@@ -23,6 +26,7 @@ The Hunter is the player in Long Way. Next work: draw the real up and down anima
 - Canvas 128x128. Feet on row y=120. Body centred on x=64. The cloak is about 20 px wide, the hat about 30, the whole body about 50 tall. Every art pixel in the pack art is 2x2, so drawing at 1x pixel detail is possible but looks finer than the rest.
 - `Run` has 8 frames of 100 ms. The placeholder `Up` has 6 frames (75, 75, 75, 125, 125, 125 ms) and `Down` has 6 frames of 100 ms. The real frame counts are open.
 - Only colours from the game palette (32 colours; indexes 19 to 31 are the Hunter's). Index 0 is transparent.
+- Layers: `Body` (the character), `Weapon` (the blade) and `background` (the user's own use, never drawn). The code selects layers by name, so keep these names.
 - `Hunter.aseprite` is committed, so git is the safety net. **Do not run the rebuild command** once drawing starts: it overwrites the file. Add or replace frames inside Aseprite. Keep the tag names, because the code uses them.
 - Tooling for checks: zoomed screenshots are still manual (roadmap item 1). Recipe: run `./dev-scripts/rust.sh script long-way "teleport:<x>:<y>;wait:0.4;hold:<key>:0.5;wait:0.3;screenshot:<name>;quit" --debug`, then crop the PNG in a Lua script with `Sprite:crop` and `SpriteSize { scale = 5 }`. The window is 2560x1440 and `screen = (1280 + 1.2 * world x, 720 - 1.2 * world y)`. Delete the screenshots afterwards.
 
@@ -83,8 +87,8 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 |---|---|---|
 | `Idle` | Idle | Side only. Usable. |
 | `Walk` (side) | Run | In use, tag `Run`. Play speed (`WALK_ANIMATION_SPEED`, 2.5) is not retuned for the doubled size. |
-| `Up` | none | Placeholder from the jump frames. Needs drawing. |
-| `Down` | none | Placeholder from the jump frames. Needs drawing. |
+| `Up` | drawn by the user | Final art (6 frames). Not seen in motion yet. |
+| `Down` | drawn by the user | Final art (6 frames). Not seen in motion yet. |
 | `Block` | none | Gap (not used in code today). Draw or drop. |
 | `Win` | none | Dropped. We will not use it. |
 
@@ -128,10 +132,10 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 | `Run` | 6 to 13 | Run | Final |
 | `Hurt` | 14 to 19 | Hurt | Final |
 | `Die` | 20 to 33 | Die | Final |
-| `Up` | 34 to 39 | Jump - Up, frames 1 to 6 (the rise, without the wall-cling frames) | **Placeholder** |
-| `Down` | 40 to 45 | Jump - Down, frames 0 to 5 (the hover, without the landing frames) | **Placeholder** |
+| `Up` | 34 to 39 | Drawn by the user (replaced the jump-frame placeholder) | Drawn, not seen in motion |
+| `Down` | 40 to 45 | Drawn by the user (replaced the jump-frame placeholder) | Drawn, not seen in motion |
 
-- `Up` and `Down` are placeholders. The pack has no up or down view, so these are side-view poses that look different from `Idle` and `Run`: `Up` has the flame trailing below the body, `Down` has the blade held out in front. They face right like the rest. The user replaces them with drawn up and down walk frames. The two tags are red in Aseprite so they are easy to find. The tag names stay `Up` and `Down` because the code uses them (the `_placeholder` suffix of `art-pipeline.md` is on the file name, and this file has real art as well).
+- `Up` and `Down` were placeholders (side-view jump poses). The user has replaced them with drawn up and down walk frames. The tag names stay because the code uses them. (The tags may still be red in Aseprite.)
 - The body is centred on the cloak (source x 38), not on the whole sprite with its flame. A first build used x 34, which put the cloak 8 px off the feet marker and made it jump sideways when the sprite flipped. With x 38 no frame is cut off at the canvas edge. Check the lying `Die` frames by eye in the game.
 - The red `Hurt` frames (15, 17, 19) are one-colour hit-flash silhouettes from the pack, not an error.
 
@@ -158,17 +162,18 @@ The build makes a 64x64 file. The last command doubles it to 128x128. Rebuilding
 
 ## Open
 
+- Weapon: show it or not, and where it sits in the up and down views. The game hides it for now (`SHOW_WEAPON`).
 - `Block` tag: draw or drop.
 - Whether 128x128 is the right size once the up and down views are drawn.
 - Names of the idle tags for up and down (for example `IdleUp` and `IdleDown`), and whether standing should keep one `Idle` for all directions.
 - Frame count for the up and down walks (8 to match `Run`, or fewer).
-- Where the blade and flame go in the up and down views, and whether the sprite is flipped when walking up or down.
+- Whether the sprite is flipped when walking up or down.
 - Whether `WALK_ANIMATION_SPEED` and the walk speed need a retune now that the sprite is twice as big.
 - Not seen yet: the animations in motion, and the lying `Die` frames, in the real game.
 
 ## Next steps
 
-1. **Up and down animations (next session).** The user draws them in `Hunter.aseprite`, with Claude's help. Start by settling the open questions above. Replace the frames of the red `Up` and `Down` tags, add the idle tags, then update `animate_player` in `player.rs` and `art-tags.md` to match. Check each step in the game with `script --debug` and zoomed screenshots.
+1. **Test the up and down animations in motion.** The frames are drawn and the weapon is hidden. Watch them in the game, retune `WALK_ANIMATION_SPEED`, then settle the open questions: idle tags, flip rule and weapon. Update `animate_player` in `player.rs` and `art-tags.md` to match. Check each step with `script --debug` and zoomed screenshots.
 2. Wire up `Hurt` and `Die` when the game has something that hurts the player.
 3. Add attack, charge, special and dash later, with the effects as separate sprites.
 4. Move the lasting content of this file into `art-pipeline.md` once the up and down views are done, and delete `Guy.aseprite` if it is no longer needed.

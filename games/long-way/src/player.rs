@@ -13,6 +13,8 @@ const WALK_SPEED: f32 = 300.0;
 const WALK_ANIMATION_SPEED: f32 = 2.5;
 /// The `Run` tag in `Hunter.aseprite` is the sideways walk. Set to match the way the art faces.
 const WALK_ART_FACES_RIGHT: bool = true;
+/// Draw the `Weapon` layer of `Hunter.aseprite`. The `background` layer is never drawn.
+const SHOW_WEAPON: bool = false;
 /// Half the 128x128 canvas of `Hunter.aseprite`. Keeps the whole canvas on screen.
 const HALF_SIZE: f32 = 64.0;
 
@@ -40,6 +42,15 @@ pub struct Player {
     playing: &'static str,
 }
 
+/// Layers of `Hunter.aseprite` that the game draws, by name.
+fn hunter_layers() -> Vec<String> {
+    let mut layers = vec!["Body".to_string()];
+    if SHOW_WEAPON {
+        layers.push("Weapon".to_string());
+    }
+    layers
+}
+
 pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
     commands.spawn((
         MapEntity,
@@ -50,7 +61,12 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
             playing: "Idle",
         },
         AseAnimation {
-            aseprite: server.load("art/characters/Hunter.aseprite"),
+            aseprite: server
+                .load_builder()
+                .with_settings::<AsepriteLoaderSettings>(|settings| {
+                    settings.layer_selection = LayerSelectionSetting::Mask(hunter_layers());
+                })
+                .load("art/characters/Hunter.aseprite"),
             animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop),
         },
         Sprite::default(),
