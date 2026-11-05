@@ -3,10 +3,11 @@
 use bevy::prelude::*;
 use game_kit::collision::Blocker;
 
-/// Half the width of the player's body. The player's feet are blocked this far from a trunk's sides.
-pub const PLAYER_HALF_WIDTH: f32 = 20.0;
-/// Distance from the centre of the player's canvas down to its feet.
-pub const PLAYER_FEET_OFFSET: f32 = 30.0;
+/// Half the width of the player's body. The feet are blocked this far from a trunk's sides.
+/// The Hunter's cloak is about 20 px wide and the hat 30. Keep this above 12.8 (half of the 25.6 gap between two rocks two cells apart), or those rocks stop forming one cluster.
+pub const PLAYER_HALF_WIDTH: f32 = 14.0;
+/// Distance from the centre of the player's canvas down to the feet (feet at y 120 of 128 in `Hunter.aseprite`).
+pub const PLAYER_FEET_OFFSET: f32 = 56.0;
 
 /// How much of the tree's bottom the player may not enter when walking down from above, as a fraction of the tree height.
 const BLOCKED_BOTTOM: f32 = 0.1;
@@ -57,7 +58,7 @@ mod tests {
     use game_kit::outline::{self, Edge};
 
     // Base at y 0, tree 128 high, trunk x 0 to 30.
-    // Blocked feet area: x -20 to 50, y 0 to 12.8.
+    // Blocked feet area: x -PLAYER_HALF_WIDTH to 30 + PLAYER_HALF_WIDTH, y 0 to 12.8.
     fn trunk() -> Trunk {
         Trunk {
             left: 0.0,
@@ -80,12 +81,18 @@ mod tests {
 
     #[test]
     fn stops_at_left_side() {
-        assert_eq!(walk(Vec2::new(-100.0, 5.0), Vec2::new(0.0, 5.0)).x, -20.0);
+        assert_eq!(
+            walk(Vec2::new(-100.0, 5.0), Vec2::new(0.0, 5.0)).x,
+            -PLAYER_HALF_WIDTH
+        );
     }
 
     #[test]
     fn stops_at_right_side() {
-        assert_eq!(walk(Vec2::new(100.0, 5.0), Vec2::new(0.0, 5.0)).x, 50.0);
+        assert_eq!(
+            walk(Vec2::new(100.0, 5.0), Vec2::new(0.0, 5.0)).x,
+            30.0 + PLAYER_HALF_WIDTH
+        );
     }
 
     #[test]

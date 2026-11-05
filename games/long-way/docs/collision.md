@@ -4,8 +4,8 @@ The numbers and object rules Long Way gives to the [collision extension](../../.
 
 ## The player
 
-- Feet: the point at the bottom of the player's sprite, 30 below the canvas centre (`PLAYER_FEET_OFFSET`).
-- Half width 20 (`PLAYER_HALF_WIDTH`). Height 60 (`PLAYER_HEIGHT`).
+- Feet: the point at the bottom of the player sprite, 56 below the canvas centre (`PLAYER_FEET_OFFSET`). The player is the Hunter (`Hunter.aseprite`, 128x128, feet at y 120), see `adr-lw15`.
+- Half width 14 (`PLAYER_HALF_WIDTH`). It must stay above 12.8, or rocks two cells apart stop merging.
 - The player is clamped to the view after collision (`player.rs`), which can move the feet into a shape.
 
 ## Trees (`Trunk`)
@@ -22,15 +22,15 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 
 - Art: `Rocks.aseprite`, native 32x32, tags `rock_0` and `rock_1`. It is drawn at a whole number scale: `draw / 32` (4 = 128 px, 5 = 160, 6 = 192). Default is 128.
 - Footprint: 2x2 cells (128 x 128).
-- Blocked area: the footprint inset by 10% on the left, right and top, and not at the bottom. That is 102.4 wide and 115.2 high. It is then grown sideways by the player's half width (20), giving 142.4 wide.
+- Blocked area: the footprint inset by 10% on the left, right and top, and not at the bottom. That is 102.4 wide and 115.2 high. It is then grown sideways by the half width (14), giving 130.4 wide.
 - No other vertical margin. The bottom line sits on the lowest art pixel. The lowest 4 art rows are empty, so the sprite is placed with its lowest visible pixel on the footprint bottom.
 - Sort line: the bottom of the blocked area plus `SORT_BIAS` (1). The player stopped at a rock is drawn in front of it. The player above it is behind it.
 - Rock `draw` and `cell` sizes must agree, or the sprite and the blocked area drift apart.
 
 ### Clusters
 
-- Rocks 2 cells apart have blocked areas that overlap (the inset footprints are 25.6 apart and the player's 20 on each side closes it), so they merge.
-- Rocks 3 or more cells apart leave a gap of about 50 pixels that the player can walk through, so they are separate clusters.
+- Rocks 2 cells apart have blocked areas that overlap (the inset footprints are 25.6 apart and the half width of 14 on each side closes it), so they merge.
+- Rocks 3 or more cells apart leave a gap of about 62 pixels that the player can walk through, so they are separate clusters.
 - Everything inside a cluster is unreachable, so interior rocks cost nothing.
 - Drawing larger than the footprint does not change collision.
 

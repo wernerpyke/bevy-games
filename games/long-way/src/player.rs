@@ -11,10 +11,10 @@ use game_kit::depth::DepthSort;
 const WALK_SPEED: f32 = 300.0;
 /// Playback speed multiplier for the walking animations. 1.0 is the speed set in Aseprite.
 const WALK_ANIMATION_SPEED: f32 = 2.5;
-/// The `Walk` tag in `Guy.aseprite` is the sideways walk. Set to match the way the art faces.
-const WALK_ART_FACES_RIGHT: bool = false;
-/// Half the 60x60 canvas of `Guy.aseprite`. Keeps the whole canvas on screen.
-const HALF_SIZE: f32 = 30.0;
+/// The `Run` tag in `Hunter.aseprite` is the sideways walk. Set to match the way the art faces.
+const WALK_ART_FACES_RIGHT: bool = true;
+/// Half the 128x128 canvas of `Hunter.aseprite`. Keeps the whole canvas on screen.
+const HALF_SIZE: f32 = 64.0;
 
 pub struct PlayerPlugin;
 
@@ -50,7 +50,7 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
             playing: "Idle",
         },
         AseAnimation {
-            aseprite: server.load("art/characters/Guy.aseprite"),
+            aseprite: server.load("art/characters/Hunter.aseprite"),
             animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop),
         },
         Sprite::default(),
@@ -93,7 +93,7 @@ fn move_player(
             continue;
         }
         let step = direction.normalize() * WALK_SPEED * time.delta_secs();
-        // Collision works on the player's feet, not the centre of its canvas.
+        // Collision works on the feet, not the centre of the canvas.
         let old_feet = transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET);
         let feet = move_feet(
             &settings,
@@ -129,7 +129,7 @@ fn animate_player(mut query: Query<(&mut AseAnimation, &mut Player)>) {
     for (mut ase, mut player) in &mut query {
         let tag = match (player.walking, player.facing) {
             (false, _) => "Idle",
-            (true, Facing::Side) => "Walk",
+            (true, Facing::Side) => "Run",
             (true, Facing::Up) => "Up",
             (true, Facing::Down) => "Down",
         };

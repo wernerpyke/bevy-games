@@ -35,6 +35,6 @@ Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.
 
 ## Long Way values for the pixel art extension
 
-- `VIEW_HEIGHT` is 1200 world units. The player is 60 pixels tall, so it is one twentieth of the screen height.
-- Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
-- The player's tags: `Idle`, `Walk`, `Up`, `Down`. See [art-tags.md](art-tags.md).
+- `VIEW_HEIGHT` is 1200 world units. The Hunter is about 50 pixels tall, so it is about one 24th of the screen height.
+- The player is the Hunter. Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
+- The player's tags (`Hunter.aseprite`): `Idle`, `Run`, `Up`, `Down`. `Up` and `Down` are placeholders. See [art-tags.md](art-tags.md).

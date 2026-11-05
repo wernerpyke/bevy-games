@@ -295,9 +295,12 @@ mod tests {
     #[test]
     fn the_blocked_area_is_the_inset_footprint_grown_sideways_by_players_half_width() {
         let a = group_area(&rock(0, 0), &map(128.0, 0.0), false);
-        // Footprint 128, inset 12.8 left, right and top, none at the bottom, then 20 wider on each side.
-        assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - 20.0, 0.0));
-        assert_eq!(a.max, MAP_ORIGIN + Vec2::new(115.2 + 20.0, 115.2));
+        // Footprint 128, inset 12.8 left, right and top, none at the bottom, then `PLAYER_HALF_WIDTH` wider on each side.
+        assert_eq!(a.min, MAP_ORIGIN + Vec2::new(12.8 - PLAYER_HALF_WIDTH, 0.0));
+        assert_eq!(
+            a.max,
+            MAP_ORIGIN + Vec2::new(115.2 + PLAYER_HALF_WIDTH, 115.2)
+        );
     }
 
     #[test]
@@ -305,7 +308,7 @@ mod tests {
         let plain = group_area(&rock(3, 2), &map(128.0, 0.0), false);
         assert_eq!(
             plain.min,
-            MAP_ORIGIN + Vec2::new(192.0 + 12.8 - 20.0, 128.0)
+            MAP_ORIGIN + Vec2::new(192.0 + 12.8 - PLAYER_HALF_WIDTH, 128.0)
         );
         let jittered = group_area(&rock(3, 2), &map(128.0, 8.0), false);
         assert_eq!(jittered.size(), plain.size());

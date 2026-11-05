@@ -78,3 +78,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The same rule as R-Town (`adr-rt9`): a lone item is passable from behind and a group is one solid shape. Trunks and rocks in one group get the same shape, so the outline has no step between them. With the 10% top inset, two rocks two cells apart in a column left a 12.8 px gap.
 
 **How to apply.** `blocking_groups` in `src/map.rs` finds the group of every object. A new blocking kind must go through it. The values are in `docs/collision.md`.
+
+## adr-lw15. The player is the Hunter (2026-11-05)
+
+**Decision.** The player sprite is `characters/Hunter.aseprite` (128x128, feet at y 120), from the Hunter sprite pack. It replaces `Guy.aseprite`. The feet are 56 below the canvas centre and the half width is 14 (`PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH`). The sprite was doubled in Aseprite on 2026-11-05 (nearest-neighbour, so each art pixel is 2x2) and is drawn at 1x. The canvas is two cells.
+
+**Rationale.** The pack art was 22x25 px, too small next to the trees and rocks at 1x. Doubling it in the `.aseprite` file, not in the game, gives the developer more pixels to draw on and keeps the game scale at 1x. The cloak is about 20 px wide (the hat 30) after doubling, so a body-width half width would be 10. The half width is 14 because it must stay above 12.8, half of the 25.6 px gap between rocks two cells apart (`adr-x20`). A smaller value would let the player walk between rocks that the map reads as one cluster.
+
+**How to apply.** Values and numbers are in `collision.md`. Art details are in `HUNTER-sprites.md`. Keep the half width above 12.8. If the sprite size changes again, `PLAYER_FEET_OFFSET`, `HALF_SIZE` and the half width change with it.
