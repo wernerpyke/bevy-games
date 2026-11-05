@@ -21,7 +21,7 @@ All blocked areas are axis-aligned rectangles, so the union is a rectilinear sha
 - **D (cluster, then skip interior objects)** is the developer's second idea. It only saves work. It is cheap once C has the union, so it is a step inside C.
 - **B** matters for non-rectangular shapes. The painted map already authors the shape, so B is not needed for rocks.
 - **E** is a candidate later for NPC pathfinding, not for the player's collision.
-- **F and G** do not fit: the slide is a game rule (delay, nearest edge, range limit), and the 50% overlap rules are not normal box collision. Roadmap item 2 decides the physics question.
+- **F and G** do not fit: the slide is a game rule (delay, nearest edge, range limit), and the 50% overlap rules are not normal box collision. Roadmap item 3 decides the physics question.
 - The outline already includes the player's width. The same grown shapes are what a navigation mesh or visibility graph for NPCs needs ("configuration space"), so the data can be reused.
 
 **Recommendation: C with D**, using own rectilinear union code (coordinate compression: sort all x and y values, mark filled cells, trace the boundary). It is exact, about 60 lines, testable and has no dependency. Bring in `i_overlay` (9.1.0, union and offset, `f32` and `f64`) only for non-rectangular shapes. Its repository is tagged `wasm` and `no-std`, but a wasm build is not tested.
@@ -48,7 +48,7 @@ The recommendation for **The player's collision stays C with D**. The feet-point
 2. **Dynamic obstacles.** Doors, pushable objects and destroyed rocks change the outline. Rebuild the affected cluster only, or keep dynamic obstacles in a separate list. Static clusters stay precomputed.
 3. **Navigation.** NPCs need pathfinding. The grown outline is the configuration space a navigation mesh or visibility graph needs, so it should be a reusable data structure, not buried in `resolve`. Occupancy grid (E) or a nav mesh then becomes a separate system fed by the same map.
 4. **Larger worlds.** One map file per area, and the union per chunk, not one global outline.
-5. **Physics crate.** The question in roadmap item 2 weighs more (NPC against NPC, projectiles, knockback). It does not replace the feet-point rule for terrain.
+5. **Physics crate.** The question in roadmap item 3 weighs more (NPC against NPC, projectiles, knockback). It does not replace the feet-point rule for terrain.
 6. **Time.** Everything already uses frame time, so no change.
 
 ### Real-time notes

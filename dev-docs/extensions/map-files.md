@@ -123,7 +123,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 
 - One grid, one object per cell. There are no layers and no ground tiles in the file.
 - One map per game build.
-- Maps with triggers, paths or nested data may outgrow this format (roadmap items 3 and 4).
+- Maps with triggers, paths or nested data may outgrow this format (roadmap items 4 and 5).
 - A visual editor is a roadmap item. It must keep this format as the source of truth.
 
 ## Tests

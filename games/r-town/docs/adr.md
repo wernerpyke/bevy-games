@@ -70,7 +70,7 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 **Decision.** A native run reads the map file from disk, not from `include_str!`. `./dev-scripts/rust.sh run r-town [map]` takes a path or a name in `assets/maps/` and passes it in `R_TOWN_MAP`. With no argument the game reads `assets/maps/test.txt` through `CARGO_MANIFEST_DIR`. F1 reads the file again and rebuilds the ground, trees, collision, camera limits and grid row numbers. Amended by `adr-rt13`: F1 also resets the player, the projectiles and the enemies. A file with an error is logged and the current map stays. The web build and a binary with no environment use the bundled copy, so F1 has no new content there.
 
-**Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 3. 
+**Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of roadmap item 4. 
 
 **How to apply.** Everything a map spawns has the `MapEntity` component, so a reload removes it. A new map system must tag its entities with it and be run in `reload_map` (`src/map.rs`).
 
@@ -84,11 +84,11 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt10. Water is a blocking object kind, cut from the tileset (2026-11-03)
 
-**Decision.** Until tiled ground exists (roadmap item 5), water is an ordinary map object kind. A pond is drawn in the map with nine kinds (`water_nw` to `water_se`, keys `7 8 9 / 4 5 6 / 1 2 3`). Each fills one cell, sits just above the ground colour (`WATER_Z`, a sublayer of the background, `adr-x14`) and blocks the whole cell grown sideways by the feet half width. The nine tiles are cut from `0-tileset.png` with `dev-scripts/aseprite/cut_tiles.lua` and packed into `art/features/water.aseprite` (`adr-rt6`). Water does not count as a neighbour in the tree groups of `adr-rt9`, because it has no tall art.
+**Decision.** Until tiled ground exists (roadmap item 6), water is an ordinary map object kind. A pond is drawn in the map with nine kinds (`water_nw` to `water_se`, keys `7 8 9 / 4 5 6 / 1 2 3`). Each fills one cell, sits just above the ground colour (`WATER_Z`, a sublayer of the background, `adr-x14`) and blocks the whole cell grown sideways by the feet half width. The nine tiles are cut from `0-tileset.png` with `dev-scripts/aseprite/cut_tiles.lua` and packed into `art/features/water.aseprite` (`adr-rt6`). Water does not count as a neighbour in the tree groups of `adr-rt9`, because it has no tall art.
 
 **Rationale.** Water must block now, and the map format has one object per cell. Counting water as a neighbour would turn a lone tree at the shore into a full cell block for no visible reason. Water is on the ground, so the depth sort and walk-behind do not apply.
 
-**How to apply.** Draw ponds in the map file. Item 5 may replace these kinds with a tile layer.
+**How to apply.** Draw ponds in the map file. Item 6 may replace these kinds with a tile layer.
 
 ## adr-rt11. The X key fires a projectile along the player's facing (2026-11-04)
 

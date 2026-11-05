@@ -1,5 +1,5 @@
 //! What the player asks for this frame, independent of the device. Systems read `PlayerInput` and never `KeyCode`,
-//! so a mouse can be added as a second source later. Planned to move to the kit (roadmap item 8).
+//! so a mouse can be added as a second source later. Planned to move to the kit (roadmap item 9).
 
 use bevy::prelude::*;
 
