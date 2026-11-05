@@ -4,6 +4,28 @@ Source: `games/long-way/input/hunter/` (character name in the files: "Clarice, n
 
 Purpose: replace `Guy.aseprite` as the player sprite. This file lists what the pack has and what we must draw. It is based on the 15 JSON files, a pixel scan of the 15 sprite sheets, and a visual check of the Idle, Run, Jump Down and Normal Attack sheets.
 
+## Status (2026-11-05) and handoff
+
+The Hunter is the player in Long Way. Next work: draw the real up and down animations (see "Next steps"), in a new session.
+
+**Done**
+- The pack is analysed (below) and built into `characters/Hunter.aseprite`: 128x128, 46 frames, tags `Idle`, `Run`, `Hurt`, `Die` (from the pack) and `Up`, `Down` (placeholders from the jump frames, red tags). Palette is the game palette, grown to 32 colours (`adr-a5`).
+- `player.rs` and `collision.rs` use the Hunter (`adr-lw15`): `Run` is the sideways walk, the art faces right (`WALK_ART_FACES_RIGHT = true`), the sprite is flipped with `transform.scale.x`, `HALF_SIZE` 64, `PLAYER_FEET_OFFSET` 56, `PLAYER_HALF_WIDTH` 14.
+- Checked in the real game with `script --debug` and zoomed screenshots: the face points the way the player walks, and the cloak is centred on the feet marker in both directions.
+
+**What the player code does now** (`animate_player` in `player.rs`)
+- Standing plays `Idle` for every facing. Walking plays `Run` (sideways), `Up` or `Down`. Horizontal input wins on a diagonal.
+- Walk animations play at `WALK_ANIMATION_SPEED` 2.5, idle at 1.0. Walk speed is 300.
+- The flip stays at the last sideways value while walking up or down. That is fine for art that is symmetric, and needs a decision if the up and down art is not.
+- No code plays `Hurt` or `Die`. No code uses `Block`.
+
+**Facts for drawing the up and down frames**
+- Canvas 128x128. Feet on row y=120. Body centred on x=64. The cloak is about 20 px wide, the hat about 30, the whole body about 50 tall. Every art pixel in the pack art is 2x2, so drawing at 1x pixel detail is possible but looks finer than the rest.
+- `Run` has 8 frames of 100 ms. The placeholder `Up` has 6 frames (75, 75, 75, 125, 125, 125 ms) and `Down` has 6 frames of 100 ms. The real frame counts are open.
+- Only colours from the game palette (32 colours; indexes 19 to 31 are the Hunter's). Index 0 is transparent.
+- `Hunter.aseprite` is committed, so git is the safety net. **Do not run the rebuild command** once drawing starts: it overwrites the file. Add or replace frames inside Aseprite. Keep the tag names, because the code uses them.
+- Tooling for checks: zoomed screenshots are still manual (roadmap item 1). Recipe: run `./dev-scripts/rust.sh script long-way "teleport:<x>:<y>;wait:0.4;hold:<key>:0.5;wait:0.3;screenshot:<name>;quit" --debug`, then crop the PNG in a Lua script with `Sprite:crop` and `SpriteSize { scale = 5 }`. The window is 2560x1440 and `screen = (1280 + 1.2 * world x, 720 - 1.2 * world y)`. Delete the screenshots afterwards.
+
 ## Pack format
 
 | Item | Value |
@@ -28,7 +50,7 @@ Measured from the opaque pixels:
 - Attack and dash effects reach x 1 to 91 and y 4 to 48.
 - `Guy.aseprite` is a 60x60 canvas. Our code uses `HALF_SIZE = 30` and `PLAYER_FEET_OFFSET = 30` (feet at the bottom edge of the canvas). For the Hunter the feet are 15 px below the canvas centre (y 47 of 64, centre at 32), and the body is 14 px left of the canvas centre.
 - Decision: re-centre the body and crop the canvas as needed. Effects (slash arcs, dash trail) will be separate sprites, so the canvas only has to fit the body and the weapon. This changes `HALF_SIZE`, `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH` and the camera clamp.
-- Decision: first try the character at its current size (about 25 px tall) in the game, then decide on scale.
+- Decision, later changed: the character was first tried at its pack size (about 25 px tall), then doubled in Aseprite (see "Decisions").
 
 ## What the pack contains
 
@@ -60,16 +82,16 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 | The player tag | Hunter source | Status |
 |---|---|---|
 | `Idle` | Idle | Side only. Usable. |
-| `Walk` (side) | Run | Usable. Play speed needs a retune (`WALK_ANIMATION_SPEED`, now 2.5). |
-| `Up` | none | Gap |
-| `Down` | none | Gap |
-| `Block` | none | Gap (not used in code today). |
+| `Walk` (side) | Run | In use, tag `Run`. Play speed (`WALK_ANIMATION_SPEED`, 2.5) is not retuned for the doubled size. |
+| `Up` | none | Placeholder from the jump frames. Needs drawing. |
+| `Down` | none | Placeholder from the jump frames. Needs drawing. |
+| `Block` | none | Gap (not used in code today). Draw or drop. |
 | `Win` | none | Dropped. We will not use it. |
 
 ## What is usable in a top-down game
 
-- **Direct use (side view, left-facing):** Idle, Run, Hurt, Die, normal attack, special attack (Charge and enter), dash.
-- **Needs a mirror:** all of the above when the player moves or faces right. Bevy can flip the sprite (`flip_x`), so no extra art is needed for that.
+- **Direct use (side view, right-facing):** Idle, Run, Hurt, Die, normal attack, special attack (Charge and enter), dash.
+- **Needs a mirror:** all of the above when the player moves or faces left. The game flips the sprite (`transform.scale.x = -1`), so no extra art is needed for that.
 - **Probably not usable as is:** Jump - Up, Jump - Down, Fall, wall hug and wall slide. They are side-scroller poses (gravity, walls). Fall is a possible base for a fall-down death pose. The jump frames may be used as a base for a hop or a dodge if we add one.
 
 ## Gaps we need to fill
@@ -80,8 +102,8 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
    - Suggested bases: Idle and Run for body shape, hat, cloak and timing. The wall-hug pose shows the face from a different angle, so check it by eye as a reference for the front view. The user draws these.
 2. **Attacks (later).** The first version has no attacks. We want to build towards them. When we add them, the pack has one sideways slash and one special. Attacks up and down need new drawing. Keep the attack, charge, special and dash sheets with the source file so they are ready.
 3. **Weapon position.** The flame blade shows in idle at the lower left. For up and down views we must decide where it goes and where the flame sits (it is the main colour accent).
-4. **Palette.** Add the pack colours (13 to 14 per sheet, fewer in total because sheets share colours) to `diodrama_palette.aseprite`. This is an edit to the game palette. Check that the existing sprites still look right, because index numbers must not move (append new colours at the end).
-5. **Canvas and anchor.** See "Character size and anchor". The collision box (`PLAYER_HALF_WIDTH` 20) is wider than the 22 px body and needs a new value.
+4. **Palette.** Done (`adr-a5`): the 13 new colours were appended to `diodrama_palette.aseprite`.
+5. **Canvas and anchor.** Done: 128x128, feet at y=120, collision values set (`adr-lw15`).
 6. **Block.** `Guy.aseprite` has it. The pack has no equivalent. Not used in code now. Open: draw later or drop the tag. (`Win` is dropped.)
 7. **Effects as separate sprites.** The dash effect is already a separate sheet. The slash arcs and the special attack effects are baked into the character frames. When we add attacks, we must split them out by hand into effect sprites (own file and tags) and remove them from the character frames. Not needed for the first version.
 8. **Source file.** Done: `characters/Hunter.aseprite` is built from the PNGs with the pack's frame durations. The user's own drawings (up and down) go into this file. The PNG sheets in `input/` stay as read-only references.
@@ -138,11 +160,15 @@ The build makes a 64x64 file. The last command doubles it to 128x128. Rebuilding
 
 - `Block` tag: draw or drop.
 - Whether 128x128 is the right size once the up and down views are drawn.
+- Names of the idle tags for up and down (for example `IdleUp` and `IdleDown`), and whether standing should keep one `Idle` for all directions.
+- Frame count for the up and down walks (8 to match `Run`, or fewer).
+- Where the blade and flame go in the up and down views, and whether the sprite is flipped when walking up or down.
+- Whether `WALK_ANIMATION_SPEED` and the walk speed need a retune now that the sprite is twice as big.
+- Not seen yet: the animations in motion, and the lying `Die` frames, in the real game.
 
 ## Next steps
 
-1. (Done) Palette expanded and `Hunter.aseprite` is on it.
-2. (Done, `adr-lw15`) `player.rs` and `collision.rs` use `Hunter.aseprite`: tag `Run` replaces `Walk`, `HALF_SIZE` 64, `PLAYER_FEET_OFFSET` 56, `PLAYER_HALF_WIDTH` 14 (above 12.8, so rocks two cells apart still merge). Checked with `script --debug`: the Hunter shows and walks left, right, up and down. Not checked: the feet marker alignment close up, and how the animations look in motion.
-3. The user replaces the placeholder `Up` and `Down` frames with drawn walk frames, and adds an idle for each direction. We switch the code to them as they are finished.
-4. Add attack, charge, special and dash later (effects as separate sprites).
-5. Move the lasting content of this file into `art-pipeline.md` when the player switch is done.
+1. **Up and down animations (next session).** The user draws them in `Hunter.aseprite`, with Claude's help. Start by settling the open questions above. Replace the frames of the red `Up` and `Down` tags, add the idle tags, then update `animate_player` in `player.rs` and `art-tags.md` to match. Check each step in the game with `script --debug` and zoomed screenshots.
+2. Wire up `Hurt` and `Die` when the game has something that hurts the player.
+3. Add attack, charge, special and dash later, with the effects as separate sprites.
+4. Move the lasting content of this file into `art-pipeline.md` once the up and down views are done, and delete `Guy.aseprite` if it is no longer needed.
