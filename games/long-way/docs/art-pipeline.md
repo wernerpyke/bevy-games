@@ -13,8 +13,9 @@ Starting-point art lives in `~/Dark/graveyard_shift/diodrama-assets/` (55 `.asep
 ## Files copied so far
 
 Long Way (`games/long-way/assets/art/`):
-- `diodrama_palette.aseprite` (from `diodrama_palette.aseprite`, 19 colours). The game's palette.
+- `diodrama_palette.aseprite` (from `diodrama_palette.aseprite`, 19 colours, expanded to 32 on 2026-11-05 with the 13 Hunter colours, see `adr-a5`). The game's palette.
 - `characters/Guy.aseprite` (from `characters/guy/Guy.aseprite`, 60x60, 41 frames, tags: Idle, Walk, Up, Down, Block, Win)
+- `characters/Hunter.aseprite` (built from the Clarice "nocturnal creature hunter" sprite pack in `input/hunter/`, which the user has a full commercial licence for and may edit. 128x128 (doubled with `resize.lua`), 46 frames, tags: Idle, Run, Hurt, Die, Up and Down. Up and Down are placeholders made from the pack jump frames (red tags). Built with `dev-scripts/aseprite/tagged_sheets.lua`. Details in `HUNTER-sprites.md`. On the game palette.)
 - `features/Green tree.aseprite` (from `features/`, resized in our copy from 512x512 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 12 colour palette, not the game palette)
 - `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
 - `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256 (32x32 art scaled 8x), with `dev-scripts/aseprite/frames_from_pngs.lua`: native 32x32, 2 frames, drawn in the game at a whole number scale (4x = 128 px), tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
@@ -25,11 +26,11 @@ Source of truth: `.aseprite` files in each game's `assets/art/` (`games/<name>/a
 
 Tools:
 - Aseprite CLI, run as `aseprite --batch --script <script.lua>`. Binary: `/Applications/Aseprite.app/Contents/MacOS/aseprite`.
-- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes.
+- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes. `tagged_sheets.lua` builds one file from several sprite sheets (one tag per sheet, durations from the Aseprite JSON, body re-centred on a new canvas).
 
 Rules:
 1. Write one shared helper first (`dev-scripts/aseprite/lib.lua`): new sprite, load palette, draw tile, outline, shade, tag frames, save. Sprite scripts call the helper. Do not repeat drawing code per sprite.
-2. Use one fixed palette per game. Long Way: `games/long-way/assets/art/diodrama_palette.aseprite` (19 colours, index 0 is transparent black `#000000a0`). Scripts must not use colours outside it.
+2. Use one fixed palette per game. Long Way: `games/long-way/assets/art/diodrama_palette.aseprite` (32 colours, index 0 is transparent black `#000000a0`). Scripts must not use colours outside it.
 3. Use one tile and sprite size grid (open question: size not chosen, for example 16x16 or 32x32). All sprites are multiples of it.
 4. Check each sprite visually: export a PNG scaled up with `--scale`, view it, fix, repeat. Stop after 3 rounds and ask the user if it still looks wrong.
 5. Claude draws placeholders, tiles, icons, UI, effects and simple animation. The user draws or refines characters and key art. Mark placeholders with the suffix `_placeholder` in the file name so they are easy to find.
