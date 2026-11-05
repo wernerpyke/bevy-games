@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
-/// Height of the game view in art pixels. The Hunter is about 50 pixels tall, so 1200 makes it about one 24th of the screen height.
-pub const VIEW_HEIGHT: f32 = 1200.0;
+/// Height of the game view in art pixels: 9 cells. The Hunter is about 50 pixels tall, so about one 11th of the screen height. The camera follows the player and stops at the map edge.
+pub const VIEW_HEIGHT: f32 = 576.0;
 
 /// Background colour behind the world.
 pub const CLEAR_COLOR: Color = Color::srgb(0.16, 0.17, 0.2);
@@ -14,8 +14,7 @@ pub const CELL_SIZE: f32 = 64.0;
 /// whole cells, so in a 16:9 window the grid starts close to the bottom left of the screen.
 pub const MAP_ORIGIN: Vec2 = Vec2::new(-16.0 * CELL_SIZE, -9.0 * CELL_SIZE);
 
-/// Half the visible area in world units. The camera sits at the origin and shows a fixed height,
-/// so the visible width follows the window aspect ratio.
-pub fn half_view(window: &Window) -> Vec2 {
-    game_kit::camera::half_view(window.width(), window.height(), VIEW_HEIGHT)
+/// The map area in world units. Cell (0, 0) has its bottom left corner at `MAP_ORIGIN`.
+pub fn map_rect(size: IVec2) -> Rect {
+    Rect::from_corners(MAP_ORIGIN, MAP_ORIGIN + size.as_vec2() * CELL_SIZE)
 }

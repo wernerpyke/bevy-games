@@ -74,6 +74,8 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 
 **Rationale.** The player was Guy, 60 pixels tall, and should be one twentieth of the screen height (60 x 20 = 1200). The developer does not want to resize the art in Aseprite or scale sprites when drawing, so the view size sets the on-screen size. This replaced an earlier value of 180.
 
+Updated 2026-11-05 (later): the view height is now 576 and the camera follows the player (`adr-lw16`). The text below is the earlier state.
+
 Updated 2026-11-05: the player is now the Hunter, a 128x128 canvas with a body about 50 pixels tall, so about one 24th of the screen height (`adr-lw15`). The value 1200 stays. The trees and rocks (128 px) and the 64 px map cell were drawn for it, and the developer sizes a character by scaling the art file in Aseprite (the Hunter was doubled there) and not by changing the view.
 
 **How to apply.** Art pixels map 1:1 to screen pixels only when the window is 1200 high. At smaller windows (a 720 high window gives 0.6x) the art is downscaled, which can make nearest-neighbour pixels uneven. If that looks bad, try linear sampling for downscaling, or a render-to-texture pixel camera. Revisit when the game design sets the screen layout.

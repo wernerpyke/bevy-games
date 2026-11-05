@@ -1,8 +1,10 @@
 //! Long Way's map: loads the map file and names the object kinds. The parser is `game_kit::map`. See
 //! `games/long-way/docs/maps.md` for the kinds.
 
+use crate::camera::map_rect;
 use crate::rocks::FOOTPRINT_CELLS;
 use bevy::prelude::*;
+use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::map::{Map, MapObject, parse};
@@ -43,7 +45,8 @@ impl Plugin for MapPlugin {
         for object in &map.objects {
             debug!("map: {} at cell {}", object.kind, object.cell);
         }
-        app.insert_resource(CurrentMap(map))
+        app.insert_resource(CameraBounds(map_rect(map.size)))
+            .insert_resource(CurrentMap(map))
             .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
@@ -74,6 +77,7 @@ fn reload_map(world: &mut World) {
     for entity in old {
         world.despawn(entity);
     }
+    world.insert_resource(CameraBounds(map_rect(map.size)));
     world.insert_resource(CurrentMap(map));
     world.resource_mut::<CollisionWorld>().clear();
     let _ = world.run_system_cached(crate::rocks::spawn_rocks);

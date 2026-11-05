@@ -1,8 +1,9 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
-use crate::camera::half_view;
-use crate::collision::PLAYER_FEET_OFFSET;
+use crate::camera::map_rect;
+use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
+use crate::map::CurrentMap;
 use crate::map::MapEntity;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
@@ -15,8 +16,6 @@ const WALK_ANIMATION_SPEED: f32 = 2.5;
 const WALK_ART_FACES_RIGHT: bool = true;
 /// Draw the `Weapon` layer of `Hunter.aseprite`. The `background` layer is never drawn.
 const SHOW_WEAPON: bool = false;
-/// Half the 128x128 canvas of `Hunter.aseprite`. Keeps the whole canvas on screen.
-const HALF_SIZE: f32 = 64.0;
 
 pub struct PlayerPlugin;
 
@@ -81,12 +80,12 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
 fn move_player(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    window: Single<&Window>,
+    map: Res<CurrentMap>,
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
-    let limit = (half_view(&window) - Vec2::splat(HALF_SIZE)).max(Vec2::ZERO);
+    let area = map_rect(map.0.size);
 
     let mut direction = Vec2::ZERO;
     if input.pressed(KeyCode::ArrowLeft) {
@@ -119,10 +118,13 @@ fn move_player(
             time.delta_secs(),
             world.edges(),
         );
+        // The feet stay inside the map, and the body stays below its top edge.
+        let feet = feet.clamp(
+            area.min + Vec2::new(PLAYER_HALF_WIDTH, 0.0),
+            area.max - Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
+        );
         transform.translation.x = feet.x;
         transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
-        transform.translation.x = transform.translation.x.clamp(-limit.x, limit.x);
-        transform.translation.y = transform.translation.y.clamp(-limit.y, limit.y);
 
         // Horizontal movement wins when walking diagonally, so the sideways walk plays.
         if direction.x != 0.0 {

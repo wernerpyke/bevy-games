@@ -17,6 +17,7 @@ fn main() {
                 view_height: camera::VIEW_HEIGHT,
                 clear_color: camera::CLEAR_COLOR,
             },
+            game_kit::camera::CameraFollowPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

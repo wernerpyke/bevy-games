@@ -11,7 +11,7 @@ games/long-way/
 ├── docs/               this folder
 └── src/
     ├── main.rs         builds the App, adds plugins
-    ├── camera.rs       VIEW_HEIGHT, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, half_view (the camera is `game_kit::camera`)
+    ├── camera.rs       VIEW_HEIGHT, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
     ├── player.rs       PlayerPlugin: player spawn, movement, animation
     ├── trees.rs        TreesPlugin: trees and their trunks from the map
     ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
@@ -35,6 +35,6 @@ Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.
 
 ## Long Way values for the pixel art extension
 
-- `VIEW_HEIGHT` is 1200 world units. The Hunter is about 50 pixels tall, so it is about one 24th of the screen height.
+- `VIEW_HEIGHT` is 576 world units (9 cells). The Hunter is about 50 pixels tall, so it is about one 11th of the screen height. The camera follows the player and stops at the map edge (`adr-lw16`).
 - The player is the Hunter. Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
 - The player's tags (`Hunter.aseprite`): `Idle`, `Run`, `Up`, `Down`. `Up` and `Down` are placeholders. See [art-tags.md](art-tags.md).

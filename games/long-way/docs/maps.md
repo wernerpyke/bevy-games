@@ -6,7 +6,7 @@ How to write a map file for Long Way. The file format itself is the [map files e
 - The game loads one map. Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
 - The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F3 grid. Press F3 to show the grid with cell numbers.
 - Cell size is 64 pixels (`cell: 64`).
-- Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells (`adr-lw8`). A map of 32 by 18 cells fills that view.
+- Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells (`adr-lw8`). A map of 32 by 18 cells is two views wide and two high, so the camera scrolls (`adr-lw16`).
 - Use a fixed-width font and turn off word wrap. Each cell takes two characters, so a row of 32 cells is 63 characters between the bars.
 
 ## Kinds you can use in a legend

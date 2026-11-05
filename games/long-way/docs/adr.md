@@ -85,4 +85,12 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** The pack art was 22x25 px, too small next to the trees and rocks at 1x. Doubling it in the `.aseprite` file, not in the game, gives the developer more pixels to draw on and keeps the game scale at 1x. The cloak is about 20 px wide (the hat 30) after doubling, so a body-width half width would be 10. The half width is 14 because it must stay above 12.8, half of the 25.6 px gap between rocks two cells apart (`adr-x20`). A smaller value would let the player walk between rocks that the map reads as one cluster.
 
-**How to apply.** Values and numbers are in `collision.md`. Art details are in `HUNTER-sprites.md`. Keep the half width above 12.8. If the sprite size changes again, `PLAYER_FEET_OFFSET`, `HALF_SIZE` and the half width change with it.
+**How to apply.** Values and numbers are in `collision.md`. Art details are in `HUNTER-sprites.md`. Keep the half width above 12.8. If the sprite size changes again, `PLAYER_FEET_OFFSET`, `PLAYER_BODY_HEIGHT` and the half width change with it.
+
+## adr-lw16. The camera follows the player and stops at the map edge (2026-11-05)
+
+**Decision.** Long Way uses `CameraFollowPlugin` from the kit, as R-Town does (`adr-x17`). `VIEW_HEIGHT` is 576 (9 cells of 64), down from 1200. `CameraBounds` is the map area (`map_rect` in `camera.rs`), set when the map loads and again on F1. The player is kept inside the map, not inside the view: the feet stop at the map edge, and `PLAYER_BODY_HEIGHT` (50) below the top edge.
+
+**Rationale.** At 1200 the Hunter was about one 24th of the screen height and hard to see. At 576 it is about one 11th, and the 32x18 map is two views wide and two high, so the camera scrolls. The camera stops at the map edge, so the body would be cut off at the top edge without the extra margin.
+
+**How to apply.** Change `VIEW_HEIGHT` to zoom. Keep 576 divisible by the cell size so the view holds whole cells. Update `adr-e7` if the number changes again. A map smaller than the view is centred.
