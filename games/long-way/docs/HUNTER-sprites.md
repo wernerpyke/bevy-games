@@ -28,7 +28,7 @@ The Hunter is the player in Long Way. The user has drawn the up and down walk fr
 - Only colours from the game palette (32 colours; indexes 19 to 31 are the Hunter's). Index 0 is transparent.
 - Layers: `Body` (the character), `Weapon` (the blade) and `background` (the user's own use, never drawn). The code selects layers by name, so keep these names.
 - `Hunter.aseprite` is committed, so git is the safety net. **Do not run the rebuild command** once drawing starts: it overwrites the file. Add or replace frames inside Aseprite. Keep the tag names, because the code uses them.
-- Tooling for checks: zoomed screenshots are still manual (roadmap item 1). Recipe: run `./dev-scripts/rust.sh script long-way "teleport:<x>:<y>;wait:0.4;hold:<key>:0.5;wait:0.3;screenshot:<name>;quit" --debug`, then crop the PNG in a Lua script with `Sprite:crop` and `SpriteSize { scale = 5 }`. The window is 2560x1440 and `screen = (1280 + 1.2 * world x, 720 - 1.2 * world y)`. Delete the screenshots afterwards.
+- Tooling for checks: use `./dev-scripts/shot.sh long-way <name> "teleport:<x>:<y>;wait:0.4;hold:<key>:0.5;wait:0.3" cx=<x> cy=<y> w=160 h=160 scale=4` for a zoomed screenshot, and `./dev-scripts/aseprite.sh check|frame_grid` for the file (`dev-docs/extensions/dev-scripts.md`). Delete the screenshots afterwards.
 
 ## Pack format
 

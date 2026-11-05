@@ -27,6 +27,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [enemy-movement.md](enemy-movement.md) | Goals, patrol and pursue strategies, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, rt12 |
 | [spawners.md](spawners.md) | Spawners with settings in the map legend | `game-kit` `spawner.rs`, `map.rs` | x25, rt12 |
 | [debug-tools.md](debug-tools.md) | Grid, info box, collision overlay | `game-kit` `debug.rs`, `collision_debug.rs` | lw3, lw6 |
+| [dev-scripts.md](dev-scripts.md) | Zoomed screenshots and Aseprite checks (`shot.sh`, `aseprite.sh`) | `dev-scripts/` | |
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | lw5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |
 | [pixel-art.md](pixel-art.md) | View height scale, animation tag switching | `game-kit` `camera.rs`, `player.rs` | e7 |

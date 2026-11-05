@@ -25,6 +25,7 @@ Long Way (`games/long-way/assets/art/`):
 Source of truth: `.aseprite` files in each game's `assets/art/` (`games/<name>/assets/art/`). Exported files go in `games/<name>/assets/generated/` and are generated, not edited by hand. Lua scripts in `dev-scripts/aseprite/` are shared by all games and take the game as an argument.
 
 Tools:
+- `./dev-scripts/aseprite.sh` runs `check`, `frame_grid`, `sheet_analysis` and `crop` (`dev-docs/extensions/dev-scripts.md`).
 - Aseprite CLI, run as `aseprite --batch --script <script.lua>`. Binary: `/Applications/Aseprite.app/Contents/MacOS/aseprite`.
 - Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes. `tagged_sheets.lua` builds one file from several sprite sheets (one tag per sheet, durations from the Aseprite JSON, body re-centred on a new canvas).
 

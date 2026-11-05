@@ -49,7 +49,7 @@ const KIND_NAMES: &[&str] = &[
     "water_se",
 ];
 
-/// Placeholder ground colour, `#548058`, until tiled backgrounds exist (roadmap item 6).
+/// Placeholder ground colour, `#548058`, until tiled backgrounds exist (roadmap item 5).
 const GROUND_COLOR: Color = Color::srgb_u8(0x54, 0x80, 0x58);
 
 pub struct MapPlugin;

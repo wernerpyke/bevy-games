@@ -181,7 +181,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 ## adr-x22. Input starts in the game and moves to the kit later (2026-11-04)
 
-**Decision.** Input handling is a module of the game for now. R-Town has `src/input.rs` with a `PlayerInput` resource (move direction, fire) that is filled from the keyboard in `InputSet`. Gameplay systems read the resource and never `KeyCode`. The module moves to the kit when the mouse is added or a second game needs it (roadmap item 9).
+**Decision.** Input handling is a module of the game for now. R-Town has `src/input.rs` with a `PlayerInput` resource (move direction, fire) that is filled from the keyboard in `InputSet`. Gameplay systems read the resource and never `KeyCode`. The module moves to the kit when the mouse is added or a second game needs it (roadmap item 8).
 
 **Rationale.** The resource isolates the device, so a mouse becomes a second writer of the same resource. A kit module now would have one user and a guessed API. The later move is a file move.
 
@@ -193,7 +193,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 **Rationale.** The grid reuses the exact outlines, thin tree bands included, so there is no second description of the obstacles and paths follow the rule the walker follows. It is easy to test without a running world. A navigation mesh crate (`bevy_northstar` and others in `adr-e4`) is heavier and tied to a Bevy version. The cost is memory and a build time of about 9 ms for a 60x60 map, once per map load.
 
-**How to apply.** See `dev-docs/extensions/nav.md`. It is the first part of roadmap item 4.
+**How to apply.** See `dev-docs/extensions/nav.md`. It is the first part of roadmap item 3.
 
 ## adr-x24. Strategies are components that write a goal (2026-11-04)
 
@@ -207,7 +207,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 **Decision.** A legend entry of a map file may have `key=value` parameters after its kind, for example `"S": spawn_skeleton every=10 strategy=patrol radius=120`. The parser keeps them in `MapObject.params` and the line number in `Params::line`. The game decides what they mean and reports errors with the file and the line. `Spawner` (`spawner.rs`) reads `every` and `max`.
 
-**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into roadmap item 5 (objects with settings).
+**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into roadmap item 4 (objects with settings).
 
 **How to apply.** See `dev-docs/extensions/spawners.md` and `map-files.md`.
 

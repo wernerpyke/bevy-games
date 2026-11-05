@@ -41,7 +41,7 @@ A grid of walk points covers the map. Two neighbouring points are linked when a 
 - The grid does not follow moving obstacles. It is built again only when the collision areas change.
 - A line that touches a convex corner of a blocked area exactly passes it. This matches walking (`collision.md`). Real paths do not meet it, because the grid points and the corners do not line up.
 - The grid is as fine as `step`. A gap narrower than the step may be missed.
-- Roadmap item 4 covers a larger design (many maps, dynamic obstacles).
+- Roadmap item 3 covers a larger design (many maps, dynamic obstacles).
 
 ## Tests
 

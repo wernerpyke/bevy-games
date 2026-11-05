@@ -48,7 +48,7 @@ The recommendation for **The player's collision stays C with D**. The feet-point
 2. **Dynamic obstacles.** Doors, pushable objects and destroyed rocks change the outline. Rebuild the affected cluster only, or keep dynamic obstacles in a separate list. Static clusters stay precomputed.
 3. **Navigation.** NPCs need pathfinding. The grown outline is the configuration space a navigation mesh or visibility graph needs, so it should be a reusable data structure, not buried in `resolve`. Occupancy grid (E) or a nav mesh then becomes a separate system fed by the same map.
 4. **Larger worlds.** One map file per area, and the union per chunk, not one global outline.
-5. **Physics crate.** The question in roadmap item 3 weighs more (NPC against NPC, projectiles, knockback). It does not replace the feet-point rule for terrain.
+5. **Physics crate.** The question in roadmap item 2 weighs more (NPC against NPC, projectiles, knockback). It does not replace the feet-point rule for terrain.
 6. **Time.** Everything already uses frame time, so no change.
 
 ### Real-time notes
