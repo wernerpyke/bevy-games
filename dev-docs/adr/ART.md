@@ -31,3 +31,11 @@
 **Rationale.** It is the palette embedded in `Guy.aseprite` and in most of the legacy character files, so existing art needs no recolouring.
 
 **How to apply.** New sprites and Lua scripts use only these colours. Other legacy files with different palettes (for example the 32-colour environment files) need remapping when they are copied across.
+
+## adr-a5. The Long Way palette may grow, by appending (2026-11-05)
+
+**Decision.** The palette in `diodrama_palette.aseprite` is expanded when new art needs colours. New colours are added at the end. Existing indexes never move. The first expansion added the 13 colours of the Hunter sprite pack (indexes 19 to 31, 32 colours in total). `dev-scripts/aseprite/extend_palette.lua` does it.
+
+**Rationale.** The Hunter pack uses its own colours. Mapping them to the 19 old colours would change the look of the character. A bigger palette keeps the pack art as drawn. Appending keeps the player, the rocks and the trees unchanged, because sprites refer to colours, not to index numbers, only inside Aseprite.
+
+**How to apply.** Run the script with the palette and the sprite that needs the colours. It adds only colours that are not yet in the palette. Update the colour count in `art-pipeline.md`. This amends `adr-a4`: "only these colours" now means "only colours in the current palette".
