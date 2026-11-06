@@ -20,12 +20,12 @@ use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
 use crate::Controlled;
-use crate::camera::CameraBounds;
+use crate::camera::{CameraBounds, CameraBoundsTarget, visible_rect};
 use crate::collision::register_blockers;
-use crate::debug::DebugInfo;
+use crate::debug::{DebugGrids, DebugInfo, GridRegion};
 use crate::depth::DepthSort;
 use crate::layers::FADE_Z_INDEX;
-use crate::map::{Area, Facing, Map, MapExit, Transition, parse};
+use crate::map::{Area, Edge, Facing, Map, MapEntry, MapExit, Transition, parse};
 use crate::map_links::{LinkedMap, validate_links};
 
 /// One map file a game registers. `file` is relative to the game folder: a native run reads it from disk (so F1 reloads
@@ -150,14 +150,74 @@ pub struct ActiveMap {
     pub rect: Rect,
 }
 
+/// A seamless link between two active maps: the exit strip of `from`, in world units, and the edge of `from` it is on.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Doorway {
+    pub from: String,
+    pub to: String,
+    pub edge: Edge,
+    pub area: Rect,
+}
+
 /// The maps in the world, and the one that holds the player.
 #[derive(Resource, Default, Debug)]
 pub struct ActiveMaps {
     pub current: String,
     pub maps: Vec<ActiveMap>,
+    /// The seamless links between active maps. The player may cross a map edge only through one of these.
+    pub doorways: Vec<Doorway>,
 }
 
 impl ActiveMaps {
+    /// The map whose area holds the point. Each map owns its bottom and left edges, so a point on a seam belongs to
+    /// one map only.
+    pub fn map_at(&self, point: Vec2) -> Option<&ActiveMap> {
+        self.maps.iter().find(|m| {
+            point.x >= m.rect.min.x
+                && point.x < m.rect.max.x
+                && point.y >= m.rect.min.y
+                && point.y < m.rect.max.y
+        })
+    }
+
+    /// The smallest rectangle that holds every active map.
+    pub fn bounding_rect(&self) -> Rect {
+        self.maps
+            .iter()
+            .map(|m| m.rect)
+            .reduce(|a, b| a.union(b))
+            .unwrap_or_default()
+    }
+
+    /// The areas the feet may stand in, as rectangles: every map shrunk by `margin_min` on its left and bottom and by
+    /// `margin_max` on its right and top (the width of the body and the height of the sprite), plus one bridge over
+    /// every doorway, so the player can cross a seam there and nowhere else. Use `clamp_to_union` to keep the feet in.
+    pub fn walkable(&self, margin_min: Vec2, margin_max: Vec2) -> Vec<Rect> {
+        let inner = |rect: Rect| Rect::from_corners(rect.min + margin_min, rect.max - margin_max);
+        let mut areas: Vec<Rect> = self.maps.iter().map(|m| inner(m.rect)).collect();
+        for door in &self.doorways {
+            let (Some(from), Some(to)) = (self.get(&door.from), self.get(&door.to)) else {
+                continue;
+            };
+            let (a, b) = (inner(from.rect), inner(to.rect));
+            let (x0, x1) = (
+                door.area.min.x + margin_min.x,
+                door.area.max.x - margin_max.x,
+            );
+            let (y0, y1) = (
+                door.area.min.y + margin_min.y,
+                door.area.max.y - margin_max.y,
+            );
+            areas.push(match door.edge {
+                Edge::Top => Rect::from_corners(Vec2::new(x0, a.max.y), Vec2::new(x1, b.min.y)),
+                Edge::Bottom => Rect::from_corners(Vec2::new(x0, b.max.y), Vec2::new(x1, a.min.y)),
+                Edge::Right => Rect::from_corners(Vec2::new(a.max.x, y0), Vec2::new(b.min.x, y1)),
+                Edge::Left => Rect::from_corners(Vec2::new(b.max.x, y0), Vec2::new(a.min.x, y1)),
+            });
+        }
+        areas
+    }
+
     pub fn get(&self, id: &str) -> Option<&ActiveMap> {
         self.maps.iter().find(|m| m.id == id)
     }
@@ -250,6 +310,10 @@ enum Phase {
     FadeIn {
         elapsed: f32,
     },
+    /// A seamless exit was used. The next system loads the neighbour map. There is no fade.
+    Seamless {
+        request: RequestMapChange,
+    },
 }
 
 /// State of the lifecycle. A game reads `locks_input` to stop the player while the screen fades.
@@ -261,6 +325,9 @@ pub struct MapTransition {
     origin: Vec2,
     /// An exit can be used. False after a transition, until the feet have left every exit area.
     armed: bool,
+    /// Seconds each active map that is not the current one has been out of view. A map is removed after
+    /// `UNLOAD_AFTER_SECS`.
+    hidden_for: std::collections::HashMap<String, f32>,
 }
 
 impl MapTransition {
@@ -270,6 +337,7 @@ impl MapTransition {
             fade,
             origin,
             armed: false,
+            hidden_for: std::collections::HashMap::new(),
         }
     }
 
@@ -277,9 +345,13 @@ impl MapTransition {
         matches!(self.phase, Phase::Idle)
     }
 
-    /// True while the screen fades or the maps are swapped: the player must not move.
+    /// True while the screen fades or the maps are swapped: the player must not move. A seamless transition never
+    /// locks the player.
     pub fn locks_input(&self) -> bool {
-        !self.is_idle()
+        matches!(
+            self.phase,
+            Phase::FadeOut { .. } | Phase::Switch { .. } | Phase::FadeIn { .. }
+        )
     }
 }
 
@@ -295,7 +367,7 @@ fn ratio(elapsed: f32, secs: f32) -> f32 {
 /// Opacity of the fade for a phase: 0 clear, 1 covered.
 fn alpha(phase: &Phase, fade: &Fade) -> f32 {
     match phase {
-        Phase::Idle => 0.0,
+        Phase::Idle | Phase::Seamless { .. } => 0.0,
         Phase::FadeOut { elapsed, .. } => ratio(*elapsed, fade.out_secs),
         Phase::Switch { .. } => 1.0,
         Phase::FadeIn { elapsed } => 1.0 - ratio(*elapsed, fade.in_secs),
@@ -407,7 +479,7 @@ impl Plugin for MapTransitionPlugin {
         app.insert_resource(registry)
             .insert_resource(ActiveMaps {
                 current: self.start.clone(),
-                maps: Vec::new(),
+                ..default()
             })
             .insert_resource(MapTransition::new(self.fade, self.origin));
         install_systems(app);
@@ -425,6 +497,11 @@ fn install_systems(app: &mut App) {
                 accept_request,
                 advance_transition,
                 perform_switch,
+                perform_seamless,
+                update_current,
+                unload_hidden,
+                ease_camera_bounds,
+                sync_debug_grids,
                 show_map_id,
             )
                 .chain(),
@@ -494,15 +571,25 @@ fn accept_request(
     mut transition: ResMut<MapTransition>,
 ) {
     for request in requests.read() {
-        if transition.is_idle() {
-            if request.transition == Transition::Seamless {
-                warn!("maps: a seamless transition is not built yet, using a scene transition");
+        if !transition.is_idle() {
+            continue;
+        }
+        let seamless = request.transition == Transition::Seamless;
+        if seamless && request.source.is_none() {
+            warn!(
+                "maps: a seamless transition needs the exit that was used, using a scene transition"
+            );
+        }
+        transition.phase = if seamless && request.source.is_some() {
+            Phase::Seamless {
+                request: request.clone(),
             }
-            transition.phase = Phase::FadeOut {
+        } else {
+            Phase::FadeOut {
                 elapsed: 0.0,
                 request: request.clone(),
-            };
-        }
+            }
+        };
     }
 }
 
@@ -569,6 +656,54 @@ fn unload_all(world: &mut World) {
     }
 }
 
+/// Removes the entities of one map.
+fn unload_entities(world: &mut World, id: &str) {
+    let old: Vec<Entity> = world
+        .query::<(Entity, &MapId)>()
+        .iter(world)
+        .filter(|(_, map)| map.0 == id)
+        .map(|(entity, _)| entity)
+        .collect();
+    for entity in old {
+        world.despawn(entity);
+    }
+}
+
+/// Runs the `load` hook for one map.
+fn run_load(world: &mut World, id: &str, origin: Vec2) {
+    let Some(hooks) = world.get_resource::<MapHooks>().copied() else {
+        error!("maps: the game has not inserted `MapHooks`");
+        return;
+    };
+    let load = MapLoad {
+        id: id.to_string(),
+        origin,
+    };
+    if let Err(error) = world.run_system_with(hooks.load, load) {
+        error!("maps: the load hook failed: {error}");
+    }
+}
+
+/// Runs the `rebuild` hook: the game fills the collision world from the entities that exist now.
+fn run_rebuild(world: &mut World) {
+    let Some(hooks) = world.get_resource::<MapHooks>().copied() else {
+        return;
+    };
+    if let Err(error) = world.run_system(hooks.rebuild) {
+        error!("maps: the rebuild hook failed: {error}");
+    }
+}
+
+/// Sets where the camera limits are heading: the box around every active map. With `snap` the camera limits jump
+/// there at once (a scene transition, the screen is covered). Otherwise `ease_camera_bounds` moves them.
+fn set_bounds(world: &mut World, snap: bool) {
+    let bounds = world.resource::<ActiveMaps>().bounding_rect();
+    world.insert_resource(CameraBoundsTarget(bounds));
+    if snap || !world.contains_resource::<CameraBounds>() {
+        world.insert_resource(CameraBounds(bounds));
+    }
+}
+
 /// Makes `id` the only active map at `origin`, sets the camera limits and runs the `load` and `rebuild` hooks.
 fn install_map(world: &mut World, id: &str, origin: Vec2) {
     let rect = {
@@ -589,22 +724,12 @@ fn install_map(world: &mut World, id: &str, origin: Vec2) {
             origin,
             rect,
         }],
+        doorways: Vec::new(),
     };
-    world.insert_resource(CameraBounds(rect));
-    let Some(hooks) = world.get_resource::<MapHooks>().copied() else {
-        error!("maps: the game has not inserted `MapHooks`");
-        return;
-    };
-    let load = MapLoad {
-        id: id.to_string(),
-        origin,
-    };
-    if let Err(error) = world.run_system_with(hooks.load, load) {
-        error!("maps: the load hook failed: {error}");
-    }
-    if let Err(error) = world.run_system(hooks.rebuild) {
-        error!("maps: the rebuild hook failed: {error}");
-    }
+    world.resource_mut::<MapTransition>().hidden_for.clear();
+    set_bounds(world, true);
+    run_load(world, id, origin);
+    run_rebuild(world);
 }
 
 /// Loads the first map after the game has set up its own start up systems.
@@ -614,19 +739,23 @@ fn load_start(world: &mut World) {
     install_map(world, &id, origin);
 }
 
-/// Reads the current map file again and loads it again, for the F1 key. The controlled entity stays where it is. On an
-/// error in the file nothing changes.
+/// Reads the current map file again and loads every active map again, for the F1 key. The controlled entity stays
+/// where it is. On an error in the file nothing changes.
 pub fn reload_current_map(world: &mut World) -> Result<(), String> {
-    let (id, origin) = {
+    let (id, maps) = {
         let active = world.resource::<ActiveMaps>();
-        let current = active
-            .current_map()
-            .ok_or_else(|| "no map is loaded".to_string())?;
-        (current.id.clone(), current.origin)
+        if active.current_map().is_none() {
+            return Err("no map is loaded".to_string());
+        }
+        (active.current.clone(), active.maps.clone())
     };
     world.resource_mut::<MapRegistry>().reload(&id)?;
     unload_all(world);
-    install_map(world, &id, origin);
+    for map in &maps {
+        run_load(world, &map.id, map.origin);
+    }
+    run_rebuild(world);
+    set_bounds(world, true);
     info!("maps: reloaded `{id}`");
     Ok(())
 }
@@ -665,6 +794,298 @@ fn perform_switch(world: &mut World) {
     let mut transition = world.resource_mut::<MapTransition>();
     transition.armed = false;
     transition.phase = Phase::FadeIn { elapsed: 0.0 };
+}
+
+/// How long a map must be out of view before it is removed, in seconds. A map that was just loaded next to the
+/// player is out of view until the camera bounds have eased, and must not go at once.
+pub const UNLOAD_AFTER_SECS: f32 = 1.0;
+/// Time constant of the camera bounds easing, in seconds.
+pub const BOUNDS_EASE_SECS: f32 = 0.35;
+
+/// Where a map goes so that its entry strip lies on the exit strip of the map it is joined to: it is placed beside
+/// that map, on the edge the exit is on, and shifted along the edge until the two strips match. The maps are never
+/// turned. `None` when the exit does not lie along exactly one edge.
+pub fn seamless_origin(
+    from_origin: Vec2,
+    from: &Map,
+    exit: &MapExit,
+    to: &Map,
+    entry: &MapEntry,
+) -> Option<Vec2> {
+    let edge = match exit.area.edges(from.size).as_slice() {
+        [edge] => *edge,
+        _ => return None,
+    };
+    let exit_low = from_origin + exit.area.min.as_vec2() * from.cell_size;
+    let from_size = from.size.as_vec2() * from.cell_size;
+    let to_size = to.size.as_vec2() * to.cell_size;
+    let entry_low = entry.area.min.as_vec2() * to.cell_size;
+    Some(match edge {
+        Edge::Top => Vec2::new(exit_low.x - entry_low.x, from_origin.y + from_size.y),
+        Edge::Bottom => Vec2::new(exit_low.x - entry_low.x, from_origin.y - to_size.y),
+        Edge::Right => Vec2::new(from_origin.x + from_size.x, exit_low.y - entry_low.y),
+        Edge::Left => Vec2::new(from_origin.x - to_size.x, exit_low.y - entry_low.y),
+    })
+}
+
+/// True when two rectangles share area. Rectangles that only touch along an edge do not overlap.
+pub fn rects_overlap(a: Rect, b: Rect) -> bool {
+    a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y
+}
+
+/// Keeps a move inside the union of `areas`. `from` is where the feet were, `to` where they want to go. The result is
+/// the point nearest to `to` among the areas that hold `from` and the areas that touch them. A step that is longer than
+/// the gap to a neighbour map therefore cannot jump a wall and land in a map that the feet were not next to.
+pub fn clamp_to_union(areas: &[Rect], from: Vec2, to: Vec2) -> Vec2 {
+    let holds =
+        |area: &Rect, point: Vec2| point.cmpge(area.min).all() && point.cmple(area.max).all();
+    let touches = |a: &Rect, b: &Rect| {
+        a.min.x <= b.max.x && b.min.x <= a.max.x && a.min.y <= b.max.y && b.min.y <= a.max.y
+    };
+    let here: Vec<&Rect> = areas.iter().filter(|area| holds(area, from)).collect();
+    areas
+        .iter()
+        .filter(|area| here.is_empty() || here.iter().any(|h| touches(h, area)))
+        .map(|area| to.clamp(area.min, area.max))
+        .min_by(|a, b| a.distance_squared(to).total_cmp(&b.distance_squared(to)))
+        .unwrap_or(to)
+}
+
+/// Moves `current` towards `target`. The time constant `tau` is the time to cover about two thirds of the distance.
+/// Edges that are within half a unit are set to the target.
+pub fn ease_rect(current: Rect, target: Rect, dt: f32, tau: f32) -> Rect {
+    let k = if tau <= 0.0 {
+        1.0
+    } else {
+        1.0 - (-dt / tau).exp()
+    };
+    let step = |from: f32, to: f32| {
+        if (to - from).abs() < 0.5 {
+            to
+        } else {
+            from + (to - from) * k
+        }
+    };
+    Rect::new(
+        step(current.min.x, target.min.x),
+        step(current.min.y, target.min.y),
+        step(current.max.x, target.max.x),
+        step(current.max.y, target.max.y),
+    )
+}
+
+/// Joins the map behind a seamless exit to the one the player is in: places it beside the current map and loads it. The
+/// player is not moved, the screen does not fade and the current map does not change until the player crosses the seam.
+fn begin_seamless(world: &mut World, request: &RequestMapChange) -> Result<(), String> {
+    let used = request
+        .source
+        .as_ref()
+        .ok_or("a seamless transition needs the exit that was used")?;
+    let (origin, rect, doorway) = {
+        let registry = world.resource::<MapRegistry>();
+        let active = world.resource::<ActiveMaps>();
+        let from_active = active
+            .get(&used.from)
+            .ok_or_else(|| format!("map `{}` is not active", used.from))?;
+        let from = registry
+            .get(&used.from)
+            .ok_or_else(|| format!("map `{}` is not registered", used.from))?;
+        let exit = from
+            .map
+            .exits
+            .iter()
+            .find(|exit| exit.name == used.exit)
+            .ok_or_else(|| format!("map `{}` has no exit `{}`", used.from, used.exit))?;
+        let to = registry
+            .get(&request.to)
+            .ok_or_else(|| format!("map `{}` is not registered", request.to))?;
+        let entry = to
+            .map
+            .entries
+            .iter()
+            .find(|entry| entry.name == request.entry)
+            .ok_or_else(|| format!("map `{}` has no entry `{}`", request.to, request.entry))?;
+        let origin = seamless_origin(from_active.origin, &from.map, exit, &to.map, entry)
+            .ok_or_else(|| format!("exit `{}` does not lie along one edge", exit.name))?;
+        let rect = Rect::from_corners(origin, origin + to.map.size.as_vec2() * to.map.cell_size);
+        let edge = exit.area.edges(from.map.size)[0];
+        let doorway = Doorway {
+            from: used.from.clone(),
+            to: request.to.clone(),
+            edge,
+            area: area_rect(&exit.area, from_active.origin, from.map.cell_size),
+        };
+        (origin, rect, doorway)
+    };
+    let already_active = world.resource::<ActiveMaps>().get(&request.to).is_some();
+    if !already_active {
+        let active = world.resource::<ActiveMaps>();
+        if let Some(clash) = active.maps.iter().find(|m| rects_overlap(m.rect, rect)) {
+            return Err(format!(
+                "map `{}` would lie on top of map `{}`",
+                request.to, clash.id
+            ));
+        }
+        let mut active = world.resource_mut::<ActiveMaps>();
+        active.maps.push(ActiveMap {
+            id: request.to.clone(),
+            origin,
+            rect,
+        });
+    }
+    {
+        let mut active = world.resource_mut::<ActiveMaps>();
+        if !active.doorways.contains(&doorway) {
+            active.doorways.push(doorway);
+        }
+    }
+    world
+        .resource_mut::<MapTransition>()
+        .hidden_for
+        .remove(&request.to);
+    if !already_active {
+        run_load(world, &request.to, origin);
+        run_rebuild(world);
+        set_bounds(world, false);
+    }
+    info!(
+        "maps: `{}` joined to `{}` at {:?}",
+        request.to, used.from, origin
+    );
+    Ok(())
+}
+
+fn perform_seamless(world: &mut World) {
+    let request = {
+        let mut transition = world.resource_mut::<MapTransition>();
+        match std::mem::take(&mut transition.phase) {
+            Phase::Seamless { request } => request,
+            other => {
+                transition.phase = other;
+                return;
+            }
+        }
+    };
+    if let Err(message) = begin_seamless(world, &request) {
+        error!("maps: cannot join `{}`: {message}", request.to);
+    }
+    world.resource_mut::<MapTransition>().phase = Phase::Idle;
+}
+
+/// The current map is the one that holds the feet. It changes when the player crosses a seam.
+fn update_current(
+    mut active: ResMut<ActiveMaps>,
+    mut transition: ResMut<MapTransition>,
+    target: Query<(&Transform, &DepthSort), With<Controlled>>,
+) {
+    if !transition.is_idle() || active.maps.len() < 2 {
+        return;
+    }
+    let Ok((transform, sort)) = target.single() else {
+        return;
+    };
+    let feet = Vec2::new(
+        transform.translation.x,
+        sort.feet_y(transform.translation.y),
+    );
+    let Some(here) = active.map_at(feet).map(|m| m.id.clone()) else {
+        return;
+    };
+    if here != active.current {
+        info!("maps: the player crossed into `{here}`");
+        active.current = here;
+        transition.armed = false;
+    }
+}
+
+/// Removes a map that is not the current one when it has been out of view for `UNLOAD_AFTER_SECS`.
+fn unload_hidden(world: &mut World) {
+    if world.resource::<ActiveMaps>().maps.len() < 2 {
+        return;
+    }
+    let visible = {
+        let mut cameras = world.query_filtered::<(&GlobalTransform, &Projection), With<Camera2d>>();
+        cameras
+            .single(world)
+            .ok()
+            .and_then(|(transform, projection)| visible_rect(transform, projection))
+    };
+    let Some(visible) = visible else {
+        return;
+    };
+    let dt = world.resource::<Time>().delta_secs();
+    let mut gone: Vec<String> = Vec::new();
+    {
+        let hidden: Vec<(String, bool)> = {
+            let active = world.resource::<ActiveMaps>();
+            active
+                .maps
+                .iter()
+                .filter(|m| m.id != active.current)
+                .map(|m| (m.id.clone(), !rects_overlap(m.rect, visible)))
+                .collect()
+        };
+        let mut transition = world.resource_mut::<MapTransition>();
+        for (id, out_of_view) in hidden {
+            if out_of_view {
+                let seconds = transition.hidden_for.entry(id.clone()).or_insert(0.0);
+                *seconds += dt;
+                if *seconds >= UNLOAD_AFTER_SECS {
+                    gone.push(id);
+                }
+            } else {
+                transition.hidden_for.remove(&id);
+            }
+        }
+    }
+    if gone.is_empty() {
+        return;
+    }
+    for id in &gone {
+        unload_entities(world, id);
+        let mut active = world.resource_mut::<ActiveMaps>();
+        active.maps.retain(|m| m.id != *id);
+        active.doorways.retain(|d| d.from != *id && d.to != *id);
+        world.resource_mut::<MapTransition>().hidden_for.remove(id);
+        info!("maps: `{id}` left the world, it was out of view");
+    }
+    run_rebuild(world);
+    set_bounds(world, false);
+}
+
+/// Moves the camera limits towards the box around the active maps, so the camera never jumps.
+fn ease_camera_bounds(
+    time: Res<Time>,
+    target: Option<Res<CameraBoundsTarget>>,
+    bounds: Option<ResMut<CameraBounds>>,
+) {
+    let (Some(target), Some(mut bounds)) = (target, bounds) else {
+        return;
+    };
+    if bounds.0 != target.0 {
+        bounds.0 = ease_rect(bounds.0, target.0, time.delta_secs(), BOUNDS_EASE_SECS);
+    }
+}
+
+/// Gives the debug grid one region per active map, so each map has its own grid and its own numbers.
+fn sync_debug_grids(active: Res<ActiveMaps>, grids: Option<ResMut<DebugGrids>>) {
+    let Some(mut grids) = grids else {
+        return;
+    };
+    if !active.is_changed() {
+        return;
+    }
+    let regions: Vec<GridRegion> = active
+        .maps
+        .iter()
+        .map(|m| GridRegion {
+            origin: m.origin,
+            rect: m.rect,
+        })
+        .collect();
+    if grids.0 != regions {
+        grids.0 = regions;
+    }
 }
 
 /// Shows the id of the current map in the F2 info box.
@@ -943,9 +1364,15 @@ mod tests {
 
     /// An app with two maps: map 1 has an exit up (3..6,9) to the entry `from_1` of map 2 (3..6,0, facing up).
     fn app_with_two_maps() -> App {
+        app_with("scene")
+    }
+
+    /// The same two maps, with the exit of the given transition style. A second update step of 0.6 seconds makes the
+    /// timers of the lifecycle run fast.
+    fn app_with(transition: &str) -> App {
         let one = registered(
             "1",
-            "exits:\n  up: area=3..6,9 to=2 entry=from_1 transition=scene\n",
+            &format!("exits:\n  up: area=3..6,9 to=2 entry=from_1 transition={transition}\n"),
         );
         let two = registered("2", "entries:\n  from_1: area=3..6,0 facing=up\n");
         let registry = MapRegistry::from_parsed(vec![one, two]).unwrap();
@@ -955,8 +1382,11 @@ mod tests {
             .insert_resource(registry)
             .insert_resource(ActiveMaps {
                 current: "1".into(),
-                maps: Vec::new(),
+                ..default()
             })
+            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                std::time::Duration::from_millis(600),
+            ))
             .insert_resource(MapTransition::new(
                 Fade {
                     colour: Color::BLACK,
@@ -1144,5 +1574,430 @@ mod tests {
         let registry = MapRegistry::from_parsed(vec![registered("1", "")]).unwrap();
         assert!(registry.get("1").is_some() && registry.get("2").is_none());
         assert_eq!(registry.ids().collect::<Vec<_>>(), vec!["1"]);
+    }
+
+    fn map_of(w: i32, h: i32, blocks: &str) -> Map {
+        let head = format!(
+            "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: {w}x{h}\nlegend:\n  \".\": empty\n{blocks}---\n"
+        );
+        let row = vec!["."; w as usize].join(" ");
+        let rows: String = (0..h).rev().map(|y| format!("{y:>2} |{row}|\n")).collect();
+        parse("t.txt", &format!("{head}{rows}"), &[]).unwrap()
+    }
+
+    #[test]
+    fn a_seamless_map_is_placed_beside_the_exit_edge_with_the_strips_on_top_of_each_other() {
+        let origin = Vec2::new(-1000.0, -500.0);
+        let exit_map = |area: &str| {
+            map_of(
+                10,
+                10,
+                &format!("exits:\n  x: area={area} to=2 entry=e transition=seamless\n"),
+            )
+        };
+        let entry_map =
+            |w: i32, h: i32, area: &str| map_of(w, h, &format!("entries:\n  e: area={area}\n"));
+        let place = |exit: &Map, entry: &Map| {
+            seamless_origin(origin, exit, &exit.exits[0], entry, &entry.entries[0]).unwrap()
+        };
+        // A top exit at x 3..6 and a bottom entry at x 1..4 of a 8 by 6 map: the new map is above, shifted left by 2.
+        let up = place(&exit_map("3..6,9"), &entry_map(8, 6, "1..4,0"));
+        assert_eq!(up, Vec2::new(-1000.0 + 192.0 - 64.0, -500.0 + 640.0));
+        // A bottom exit: the new map is below.
+        let down = place(&exit_map("3..6,0"), &entry_map(8, 6, "1..4,5"));
+        assert_eq!(down, Vec2::new(-1000.0 + 192.0 - 64.0, -500.0 - 6.0 * 64.0));
+        // A right exit at y 4..5 and a left entry at y 2..3 of a 6 by 8 map: the new map is to the right, shifted down.
+        let right = place(&exit_map("9,4..5"), &entry_map(6, 8, "0,2..3"));
+        assert_eq!(right, Vec2::new(-1000.0 + 640.0, -500.0 + 256.0 - 128.0));
+        // A left exit: the new map is to the left.
+        let left = place(&exit_map("0,4..5"), &entry_map(6, 8, "5,2..3"));
+        assert_eq!(
+            left,
+            Vec2::new(-1000.0 - 6.0 * 64.0, -500.0 + 256.0 - 128.0)
+        );
+    }
+
+    #[test]
+    fn rectangles_that_only_touch_do_not_overlap() {
+        let a = Rect::new(0.0, 0.0, 640.0, 640.0);
+        assert!(!rects_overlap(a, Rect::new(0.0, 640.0, 640.0, 1280.0)));
+        assert!(!rects_overlap(a, Rect::new(640.0, 0.0, 1280.0, 640.0)));
+        assert!(rects_overlap(a, Rect::new(0.0, 639.0, 640.0, 1279.0)));
+        assert!(rects_overlap(a, Rect::new(100.0, 100.0, 200.0, 200.0)));
+    }
+
+    #[test]
+    fn a_move_is_kept_inside_the_union_of_areas() {
+        let low = Rect::new(0.0, 0.0, 100.0, 100.0);
+        let high = Rect::new(0.0, 200.0, 100.0, 300.0);
+        let bridge = Rect::new(40.0, 100.0, 60.0, 200.0);
+        let areas = [low, high, bridge];
+        let at = |from: Vec2, to: Vec2| clamp_to_union(&areas, from, to);
+        // Inside an area, or across the bridge: unchanged.
+        assert_eq!(
+            at(Vec2::new(50.0, 90.0), Vec2::new(50.0, 150.0)),
+            Vec2::new(50.0, 150.0)
+        );
+        assert_eq!(
+            at(Vec2::new(10.0, 10.0), Vec2::new(20.0, 20.0)),
+            Vec2::new(20.0, 20.0)
+        );
+        // From the bridge the feet may step into either map.
+        assert_eq!(
+            at(Vec2::new(50.0, 150.0), Vec2::new(10.0, 210.0)),
+            Vec2::new(10.0, 210.0)
+        );
+        // Beside the bridge, in the gap between the two maps: pushed back to the map the feet were in.
+        assert_eq!(
+            at(Vec2::new(10.0, 100.0), Vec2::new(10.0, 105.0)),
+            Vec2::new(10.0, 100.0)
+        );
+        // A long step from the lower map into the gap does not jump the wall into the upper map, even though the upper
+        // map is nearer. It ends in the corridor at most.
+        assert_eq!(
+            at(Vec2::new(10.0, 90.0), Vec2::new(10.0, 190.0)),
+            Vec2::new(40.0, 190.0)
+        );
+        // Past the outer edge: pushed back inside.
+        assert_eq!(
+            at(Vec2::new(5.0, 50.0), Vec2::new(-30.0, 50.0)),
+            Vec2::new(0.0, 50.0)
+        );
+        // No areas, or feet that were nowhere: the nearest point of any area.
+        assert_eq!(
+            clamp_to_union(&[], Vec2::ZERO, Vec2::new(5.0, 5.0)),
+            Vec2::new(5.0, 5.0)
+        );
+        assert_eq!(
+            at(Vec2::new(500.0, 500.0), Vec2::new(10.0, 120.0)),
+            Vec2::new(10.0, 100.0)
+        );
+    }
+
+    fn active_pair() -> ActiveMaps {
+        // Two 640 by 640 maps, the second above the first, joined by a doorway at x 192..448 on the top edge.
+        ActiveMaps {
+            current: "1".into(),
+            maps: vec![
+                ActiveMap {
+                    id: "1".into(),
+                    origin: Vec2::ZERO,
+                    rect: Rect::new(0.0, 0.0, 640.0, 640.0),
+                },
+                ActiveMap {
+                    id: "2".into(),
+                    origin: Vec2::new(0.0, 640.0),
+                    rect: Rect::new(0.0, 640.0, 640.0, 1280.0),
+                },
+            ],
+            doorways: vec![Doorway {
+                from: "1".into(),
+                to: "2".into(),
+                edge: Edge::Top,
+                area: Rect::new(192.0, 576.0, 448.0, 640.0),
+            }],
+        }
+    }
+
+    #[test]
+    fn the_player_can_cross_a_seam_only_through_the_doorway() {
+        let active = active_pair();
+        // The body is 14 wide on each side and 50 tall, as in Long Way.
+        let areas = active.walkable(Vec2::new(14.0, 0.0), Vec2::new(14.0, 50.0));
+        let walk = |from: Vec2, to: Vec2| clamp_to_union(&areas, from, to);
+        // In the doorway, crossing from the lower map to the upper one in small steps: free.
+        for (from, to) in [
+            (Vec2::new(300.0, 580.0), Vec2::new(300.0, 600.0)),
+            (Vec2::new(300.0, 600.0), Vec2::new(300.0, 640.0)),
+            (Vec2::new(300.0, 640.0), Vec2::new(300.0, 700.0)),
+        ] {
+            assert_eq!(walk(from, to), to, "{from} to {to}");
+        }
+        // Beside the doorway the top of the lower map is a wall, 50 below the edge, also for a long step.
+        assert_eq!(
+            walk(Vec2::new(100.0, 585.0), Vec2::new(100.0, 630.0)),
+            Vec2::new(100.0, 590.0)
+        );
+        assert_eq!(
+            walk(Vec2::new(100.0, 585.0), Vec2::new(100.0, 700.0)),
+            Vec2::new(100.0, 590.0)
+        );
+        // The doorway is narrower than the strip by the body width on each side.
+        assert_eq!(
+            walk(Vec2::new(230.0, 585.0), Vec2::new(195.0, 620.0)).x,
+            192.0 + 14.0
+        );
+        // The upper map has its own walls: not past its top.
+        assert_eq!(
+            walk(Vec2::new(300.0, 1200.0), Vec2::new(300.0, 1400.0)),
+            Vec2::new(300.0, 1230.0)
+        );
+        // Without the doorway (the neighbour was removed) the seam is a wall again.
+        let mut closed = active;
+        closed.doorways.clear();
+        closed.maps.pop();
+        let areas = closed.walkable(Vec2::new(14.0, 0.0), Vec2::new(14.0, 50.0));
+        assert_eq!(
+            clamp_to_union(&areas, Vec2::new(300.0, 585.0), Vec2::new(300.0, 700.0)),
+            Vec2::new(300.0, 590.0)
+        );
+    }
+
+    #[test]
+    fn a_doorway_on_a_side_edge_bridges_sideways() {
+        let active = ActiveMaps {
+            current: "1".into(),
+            maps: vec![
+                ActiveMap {
+                    id: "1".into(),
+                    origin: Vec2::ZERO,
+                    rect: Rect::new(0.0, 0.0, 640.0, 640.0),
+                },
+                ActiveMap {
+                    id: "2".into(),
+                    origin: Vec2::new(640.0, 0.0),
+                    rect: Rect::new(640.0, 0.0, 1280.0, 640.0),
+                },
+            ],
+            doorways: vec![Doorway {
+                from: "1".into(),
+                to: "2".into(),
+                edge: Edge::Right,
+                area: Rect::new(576.0, 256.0, 640.0, 384.0),
+            }],
+        };
+        let areas = active.walkable(Vec2::new(14.0, 0.0), Vec2::new(14.0, 50.0));
+        let through = Vec2::new(640.0, 300.0);
+        assert_eq!(
+            clamp_to_union(&areas, Vec2::new(620.0, 300.0), through),
+            through
+        );
+        assert_eq!(
+            clamp_to_union(&areas, Vec2::new(620.0, 500.0), Vec2::new(640.0, 500.0)).x,
+            640.0 - 14.0
+        );
+    }
+
+    #[test]
+    fn the_bounds_box_holds_every_active_map() {
+        let active = active_pair();
+        assert_eq!(active.bounding_rect(), Rect::new(0.0, 0.0, 640.0, 1280.0));
+        assert_eq!(active.map_at(Vec2::new(10.0, 639.9)).unwrap().id, "1");
+        assert_eq!(active.map_at(Vec2::new(10.0, 640.0)).unwrap().id, "2");
+        assert!(active.map_at(Vec2::new(700.0, 10.0)).is_none());
+    }
+
+    #[test]
+    fn eased_bounds_move_smoothly_and_arrive() {
+        let from = Rect::new(0.0, 0.0, 640.0, 640.0);
+        let to = Rect::new(0.0, 0.0, 640.0, 1280.0);
+        let mut now = from;
+        let mut last_top = now.max.y;
+        for _ in 0..400 {
+            now = ease_rect(now, to, 1.0 / 60.0, BOUNDS_EASE_SECS);
+            assert!(now.max.y >= last_top, "never goes backwards");
+            assert!(
+                now.max.y - last_top < 40.0,
+                "no jump: {}",
+                now.max.y - last_top
+            );
+            last_top = now.max.y;
+        }
+        assert_eq!(now, to);
+        // A tau of zero jumps at once.
+        assert_eq!(ease_rect(from, to, 0.016, 0.0), to);
+    }
+
+    /// Spawns a camera that sees the area around `centre`, 200 by 200 units.
+    fn put_camera(app: &mut App, centre: Vec2) -> Entity {
+        app.world_mut()
+            .spawn((
+                Camera2d,
+                GlobalTransform::from(Transform::from_translation(centre.extend(0.0))),
+                Projection::Orthographic(OrthographicProjection {
+                    area: Rect::new(-100.0, -100.0, 100.0, 100.0),
+                    ..OrthographicProjection::default_2d()
+                }),
+            ))
+            .id()
+    }
+
+    #[test]
+    fn a_seamless_exit_joins_the_next_map_without_a_fade_or_a_lock() {
+        let mut app = app_with("seamless");
+        app.update();
+        put_camera(&mut app, ORIGIN + Vec2::new(320.0, 300.0));
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(192.0 + 58.0, 600.0));
+        app.update();
+        let log = app.world().resource::<Log>().0.clone();
+        // The start map, then the second map at the top of the first, aligned strip on strip (both start at x 3).
+        assert_eq!(
+            log[2],
+            format!("load 2 at {}", ORIGIN + Vec2::new(0.0, 640.0)),
+            "{log:?}"
+        );
+        assert!(log[3].starts_with("rebuild with 2 map"), "{log:?}");
+        assert_eq!(log.len(), 4, "no arrive hook: {log:?}");
+        let active = app.world().resource::<ActiveMaps>();
+        assert_eq!(active.maps.len(), 2);
+        assert_eq!(active.current, "1", "the player is still in the first map");
+        assert_eq!(active.doorways.len(), 1);
+        assert_eq!(active.doorways[0].edge, Edge::Top);
+        assert!(!app.world().resource::<MapTransition>().locks_input());
+        assert!(app.world().resource::<MapTransition>().is_idle());
+        // The player was not moved.
+        assert_eq!(
+            player_feet(&mut app),
+            ORIGIN + Vec2::new(192.0 + 58.0, 600.0)
+        );
+        // The camera limits head for the box around both maps. The current limits have not jumped.
+        let target = app.world().resource::<CameraBoundsTarget>().0;
+        assert_eq!(
+            target,
+            Rect::from_corners(ORIGIN, ORIGIN + Vec2::new(640.0, 1280.0))
+        );
+        let bounds = app.world().resource::<CameraBounds>().0;
+        assert!(
+            bounds.max.y < target.max.y,
+            "the limits ease and do not jump: {bounds:?}"
+        );
+    }
+
+    #[test]
+    fn crossing_the_seam_changes_the_current_map_and_the_old_one_goes_when_out_of_view() {
+        let mut app = app_with("seamless");
+        app.update();
+        let camera = put_camera(&mut app, ORIGIN + Vec2::new(320.0, 600.0));
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 600.0));
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().maps.len(), 2);
+        // Across the seam: the second map holds the feet. Both maps are in view, so nothing is removed.
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 700.0));
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<ActiveMaps>().maps.len(),
+            2,
+            "the first map is still in view"
+        );
+        // The camera moves up: the first map is out of view. It goes after the grace time. Virtual time takes at most
+        // 0.25 s per update, so that is a few updates.
+        app.world_mut()
+            .entity_mut(camera)
+            .insert(GlobalTransform::from(Transform::from_translation(
+                (ORIGIN + Vec2::new(320.0, 1100.0)).extend(0.0),
+            )));
+        app.update();
+        assert_eq!(
+            app.world().resource::<ActiveMaps>().maps.len(),
+            2,
+            "not yet, the grace time has not passed"
+        );
+        for _ in 0..6 {
+            app.update();
+        }
+        let active = app.world().resource::<ActiveMaps>();
+        assert_eq!(active.maps.len(), 1);
+        assert_eq!(active.maps[0].id, "2");
+        assert!(active.doorways.is_empty());
+        let ids: Vec<String> = app
+            .world_mut()
+            .query::<&MapId>()
+            .iter(app.world())
+            .map(|id| id.0.clone())
+            .collect();
+        assert_eq!(ids, vec!["2".to_string()], "only the second map is left");
+        assert!(
+            app.world()
+                .resource::<Log>()
+                .0
+                .last()
+                .unwrap()
+                .starts_with("rebuild with 1 map")
+        );
+        assert_eq!(
+            app.world().resource::<CameraBoundsTarget>().0,
+            Rect::from_corners(
+                ORIGIN + Vec2::new(0.0, 640.0),
+                ORIGIN + Vec2::new(640.0, 1280.0)
+            )
+        );
+    }
+
+    #[test]
+    fn walking_back_through_the_doorway_keeps_the_first_map_and_does_not_load_it_twice() {
+        let mut app = app_with("seamless");
+        app.update();
+        put_camera(&mut app, ORIGIN + Vec2::new(320.0, 600.0));
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 600.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 700.0));
+        app.update();
+        // Back into the first map, out of its exit and into it again: the second map is already there.
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 300.0));
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "1");
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 600.0));
+        app.update();
+        let loads = app
+            .world()
+            .resource::<Log>()
+            .0
+            .iter()
+            .filter(|line| line.starts_with("load 2"))
+            .count();
+        assert_eq!(loads, 1);
+        assert_eq!(app.world().resource::<ActiveMaps>().doorways.len(), 1);
+    }
+
+    #[test]
+    fn a_seamless_map_that_would_overlap_another_is_refused() {
+        // Two exits of map 1 lead to maps that both sit above it: the second one overlaps the first.
+        let one = registered(
+            "1",
+            "exits:\n  a: area=0..1,9 to=2 entry=e transition=seamless\n  b: area=8..9,9 to=3 entry=e transition=seamless\n",
+        );
+        let two = registered("2", "entries:\n  e: area=0..1,0\n");
+        let three = registered("3", "entries:\n  e: area=8..9,0\n");
+        let registry = MapRegistry::from_parsed(vec![one, two, three]).unwrap();
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<Log>()
+            .insert_resource(registry)
+            .insert_resource(ActiveMaps {
+                current: "1".into(),
+                ..default()
+            })
+            .insert_resource(MapTransition::new(Fade::default(), ORIGIN));
+        let hooks = MapHooks {
+            load: app.world_mut().register_system(load_hook),
+            rebuild: app.world_mut().register_system(rebuild_hook),
+            arrive: app.world_mut().register_system(arrive_hook),
+        };
+        app.insert_resource(hooks);
+        install_systems(&mut app);
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(40.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(40.0, 600.0));
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().maps.len(), 2);
+        // Back down, out of the exit, then into the second exit: map 3 would be placed where map 2 already is.
+        set_feet(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(560.0, 600.0));
+        app.update();
+        let active = app.world().resource::<ActiveMaps>();
+        assert_eq!(active.maps.len(), 2, "map 3 is refused");
+        assert!(active.get("3").is_none());
     }
 }

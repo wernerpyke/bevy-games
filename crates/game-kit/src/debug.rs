@@ -105,6 +105,7 @@ impl Plugin for DebugPlugin {
             show_info: self.start_visible,
         })
         .init_resource::<DebugInfo>()
+        .init_resource::<DebugGrids>()
         .add_systems(Startup, (spawn_grid_root, spawn_info_box))
         .add_systems(
             Update,
@@ -181,16 +182,62 @@ impl DebugInfo {
 #[derive(Component)]
 struct GridRoot;
 
-/// A column number. It sits at world `x` and is kept on the top edge of the view.
+/// A column number. It sits at world `x` and is kept on the top edge of the view, but not above `top`, the top edge of
+/// the map it belongs to (infinite for the one global grid).
 #[derive(Component)]
 struct ColumnLabel {
     x: f32,
+    top: f32,
 }
 
-/// A row number. It sits at world `y` and is kept on the left edge of the view.
+/// A row number. It sits at world `y` and is kept on the left edge of the view, but not left of `left`, the left edge
+/// of the map it belongs to (negative infinity for the one global grid).
 #[derive(Component)]
 struct RowLabel {
     y: f32,
+    left: f32,
+}
+
+/// The area and origin of one map. With regions set, the grid is drawn once per region: lines inside the region only,
+/// and numbers counted from the region origin (`map_transition.rs` sets them from the active maps). Without regions
+/// there is one grid from `DebugSettings::grid_origin` over the whole view.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GridRegion {
+    pub origin: Vec2,
+    pub rect: Rect,
+}
+
+#[derive(Resource, Default, Debug)]
+pub struct DebugGrids(pub Vec<GridRegion>);
+
+/// One grid to draw: its origin, and the map area it is clipped to (`None` for the global grid).
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct GridPart {
+    origin: Vec2,
+    clip: Option<Rect>,
+}
+
+fn rects_overlap(a: Rect, b: Rect) -> bool {
+    a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y
+}
+
+/// The grids to draw for the visible area: one per region that is in view, or the global grid.
+fn grid_parts(settings: &DebugSettings, grids: &DebugGrids, visible: Rect) -> Vec<GridPart> {
+    if grids.0.is_empty() {
+        return vec![GridPart {
+            origin: settings.grid_origin.resolve(visible),
+            clip: None,
+        }];
+    }
+    grids
+        .0
+        .iter()
+        .filter(|region| rects_overlap(region.rect, visible))
+        .map(|region| GridPart {
+            origin: region.origin,
+            clip: Some(region.rect),
+        })
+        .collect()
 }
 
 #[derive(Component)]
@@ -235,16 +282,19 @@ fn line_range(origin: f32, low: f32, high: f32, cell: f32) -> RangeInclusive<i32
     first..=last
 }
 
-/// The lines and origin the grid was last built for.
-type GridKey = (RangeInclusive<i32>, RangeInclusive<i32>, Vec2, Option<i32>);
+/// The lines of one grid that were last built: its visible columns and rows, origin and clip area.
+type PartKey = (RangeInclusive<i32>, RangeInclusive<i32>, Vec2, Option<Rect>);
+/// Everything the grid was last built for.
+type GridKey = (Vec<PartKey>, Option<i32>);
 
 /// Lines are thin sprites, not gizmos, because gizmos always draw on top of everything.
 /// Column numbers run along the top edge, row numbers along the left edge (`pin_grid_labels`).
 /// Rebuilt only when the set of visible lines or the origin changes, so a scrolling camera rebuilds it when it
-/// crosses a line.
+/// crosses a line. With `DebugGrids` set, every map in view has its own grid, with numbers counted from its own origin.
 fn rebuild_grid(
     mut commands: Commands,
     settings: Res<DebugSettings>,
+    grids: Res<DebugGrids>,
     camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
     root: Single<(Entity, &mut Visibility), With<GridRoot>>,
     mut last: Local<Option<GridKey>>,
@@ -259,14 +309,30 @@ fn rebuild_grid(
     let Some(visible) = visible_rect(transform, projection) else {
         return;
     };
-    let origin = settings.grid_origin.resolve(visible);
     let cell = settings.cell_size;
-    let columns = line_range(origin.x, visible.min.x, visible.max.x, cell);
-    let rows = line_range(origin.y, visible.min.y, visible.max.y, cell);
-    let key = (
-        columns.clone(),
-        rows.clone(),
-        origin,
+    // The visible range of lines of each part, clipped to its map.
+    let parts: Vec<(GridPart, RangeInclusive<i32>, RangeInclusive<i32>)> =
+        grid_parts(&settings, &grids, visible)
+            .into_iter()
+            .map(|part| {
+                let seen = part.clip.map_or(visible, |clip| {
+                    Rect::new(
+                        visible.min.x.max(clip.min.x),
+                        visible.min.y.max(clip.min.y),
+                        visible.max.x.min(clip.max.x),
+                        visible.max.y.min(clip.max.y),
+                    )
+                });
+                let columns = line_range(part.origin.x, seen.min.x, seen.max.x, cell);
+                let rows = line_range(part.origin.y, seen.min.y, seen.max.y, cell);
+                (part, columns, rows)
+            })
+            .collect();
+    let key: GridKey = (
+        parts
+            .iter()
+            .map(|(part, columns, rows)| (columns.clone(), rows.clone(), part.origin, part.clip))
+            .collect(),
         settings.rows_from_top,
     );
     if last.as_ref() == Some(&key) {
@@ -274,12 +340,6 @@ fn rebuild_grid(
     }
     *last = Some(key);
 
-    // A line runs one cell past the outermost line on the other axis, which covers the whole view until the set of
-    // lines changes.
-    let x_from = origin.x + (*columns.start() - 1) as f32 * cell;
-    let x_to = origin.x + (*columns.end() + 1) as f32 * cell;
-    let y_from = origin.y + (*rows.start() - 1) as f32 * cell;
-    let y_to = origin.y + (*rows.end() + 1) as f32 * cell;
     let color = settings.grid_color;
     let z = settings.grid_z;
     let scale = settings.scale();
@@ -290,35 +350,60 @@ fn rebuild_grid(
         .entity(root)
         .despawn_children()
         .with_children(|parent| {
-            for i in columns {
-                let x = origin.x + i as f32 * cell;
-                parent.spawn((
-                    Sprite::from_color(color, Vec2::new(thickness, y_to - y_from)),
-                    Transform::from_xyz(x, (y_from + y_to) / 2.0, z),
-                ));
-                parent.spawn((
-                    ColumnLabel { x },
-                    Text2d::new(i.to_string()),
-                    font.clone(),
-                    TextColor(color),
-                    Anchor::TOP_LEFT,
-                    Transform::from_xyz(x + margin, visible.max.y - margin, z),
-                ));
-            }
-            for j in rows {
-                let y = origin.y + j as f32 * cell;
-                parent.spawn((
-                    Sprite::from_color(color, Vec2::new(x_to - x_from, thickness)),
-                    Transform::from_xyz((x_from + x_to) / 2.0, y, z),
-                ));
-                parent.spawn((
-                    RowLabel { y },
-                    Text2d::new(settings.row_number(j).to_string()),
-                    font.clone(),
-                    TextColor(color),
-                    Anchor::BOTTOM_LEFT,
-                    Transform::from_xyz(visible.min.x + margin, y + margin, z),
-                ));
+            for (part, columns, rows) in parts {
+                let origin = part.origin;
+                // The global grid: a line runs one cell past the outermost line on the other axis, which covers the
+                // whole view until the set of lines changes. A map grid: a line covers the whole map.
+                let (x_from, x_to, y_from, y_to) = match part.clip {
+                    Some(clip) => (clip.min.x, clip.max.x, clip.min.y, clip.max.y),
+                    None => (
+                        origin.x + (*columns.start() - 1) as f32 * cell,
+                        origin.x + (*columns.end() + 1) as f32 * cell,
+                        origin.y + (*rows.start() - 1) as f32 * cell,
+                        origin.y + (*rows.end() + 1) as f32 * cell,
+                    ),
+                };
+                let top = part.clip.map_or(f32::INFINITY, |clip| clip.max.y);
+                let left = part.clip.map_or(f32::NEG_INFINITY, |clip| clip.min.x);
+                for i in columns {
+                    let x = origin.x + i as f32 * cell;
+                    parent.spawn((
+                        Sprite::from_color(color, Vec2::new(thickness, y_to - y_from)),
+                        Transform::from_xyz(x, (y_from + y_to) / 2.0, z),
+                    ));
+                    // The line at the right edge of a map has no cell to its right to number.
+                    if part.clip.is_some_and(|clip| x >= clip.max.x - 0.5) {
+                        continue;
+                    }
+                    parent.spawn((
+                        ColumnLabel { x, top },
+                        Text2d::new(i.to_string()),
+                        font.clone(),
+                        TextColor(color),
+                        Anchor::TOP_LEFT,
+                        Transform::from_xyz(x + margin, visible.max.y.min(top) - margin, z),
+                    ));
+                }
+                for j in rows {
+                    let y = origin.y + j as f32 * cell;
+                    parent.spawn((
+                        Sprite::from_color(color, Vec2::new(x_to - x_from, thickness)),
+                        Transform::from_xyz((x_from + x_to) / 2.0, y, z),
+                    ));
+                    // The line at the top edge of a map has no row above it to number. It is also the bottom line of
+                    // the map above, whose label would sit on top of it.
+                    if part.clip.is_some_and(|clip| y >= clip.max.y - 0.5) {
+                        continue;
+                    }
+                    parent.spawn((
+                        RowLabel { y, left },
+                        Text2d::new(settings.row_number(j).to_string()),
+                        font.clone(),
+                        TextColor(color),
+                        Anchor::BOTTOM_LEFT,
+                        Transform::from_xyz(visible.min.x.max(left) + margin, y + margin, z),
+                    ));
+                }
             }
         });
 }
@@ -337,10 +422,10 @@ fn pin_grid_labels(
     let margin = LABEL_MARGIN * settings.scale();
     for (label, mut transform) in &mut columns {
         transform.translation.x = label.x + margin;
-        transform.translation.y = visible.max.y - margin;
+        transform.translation.y = visible.max.y.min(label.top) - margin;
     }
     for (label, mut transform) in &mut rows {
-        transform.translation.x = visible.min.x + margin;
+        transform.translation.x = visible.min.x.max(label.left) + margin;
         transform.translation.y = label.y + margin;
     }
 }
@@ -351,6 +436,7 @@ fn report_target(
     target: Single<(&Transform, &DepthSort), With<Controlled>>,
     camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
     settings: Res<DebugSettings>,
+    grids: Res<DebugGrids>,
     mut info: ResMut<DebugInfo>,
 ) {
     let (camera_transform, projection) = camera.into_inner();
@@ -362,7 +448,15 @@ fn report_target(
         transform.translation.x,
         sort.feet_y(transform.translation.y),
     );
-    let origin = settings.grid_origin.resolve(visible);
+    // The numbers count from the map that holds the feet, or from the global grid.
+    let origin = grids
+        .0
+        .iter()
+        .find(|region| region.rect.contains(world))
+        .map_or_else(
+            || settings.grid_origin.resolve(visible),
+            |region| region.origin,
+        );
     let grid = world - origin;
     let cell = (grid / settings.cell_size).floor();
     let name = settings.target_name;
@@ -437,6 +531,59 @@ mod tests {
         );
     }
 
+    fn settings_for_parts() -> DebugSettings {
+        DebugSettings {
+            cell_size: 64.0,
+            grid_color: Color::WHITE,
+            grid_origin: GridOrigin::World(Vec2::new(5.0, 6.0)),
+            target_name: "t",
+            grid_z: 0.0,
+            hud_z_index: 0,
+            rows_from_top: None,
+            show_grid: true,
+            show_info: true,
+        }
+    }
+
+    #[test]
+    fn without_regions_there_is_one_global_grid() {
+        let visible = Rect::new(0.0, 0.0, 100.0, 100.0);
+        let parts = grid_parts(&settings_for_parts(), &DebugGrids::default(), visible);
+        assert_eq!(
+            parts,
+            vec![GridPart {
+                origin: Vec2::new(5.0, 6.0),
+                clip: None
+            }]
+        );
+    }
+
+    #[test]
+    fn each_region_in_view_gets_its_own_grid_with_its_own_origin() {
+        let lower = GridRegion {
+            origin: Vec2::new(0.0, 0.0),
+            rect: Rect::new(0.0, 0.0, 640.0, 640.0),
+        };
+        let upper = GridRegion {
+            origin: Vec2::new(0.0, 640.0),
+            rect: Rect::new(0.0, 640.0, 640.0, 1280.0),
+        };
+        let far = GridRegion {
+            origin: Vec2::new(0.0, 5000.0),
+            rect: Rect::new(0.0, 5000.0, 640.0, 5640.0),
+        };
+        let grids = DebugGrids(vec![lower, upper, far]);
+        // A view that straddles the seam between the first two maps.
+        let visible = Rect::new(100.0, 400.0, 600.0, 900.0);
+        let parts = grid_parts(&settings_for_parts(), &grids, visible);
+        assert_eq!(parts.len(), 2);
+        assert_eq!(parts[0].origin, lower.origin);
+        assert_eq!(parts[1].origin, upper.origin);
+        assert_eq!(parts[1].clip, Some(upper.rect));
+        // A view that only touches the seam from below does not include the upper map.
+        let below = Rect::new(100.0, 100.0, 600.0, 640.0);
+        assert_eq!(grid_parts(&settings_for_parts(), &grids, below).len(), 1);
+    }
     #[test]
     fn info_keeps_order_and_updates_in_place() {
         let mut info = DebugInfo::default();

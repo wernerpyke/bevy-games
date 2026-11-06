@@ -21,7 +21,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [collision-research.md](collision-research.md) | Approaches compared, why outlines | none | lw1, lw10 |
 | [draw-order.md](draw-order.md) | Depth sort by feet, named layers | `game-kit` `depth.rs`, `layers.rs` | lw2, lw9 (lw12 for Long Way) |
 | [map-files.md](map-files.md) | Text map format and parser contract, exits and entries | `game-kit` `map.rs`, `map_areas.rs`, `map_links.rs` | lw8, lw11, x18, x30 |
-| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, entry placement | `game-kit` `map_transition.rs` | x30, x31, lw19 |
+| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition.rs` | x30, x31, x32, lw19 |
 | [groups.md](groups.md) | Single items and neighbour groups for blocked areas | `game-kit` `groups.rs` | x20, rt9, lw14 |
 | [projectiles.md](projectiles.md) | Straight-flying projectiles that stop at blocked areas and the map edge | `game-kit` `projectile.rs` | x21, rt11 |
 | [nav.md](nav.md) | Grid path finding built from the collision outlines | `game-kit` `nav.rs` | x23, rt12 |

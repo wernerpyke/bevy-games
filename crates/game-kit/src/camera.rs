@@ -65,6 +65,11 @@ pub fn half_view(window_width: f32, window_height: f32, view_height: f32) -> Vec
 #[derive(Resource)]
 pub struct CameraBounds(pub Rect);
 
+/// Where `CameraBounds` is heading. A game that changes the bounds smoothly (a seamless map transition) sets this, and
+/// `map_transition.rs` moves `CameraBounds` towards it over a short time, so the camera never jumps.
+#[derive(Resource)]
+pub struct CameraBoundsTarget(pub Rect);
+
 /// Moves the `Camera2d` to follow the `Controlled` entity (`CameraBounds` limits it). The camera position is
 /// rounded to a whole world unit, so pixel art does not shimmer when it scrolls.
 pub struct CameraFollowPlugin;

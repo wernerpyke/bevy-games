@@ -218,18 +218,18 @@ Order: scene transitions first, then seamless, on one lifecycle. Each step ends 
 8. **Fade (done)** A full-screen overlay on the top layer in `layers.rs` (no bare z values), `Fade { colour, out_secs, in_secs }`, input locked while it runs. The swap happens while the screen is fully covered. Scripted run with screenshots at the fade-out peak and after the fade-in.
 9. **Debug info (done: the F2 box has a `map` row)** The F2 box shows the map id with the cell. Kit test for the label. Record the lifecycle decision in `dev-docs/adr/EXTENSIONS.md` and `games/long-way/docs/adr.md`. Ask the user about a commit.
 
-### Phase C: seamless
+### Phase C: seamless (done 2026-11-06)
 
-10. **Test pair for seamless.** The 1 to 2 link (`to_2` `area=3..6,9` to `from_1` `area=3..6,0`) is the pair: equal length, opposite edges. Set `transition=seamless` on `to_2` when Phase C starts (the user agreed).
-11. **Offsets and layout** (kit, pure functions). A seamless exit and its entry must have the same length (strict check, decided so a mistake in a map file shows as a clear load error). The offset along the edge is the exit start minus the entry start, so the two strips lie on top of each other and the strip is the doorway: world offset from an exit and an entry on each of the four edges, and the overlap check between active maps (`validate_layout`). Kit tests for every edge, strips of equal length, and overlap.
-12. **Seamless lifecycle.**
+10. **Test pair for seamless (done: `to_2` is seamless)**. The 1 to 2 link (`to_2` `area=3..6,9` to `from_1` `area=3..6,0`) is the pair: equal length, opposite edges. Set `transition=seamless` on `to_2` when Phase C starts (the user agreed).
+11. **Offsets and layout (done)** (kit, pure functions). A seamless exit and its entry must have the same length (strict check, decided so a mistake in a map file shows as a clear load error). The offset along the edge is the exit start minus the entry start, so the two strips lie on top of each other and the strip is the doorway: world offset from an exit and an entry on each of the four edges, and the overlap check between active maps (`validate_layout`). Kit tests for every edge, strips of equal length, and overlap.
+12. **Seamless lifecycle (done)**
     - On a seamless exit send `LoadMap` at the computed offset. Both maps are live. No lock and no fade.
     - Player clamp: `move_player` now clamps to one `map_rect`. With two live maps, the clamp is the union of the active map rectangles, and the player may cross a map edge only inside the doorway (the exit strip, which equals the entry strip). Everywhere else the edge stays a wall. Write a failing test for this first.
     - The current map switches when the feet cross the seam. `UnloadMap` runs when the old map's rectangle is outside `visible_rect`.
     - After each load or unload, rebuild `CollisionWorld` from all `Blocker` components of the active maps. Depth sort needs no change.
     - Scripted run: walk through the seam, screenshots before, at the seam, after the unload. Look at rocks and trees near the seam, and at the one-cell tree rule (`adr-lw18`).
-13. **Eased camera bounds.** `CameraBounds` gets a target and a current rectangle. The target is the bounding box of the active maps. A system eases the current rectangle towards the target after a load or unload. Kit tests for the easing and the clamp. Scripted run with screenshots to confirm no jump.
-14. **Debug grid per active map.** The F3 grid and cell labels draw for each active map from its own origin, with local numbers (`GridOrigin` takes a list or the debug plugin reads `ActiveMaps`). Check with `--debug` screenshots, and `./dev-scripts/shot.sh` at the seam. Run `./dev-scripts/rust.sh web`. Record the seamless decisions in the ADR files. Ask the user about a commit.
+13. **Eased camera bounds (done)** `CameraBounds` gets a target and a current rectangle. The target is the bounding box of the active maps. A system eases the current rectangle towards the target after a load or unload. Kit tests for the easing and the clamp. Scripted run with screenshots to confirm no jump.
+14. **Debug grid per active map (done)** The F3 grid and cell labels draw for each active map from its own origin, with local numbers (`GridOrigin` takes a list or the debug plugin reads `ActiveMaps`). Check with `--debug` screenshots, and `./dev-scripts/shot.sh` at the seam. Run `./dev-scripts/rust.sh web`. Record the seamless decisions in the ADR files. Ask the user about a commit.
 
 ### Phase D: close
 
@@ -254,3 +254,12 @@ Migrate lasting content: the file format to `dev-docs/extensions/map-files.md` a
 - `goto:<map>:<entry>` waits until the transition is done, so there is no `wait_map` command.
 - The start map comes from a map file name (`LONG_WAY_MAP`, the same pattern as R-Town's `R_TOWN_MAP`) and not from an id, so `rust.sh` can take it as an argument.
 - Phase C step 12 (seamless) adds to the same lifecycle. The `rebuild` hook must then rebuild from all active maps, and `CameraBounds` moves from the kit's `install_map` to the eased bounding box.
+
+## Changes made while building phase C
+
+- A map that is out of view is removed after 1 second (`UNLOAD_AFTER_SECS`), not at once, because a map that was just loaded is out of view until the camera limits have eased.
+- The player clamp is `clamp_to_union(areas, old_feet, new_feet)` over `ActiveMaps::walkable`. The first version took only the new position and could carry a long step through a wall into the nearer map. The old feet decide which areas count.
+- `CameraBounds` stays the current limits that the camera reads, and a new resource `CameraBoundsTarget` holds where they are heading. The limits ease with a time constant of 0.35 s.
+- The debug grid has a resource `DebugGrids` with one region per map, and does not take a list in `GridOrigin`. The lines and numbers of each map follow its own origin. The grid lines at the top and right edge of a map have no number.
+- The 1 to 2 exit is `seamless` in `1.txt`. The other two exits are `scene`.
+- Seen in scripted runs: the walk through the seam with the grid of both maps and the info box on map 2, the wall beside the doorway (feet stop at y 14), the first map removed after the player went far enough into map 2 (the collision log goes from 4 clusters to 1), and the scene transitions after the change. Not seen on screen: the easing of the camera limits as an animation (it is unit tested), and rocks or trees that cross the seam (no object of maps 1 and 2 is near it).

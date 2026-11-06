@@ -64,6 +64,10 @@ With the grid origin at the bottom left, the column "0" label (top edge) and the
 
 ## Completed Items
 
+### Moving between maps
+
+Done 2026-11-06 (`dev-docs/PLAN-map-transitions.md`, `adr-x30` to `adr-x32`). Maps have exits and entries in their front matter. The kit checks the links between maps, runs a scene transition (fade) and a seamless transition (the next map joins the world and the player crosses a doorway), places the player at the same position along the entry strip, and eases the camera limits. The F3 grid has one grid per active map. Long Way has three maps joined by one seamless and two scene transitions. Known issues: no exit back from the second map, enemies and projectiles across a seam are not handled, `CameraBounds` is an eased box in a seamless game, and what a map keeps when the player returns (destroyed objects) is not decided (plan, "Returning to a previous map"). The eased box means R-Town style systems that read `CameraBounds` as the map area do not fit seamless maps yet.
+
 ### Reusable dev-scripts for screenshots and art checks
 
 Done 2026-11-05. `dev-scripts/shot.sh <game> <name> "<commands>" cx= cy= w= h= scale=` runs a scripted run with `--debug`, takes the screenshot and saves a zoomed crop in world units (`target/screenshots/<name>_crop.png`). `dev-scripts/aseprite.sh <script> <file> key=value ...` runs one of four Lua scripts in `dev-scripts/aseprite/`: `crop` (screen or world region, nearest scale), `frame_grid` (a tag or frame range as one scaled grid PNG), `check` (canvas, colour mode, layers, tags with frames and durations, palette check against `diodrama_palette.aseprite`, bounds and feet row per frame, frames cut off at the edge) and `sheet_analysis` (per frame bounds and colours of a pack sheet). The crop is done in Lua and not in `script.rs`, so the kit has no new dependency. Known issues: the crop is centred on world coordinates you give, not on the player automatically; `shot.sh` reads `VIEW_HEIGHT` from `games/<game>/src/camera.rs` with a regex; `lib.lua` (art pipeline rule 1) is still not written, so the scripts stay standalone. Usage: `dev-docs/extensions/dev-scripts.md`.

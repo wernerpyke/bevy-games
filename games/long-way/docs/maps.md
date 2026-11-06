@@ -19,11 +19,11 @@ The format is in the [map files extension](../../../dev-docs/extensions/map-file
 | 1 | `to_3` | `9,8..9` (right edge) | 3 | `from_1` | `0,6..7` (left edge) |
 | 2 | `to_3` | `9,4..5` (right edge) | 3 | `from_2` | `0,8..9` (left edge) |
 
-- Walking into an exit fades the screen, loads the target map and puts the player in the entry at the same position along the strip (`dev-docs/extensions/map-transitions.md`). Every exit is `transition=scene` for now. The 1 to 2 pair has equal lengths on opposite edges, so it can be made `seamless` to test that style.
+- Walking into an exit fades the screen, loads the target map and puts the player in the entry at the same position along the strip (`dev-docs/extensions/map-transitions.md`). The 1 to 2 exit is `transition=seamless`: map 2 is loaded above map 1, aligned strip on strip, and the player walks across (`adr-x32`). The two other exits are `scene`. Map 3 is reached from maps 1 and 2, so only one link to it can be seamless unless the three maps fit together without overlapping.
 - Every exit and its entry have the same length. The player keeps their position along the strip.
 - Write the cells of an exit or entry area as blanks in the grid. Keep trees and rocks out of them.
 - Map 1 has the real start (`@` at cell (4,0)). Map 2 also has an `@`, at the cell of its entry, so a scripted run can start there.
-- The seamless transition is not built yet (`dev-docs/PLAN-map-transitions.md`, phase C). A seamless exit uses the fade for now.
+- In a seamless join the player can leave a map only through the doorway (the exit strip). Everywhere else the map edge is a wall. The first map is removed after it has been out of view for 1 second.
 
 ## Kinds you can use in a legend
 

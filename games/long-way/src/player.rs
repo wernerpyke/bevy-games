@@ -7,7 +7,7 @@ use crate::map::player_start_feet;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 use game_kit::map::Facing as EntryFacing;
-use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition};
+use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
 
 /// Walk speed in art pixels per second.
 const WALK_SPEED: f32 = 300.0;
@@ -110,7 +110,12 @@ fn move_player(
     settings: Res<CollisionSettings>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
-    let area = active.current_rect();
+    // The feet stay inside a map, and the body stays below its top edge. They may cross from one map to another only
+    // through a doorway of a seamless exit.
+    let walkable = active.walkable(
+        Vec2::new(PLAYER_HALF_WIDTH, 0.0),
+        Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
+    );
 
     // The player stands still while the screen fades.
     if transition.locks_input() {
@@ -152,11 +157,7 @@ fn move_player(
             time.delta_secs(),
             world.edges(),
         );
-        // The feet stay inside the map, and the body stays below its top edge.
-        let feet = feet.clamp(
-            area.min + Vec2::new(PLAYER_HALF_WIDTH, 0.0),
-            area.max - Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
-        );
+        let feet = clamp_to_union(&walkable, old_feet, feet);
         transform.translation.x = feet.x;
         transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
 

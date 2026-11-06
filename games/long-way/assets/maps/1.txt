@@ -11,7 +11,7 @@ legend:
   "r": red_tree
   "@": player_start
 exits:
-  to_2: area=3..6,9 to=2 entry=from_1 transition=scene
+  to_2: area=3..6,9 to=2 entry=from_1 transition=seamless
   to_3: area=9,8..9 to=3 entry=from_1 transition=scene
 ---
    |0                  |
