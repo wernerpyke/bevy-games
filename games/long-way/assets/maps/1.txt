@@ -9,16 +9,20 @@ legend:
   "1": rock_1
   "g": green_tree
   "r": red_tree
+  "@": player_start
+exits:
+  to_2: area=3..6,9 to=2 entry=from_1 transition=scene
+  to_3: area=9,8..9 to=3 entry=from_1 transition=scene
 ---
    |0                  |
    |0 1 2 3 4 5 6 7 8 9|
- 9 |. . . . . . . . . .|
- 8 |. . . . . . . . . .|
- 7 |. g . . . . . r . .|
- 6 |. . . . . . . . . .|
+ 9 |. . .         . .  |
+ 8 |. . . . . . . . .  |
+ 7 |. g . . . . . . . .|
+ 6 |. . . . . . r . . .|
  5 |. . . . . . . . . .|
  4 |. . g . . . . . . .|
  3 |. r . r g . . . . .|
  2 |. . g . r . . . . .|
  1 |. r . r . . . . . .|
- 0 |. . . . . . . . . .|
+ 0 |. . . . @ . . . . .|
