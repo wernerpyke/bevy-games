@@ -57,6 +57,7 @@ impl Plugin for MapPlugin {
             start: start_map(),
             origin: MAP_ORIGIN,
             fade: Fade::default(),
+            camera_ease_secs: crate::camera::CAMERA_EASE_SECS,
         });
         let hooks = MapHooks {
             load: app.world_mut().register_system(load_hook),

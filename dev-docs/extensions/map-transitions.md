@@ -50,11 +50,11 @@ A request for a map or entry that does not exist is logged and the world stays a
 
 ## How a seamless transition runs
 
-1. The player walks into a `seamless` exit area. The kit places the target map beside the current one (`seamless_origin`): on the edge of the exit, shifted along it so the two strips lie on top of each other. The player is not moved, the screen does not fade and input is not locked.
-2. Both maps are now in `ActiveMaps`, and the link is a `Doorway`. The kit runs the `load` hook for the new map and then the `rebuild` hook, which rebuilds the collision world from every entity of every active map. `CameraBoundsTarget` becomes the box around both maps.
+1. The player walks into a `seamless` exit area (the camera starts to show the joined map too). The kit places the target map beside the current one (`seamless_origin`): on the edge of the exit, shifted along it so the two strips lie on top of each other. The player is not moved, the screen does not fade and input is not locked.
+2. Both maps are now in `ActiveMaps`, and the link is a `Doorway`. The kit runs the `load` hook for the new map and then the `rebuild` hook, which rebuilds the collision world from every entity of every active map. While the feet are in the exit, the camera limits are the box around both maps, so the player sees ahead. In every other place it is the current map alone (`camera_target`).
 3. The player may cross the seam only inside the doorway. The game keeps the feet inside `ActiveMaps::walkable(...)` with `clamp_to_union(areas, old_feet, new_feet)`: every map shrunk by the size of the body, plus a bridge over each doorway. Beside the doorway the edge is a wall as before. The result is the nearest point among the areas that hold the old feet and the areas that touch them, so a long step cannot jump a wall.
 4. The current map is the map that holds the feet (`ActiveMaps::map_at`). It changes when the player crosses the seam, in either direction.
-5. A map that is not the current one and is outside the camera view is removed after `UNLOAD_AFTER_SECS` (1 second): its entities, its doorway and its collision. The camera limits ease to the box of the maps that are left.
+5. A map that is not the current one and is outside the camera view is removed after `UNLOAD_AFTER_SECS` (1 second): its entities, its doorway and its collision. The camera limits become the current map from the moment the player crosses the seam. The camera glides to its new place (`CameraSmoothing`): it still follows the player, and the extra move that the new limits add is eased out. It moves on until none of the map that was left is in view. How fast is set by `camera_ease_secs` of the plugin (a time constant: about two thirds of the way in that time). A scene transition makes the camera jump (`snap`).
 6. Walking back through the doorway while the first map is still loaded needs no exit. If the player walks into the exit again, the map is already active and is not loaded twice.
 
 ```mermaid
@@ -94,7 +94,7 @@ The player keeps their position along the strip. The offset is measured in world
 
 ## What a game does
 
-1. Add `MapTransitionPlugin { sources, kinds, start, origin, fade }`. `sources` are the map files with their ids, `kinds` the legend names, `origin` the world position of cell (0,0) of a scene transition map.
+1. Add `MapTransitionPlugin { sources, kinds, start, origin, fade, camera_ease_secs }`. `sources` are the map files with their ids, `kinds` the legend names, `origin` the world position of cell (0,0) of a scene transition map.
 2. Insert `MapHooks`, made with `world.register_system`:
    - `load`: `In<MapLoad>`. Spawn the objects of the map and add `MapId(id)` to each one.
    - `rebuild`: clear `CollisionWorld` and add the blocked areas of the entities that exist. Runs after every load.

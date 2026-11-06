@@ -20,7 +20,7 @@ use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
 use crate::Controlled;
-use crate::camera::{CameraBounds, CameraBoundsTarget, visible_rect};
+use crate::camera::{CameraBounds, CameraSmoothing, visible_rect};
 use crate::collision::register_blockers;
 use crate::debug::{DebugGrids, DebugInfo, GridRegion};
 use crate::depth::DepthSort;
@@ -458,6 +458,9 @@ pub struct MapTransitionPlugin {
     /// World position of cell (0,0) of a map that a scene transition loads.
     pub origin: Vec2,
     pub fade: Fade,
+    /// Time constant of the camera glide when the player crosses into another map, in seconds. The camera covers about
+    /// two thirds of the way in this time, so larger is slower. `CAMERA_EASE_SECS` is a start.
+    pub camera_ease_secs: f32,
 }
 
 impl Plugin for MapTransitionPlugin {
@@ -481,7 +484,11 @@ impl Plugin for MapTransitionPlugin {
                 current: self.start.clone(),
                 ..default()
             })
-            .insert_resource(MapTransition::new(self.fade, self.origin));
+            .insert_resource(MapTransition::new(self.fade, self.origin))
+            .insert_resource(CameraSmoothing {
+                tau: self.camera_ease_secs,
+                snap: false,
+            });
         install_systems(app);
     }
 }
@@ -500,7 +507,7 @@ fn install_systems(app: &mut App) {
                 perform_seamless,
                 update_current,
                 unload_hidden,
-                ease_camera_bounds,
+                retarget_camera,
                 sync_debug_grids,
                 show_map_id,
             )
@@ -694,13 +701,13 @@ fn run_rebuild(world: &mut World) {
     }
 }
 
-/// Sets where the camera limits are heading: the box around every active map. With `snap` the camera limits jump
-/// there at once (a scene transition, the screen is covered). Otherwise `ease_camera_bounds` moves them.
-fn set_bounds(world: &mut World, snap: bool) {
-    let bounds = world.resource::<ActiveMaps>().bounding_rect();
-    world.insert_resource(CameraBoundsTarget(bounds));
-    if snap || !world.contains_resource::<CameraBounds>() {
-        world.insert_resource(CameraBounds(bounds));
+/// Puts the camera limits on the current map at once, and makes the camera jump with them (a scene transition, the
+/// screen is covered). A seamless transition changes the limits in `retarget_camera` and the camera glides.
+fn snap_bounds(world: &mut World) {
+    let rect = world.resource::<ActiveMaps>().current_rect();
+    world.insert_resource(CameraBounds(rect));
+    if let Some(mut smoothing) = world.get_resource_mut::<CameraSmoothing>() {
+        smoothing.snap = true;
     }
 }
 
@@ -727,7 +734,7 @@ fn install_map(world: &mut World, id: &str, origin: Vec2) {
         doorways: Vec::new(),
     };
     world.resource_mut::<MapTransition>().hidden_for.clear();
-    set_bounds(world, true);
+    snap_bounds(world);
     run_load(world, id, origin);
     run_rebuild(world);
 }
@@ -755,7 +762,7 @@ pub fn reload_current_map(world: &mut World) -> Result<(), String> {
         run_load(world, &map.id, map.origin);
     }
     run_rebuild(world);
-    set_bounds(world, true);
+    snap_bounds(world);
     info!("maps: reloaded `{id}`");
     Ok(())
 }
@@ -799,8 +806,8 @@ fn perform_switch(world: &mut World) {
 /// How long a map must be out of view before it is removed, in seconds. A map that was just loaded next to the
 /// player is out of view until the camera bounds have eased, and must not go at once.
 pub const UNLOAD_AFTER_SECS: f32 = 1.0;
-/// Time constant of the camera bounds easing, in seconds.
-pub const BOUNDS_EASE_SECS: f32 = 0.35;
+/// Default time constant of the camera glide, in seconds.
+pub const CAMERA_EASE_SECS: f32 = 0.9;
 
 /// Where a map goes so that its entry strip lies on the exit strip of the map it is joined to: it is placed beside
 /// that map, on the edge the exit is on, and shifted along the edge until the two strips match. The maps are never
@@ -849,29 +856,6 @@ pub fn clamp_to_union(areas: &[Rect], from: Vec2, to: Vec2) -> Vec2 {
         .map(|area| to.clamp(area.min, area.max))
         .min_by(|a, b| a.distance_squared(to).total_cmp(&b.distance_squared(to)))
         .unwrap_or(to)
-}
-
-/// Moves `current` towards `target`. The time constant `tau` is the time to cover about two thirds of the distance.
-/// Edges that are within half a unit are set to the target.
-pub fn ease_rect(current: Rect, target: Rect, dt: f32, tau: f32) -> Rect {
-    let k = if tau <= 0.0 {
-        1.0
-    } else {
-        1.0 - (-dt / tau).exp()
-    };
-    let step = |from: f32, to: f32| {
-        if (to - from).abs() < 0.5 {
-            to
-        } else {
-            from + (to - from) * k
-        }
-    };
-    Rect::new(
-        step(current.min.x, target.min.x),
-        step(current.min.y, target.min.y),
-        step(current.max.x, target.max.x),
-        step(current.max.y, target.max.y),
-    )
 }
 
 /// Joins the map behind a seamless exit to the one the player is in: places it beside the current map and loads it. The
@@ -946,7 +930,6 @@ fn begin_seamless(world: &mut World, request: &RequestMapChange) -> Result<(), S
     if !already_active {
         run_load(world, &request.to, origin);
         run_rebuild(world);
-        set_bounds(world, false);
     }
     info!(
         "maps: `{}` joined to `{}` at {:?}",
@@ -1050,20 +1033,45 @@ fn unload_hidden(world: &mut World) {
         info!("maps: `{id}` left the world, it was out of view");
     }
     run_rebuild(world);
-    set_bounds(world, false);
 }
 
-/// Moves the camera limits towards the box around the active maps, so the camera never jumps.
-fn ease_camera_bounds(
-    time: Res<Time>,
-    target: Option<Res<CameraBoundsTarget>>,
+/// Where the camera limits should be: the current map, so the camera shows only the map the player is in. While the feet
+/// are in the exit of the current map that leads into a joined map, the box also holds that map, so the player sees
+/// ahead and the sprite is not cut off at the seam. Once the player has crossed into the new map the box is that map
+/// alone, and the camera moves on to it: the map that was left goes out of view.
+pub fn camera_target(active: &ActiveMaps, feet: Option<Vec2>) -> Rect {
+    let mut target = active.current_rect();
+    let Some(feet) = feet else {
+        return target;
+    };
+    for door in active.doorways.iter().filter(|d| d.from == active.current) {
+        let inside = feet.cmpge(door.area.min).all() && feet.cmple(door.area.max).all();
+        if let (true, Some(next)) = (inside, active.get(&door.to)) {
+            target = target.union(next.rect);
+        }
+    }
+    target
+}
+
+/// Sets the camera limits every frame (`camera_target`). When they change the camera glides to its new place
+/// (`CameraSmoothing`), so there is no jump.
+fn retarget_camera(
+    active: Res<ActiveMaps>,
     bounds: Option<ResMut<CameraBounds>>,
+    player: Query<(&Transform, &DepthSort), With<Controlled>>,
 ) {
-    let (Some(target), Some(mut bounds)) = (target, bounds) else {
+    let Some(mut bounds) = bounds else {
         return;
     };
-    if bounds.0 != target.0 {
-        bounds.0 = ease_rect(bounds.0, target.0, time.delta_secs(), BOUNDS_EASE_SECS);
+    let feet = player.single().ok().map(|(transform, sort)| {
+        Vec2::new(
+            transform.translation.x,
+            sort.feet_y(transform.translation.y),
+        )
+    });
+    let wanted = camera_target(&active, feet);
+    if bounds.0 != wanted {
+        bounds.0 = wanted;
     }
 }
 
@@ -1788,24 +1796,31 @@ mod tests {
     }
 
     #[test]
-    fn eased_bounds_move_smoothly_and_arrive() {
-        let from = Rect::new(0.0, 0.0, 640.0, 640.0);
-        let to = Rect::new(0.0, 0.0, 640.0, 1280.0);
-        let mut now = from;
-        let mut last_top = now.max.y;
-        for _ in 0..400 {
-            now = ease_rect(now, to, 1.0 / 60.0, BOUNDS_EASE_SECS);
-            assert!(now.max.y >= last_top, "never goes backwards");
-            assert!(
-                now.max.y - last_top < 40.0,
-                "no jump: {}",
-                now.max.y - last_top
-            );
-            last_top = now.max.y;
-        }
-        assert_eq!(now, to);
-        // A tau of zero jumps at once.
-        assert_eq!(ease_rect(from, to, 0.016, 0.0), to);
+    fn the_camera_shows_the_current_map_and_looks_ahead_only_in_the_exit() {
+        let active = active_pair();
+        let first = Rect::new(0.0, 0.0, 640.0, 640.0);
+        let both = Rect::new(0.0, 0.0, 640.0, 1280.0);
+        let second = Rect::new(0.0, 640.0, 640.0, 1280.0);
+        // In the first map, away from the exit: only the first map.
+        assert_eq!(camera_target(&active, Some(Vec2::new(300.0, 300.0))), first);
+        // In the exit (x 192..448, the top row): the box holds the joined map as well.
+        assert_eq!(camera_target(&active, Some(Vec2::new(300.0, 600.0))), both);
+        // Beside the exit, in the same row: not yet.
+        assert_eq!(camera_target(&active, Some(Vec2::new(100.0, 600.0))), first);
+        // No player: the current map.
+        assert_eq!(camera_target(&active, None), first);
+        // Across the seam the second map is the current one and the box is that map alone: the map that was left is
+        // not in it, even though it is still loaded.
+        let mut crossed = active;
+        crossed.current = "2".into();
+        assert_eq!(
+            camera_target(&crossed, Some(Vec2::new(300.0, 700.0))),
+            second
+        );
+        assert_eq!(
+            camera_target(&crossed, Some(Vec2::new(300.0, 600.0))),
+            second
+        );
     }
 
     /// Spawns a camera that sees the area around `centre`, 200 by 200 units.
@@ -1852,16 +1867,10 @@ mod tests {
             player_feet(&mut app),
             ORIGIN + Vec2::new(192.0 + 58.0, 600.0)
         );
-        // The camera limits head for the box around both maps. The current limits have not jumped.
-        let target = app.world().resource::<CameraBoundsTarget>().0;
+        // The player is in the exit, so the camera limits are the box around both maps.
         assert_eq!(
-            target,
+            app.world().resource::<CameraBounds>().0,
             Rect::from_corners(ORIGIN, ORIGIN + Vec2::new(640.0, 1280.0))
-        );
-        let bounds = app.world().resource::<CameraBounds>().0;
-        assert!(
-            bounds.max.y < target.max.y,
-            "the limits ease and do not jump: {bounds:?}"
         );
     }
 
@@ -1879,6 +1888,16 @@ mod tests {
         set_feet(&mut app, ORIGIN + Vec2::new(250.0, 700.0));
         app.update();
         assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        app.update();
+        let second = Rect::from_corners(
+            ORIGIN + Vec2::new(0.0, 640.0),
+            ORIGIN + Vec2::new(640.0, 1280.0),
+        );
+        assert_eq!(
+            app.world().resource::<CameraBounds>().0,
+            second,
+            "after the crossing the camera limits head for the new map alone"
+        );
         for _ in 0..3 {
             app.update();
         }
@@ -1923,7 +1942,7 @@ mod tests {
                 .starts_with("rebuild with 1 map")
         );
         assert_eq!(
-            app.world().resource::<CameraBoundsTarget>().0,
+            app.world().resource::<CameraBounds>().0,
             Rect::from_corners(
                 ORIGIN + Vec2::new(0.0, 640.0),
                 ORIGIN + Vec2::new(640.0, 1280.0)

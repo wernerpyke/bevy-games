@@ -65,10 +65,38 @@ pub fn half_view(window_width: f32, window_height: f32, view_height: f32) -> Vec
 #[derive(Resource)]
 pub struct CameraBounds(pub Rect);
 
-/// Where `CameraBounds` is heading. A game that changes the bounds smoothly (a seamless map transition) sets this, and
-/// `map_transition.rs` moves `CameraBounds` towards it over a short time, so the camera never jumps.
+/// Makes the camera glide when `CameraBounds` change, instead of jumping to where the new bounds put it. The camera
+/// keeps following the player exactly. Only the part that the bounds change added is eased out: the camera starts
+/// where it was and the difference decays with time constant `tau` seconds (about two thirds of it in `tau`). Without
+/// this resource the camera always jumps. See `dev-docs/adr/EXTENSIONS.md` adr-x32.
 #[derive(Resource)]
-pub struct CameraBoundsTarget(pub Rect);
+pub struct CameraSmoothing {
+    pub tau: f32,
+    /// Set to make the next change of the bounds jump (the screen is covered, as in a scene transition). Cleared by
+    /// the camera after one frame.
+    pub snap: bool,
+}
+
+/// The part of a camera move that is still to be eased out: the offset shrinks with time constant `tau`, and is
+/// dropped when it is under a quarter of a unit.
+pub fn smooth_offset(offset: Vec2, dt: f32, tau: f32) -> Vec2 {
+    if tau <= 0.0 {
+        return Vec2::ZERO;
+    }
+    let eased = offset * (-dt / tau).exp();
+    if eased.length_squared() < 0.0625 {
+        Vec2::ZERO
+    } else {
+        eased
+    }
+}
+
+/// What `follow_controlled` remembers between frames when `CameraSmoothing` is present.
+#[derive(Default)]
+struct SmoothState {
+    last_bounds: Option<Rect>,
+    offset: Vec2,
+}
 
 /// Moves the `Camera2d` to follow the `Controlled` entity (`CameraBounds` limits it). The camera position is
 /// rounded to a whole world unit, so pixel art does not shimmer when it scrolls.
@@ -87,6 +115,9 @@ fn follow_controlled(
     target: Single<&Transform, (With<Controlled>, Without<Camera2d>)>,
     mut camera: Single<(&mut Transform, &Projection), With<Camera2d>>,
     bounds: Option<Res<CameraBounds>>,
+    smoothing: Option<ResMut<CameraSmoothing>>,
+    time: Res<Time>,
+    mut state: Local<SmoothState>,
 ) {
     let (transform, projection) = &mut *camera;
     let Projection::Orthographic(orthographic) = projection else {
@@ -96,11 +127,23 @@ fn follow_controlled(
     if half.x <= 1.0 || half.y <= 1.0 {
         return;
     }
-    let position = follow_position(
-        target.translation.truncate(),
-        half,
-        bounds.map(|bounds| bounds.0),
-    );
+    let bounds = bounds.map(|bounds| bounds.0);
+    let desired = follow_position(target.translation.truncate(), half, bounds);
+    let mut position = desired;
+    if let Some(mut smoothing) = smoothing {
+        if state.last_bounds.is_some() && state.last_bounds != bounds {
+            // The bounds changed: start from where the camera is, and ease out the difference.
+            state.offset = if smoothing.snap {
+                Vec2::ZERO
+            } else {
+                transform.translation.truncate() - desired
+            };
+        }
+        smoothing.snap = false;
+        state.last_bounds = bounds;
+        state.offset = smooth_offset(state.offset, time.delta_secs(), smoothing.tau);
+        position = (desired + state.offset).round();
+    }
     transform.translation.x = position.x;
     transform.translation.y = position.y;
 }
@@ -129,6 +172,27 @@ pub fn follow_position(target: Vec2, half: Vec2, bounds: Option<Rect>) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_camera_offset_decays_without_stopping_and_ends() {
+        let mut offset = Vec2::new(0.0, -200.0);
+        let mut last = offset.length();
+        for _ in 0..600 {
+            offset = smooth_offset(offset, 1.0 / 60.0, 0.9);
+            assert!(
+                offset.length() < last,
+                "it shrinks every frame, never stops"
+            );
+            // No frame moves the camera by more than it needs: a smooth glide, not a jump.
+            assert!(last - offset.length() < 4.0);
+            last = offset.length();
+            if offset == Vec2::ZERO {
+                break;
+            }
+        }
+        assert_eq!(offset, Vec2::ZERO);
+        assert_eq!(smooth_offset(Vec2::new(5.0, 5.0), 0.016, 0.0), Vec2::ZERO);
+    }
 
     #[test]
     fn the_view_width_follows_the_window_shape() {
