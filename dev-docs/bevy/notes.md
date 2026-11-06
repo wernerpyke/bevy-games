@@ -67,3 +67,12 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Spawn `AseAnimation { aseprite: server.load("art/characters/Guy.aseprite"), animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop) }` with `Sprite::default()`.
 - Switch animation: `ase.animation.play_loop("Walk")`. Tag names are case sensitive and match the Aseprite tags. Call it only when the tag changes.
 - A file with no tags: `animation: Animation::default()` plays all frames in a loop. A named tag that does not exist is an error.
+
+## One-shot systems and UI overlays (verified in `map_transition.rs`)
+
+- Register a system that takes input: `let id = app.world_mut().register_system(my_system);` with `fn my_system(In(x): In<MyInput>, ..)`. Store `SystemId<In<MyInput>>` (Copy) in a resource. Run it with `world.run_system_with(id, MyInput { .. })`. Run one without input with `world.run_system(id)`. Both return a `Result`, so log the error. Commands queued by the system are applied when it returns.
+- Inside an exclusive system (`fn(world: &mut World)`) copy the ids out first (`world.resource::<Hooks>().clone()`, or `get_resource::<Hooks>().copied()`), because running a system needs `&mut World`.
+- Write a message from a test or from `&mut World`: `world.write_message(msg)` (`bevy_ecs` `World::write_message`).
+- A full-screen overlay: `commands.spawn((Node { position_type: PositionType::Absolute, width: percent(100), height: percent(100), ..default() }, BackgroundColor(colour), GlobalZIndex(z)))`. Change `BackgroundColor.0` to fade it. Screenshots include UI.
+- `#[derive(SystemParam)] struct MapLink<'w> { writer: MessageWriter<'w, M>, res: Option<Res<'w, R>> }` bundles parameters when a system has more than 7 (clippy `too_many_arguments`).
+- A test app for a plugin that spawns UI needs only `MinimalPlugins`: the UI components can be spawned without the UI plugins.

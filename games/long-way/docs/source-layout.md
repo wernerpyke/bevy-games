@@ -13,9 +13,9 @@ games/long-way/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       VIEW_HEIGHT, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
     ├── player.rs       PlayerPlugin: player spawn, movement, animation
-    ├── trees.rs        TreesPlugin: trees and their trunks from the map
-    ├── rocks.rs        RocksPlugin: rocks and their blocked areas from the map
-    ├── map.rs          MapPlugin, `Kind`: loads the map file and names its kinds. The parser is `game_kit::map`
+    ├── trees.rs        `spawn_trees`: trees and their trunks of one map
+    ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
+    ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
 

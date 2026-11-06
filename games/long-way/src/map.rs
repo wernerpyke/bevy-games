@@ -1,90 +1,111 @@
-//! Long Way's map: loads the map file and names the object kinds. The parser is `game_kit::map`. See
-//! `games/long-way/docs/maps.md` for the kinds.
+//! Long Way's maps: registers the map files and names the object kinds. The parser, the registry and the moves between
+//! maps are in `game_kit::map` and `game_kit::map_transition`. See `games/long-way/docs/maps.md` for the kinds.
 
-use crate::camera::{MAP_ORIGIN, map_rect};
+use crate::camera::MAP_ORIGIN;
 use crate::rocks::FOOTPRINT_CELLS;
 use bevy::prelude::*;
-use game_kit::camera::CameraBounds;
-use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
-use game_kit::map::{Map, MapObject, PLAYER_START, parse};
+use game_kit::map::{Map, MapObject, PLAYER_START};
+use game_kit::map_transition::{
+    Fade, MapHooks, MapLoad, MapRegistry, MapSource, MapTransitionPlugin, reload_current_map,
+};
 use game_kit::reload::ReloadMap;
 
-/// The map file Long Way loads, relative to the game folder. A native run reads it from disk, so F1 reloads it. The
-/// web build has no disk and uses the bundled copy.
-const MAP_NAME: &str = "assets/maps/1.txt";
-const MAP_SOURCE: &str = include_str!("../assets/maps/1.txt");
-
-fn load_map() -> Result<Map, String> {
-    let Some(dir) = std::env::var_os("CARGO_MANIFEST_DIR") else {
-        return parse(MAP_NAME, MAP_SOURCE, KIND_NAMES).map_err(|error| error.to_string());
-    };
-    let path = std::path::Path::new(&dir).join(MAP_NAME);
-    let name = path.display().to_string();
-    let source = std::fs::read_to_string(&path).map_err(|error| format!("{name}: {error}"))?;
-    parse(&name, &source, KIND_NAMES).map_err(|error| error.to_string())
-}
+/// Every map of the game. A native run reads the files from disk, so F1 reloads the current one. The web build has no
+/// disk and uses the bundled copies.
+const MAPS: &[MapSource] = &[
+    MapSource {
+        id: "1",
+        file: "assets/maps/1.txt",
+        bundled: include_str!("../assets/maps/1.txt"),
+    },
+    MapSource {
+        id: "2",
+        file: "assets/maps/2.txt",
+        bundled: include_str!("../assets/maps/2.txt"),
+    },
+    MapSource {
+        id: "3",
+        file: "assets/maps/3.txt",
+        bundled: include_str!("../assets/maps/3.txt"),
+    },
+];
 
 /// The legend names the parser accepts.
 const KIND_NAMES: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree", PLAYER_START];
+
+/// The map the game starts in: the id from the file name in `LONG_WAY_MAP` (`rust.sh run long-way 2.txt` sets it), else
+/// map 1. A map that is not the first needs a `player_start` marker to start in.
+fn start_map() -> String {
+    std::env::var("LONG_WAY_MAP")
+        .ok()
+        .and_then(|path| {
+            std::path::Path::new(&path)
+                .file_stem()
+                .map(|stem| stem.to_string_lossy().into_owned())
+        })
+        .unwrap_or_else(|| "1".to_string())
+}
 
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        let map = load_map().unwrap_or_else(|error| panic!("{error}"));
-        info!(
-            "map: {} cell {} size {} draw {:?} jitter {}, {} objects",
-            map.name,
-            map.cell_size,
-            map.size,
-            map.draw_size,
-            map.jitter,
-            map.objects.len()
-        );
-        for object in &map.objects {
-            debug!("map: {} at cell {}", object.kind, object.cell);
-        }
-        app.insert_resource(CameraBounds(map_rect(map.size)))
-            .insert_resource(CurrentMap(map))
+        app.add_plugins(MapTransitionPlugin {
+            sources: MAPS,
+            kinds: KIND_NAMES,
+            start: start_map(),
+            origin: MAP_ORIGIN,
+            fade: Fade::default(),
+        });
+        let hooks = MapHooks {
+            load: app.world_mut().register_system(load_hook),
+            rebuild: app
+                .world_mut()
+                .register_system(crate::rocks::rebuild_collision),
+            arrive: app
+                .world_mut()
+                .register_system(crate::player::arrive_player),
+        };
+        app.insert_resource(hooks)
             .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
 
-#[derive(Resource)]
-pub struct CurrentMap(pub Map);
-
-/// Marks everything a map spawns (rocks, trees and the player), so a reload removes it.
-#[derive(Component)]
-pub struct MapEntity;
-
-/// Runs on `ReloadMap` (F1, sent by the kit): reads the map file again, removes everything marked `MapEntity`, spawns
-/// the rocks, trees and player again and rebuilds the collision areas. A file with an error is reported and nothing
-/// changes.
-fn reload_map(world: &mut World) {
-    let map = match load_map() {
-        Ok(map) => map,
-        Err(error) => {
-            error!("map: reload failed, keeping the current map: {error}");
-            return;
-        }
+/// Spawns the rocks and trees of one map. Everything is tagged with the map id, so the kit removes it with the map.
+fn load_hook(
+    In(load): In<MapLoad>,
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    registry: Res<MapRegistry>,
+) {
+    let Some(registered) = registry.get(&load.id) else {
+        error!("map: `{}` is not registered", load.id);
+        return;
     };
-    info!("map: reloaded {}, {} objects", map.name, map.objects.len());
-    let old: Vec<Entity> = world
-        .query_filtered::<Entity, With<MapEntity>>()
-        .iter(world)
-        .collect();
-    for entity in old {
-        world.despawn(entity);
+    let map = &registered.map;
+    info!(
+        "map: {} cell {} size {} draw {:?} jitter {}, {} objects",
+        map.name,
+        map.cell_size,
+        map.size,
+        map.draw_size,
+        map.jitter,
+        map.objects.len()
+    );
+    for object in &map.objects {
+        debug!("map: {} at cell {}", object.kind, object.cell);
     }
-    world.insert_resource(CameraBounds(map_rect(map.size)));
-    world.insert_resource(CurrentMap(map));
-    world.resource_mut::<CollisionWorld>().clear();
-    let _ = world.run_system_cached(crate::rocks::spawn_rocks);
-    let _ = world.run_system_cached(crate::trees::spawn_trees);
-    let _ = world.run_system_cached(crate::player::spawn_player);
-    let _ = world.run_system_cached(register_blockers);
-    let _ = world.run_system_cached(crate::rocks::mark_interior);
+    crate::rocks::spawn_rocks(&mut commands, &server, map, &load);
+    crate::trees::spawn_trees(&mut commands, &server, map, &load);
+}
+
+/// Runs on `ReloadMap` (F1, sent by the kit): reads the current map file again and loads it again. A file with an
+/// error is reported and nothing changes.
+fn reload_map(world: &mut World) {
+    if let Err(error) = reload_current_map(world) {
+        error!("map: reload failed, keeping the current map: {error}");
+    }
 }
 
 /// How a blocking object relates to its neighbours (`adr-lw14`).
@@ -139,7 +160,7 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
 
 /// World position of the player's feet at the `player_start` marker: the centre of its cell. `None` when the map has no
 /// marker. A second marker is reported and ignored.
-pub fn player_start_feet(map: &Map) -> Option<Vec2> {
+pub fn player_start_feet(map: &Map, origin: Vec2) -> Option<Vec2> {
     let mut starts = map
         .objects
         .iter()
@@ -151,7 +172,7 @@ pub fn player_start_feet(map: &Map) -> Option<Vec2> {
             map.name
         );
     }
-    Some(MAP_ORIGIN + (start.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size)
+    Some(origin + (start.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size)
 }
 
 /// What an object is. Art, footprint and collision rule for each kind are set in code.

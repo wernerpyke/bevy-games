@@ -1,11 +1,13 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
-use crate::camera::map_rect;
+use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
-use crate::map::{CurrentMap, MapEntity, player_start_feet};
+use crate::map::player_start_feet;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
+use game_kit::map::Facing as EntryFacing;
+use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition};
 
 /// Walk speed in art pixels per second.
 const WALK_SPEED: f32 = 300.0;
@@ -51,18 +53,30 @@ fn hunter_layers() -> Vec<String> {
 
 /// Spawns the player with the feet at the centre of the `player_start` cell of the map. A map without the marker
 /// is reported and the player starts at the bottom middle.
-pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
-    let feet = player_start_feet(&map.0).unwrap_or_else(|| {
+pub fn spawn_player(
+    mut commands: Commands,
+    server: Res<AssetServer>,
+    registry: Res<MapRegistry>,
+    active: Res<ActiveMaps>,
+) {
+    let Some(registered) = registry.get(&active.current) else {
+        error!(
+            "player: the start map `{}` is not registered",
+            active.current
+        );
+        return;
+    };
+    let map = &registered.map;
+    let feet = player_start_feet(map, MAP_ORIGIN).unwrap_or_else(|| {
         error!(
             "map {}: no player_start marker, starting at the bottom middle",
-            map.0.name
+            map.name
         );
-        let area = map_rect(map.0.size);
-        Vec2::new((area.min.x + area.max.x) / 2.0, area.min.y)
+        let width = map.size.x as f32 * map.cell_size;
+        Vec2::new(MAP_ORIGIN.x + width / 2.0, MAP_ORIGIN.y)
     });
     let start = feet + Vec2::new(0.0, PLAYER_FEET_OFFSET);
     commands.spawn((
-        MapEntity,
         game_kit::Controlled,
         Player {
             facing: Facing::Down,
@@ -90,12 +104,22 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>, map: Res<C
 fn move_player(
     input: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    map: Res<CurrentMap>,
+    active: Res<ActiveMaps>,
+    transition: Res<MapTransition>,
     world: Res<CollisionWorld>,
     settings: Res<CollisionSettings>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
-    let area = map_rect(map.0.size);
+    let area = active.current_rect();
+
+    // The player stands still while the screen fades.
+    if transition.locks_input() {
+        for (_, mut player, mut assist) in &mut query {
+            player.walking = false;
+            assist.reset();
+        }
+        return;
+    }
 
     let mut direction = Vec2::ZERO;
     if input.pressed(KeyCode::ArrowLeft) {
@@ -169,6 +193,35 @@ fn animate_player(mut query: Query<(&mut AseAnimation, &mut Player)>) {
                 1.0
             };
             player.playing = tag;
+        }
+    }
+}
+
+/// Puts the player in the entry after a map transition (a hook of `game_kit::map_transition`): the feet go to the
+/// arrival position and the player looks the way the entry says.
+pub fn arrive_player(
+    In(arrival): In<Arrival>,
+    mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
+) {
+    for (mut transform, mut player, mut assist) in &mut query {
+        transform.translation.x = arrival.feet.x;
+        transform.translation.y = arrival.feet.y + PLAYER_FEET_OFFSET;
+        assist.reset();
+        player.walking = false;
+        let (facing, faces_right) = match arrival.facing {
+            None => continue,
+            Some(EntryFacing::Up) => (Facing::Up, None),
+            Some(EntryFacing::Down) => (Facing::Down, None),
+            Some(EntryFacing::Left) => (Facing::Side, Some(false)),
+            Some(EntryFacing::Right) => (Facing::Side, Some(true)),
+        };
+        player.facing = facing;
+        if let Some(right) = faces_right {
+            transform.scale.x = if right == WALK_ART_FACES_RIGHT {
+                1.0
+            } else {
+                -1.0
+            };
         }
     }
 }

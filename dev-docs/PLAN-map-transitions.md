@@ -203,20 +203,20 @@ Order: scene transitions first, then seamless, on one lifecycle. Each step ends 
    - The game still loads only `1.txt`. Check with a scripted run and a screenshot that map 1 looks as before and the player starts at (4,0).
 4. **Record the decision (done 2026-11-06: adr-x30, adr-lw19)** in `dev-docs/adr/EXTENSIONS.md` (exits and entries in front matter, grid areas written with blanks, `player_start` convention). Update `dev-docs/extensions/map-files.md`, `games/long-way/docs/maps.md` and roadmap item 4. Ask the user about a commit.
 
-### Phase B: registry and scene transition
+### Phase B: registry and scene transition (done 2026-11-06)
 
-5. **Registry and map ids** (new `crates/game-kit/src/map_transition.rs`, plus `lib.rs`).
+5. **Registry and map ids (done)** (new `crates/game-kit/src/map_transition.rs`, plus `lib.rs`).
    - `MapRegistry` (id to parsed `Map`, with `register(id, name, source)`; native reads the file from disk, web uses the bundled text), `ActiveMaps` (id, `Map`, `world_offset`), the `MapId` component, and the messages `LoadMap`, `UnloadMap` and `MapReady`. Run `validate_links` when the registry is built.
    - Long Way registers `1.txt`, `2.txt` and `3.txt` with `include_str!`. `MapEntity` becomes `MapId`. `spawn_rocks`, `spawn_trees` and `spawn_player` take a map and an offset. `camera.rs` `map_rect` takes the offset. F1 reloads the current map only.
    - Behaviour stays the same with one active map. Check with a scripted run on map 1. Run `./dev-scripts/rust.sh web`.
-6. **Dev launch** (`LONG_WAY_MAP=<id>`, `<GAME>_MAP` pattern): the game starts in that map at its `player_start`. Add `@` to `3.txt` if the user wants to start there. Scripted run starts in map 2 and takes a screenshot.
-7. **Scene lifecycle without fade.**
+6. **Dev launch (done: the start map is the file in `LONG_WAY_MAP`, set by `rust.sh run long-way 2.txt` or `rust.sh script long-way "..." 2.txt`)** (`LONG_WAY_MAP=<id>`, `<GAME>_MAP` pattern): the game starts in that map at its `player_start`. Add `@` to `3.txt` if the user wants to start there. Scripted run starts in map 2 and takes a screenshot.
+7. **Scene lifecycle (done, with the fade of step 8)**
    - Add a `MapPhase` sub-state (`Idle`, `FadeOut`, `Switching`, `FadeIn`), `TransitionLock`, and the exit detection system (feet point inside an exit area of the current map, fires once, rearms when the feet leave every exit area).
    - On a scene exit: lock, `UnloadMap`, `LoadMap` at offset 0, place the player in the entry strip at the same offset along the strip as where they left the exit, with the entry's `facing`, unlock. **Entry placement** is a pure function `entry_position(exit, exit_feet, entry)` with kit tests for every pair of edges (4 by 4). Offset = feet coordinate along the exit strip minus the strip start. The result = entry strip start plus that offset along the entry strip, and the middle of the strip's depth across it. Same kind of edge: the offset carries over unchanged. Different kind (horizontal strip to vertical strip or the reverse): the offset moves to the other axis and the low end stays the low end. The player entity is kept. Player movement and the shot systems check the lock.
    - Write a failing test for the pure parts first (feet in area, fire once, entry placement). Add the `goto:<map>:<entry>` and `wait_map` script commands (`crates/game-kit/src/script.rs`, `adr-x5`).
    - Scripted runs with `--debug`: walk into `to_2`, `to_3` in map 1 and `to_3` in map 2. Screenshot before and after each. Check that the player does not bounce back at the entry.
-8. **Fade.** A full-screen overlay on the top layer in `layers.rs` (no bare z values), `Fade { colour, out_secs, in_secs }`, input locked while it runs. The swap happens while the screen is fully covered. Scripted run with screenshots at the fade-out peak and after the fade-in.
-9. **Debug info.** The F2 box shows the map id with the cell. Kit test for the label. Record the lifecycle decision in `dev-docs/adr/EXTENSIONS.md` and `games/long-way/docs/adr.md`. Ask the user about a commit.
+8. **Fade (done)** A full-screen overlay on the top layer in `layers.rs` (no bare z values), `Fade { colour, out_secs, in_secs }`, input locked while it runs. The swap happens while the screen is fully covered. Scripted run with screenshots at the fade-out peak and after the fade-in.
+9. **Debug info (done: the F2 box has a `map` row)** The F2 box shows the map id with the cell. Kit test for the label. Record the lifecycle decision in `dev-docs/adr/EXTENSIONS.md` and `games/long-way/docs/adr.md`. Ask the user about a commit.
 
 ### Phase C: seamless
 
@@ -245,3 +245,12 @@ Order: scene transitions first, then seamless, on one lifecycle. Each step ends 
 ## 9. Final step when done (step 16)
 
 Migrate lasting content: the file format to `dev-docs/extensions/map-files.md` and `games/long-way/docs/maps.md`; the lifecycle to a new `dev-docs/extensions/map-transitions.md`; decisions to `dev-docs/adr/EXTENSIONS.md` and `games/long-way/docs/adr.md`; update roadmap items 3 and 4 and add a Completed item. Add any new Bevy concept (`SubStates`, state-scoped entities) to `dev-docs/bevy/concepts.md`. Delete this plan file.
+
+## Changes made while building phase B
+
+- The lifecycle runs the game through three one-shot system hooks (`load`, `rebuild`, `arrive`) and not through load and unload messages, because the order must be fixed inside one frame (`adr-x31`). The plan's `LoadMap`, `UnloadMap` and `MapReady` messages are not built.
+- The phase is a resource (`MapTransition`), not a `SubState`, because the game has no app states yet.
+- The game gets a `rebuild` hook that the plan did not list, because the collision world is rebuilt from the entities after every load.
+- `goto:<map>:<entry>` waits until the transition is done, so there is no `wait_map` command.
+- The start map comes from a map file name (`LONG_WAY_MAP`, the same pattern as R-Town's `R_TOWN_MAP`) and not from an id, so `rust.sh` can take it as an argument.
+- Phase C step 12 (seamless) adds to the same lifecycle. The `rebuild` hook must then rebuild from all active maps, and `CameraBounds` moves from the kit's `install_map` to the eased bounding box.

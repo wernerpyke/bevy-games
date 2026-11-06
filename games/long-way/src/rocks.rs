@@ -5,12 +5,12 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
-use crate::camera::MAP_ORIGIN;
 use crate::collision::PLAYER_HALF_WIDTH;
-use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
-use game_kit::collision::{CollisionWorld, register_blockers};
+use crate::map::{Group, Kind, blocking_groups};
+use game_kit::collision::{Blocker, CollisionWorld};
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
+use game_kit::map_transition::{MapId, MapLoad};
 
 /// Footprint of a rock in cells, in x and y.
 pub const FOOTPRINT_CELLS: f32 = 2.0;
@@ -32,18 +32,13 @@ const DEFAULT_DRAW_SIZE: f32 = 128.0;
 /// draw order of the two would be a tie. With it the player is drawn in front when it stands at the rock or below it.
 pub const SORT_BIAS: f32 = 1.0;
 
-pub struct RocksPlugin;
-
-impl Plugin for RocksPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_rocks)
-            .add_systems(PostStartup, mark_interior.after(register_blockers));
-    }
-}
-
 /// Marker for a rock. The collision code queries it.
 #[derive(Component)]
 pub struct Rock;
+
+/// The area a rock blocks. `rebuild_collision` adds it to the collision world.
+#[derive(Component)]
+pub struct RockArea(Rect);
 
 /// Marks a rock that touches no empty space, because rocks around it fill every side (`outline::Cluster::interior`).
 /// Collision uses only the outline edges, so this costs nothing there. The debug overlay colours these rocks.
@@ -61,12 +56,11 @@ struct Placement {
     feet_offset: f32,
 }
 
-fn placement(object: &MapObject, map: &Map) -> Placement {
+fn placement(object: &MapObject, map: &Map, origin: Vec2) -> Placement {
     let scale = (draw_size(map) / ART_PIXELS).round().max(1.0);
     let draw = scale * ART_PIXELS;
     let footprint = FOOTPRINT_CELLS * map.cell_size;
-    let corner =
-        MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter);
+    let corner = footprint_corner(object, map, origin);
     // The canvas centre is above the footprint bottom by this much, which puts the visible rock bottom on it.
     let centre_above_footprint = (0.5 - BOTTOM_MARGIN) * draw;
     Placement {
@@ -86,15 +80,15 @@ fn draw_size(map: &Map) -> f32 {
 }
 
 /// World position of the bottom left corner of the footprint.
-pub fn footprint_corner(object: &MapObject, map: &Map) -> Vec2 {
-    MAP_ORIGIN + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
+pub fn footprint_corner(object: &MapObject, map: &Map, origin: Vec2) -> Vec2 {
+    origin + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
 }
 
 /// The area the player's feet may not enter for an object in a group: the footprint inset by `INSET_FRACTION` on the left, right
 /// and top and by `BOTTOM_INSET_FRACTION` at the bottom, then grown sideways by the player's half width. With `open_top` there
 /// is no inset at the top, so it merges with the object above (`Group::neighbour_above`). There is no vertical margin.
-pub fn group_area(object: &MapObject, map: &Map, open_top: bool) -> Rect {
-    let corner = footprint_corner(object, map);
+pub fn group_area(object: &MapObject, map: &Map, origin: Vec2, open_top: bool) -> Rect {
+    let corner = footprint_corner(object, map, origin);
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let inset = INSET_FRACTION * footprint;
     let top_inset = if open_top { 0.0 } else { inset };
@@ -107,12 +101,12 @@ pub fn group_area(object: &MapObject, map: &Map, open_top: bool) -> Rect {
 }
 
 /// The blocked area of a rock: the band at its bottom when it stands alone, the group area when it is in a group.
-fn blocked_area(object: &MapObject, map: &Map, group: Group) -> Rect {
-    let full = group_area(object, map, group.neighbour_above);
+fn blocked_area(object: &MapObject, map: &Map, origin: Vec2, group: Group) -> Rect {
+    let full = group_area(object, map, origin, group.neighbour_above);
     if group.is_group() {
         return full;
     }
-    let corner = footprint_corner(object, map);
+    let corner = footprint_corner(object, map, origin);
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     Rect::new(
         full.min.x,
@@ -141,13 +135,9 @@ fn jitter_offset(object: &MapObject, jitter: f32) -> Vec2 {
     Vec2::new(unit(1), unit(2)) * jitter
 }
 
-pub fn spawn_rocks(
-    mut commands: Commands,
-    server: Res<AssetServer>,
-    map: Res<CurrentMap>,
-    mut world: ResMut<CollisionWorld>,
-) {
-    let map = &map.0;
+/// Spawns the rocks of one map. The blocked areas are added to the collision world by `rebuild_collision`, once the
+/// trees exist too.
+pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     if (draw_size(map) / ART_PIXELS).fract() != 0.0 {
         warn!(
             "map {}: draw {} is not a multiple of {}, using {}",
@@ -163,23 +153,18 @@ pub fn spawn_rocks(
         .zip(blocking_groups(map))
         .filter(|(o, _)| Kind::of(o).is_rock())
         .collect();
-    let areas: Vec<Rect> = rocks
-        .iter()
-        .map(|(o, group)| blocked_area(o, map, *group))
-        .collect();
-    let first_area = world.add_blocked(&areas);
 
-    for (index, (object, _)) in rocks.into_iter().enumerate() {
+    for (object, group) in rocks {
         let tag = match Kind::of(object) {
             Kind::Rock0 => "rock_0",
             Kind::Rock1 => "rock_1",
             _ => unreachable!("only rocks are spawned here"),
         };
-        let placement = placement(object, map);
+        let placement = placement(object, map, load.origin);
         commands.spawn((
             Rock,
-            MapEntity,
-            BlockedArea(first_area + index),
+            MapId(load.id.clone()),
+            RockArea(blocked_area(object, map, load.origin, group)),
             AseAnimation {
                 aseprite: server.load("art/features/Rocks.aseprite"),
                 animation: Animation::tag(tag),
@@ -194,26 +179,33 @@ pub fn spawn_rocks(
     }
 }
 
-/// Number of the rock's blocked area in `CollisionWorld`.
-#[derive(Component)]
-pub struct BlockedArea(usize);
-
-/// Runs after every blocked area is registered, so a rock next to a trunk is judged with the trunk in place.
-pub fn mark_interior(
+/// Fills the collision world from the entities that exist: the rock areas first, then the tree trunks, so a trunk that
+/// overlaps a rock joins its cluster. Then it marks the rocks that touch no empty space. The kit runs it after every
+/// load and unload.
+pub fn rebuild_collision(
     mut commands: Commands,
-    world: Res<CollisionWorld>,
-    rocks: Query<(Entity, &BlockedArea), With<Rock>>,
+    mut world: ResMut<CollisionWorld>,
+    rocks: Query<(Entity, &RockArea)>,
+    blockers: Query<&Blocker>,
 ) {
+    world.clear();
+    let rocks: Vec<(Entity, Rect)> = rocks
+        .iter()
+        .map(|(entity, area)| (entity, area.0))
+        .collect();
+    let areas: Vec<Rect> = rocks.iter().map(|(_, area)| *area).collect();
+    let first_rock = world.add_blocked(&areas);
+    let trunks: Vec<Rect> = blockers.iter().map(|blocker| blocker.0).collect();
+    world.add_blocked(&trunks);
+
     let mut interior = 0;
-    for (entity, area) in &rocks {
-        if world.is_interior(area.0) {
-            commands.entity(entity).insert(InteriorRock);
+    for (index, (entity, _)) in rocks.iter().enumerate() {
+        if world.is_interior(first_rock + index) {
+            commands.entity(*entity).insert(InteriorRock);
             interior += 1;
+        } else {
+            commands.entity(*entity).remove::<InteriorRock>();
         }
     }
-    info!(
-        "rocks: {} of {} rocks are interior",
-        interior,
-        rocks.iter().count()
-    );
+    info!("rocks: {} of {} rocks are interior", interior, rocks.len());
 }

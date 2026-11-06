@@ -27,8 +27,8 @@ use std::fmt;
 
 use bevy::math::IVec2;
 
-use crate::map_areas::{self, MapEntry, MapExit, RawLink};
-pub use crate::map_areas::{Area, Edge, Facing, PLAYER_START, Transition};
+use crate::map_areas::{self, RawLink};
+pub use crate::map_areas::{Area, Edge, Facing, MapEntry, MapExit, PLAYER_START, Transition};
 
 /// One painted character: an object whose bottom left corner is at `cell`.
 #[derive(Clone, Debug, PartialEq)]

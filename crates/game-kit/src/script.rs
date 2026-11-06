@@ -10,6 +10,8 @@
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
 //!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
 //!   Add a `wait` before it after a `teleport`, so the frame shows the new position.
+//! - `goto:<map>:<entry>`           start a scene transition to an entry of a registered map and wait until it is done
+//!   (`map_transition.rs`). The player is put in the middle of the entry
 //! - `quit`
 //!
 //! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`. Game specific commands
@@ -17,12 +19,15 @@
 
 use std::collections::VecDeque;
 
+use bevy::ecs::system::SystemParam;
 use bevy::input::InputSystems;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 
 use crate::Controlled;
 use crate::depth::DepthSort;
+use crate::map::Transition;
+use crate::map_transition::{ActiveMaps, MapTransition, RequestMapChange};
 
 /// Seconds to wait after start before the script runs, so the window and world are up.
 const START_DELAY: f32 = 1.0;
@@ -42,15 +47,18 @@ impl Plugin for ScriptPlugin {
         };
         let commands = parse(&text);
         info!("script: {} commands loaded", commands.len());
-        app.insert_resource(Script {
-            commands,
-            elapsed: -START_DELAY,
-            since_log: 0.0,
-            shot_requested: false,
-            shot_saved: false,
-            screenshot_dir_variable: format!("{}_SCREENSHOT_DIR", self.env_prefix),
-        })
-        .add_systems(PreUpdate, run_script.after(InputSystems));
+        app.add_message::<RequestMapChange>()
+            .insert_resource(Script {
+                commands,
+                elapsed: -START_DELAY,
+                since_log: 0.0,
+                shot_requested: false,
+                shot_saved: false,
+                goto_sent: false,
+                goto_busy: false,
+                screenshot_dir_variable: format!("{}_SCREENSHOT_DIR", self.env_prefix),
+            })
+            .add_systems(PreUpdate, run_script.after(InputSystems));
     }
 }
 
@@ -60,6 +68,7 @@ enum Command {
     Hold(Vec<KeyCode>, f32),
     Wait(f32),
     Screenshot(String),
+    Goto(String, String),
     Quit,
 }
 
@@ -72,6 +81,9 @@ struct Script {
     /// State of the current `screenshot` command.
     shot_requested: bool,
     shot_saved: bool,
+    /// State of the current `goto` command: the request was sent, and the transition has been seen running.
+    goto_sent: bool,
+    goto_busy: bool,
     /// Name of the environment variable that sets the screenshot folder.
     screenshot_dir_variable: String,
 }
@@ -98,6 +110,9 @@ fn parse(text: &str) -> VecDeque<Command> {
                             .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
                 {
                     Command::Screenshot(name.to_string())
+                }
+                ["goto", map, entry] if !map.is_empty() && !entry.is_empty() => {
+                    Command::Goto(map.to_string(), entry.to_string())
                 }
                 ["quit"] => Command::Quit,
                 _ => None?,
@@ -138,6 +153,14 @@ fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
     )
 }
 
+/// What a `goto` command needs from the map lifecycle.
+#[derive(SystemParam)]
+struct MapLink<'w> {
+    changes: MessageWriter<'w, RequestMapChange>,
+    transition: Option<Res<'w, MapTransition>>,
+    maps: Option<Res<'w, ActiveMaps>>,
+}
+
 fn run_script(
     mut commands: Commands,
     mut script: ResMut<Script>,
@@ -145,6 +168,7 @@ fn run_script(
     time: Res<Time>,
     mut target: Query<(&mut Transform, &DepthSort), With<Controlled>>,
     mut exit: MessageWriter<AppExit>,
+    mut link: MapLink,
 ) {
     script.elapsed += time.delta_secs();
     if script.elapsed < 0.0 {
@@ -209,6 +233,33 @@ fn run_script(
                 script.shot_saved
             }
         }
+        Command::Goto(map, entry) => {
+            if !script.goto_sent {
+                info!("script: goto map {map} entry {entry}");
+                link.changes.write(RequestMapChange {
+                    to: map.clone(),
+                    entry: entry.clone(),
+                    transition: Transition::Scene,
+                    source: None,
+                });
+                script.goto_sent = true;
+                script.goto_busy = false;
+                false
+            } else {
+                let idle = link.transition.as_ref().is_none_or(|t| t.is_idle());
+                script.goto_busy |= !idle;
+                let arrived = link.maps.as_ref().is_some_and(|m| m.current == *map);
+                // A request for an unknown map is refused and never shows as busy, so stop waiting after 5 seconds.
+                if idle && ((script.goto_busy && arrived) || script.elapsed > 5.0) {
+                    if !arrived {
+                        warn!("script: goto {map} {entry} did not arrive");
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+        }
         Command::Quit => {
             exit.write(AppExit::Success);
             true
@@ -240,6 +291,8 @@ fn run_script(
         script.commands.pop_front();
         script.elapsed = 0.0;
         script.shot_requested = false;
+        script.goto_sent = false;
+        script.goto_busy = false;
     }
 }
 
@@ -256,6 +309,15 @@ mod tests {
         assert!(matches!(commands[2], Command::Wait(s) if s == 0.5));
         assert!(matches!(&commands[3], Command::Screenshot(name) if name == "a_1"));
         assert!(matches!(commands[4], Command::Quit));
+    }
+
+    #[test]
+    fn goto_needs_a_map_and_an_entry() {
+        let commands = parse("goto:2:from_1;goto:2;goto::x");
+        assert_eq!(commands.len(), 1);
+        assert!(
+            matches!(&commands[0], Command::Goto(map, entry) if map == "2" && entry == "from_1")
+        );
     }
 
     #[test]

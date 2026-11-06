@@ -5,25 +5,18 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
-use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
+use crate::map::{Group, Kind, blocking_groups};
 use crate::rocks::{SORT_BIAS, footprint_corner};
 use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
+use game_kit::map_transition::{MapId, MapLoad};
 
 /// Both tree canvases are 128x128, the size of a 2x2 cell footprint at a cell size of 64.
 const TREE_SIZE: f32 = 128.0;
 /// Horizontal extent of the solid trunk in the art, in pixels from the left edge of the canvas.
 const TRUNK_LEFT_PX: f32 = 76.0;
 const TRUNK_RIGHT_PX: f32 = 104.0;
-
-pub struct TreesPlugin;
-
-impl Plugin for TreesPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_trees);
-    }
-}
 
 /// The art file of a tree kind. Neither tree file has animation tags, so all frames play in a loop.
 fn art_path(kind: Kind) -> Option<&'static str> {
@@ -48,13 +41,13 @@ fn placement(corner: Vec2) -> (Vec2, Trunk) {
     )
 }
 
-pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
-    let map = &map.0;
+/// Spawns the trees of one map. Their trunks are blockers, which `rebuild_collision` adds to the collision world.
+pub fn spawn_trees(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
         let Some(path) = art_path(Kind::of(object)) else {
             continue;
         };
-        spawn_tree(&mut commands, &server, path, object, map, group);
+        spawn_tree(commands, server, path, object, map, load, group);
     }
 }
 
@@ -79,12 +72,13 @@ fn spawn_tree(
     path: &'static str,
     object: &MapObject,
     map: &Map,
+    load: &MapLoad,
     group: Group,
 ) {
-    let corner = footprint_corner(object, map);
+    let corner = footprint_corner(object, map, load.origin);
     let (centre, trunk) = placement(corner);
     commands.spawn((
-        MapEntity,
+        MapId(load.id.clone()),
         tree_blocker(&trunk, corner, map.cell_size, group),
         DepthSort {
             feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,

@@ -3,7 +3,7 @@
 How to write a map file for Long Way. The file format itself is the [map files extension](../../../dev-docs/extensions/map-files.md). This page covers what Long Way adds: the kinds, sizes, files and checks.
 
 - Files are in `games/long-way/assets/maps/`. The current map is `1.txt`, a 10 by 10 cell map.
-- The game loads one map (`1.txt`) for now. The other two (`2.txt`, `3.txt`) are not loaded yet. They are used when maps can be joined (`dev-docs/PLAN-map-transitions.md`). Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
+- The game registers all three maps (`MAPS` in `src/map.rs`, ids `1`, `2`, `3`) and starts in map 1. Add a map there and in the legend list. `rust.sh run long-way 2.txt` starts in map 2 at its `@`. The name list is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
 - The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F3 grid. Press F3 to show the grid with cell numbers.
 - Cell size is 64 pixels (`cell: 64`).
 - Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576). The view is 8 by 8 cells (`adr-lw17`). A map larger than 8 cells scrolls (`adr-lw16`), and a smaller one is centred. The size is read from the file, so you can change it freely. The player starts at the `player_start` marker (`adr-lw19`).
@@ -19,11 +19,11 @@ The format is in the [map files extension](../../../dev-docs/extensions/map-file
 | 1 | `to_3` | `9,8..9` (right edge) | 3 | `from_1` | `0,6..7` (left edge) |
 | 2 | `to_3` | `9,4..5` (right edge) | 3 | `from_2` | `0,8..9` (left edge) |
 
-- Every exit is `transition=scene` for now. The 1 to 2 pair has equal lengths on opposite edges, so it can be made `seamless` to test that style.
+- Walking into an exit fades the screen, loads the target map and puts the player in the entry at the same position along the strip (`dev-docs/extensions/map-transitions.md`). Every exit is `transition=scene` for now. The 1 to 2 pair has equal lengths on opposite edges, so it can be made `seamless` to test that style.
 - Every exit and its entry have the same length. The player keeps their position along the strip.
 - Write the cells of an exit or entry area as blanks in the grid. Keep trees and rocks out of them.
 - Map 1 has the real start (`@` at cell (4,0)). Map 2 also has an `@`, at the cell of its entry, so a scripted run can start there.
-- Nothing moves the player between maps yet. The game reads the blocks, and the plan describes the rest.
+- The seamless transition is not built yet (`dev-docs/PLAN-map-transitions.md`, phase C). A seamless exit uses the fade for now.
 
 ## Kinds you can use in a legend
 

@@ -10,6 +10,9 @@ This folder holds no test code. Long Way has no unit tests yet (`adr-lw17`, `adr
 | `crates/game-kit/src/collision.rs` | `resolve`, `move_feet`, sliding, merged cluster cases, float noise at edges |
 | `crates/game-kit/src/outline.rs` | merging rectangles into clusters, outline edges, inward corners, `Edge::covers` |
 | `crates/game-kit/src/map.rs` | the text map parser, including every error message |
+| `crates/game-kit/src/map_areas.rs` | exits and entries of one map file: area notation, edge rules, objects in areas |
+| `crates/game-kit/src/map_links.rs` | the checks between maps: target map and entry, equal lengths, seamless edges |
+| `crates/game-kit/src/map_transition.rs` | the fade, exit detection, entry placement and the lifecycle with test hooks |
 | `crates/game-kit/src/depth.rs` | draw order from the feet |
 | `crates/game-kit/src/debug.rs` | the grid line range (also for a moved camera), the visible rect, grid origin, and the info box rows |
 | `crates/game-kit/src/collision_debug.rs` | the overlay line boxes |

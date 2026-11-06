@@ -17,6 +17,7 @@
 #                                             # for example: script long-way "teleport:225:-150;hold:up:3;quit"
 #                                             # add screenshot:<name> to save target/screenshots/<name>.png,
 #                                             # for example: script long-way "wait:0.5;screenshot:start;quit"
+#                                             # an optional map file after the commands starts the game in that map: script long-way "..." 2.txt
 #   ./dev-scripts/rust.sh size                # disk use of target/ and its biggest folders
 #   ./dev-scripts/rust.sh prune               # delete the incremental cache and stale binaries (see CLAUDE.md, "Disk use")
 #   ./dev-scripts/rust.sh <other> [args...]   # passed straight to cargo
@@ -74,14 +75,26 @@ case "${1:-}" in
       echo "✗ Usage: ./dev-scripts/rust.sh script <game> \"<commands>\"" >&2
       exit 1
     fi
-    game="$1"; commands="$2"
+    game="$1"; commands="$2"; shift 2
+    # An optional map file after the commands: a path, or a name in games/<game>/assets/maps/. The game starts in
+    # that map (<GAME>_MAP), for example: script long-way "wait:0.5;screenshot:two;quit" 2.txt
+    map_env=()
+    if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then
+      map="$1"
+      if [ ! -f "$map" ]; then map="games/$game/assets/maps/$map"; fi
+      if [ ! -f "$map" ]; then
+        echo "✗ Map file not found: $1" >&2
+        exit 1
+      fi
+      map_env=("$(echo "$game" | tr 'a-z-' 'A-Z_')_MAP=$(cd "$(dirname "$map")" && pwd)/$(basename "$map")")
+    fi
     # The game reads <GAME>_SCRIPT, for example LONG_WAY_SCRIPT (see crates/game-kit/src/script.rs).
     variable="$(echo "$game" | tr 'a-z-' 'A-Z_')_SCRIPT"
     module="$(echo "$game" | tr '-' '_')"
     cargo build -p "$game" --quiet
     # A 30 second limit stops a stuck game. Output is filtered to the lines that matter; set
     # LOG_FILTER to a different grep pattern to see more.
-    env "$variable=$commands" CARGO_MANIFEST_DIR="$PWD/games/$game" \
+    env "$variable=$commands" ${map_env[@]+"${map_env[@]}"} CARGO_MANIFEST_DIR="$PWD/games/$game" \
       RUST_LOG="${RUST_LOG:-info,$module=debug,game_kit=debug,wgpu=error,naga=warn}" \
       perl -e 'alarm 30; exec @ARGV' "./target/debug/$game" 2>&1 \
       | sed 's/\x1b\[[0-9;]*m//g' \

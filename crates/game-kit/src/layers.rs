@@ -13,6 +13,7 @@
 //! | Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 //! | HUD | UI `GlobalZIndex` | `HUD_Z_INDEX` |
 //! | UI (dialogs) | UI `GlobalZIndex` | `UI_Z_INDEX` |
+//! | Map fade | UI `GlobalZIndex` | `FADE_Z_INDEX` |
 //!
 //! Features (rocks, trees) and characters (the player, NPCs) are one layer, the world, sorted together by their
 //! feet. Separate layers would stop a character walking behind a tree. The HUD and UI are drawn by `bevy_ui`
@@ -37,6 +38,8 @@ pub const FEATURE_DEBUG_FEET_Z: f32 = 202.0;
 pub const HUD_Z_INDEX: i32 = 0;
 /// Z index of dialogs and menus, above the HUD.
 pub const UI_Z_INDEX: i32 = 100;
+/// Z index of the full-screen fade of a map transition (`map_transition.rs`), above the UI.
+pub const FADE_Z_INDEX: i32 = 1000;
 
 // Checked when the game is compiled.
 const _: () = {
@@ -50,5 +53,5 @@ const _: () = {
     );
     // `OrthographicProjection::default_2d` shows z from -1000 to 1000.
     assert!(BACKGROUND_Z > -1000.0 && MOVEMENT_DEBUG_Z < 1000.0);
-    assert!(HUD_Z_INDEX < UI_Z_INDEX);
+    assert!(HUD_Z_INDEX < UI_Z_INDEX && UI_Z_INDEX < FADE_Z_INDEX);
 };

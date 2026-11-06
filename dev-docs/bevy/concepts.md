@@ -264,6 +264,12 @@ A system with `Single<...>` runs only while exactly one entity matches. Otherwis
 
 Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages. Define one with `#[derive(Message)]`, register it with `app.add_message::<T>()`, send with `MessageWriter<T>::write` and read with `MessageReader<T>::read`. The kit sends `ProjectileHit` when a projectile is removed (`crates/game-kit/src/projectile.rs`), and the game can read it for effects or damage. The Aseprite plugin also sends `AnimationEvents::Finished`. Use messages for game events such as "enemy died" and for passing actions between plugins.
 
+## One-shot systems
+
+A normal system runs every frame in a schedule. A one-shot system is registered once and run on demand, with an input value, at a moment the code chooses. Register with `world.register_system(my_system)`, which returns a `SystemId`, and run with `world.run_system_with(id, input)` (or `run_system(id)` for a system without input). The system takes its input as its first parameter, `In<T>`, and may use any other system parameter (`Commands`, `Res`, `Query`). Commands it queues are applied when it returns, so the next one-shot system sees the entities it spawned.
+
+The map transition uses three of them. The kit decides when a map loads and unloads, and the game gives it systems that spawn the map objects, rebuild the collision world and place the player (`MapHooks` in `crates/game-kit/src/map_transition.rs`). The kit has no game types, and the three run in a fixed order within one frame. A `SystemId` is `Copy`, so a resource that holds them can be copied out of the world before the kit runs them with `&mut World`.
+
 ## States
 
 **Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture defaults in `CLAUDE.md` plan to use it for app flow (loading, menu, playing) and a sub-state for the play mode.

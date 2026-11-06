@@ -45,6 +45,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 | `hold:<keys>:<seconds>` | Holds keys (`up`, `down`, `left`, `right`, `x`, `f1` to `f3`), for example `hold:up+left:2`. `hold:x:0.1` is one key press |
 | `wait:<seconds>` | Waits |
 | `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `<PREFIX>_SCREENSHOT_DIR`) |
+| `goto:<map>:<entry>` | Starts a scene transition to an entry of a registered map and waits until it is done. The player is put in the middle of the entry (`map_transition.rs`) |
 | `quit` | Exits |
 
 10. The plugin logs the feet position every 0.25 seconds. When the controlled entity is gone (the player died) it logs `none` and the script goes on. It runs in `PreUpdate` after Bevy's input systems and writes keys with `press` and `release`.

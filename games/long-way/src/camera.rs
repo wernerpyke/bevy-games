@@ -16,8 +16,3 @@ pub const CELL_SIZE: f32 = 64.0;
 /// do not move when the window is resized. A map smaller than the view is centred by the camera, so the value only
 /// has to stay the same between runs.
 pub const MAP_ORIGIN: Vec2 = Vec2::new(-16.0 * CELL_SIZE, -9.0 * CELL_SIZE);
-
-/// The map area in world units. Cell (0, 0) has its bottom left corner at `MAP_ORIGIN`.
-pub fn map_rect(size: IVec2) -> Rect {
-    Rect::from_corners(MAP_ORIGIN, MAP_ORIGIN + size.as_vec2() * CELL_SIZE)
-}
