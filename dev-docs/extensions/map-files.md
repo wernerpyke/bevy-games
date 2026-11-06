@@ -118,7 +118,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 
 ### Exits and entries
 
-Two optional blocks in the front matter describe how maps join. The game reads them when it moves the player between maps (`dev-docs/PLAN-map-transitions.md`, not built yet). The parser reads and checks them now.
+Two optional blocks in the front matter describe how maps join. The game reads them when it moves the player between maps (`dev-docs/extensions/map-transitions.md`). The parser reads and checks them now.
 
 ```
 exits:
@@ -147,7 +147,7 @@ entries:
 ## Limits
 
 - One grid, one object per cell. There are no layers and no ground tiles in the file.
-- One map file is one map. How a game moves between maps is in `dev-docs/PLAN-map-transitions.md`.
+- One map file is one map. How a game moves between maps is in `dev-docs/extensions/map-transitions.md`.
 - Maps with triggers, paths or nested data may outgrow this format (roadmap items 4 and 5).
 - A visual editor is a roadmap item. It must keep this format as the source of truth.
 

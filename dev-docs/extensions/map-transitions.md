@@ -1,6 +1,6 @@
 # Map transitions
 
-How a game moves the player from one map to another. The format of the exits and entries is in [map-files.md](map-files.md). The plan, including the part that is not built yet, is `dev-docs/PLAN-map-transitions.md`.
+How a game moves the player from one map to another. The format of the exits and entries is in [map-files.md](map-files.md). Research on other engines: `dev-docs/RESEARCH-map-transitions.md`.
 
 ## Status
 
@@ -117,5 +117,21 @@ Long Way: `games/long-way/src/map.rs` (hooks, registration), `rocks.rs` (`rebuil
 - Return exits are not built: the walk back works only while the first map is still loaded.
 - Enemies and projectiles across a seam are not handled. `CameraBounds` is an eased box here, so a system that reads it as the playable area (enemy movement, nav) should not be used with seamless maps yet.
 - Cross-seam rocks and trees do form one cluster, since collision is in world units. Long Way's map 1 and 2 have no object near the seam, so this was not seen on screen.
-- A map is rebuilt from its file on every load. What the player changed in a map is not kept (see the plan, "Returning to a previous map").
+- A map is rebuilt from its file on every load. What the player changed in a map is not kept (see "Returning to a previous map" below).
 - The first map is loaded in `PostStartup`. The player is spawned at the start map's `player_start` in `Startup`.
+
+## Open questions
+
+### Returning to a previous map
+
+Nothing is decided. A map is rebuilt from its file on every load, so it comes back as authored.
+
+- What state should a map keep when the player leaves and comes back (a destroyed rock, an opened door, a killed enemy)? Options: always reset (simple, fits a platformer stage); keep a per-map state record in a resource keyed by map id and apply it when the map loads; or keep state only for objects marked as persistent.
+- Where does the player appear on return? At the named entry of the exit used. There are no return exits yet. When they are added, each exit needs a matching entry in the other map.
+- In seamless mode a map that is unloaded and loaded again must give the same result at the seam.
+- Enemies that follow the player across a seam, and projectiles in flight across a transition, are not handled.
+
+### Other
+
+- Research and the comparison with other engines: `dev-docs/RESEARCH-map-transitions.md`. The question of a Bevy asset loader for the maps is there too (roadmap item 3).
+- Seamless layout: a map can be reached by one seamless link only if the maps fit together without overlapping. A map that would overlap an active map is refused.

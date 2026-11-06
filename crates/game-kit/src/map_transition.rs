@@ -1,6 +1,6 @@
 //! Moving between maps. A game registers its maps, the kit runs the lifecycle: the player walks into an exit zone, the
 //! screen fades out, the old map is removed, the new one is loaded, the player is placed in the entry and the screen
-//! fades in. See `dev-docs/PLAN-map-transitions.md` and `dev-docs/adr/EXTENSIONS.md` adr-x31.
+//! fades in. See `dev-docs/extensions/map-transitions.md` and `dev-docs/adr/EXTENSIONS.md` adr-x31.
 //!
 //! The kit has no game types. The game gives it three one-shot systems (`MapHooks`):
 //! - `load` spawns the objects of one map and tags every one with `MapId`, so the kit can remove them.

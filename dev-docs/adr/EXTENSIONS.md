@@ -249,7 +249,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 **Rationale.** Exits are rectangles on a map edge, usually several cells wide. A block in the front matter says so in one line and keeps legend characters free for objects that block. A strip cannot be a diagonal or a block, so a wrong exit is not possible to write. The grid marks stay a reading aid because blank and `.` are already the same empty cell (rule 12 of the format). Every exit and entry has the same length so the position along the strip carries over to the other map, for scene transitions as well as seamless ones. Checking the links when the maps are registered turns a typo in a map file into an error with the file and line. `player_start` already existed in R-Town, so the games share one name for a start.
 
-**How to apply.** Write the blocks as in `dev-docs/extensions/map-files.md`. A map without the blocks parses as before, so R-Town is unchanged. A game that registers several maps calls `validate_links`. Moving between maps (the registry, the lifecycle, the camera) is in `dev-docs/PLAN-map-transitions.md` and not built yet.
+**How to apply.** Write the blocks as in `dev-docs/extensions/map-files.md`. A map without the blocks parses as before, so R-Town is unchanged. A game that registers several maps calls `validate_links`. Moving between maps (the registry, the lifecycle, the camera) is in `dev-docs/extensions/map-transitions.md` (`adr-x31`, `adr-x32`).
 
 ## adr-x31. A map transition is run by the kit through three game hooks (2026-11-06)
 
@@ -257,7 +257,7 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 **Rationale.** The order of load, rebuild and arrive matters, and all of it must happen while the screen is covered. Hooks run in one fixed order inside one frame, so no frame shows a half loaded map. Messages between separate systems would need system sets and sync points for the same result. The kit stays free of game types, because the game does the spawning and the facing. The game has no app states yet, and a sub state needs a parent state, so a resource carries the three phases. Keeping the position along the strip makes a wide door feel like one door. The transpose is easy to follow when editing maps: the start cell of an exit always maps to the start cell of its entry.
 
-**How to apply.** Add `MapTransitionPlugin { sources, kinds, start, origin, fade }`, insert `MapHooks` and tag every spawned map entity with `MapId`. Stop the player with `MapTransition::locks_input`. `reload_current_map` (F1) reads the current file again and runs `load` and `rebuild`. The first map is loaded in `PostStartup` after the collision blockers are registered, so `rebuild` must clear the world first. Seamless transitions use the same lifecycle later (`dev-docs/PLAN-map-transitions.md`) and fall back to the fade until then. See `dev-docs/extensions/map-transitions.md`.
+**How to apply.** Add `MapTransitionPlugin { sources, kinds, start, origin, fade }`, insert `MapHooks` and tag every spawned map entity with `MapId`. Stop the player with `MapTransition::locks_input`. `reload_current_map` (F1) reads the current file again and runs `load` and `rebuild`. The first map is loaded in `PostStartup` after the collision blockers are registered, so `rebuild` must clear the world first. Seamless transitions use the same lifecycle (`adr-x32`). See `dev-docs/extensions/map-transitions.md`.
 
 ## adr-x32. A seamless exit joins the next map into the world, the player crosses a doorway (2026-11-06)
 

@@ -202,11 +202,19 @@ fn animate_player(mut query: Query<(&mut AseAnimation, &mut Player)>) {
 /// arrival position and the player looks the way the entry says.
 pub fn arrive_player(
     In(arrival): In<Arrival>,
+    active: Res<ActiveMaps>,
     mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
 ) {
+    // An entry at the edge of a map can put the feet where the body would be cut off by the edge of the view (the top
+    // of the map) or outside the walkable area. Move them to the nearest place the player can stand, as `move_player` does.
+    let walkable = active.walkable(
+        Vec2::new(PLAYER_HALF_WIDTH, 0.0),
+        Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
+    );
+    let feet = clamp_to_union(&walkable, arrival.feet, arrival.feet);
     for (mut transform, mut player, mut assist) in &mut query {
-        transform.translation.x = arrival.feet.x;
-        transform.translation.y = arrival.feet.y + PLAYER_FEET_OFFSET;
+        transform.translation.x = feet.x;
+        transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
         assist.reset();
         player.walking = false;
         let (facing, faces_right) = match arrival.facing {

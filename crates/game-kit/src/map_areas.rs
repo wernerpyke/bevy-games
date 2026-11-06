@@ -1,5 +1,5 @@
 //! Exits and entries of a map: the `exits:` and `entries:` front matter blocks. See
-//! `dev-docs/PLAN-map-transitions.md` for the design.
+//! `dev-docs/extensions/map-transitions.md` for the design.
 //!
 //! ```text
 //! exits:

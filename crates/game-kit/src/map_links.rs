@@ -1,6 +1,6 @@
 //! Checks that the exits of a set of maps lead somewhere. A file can only check itself (`map_areas`). This module
 //! checks the files against each other, once, when a game registers its maps. See
-//! `dev-docs/PLAN-map-transitions.md`.
+//! `dev-docs/extensions/map-transitions.md`.
 //!
 //! Rules, for every exit:
 //! - `to` is the id of a registered map, and `entry` names an entry of that map.
