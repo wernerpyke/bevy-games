@@ -9,8 +9,9 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw8 | Maps are text grids, rocks come first |
 | adr-lw12 | Long Way draw order layers |
 | adr-lw13 | Rock blocked area and sort line |
-| adr-lw14 | A lone item blocks a band, a group blocks its footprint |
+| adr-lw14 | A lone item blocks a band, a group blocks its footprint (trees: see adr-lw18) |
 | adr-lw17 | The view is a square of 8 by 8 cells, no game tests for collision |
+| adr-lw18 | A tree in a cluster blocks one map cell, the trunk cell |
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
@@ -103,3 +104,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The developer is experimenting with map sizes. A test that fixes the size and object cells of the bundled map fails on every edit. The collision rules are general and the kit tests them (`adr-x4`).
 
 **How to apply.** Edit the map file and its `size:` freely. Resizing the window shows more of the world along its longer side, because the view height is fixed. The map file is still checked at start, and a mistake stops the game with the file and line.
+
+## adr-lw18. A tree in a cluster blocks one map cell, the trunk cell (2026-11-06)
+
+**Decision.** This amends `adr-lw14`. A tree that stands alone still blocks its trunk band (the bottom 10% of the tree height). A tree in a group blocks exactly one cell: the bottom right cell of its 2x2 footprint, which holds the trunk (art x 76 to 104 of 128). The box is one cell wide and high, with no widening by the player. Rocks keep the rule of `adr-lw14`. Groups still count trees and rocks together.
+
+**Rationale.** With the footprint rule a clustered tree blocked a whole 2x2 area, so the player could not reach the base of a neighbouring tree. A box the size of one cell lines up with the grid, so placing a map is easy, and boxes of neighbours touch, so the player cannot slip between them and get lost inside a cluster. The player walks up to the base of a tree between trunks, as with a lone tree.
+
+**How to apply.** `tree_blocker` in `trees.rs` picks the shape. The kit takes any rectangle, so `game-kit` needs no change. A tree canvas of another size changes which cell holds the trunk.

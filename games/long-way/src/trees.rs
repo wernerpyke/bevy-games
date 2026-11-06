@@ -6,7 +6,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::collision::Trunk;
 use crate::map::{CurrentMap, Group, Kind, MapEntity, blocking_groups};
-use crate::rocks::{SORT_BIAS, footprint_corner, group_area};
+use crate::rocks::{SORT_BIAS, footprint_corner};
 use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
@@ -58,11 +58,16 @@ pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
     }
 }
 
-/// A tree that stands alone blocks its trunk. A tree in a group blocks like a rock in a group, so trees and rocks
-/// that touch merge into one shape (`adr-lw14`).
-fn tree_blocker(trunk: &Trunk, object: &MapObject, map: &Map, group: Group) -> Blocker {
+/// A tree that stands alone blocks the bottom band of its trunk. A tree in a group blocks exactly one map cell: the
+/// bottom right cell of its footprint, which holds the trunk (`adr-lw18`).
+fn tree_blocker(trunk: &Trunk, corner: Vec2, cell: f32, group: Group) -> Blocker {
     if group.is_group() {
-        Blocker(group_area(object, map, group.neighbour_above))
+        Blocker(Rect::new(
+            corner.x + cell,
+            corner.y,
+            corner.x + 2.0 * cell,
+            corner.y + cell,
+        ))
     } else {
         trunk.blocker()
     }
@@ -76,10 +81,11 @@ fn spawn_tree(
     map: &Map,
     group: Group,
 ) {
-    let (centre, trunk) = placement(footprint_corner(object, map));
+    let corner = footprint_corner(object, map);
+    let (centre, trunk) = placement(corner);
     commands.spawn((
         MapEntity,
-        tree_blocker(&trunk, object, map, group),
+        tree_blocker(&trunk, corner, map.cell_size, group),
         DepthSort {
             feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,
         },

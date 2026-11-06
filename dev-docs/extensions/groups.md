@@ -22,7 +22,7 @@ Blocking items that touch form a group. A game gives an item that stands alone a
 | Item size in cells | 1 x 1 | 2 x 2 |
 | Adjacency | `EdgesAndCorners` | `EdgesAndCorners` |
 | Area when alone | base band, 4 px deep | tree: trunk band, rock: bottom 10% of the footprint |
-| Area in a group | the whole cell | the rock footprint rule (`games/long-way/docs/collision.md`) |
+| Area in a group | the whole cell | rock: the footprint rule, tree: the trunk cell (`games/long-way/docs/collision.md`, `adr-lw18`) |
 
 ## Specification
 

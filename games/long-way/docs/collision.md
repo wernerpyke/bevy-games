@@ -45,7 +45,8 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 Objects whose 2x2 footprints overlap or touch (anchors at most 2 cells apart, also at a corner) form a group, whatever the kinds.
 
 - A tree alone: the trunk band above. A rock alone: the bottom 10% of the footprint height (12.8 at a cell size of 64), with the rock sides (inset 10%, grown by 20).
-- In a group, a tree or rock blocks the rock footprint area above. A member with a member above it (`Group::neighbour_above`) has no top inset, so the shapes merge.
+- In a group, a rock blocks the rock footprint area above. A member with a member above it (`Group::neighbour_above`) has no top inset, so the shapes merge.
+- In a group, a tree blocks exactly one map cell: the bottom right cell of its footprint, which holds the trunk. The box is 64 by 64 with no widening, so it lines up with the F3 grid and boxes of neighbours touch with no gap (`adr-lw18`). The player can enter the cells between them.
 - Footprints 3 cells apart do not touch, so they stay separate.
 
 ## Slide values

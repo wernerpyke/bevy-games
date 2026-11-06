@@ -29,7 +29,7 @@ Characters that are next to each other overlap by one cell. This is on purpose: 
 
 ## Trees
 
-A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster. Four trees two cells apart in both directions touch and form a grove (see `1.txt`, cells (1,1) to (3,3)).
+A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). A tree that touches another tree or a rock is in a cluster and then blocks one cell, the bottom right cell of its footprint (the trunk cell) (`adr-lw18`). Four trees two cells apart in both directions touch and form a grove (see `1.txt`, cells (1,1) to (3,3)).
 
 ## Rocks and collision
 
