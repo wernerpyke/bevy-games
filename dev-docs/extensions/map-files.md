@@ -102,7 +102,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 
 ### Errors
 
-14. Any format error stops loading and names the file and line, for example `assets/maps/rocks-test.txt:15: character x is not in the legend`.
+14. Any format error stops loading and names the file and line, for example `assets/maps/1.txt:15: character x is not in the legend`.
 15. Errors are:
     - front matter: a missing key, a bad `size`, an `origin` that is not `bottom-left` or `top-left`, a legend kind the game does not know, or a reserved legend key, or a bad or repeated legend parameter
     - a row with no `|`, or no closing `|`

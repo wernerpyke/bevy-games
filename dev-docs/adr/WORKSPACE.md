@@ -48,3 +48,11 @@
 
 **How to apply.** When starting a second game, list the code it could reuse from Long Way and propose what to extract. Applied for R-Town: the shared crate is `crates/game-kit` (`adr-x12`). A game keeps its own values, kinds, art and rules, and the kit holds only what both games use.
 
+
+## adr-w7. Shared rules are tested in `game-kit`, games test only their own mechanics (2026-11-06)
+
+**Decision.** Code in `crates/game-kit/` is tested in `game-kit`. A game has unit tests only for mechanics that are not in the kit. A game has no tests for collision, map parsing, depth sort or other kit behaviour. A game does not test its bundled map file (its size, object count or cells), so the map can change freely.
+
+**Rationale.** A rule tested in two places needs two updates. Tests of the map file break on every edit while the developer experiments with layouts. Kit code is the shared contract, so it carries the tests.
+
+**How to apply.** When a game rule moves into the kit, move its tests with it (ask first, as for any move to the kit). Game tests stay inline in a `#[cfg(test)] mod tests` at the bottom of the file they test. Applied to Long Way on 2026-11-06 (`adr-lw17`).

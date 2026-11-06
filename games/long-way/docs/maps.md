@@ -2,11 +2,11 @@
 
 How to write a map file for Long Way. The file format itself is the [map files extension](../../../dev-docs/extensions/map-files.md). This page covers what Long Way adds: the kinds, sizes, files and checks.
 
-- Files are in `games/long-way/assets/maps/`. The current example is `rocks-test.txt`, a 32 by 18 cell map.
+- Files are in `games/long-way/assets/maps/`. The current map is `1.txt`, a 10 by 10 cell map.
 - The game loads one map. Its name is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
 - The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F3 grid. Press F3 to show the grid with cell numbers.
 - Cell size is 64 pixels (`cell: 64`).
-- Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells (`adr-lw8`). A map of 32 by 18 cells is two views wide and two high, so the camera scrolls (`adr-lw16`).
+- Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576). The view is 8 by 8 cells (`adr-lw17`). A map larger than 8 cells scrolls (`adr-lw16`), and a smaller one is centred. The size is read from the file, so you can change it freely. The player starts at the bottom middle of the map.
 - Use a fixed-width font and turn off word wrap. Each cell takes two characters, so a row of 32 cells is 63 characters between the bars.
 
 ## Kinds you can use in a legend
@@ -29,7 +29,7 @@ Characters that are next to each other overlap by one cell. This is on purpose: 
 
 ## Trees
 
-A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster. Four trees two cells apart in both directions touch and form a grove (see `rocks-test.txt`, cells (12,2) to (14,4)).
+A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). Trunks that touch rocks join the rock cluster. Four trees two cells apart in both directions touch and form a grove (see `1.txt`, cells (1,1) to (3,3)).
 
 ## Rocks and collision
 

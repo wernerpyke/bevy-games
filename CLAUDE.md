@@ -76,7 +76,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Bundles such as `SpriteBundle` are removed. Use required components.
 5. Bevy reference order: (a) `bevy-src/` (git-ignored shallow clone of tag `v0.20.1`; update it when the version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on dependency source; (c) docs.rs for the pinned version. Search for the exact API. Do not read whole files.
 6. Read `dev-docs/bevy/notes.md` (verified patterns) before searching again, and record new verified patterns there. Keep it short. When the project uses a new Bevy concept for the first time, add its section to `dev-docs/bevy/concepts.md` (plain language, project code as the example). Put our own reusable, non-standard designs (such as `allow_sliding`) in `dev-docs/extensions/`, and link their ADR.
-7. Run `./dev-scripts/rust.sh lint` before reporting work as done, and `test` when tests exist.
+7. Run `./dev-scripts/rust.sh lint` before reporting work as done, and `test` for each crate you changed that has tests (`game-kit` has them; a game may have none).
 8. Run `./dev-scripts/rust.sh web` after adding dependencies, not only the native build.
 9. When behaviour does not work in the real game, reproduce it with `./dev-scripts/rust.sh script` first, write a failing test for the cause, fix it, then rerun the script. Do not report a fix as working from unit tests alone. Say which parts you did not see on screen.
 10. Match the style of surrounding code. Keep comments sparse.
@@ -87,6 +87,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for play mode.
 - Use events or messages between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
+- Tests (`adr-w7`): code in `game-kit` is tested in `game-kit`. A game adds unit tests only for mechanics that are not in the kit, inline in the file they test. Do not test kit behaviour (collision, map parser, depth sort) or the bundled map file in a game, so maps can change freely. When a game rule moves to the kit, move its tests too.
 - Draw order comes from `crates/game-kit/src/layers.rs` and a game's own overrides (adr-x9, adr-x14). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
 

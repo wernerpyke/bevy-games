@@ -10,7 +10,17 @@ use bevy_aseprite_ultra::AsepriteUltraPlugin;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugins(
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resolution: (camera::WINDOW_SIZE, camera::WINDOW_SIZE).into(),
+                        ..default()
+                    }),
+                    ..default()
+                }),
+        )
         .add_plugins(AsepriteUltraPlugin)
         .add_plugins((
             game_kit::camera::PixelCameraPlugin {

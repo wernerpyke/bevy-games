@@ -50,7 +50,14 @@ fn hunter_layers() -> Vec<String> {
     layers
 }
 
-pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
+/// Spawns the player at the bottom middle of the map. The camera stops at the map edge, so this is also the bottom
+/// middle of the screen.
+pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
+    let area = map_rect(map.0.size);
+    let start = Vec2::new(
+        (area.min.x + area.max.x) / 2.0,
+        area.min.y + PLAYER_FEET_OFFSET,
+    );
     commands.spawn((
         MapEntity,
         game_kit::Controlled,
@@ -73,7 +80,7 @@ pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>) {
             feet_offset: PLAYER_FEET_OFFSET,
         },
         SlideAssist::default(),
-        Transform::default(),
+        Transform::from_translation(start.extend(0.0)),
     ));
 }
 

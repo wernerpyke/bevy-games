@@ -12,8 +12,8 @@ use game_kit::reload::ReloadMap;
 
 /// The map file Long Way loads, relative to the game folder. A native run reads it from disk, so F1 reloads it. The
 /// web build has no disk and uses the bundled copy.
-const MAP_NAME: &str = "assets/maps/rocks-test.txt";
-const MAP_SOURCE: &str = include_str!("../assets/maps/rocks-test.txt");
+const MAP_NAME: &str = "assets/maps/1.txt";
+const MAP_SOURCE: &str = include_str!("../assets/maps/1.txt");
 
 fn load_map() -> Result<Map, String> {
     let Some(dir) = std::env::var_os("CARGO_MANIFEST_DIR") else {
@@ -98,12 +98,6 @@ pub struct Group {
 }
 
 impl Group {
-    #[cfg(test)]
-    pub const ALONE: Group = Group {
-        size: 1,
-        neighbour_above: false,
-    };
-
     pub fn is_group(self) -> bool {
         self.size > 1
     }
@@ -161,51 +155,5 @@ impl Kind {
     pub fn of(object: &MapObject) -> Kind {
         Kind::from_name(&object.kind)
             .unwrap_or_else(|| panic!("map object of unknown kind `{}`", object.kind))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn cells(map: &Map, kind: Kind) -> Vec<(i32, i32)> {
-        let mut found: Vec<_> = map
-            .objects
-            .iter()
-            .filter(|o| Kind::of(o) == kind)
-            .map(|o| (o.cell.x, o.cell.y))
-            .collect();
-        found.sort();
-        found
-    }
-
-    #[test]
-    fn the_bundled_map_parses() {
-        let map = parse(MAP_NAME, MAP_SOURCE, KIND_NAMES).unwrap_or_else(|e| panic!("{e}"));
-        assert_eq!(map.name, "rocks-test");
-        assert_eq!(map.cell_size, 64.0);
-        assert_eq!(map.size, IVec2::new(32, 18));
-        assert_eq!(map.draw_size, None);
-        assert_eq!(map.jitter, 0.0);
-        // 10 rocks in the first feature, three copies of the 8 rock patch, two single rocks, two trees and a grove of four red trees.
-        assert_eq!(map.objects.len(), 42);
-        assert_eq!(cells(&map, Kind::GreenTree), vec![(12, 8)]);
-        assert_eq!(
-            cells(&map, Kind::RedTree),
-            vec![(12, 2), (12, 4), (14, 2), (14, 4), (18, 8)]
-        );
-    }
-
-    #[test]
-    fn every_kind_name_has_a_kind() {
-        for name in KIND_NAMES {
-            assert!(Kind::from_name(name).is_some(), "{name}");
-        }
-    }
-
-    #[test]
-    fn rocks_are_rocks_and_trees_are_not() {
-        assert!(Kind::Rock0.is_rock() && Kind::Rock1.is_rock());
-        assert!(!Kind::GreenTree.is_rock() && !Kind::RedTree.is_rock());
     }
 }
