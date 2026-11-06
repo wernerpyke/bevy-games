@@ -12,6 +12,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw14 | A lone item blocks a band, a group blocks its footprint (trees: see adr-lw18) |
 | adr-lw17 | The view is a square of 8 by 8 cells, no game tests for collision |
 | adr-lw18 | A tree in a cluster blocks one map cell, the trunk cell |
+| adr-lw19 | The player starts at the `player_start` marker |
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
@@ -99,7 +100,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw17. The view is a square of 8 by 8 cells, and the game has no collision tests (2026-11-06)
 
-**Decision.** The window is square (`WINDOW_SIZE`, 720) and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells. This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map. Long Way has no unit tests for collision, placement or the bundled map. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics).
+**Decision.** The window is square (`WINDOW_SIZE`, 720) and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells. This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map (changed by `adr-lw19`). Long Way has no unit tests for collision, placement or the bundled map. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics).
 
 **Rationale.** The developer is experimenting with map sizes. A test that fixes the size and object cells of the bundled map fails on every edit. The collision rules are general and the kit tests them (`adr-x4`).
 
@@ -112,3 +113,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** With the footprint rule a clustered tree blocked a whole 2x2 area, so the player could not reach the base of a neighbouring tree. A box the size of one cell lines up with the grid, so placing a map is easy, and boxes of neighbours touch, so the player cannot slip between them and get lost inside a cluster. The player walks up to the base of a tree between trunks, as with a lone tree.
 
 **How to apply.** `tree_blocker` in `trees.rs` picks the shape. The kit takes any rectangle, so `game-kit` needs no change. A tree canvas of another size changes which cell holds the trunk.
+
+## adr-lw19. The player starts at the `player_start` marker (2026-11-06)
+
+**Decision.** This replaces the start at the bottom middle of `adr-lw17`. The player's feet start at the centre of the cell of the `player_start` marker (`"@": player_start`) in the map file. A map without the marker is reported and the player starts at the bottom middle. The marker has no art and blocks nothing, and `blocking_groups` does not count it. `1.txt` has it at cell (4,0).
+
+**Rationale.** Several maps need their own starts, and a later map with a marker can be started directly for a scripted run (`adr-x30`). R-Town already works this way.
+
+**How to apply.** Put one `@` in each map that the game can start in. Do not put it inside an exit area. Reading it is `player_start_feet` in `games/long-way/src/map.rs`.

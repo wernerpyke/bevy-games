@@ -9,6 +9,8 @@ pub mod groups;
 pub mod hitbox;
 pub mod layers;
 pub mod map;
+pub mod map_areas;
+pub mod map_links;
 pub mod movement;
 pub mod movement_debug;
 pub mod nav;

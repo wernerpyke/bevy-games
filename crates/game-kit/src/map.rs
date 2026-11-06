@@ -14,6 +14,9 @@
 //!   `"S": spawn_skeleton every=10 radius=120` (`Params`). The game reads them by name. `.` is always empty. Quote the character
 //!   (for example `"#"`), because an unquoted `#` starts a comment.
 //!
+//! - `exits` and `entries`: indented `name: key=value ...` lines for the zones that lead to other maps (`map_areas`).
+//!   Both are optional.
+//!
 //! Grid: rows of the form `<label>|<cells>|`. Cell k is the character at offset 2k between the bars, and a
 //! blank or `.` is empty. Ruler lines, blank lines and `#` comment lines are ignored.
 //!
@@ -23,6 +26,9 @@ use std::collections::HashMap;
 use std::fmt;
 
 use bevy::math::IVec2;
+
+use crate::map_areas::{self, MapEntry, MapExit, RawLink};
+pub use crate::map_areas::{Area, Edge, Facing, PLAYER_START, Transition};
 
 /// One painted character: an object whose bottom left corner is at `cell`.
 #[derive(Clone, Debug, PartialEq)]
@@ -109,6 +115,10 @@ pub struct Map {
     pub draw_size: Option<f32>,
     pub jitter: f32,
     pub objects: Vec<MapObject>,
+    /// Zones that lead to other maps, from the `exits:` block. Empty when the file has none.
+    pub exits: Vec<MapExit>,
+    /// Places where the player can arrive, from the `entries:` block. Empty when the file has none.
+    pub entries: Vec<MapEntry>,
 }
 
 /// A problem in a map file, with the 1-based line it was found on.
@@ -137,6 +147,17 @@ struct Header {
     draw_size: Option<f32>,
     jitter: Option<f32>,
     legend: HashMap<char, (String, Params)>,
+    exits: Vec<RawLink>,
+    entries: Vec<RawLink>,
+}
+
+/// The nested block that the indented lines belong to.
+#[derive(Clone, Copy, PartialEq)]
+enum Block {
+    None,
+    Legend,
+    Exits,
+    Entries,
 }
 
 /// Reads the frontmatter. Returns the index of the closing `---` line, the header, the map name and the cell size.
@@ -189,6 +210,9 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
 
     let origin = header.origin.unwrap_or(Origin::BottomLeft);
     let objects = parse_grid(&lines, close + 1, size, origin, &header.legend, &fail)?;
+    let exits = map_areas::build_exits(&header.exits, origin, size, &fail)?;
+    let entries = map_areas::build_entries(&header.entries, origin, size, &fail)?;
+    map_areas::check_areas(&exits, &entries, &objects, &fail)?;
 
     Ok(Map {
         name,
@@ -198,6 +222,8 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
         draw_size: header.draw_size,
         jitter: header.jitter.unwrap_or(0.0),
         objects,
+        exits,
+        entries,
     })
 }
 
@@ -301,7 +327,7 @@ fn parse_grid(
     Ok(objects)
 }
 
-type Fail<'a> = dyn Fn(usize, String) -> MapError + 'a;
+pub(crate) type Fail<'a> = dyn Fn(usize, String) -> MapError + 'a;
 
 /// Removes a comment: `#` at the start of the line or after a space.
 fn strip_comment(line: &str) -> &str {
@@ -334,7 +360,7 @@ fn parse_header(
     fail: &Fail,
 ) -> Result<Header, MapError> {
     let mut header = Header::default();
-    let mut in_legend = false;
+    let mut block = Block::None;
     for (offset, raw) in lines.iter().enumerate() {
         let line = first_line + offset;
         let text = strip_comment(raw);
@@ -349,8 +375,28 @@ fn parse_header(
         };
         let indented = text.starts_with(' ') || text.starts_with('\t');
         if indented {
-            if !in_legend {
-                return Err(fail(line, "indented line outside `legend`".into()));
+            if block == Block::None {
+                return Err(fail(
+                    line,
+                    "indented line outside `legend`, `exits` and `entries`".into(),
+                ));
+            }
+            if block != Block::Legend {
+                if key.is_empty() {
+                    return Err(fail(line, "the name of an exit or entry is empty".into()));
+                }
+                let params = params_from(value.split_whitespace(), line, fail)?;
+                let link = RawLink {
+                    name: key,
+                    line,
+                    params,
+                };
+                if block == Block::Exits {
+                    header.exits.push(link);
+                } else {
+                    header.entries.push(link);
+                }
+                continue;
             }
             let mut chars = key.chars();
             let (Some(character), None) = (chars.next(), chars.next()) else {
@@ -384,7 +430,7 @@ fn parse_header(
             header.legend.insert(character, (kind.to_string(), params));
             continue;
         }
-        in_legend = false;
+        block = Block::None;
         match key.as_str() {
             "map" => header.name = Some(value.to_string()),
             "cell" => header.cell_size = Some(positive(value, "cell", line, fail)?),
@@ -431,14 +477,15 @@ fn parse_header(
                     })?;
                 header.jitter = Some(jitter);
             }
-            "legend" => {
+            "legend" | "exits" | "entries" => {
                 if !value.is_empty() {
-                    return Err(fail(
-                        line,
-                        "`legend:` takes indented `char: kind` lines".into(),
-                    ));
+                    return Err(fail(line, format!("`{key}:` takes indented lines")));
                 }
-                in_legend = true;
+                block = match key.as_str() {
+                    "legend" => Block::Legend,
+                    "exits" => Block::Exits,
+                    _ => Block::Entries,
+                };
             }
             other => return Err(fail(line, format!("unknown key `{other}`"))),
         }
@@ -454,6 +501,16 @@ fn legend_value<'a>(
 ) -> Result<(&'a str, Params), MapError> {
     let mut words = value.split_whitespace();
     let kind = words.next().unwrap_or("");
+    let params = params_from(words, line, fail)?;
+    Ok((kind, params))
+}
+
+/// Reads `key=value` words into `Params`.
+fn params_from<'a>(
+    words: impl Iterator<Item = &'a str>,
+    line: usize,
+    fail: &Fail,
+) -> Result<Params, MapError> {
     let mut pairs: Vec<(String, String)> = Vec::new();
     for word in words {
         let Some((key, text)) = word.split_once('=') else {
@@ -476,7 +533,7 @@ fn legend_value<'a>(
         }
         pairs.push((key.to_string(), text.to_string()));
     }
-    Ok((kind, Params { pairs, line }))
+    Ok(Params { pairs, line })
 }
 
 fn positive(value: &str, key: &str, line: usize, fail: &Fail) -> Result<f32, MapError> {

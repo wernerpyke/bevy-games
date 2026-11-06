@@ -15,10 +15,12 @@ A text file that a human edits to draw a whole map. One character is one cell. T
 | Part | Code | Shared? |
 |---|---|---|
 | Parser: `parse(file, source, kinds)`, `Map`, `MapObject`, `MapError` | `crates/game-kit/src/map.rs` | Shared. Object kinds are names (adr-x13). |
+| Exits and entries: `Area`, `MapExit`, `MapEntry`, the in-file checks | `crates/game-kit/src/map_areas.rs` | Shared |
+| Links between maps: `validate_links` | `crates/game-kit/src/map_links.rs` | Shared. Not used by a game yet. |
 | Loading and `Kind` | `games/<game>/src/map.rs` | Per game |
 | Spawning | per game | Per game |
 
-Decisions: `adr-x18`, `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
+Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
 
 ## Specification
 
@@ -76,6 +78,8 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 | `legend` | yes | Maps each character in the grid to an object kind |
 | `draw` | no | Drawn size of an object in pixels. The game gives the default |
 | `jitter` | no | Largest random shift of each object in pixels. Default 0 |
+| `exits` | no | Zones that lead to other maps. See "Exits and entries" |
+| `entries` | no | Places where the player arrives from another map. See "Exits and entries" |
 
 3. A legend character is one character, in quotes. `.` always means empty and is written `".": empty`. The keys `.`, `|` and a space are reserved and cannot name an object kind.
 4. The game defines the set of kinds. It passes the names it knows to `parse`, which reports any other name with its line. Objects carry the name as a `String`, and the game converts it to its own enum (adr-x13).
@@ -104,12 +108,33 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 
 14. Any format error stops loading and names the file and line, for example `assets/maps/1.txt:15: character x is not in the legend`.
 15. Errors are:
+    - exits and entries: see rules 16 to 22, each error names the line of the item
     - front matter: a missing key, a bad `size`, an `origin` that is not `bottom-left` or `top-left`, a legend kind the game does not know, or a reserved legend key, or a bad or repeated legend parameter
     - a row with no `|`, or no closing `|`
     - a wrong row label
     - a row of the wrong width, or a non-space character at an odd offset
     - a character that is not in the legend
     - a row count that does not match the height
+
+### Exits and entries
+
+Two optional blocks in the front matter describe how maps join. The game reads them when it moves the player between maps (`dev-docs/PLAN-map-transitions.md`, not built yet). The parser reads and checks them now.
+
+```
+exits:
+  to_2: area=3..6,9 to=2 entry=from_1 transition=scene
+entries:
+  from_1: area=3..6,0 facing=up
+```
+
+16. One line is `name: key=value ...`, indented under `exits:` or `entries:`. Names are unique inside one block. An entry and an exit may share a name.
+17. `area` is a straight strip of cells: `x0..x1,y`, `x,y0..y1` or one cell `x,y`. A range on both axes is an error, so an area is never a block or a diagonal. A range goes from low to high. Cells are numbered like the row labels of the file, so a `top-left` file counts rows from the top. The area must be inside the map.
+18. An **exit** needs `area`, `to` (the id of the target map, set by the game), `entry` (the name of an entry in that map) and `transition` (`seamless` or `scene`). Its area lies along a map edge: a horizontal strip on the top or bottom row, a vertical strip in the left or right column. A single cell in a corner is an error, because it touches two edges.
+19. An **entry** needs `area` and may have `facing` (`up`, `down`, `left` or `right`).
+20. Mark the cells of an area with a blank (`' '`) in the grid, not `.`. This is a reading aid. The parser treats both the same (rule 12) and does not check it.
+21. No object may stand in an area. The one exception is a `player_start` marker in an entry area. Two exits may not overlap, and an entry may not overlap an exit (the player would be sent back at once).
+22. Between maps (`validate_links`, when a game registers its maps): the exit leads to a registered map and an entry of that map, and the two have the same length, so the position along the strip carries over. A seamless exit needs its entry on the opposite edge (a top exit joins a bottom entry) and may not lead to its own map.
+23. **Start marker.** `"@": player_start` is an ordinary marker (rule 5). A game reads its cell as the start of the player. A map that is only entered from another map needs none. Add one to a later map to be able to start in it directly, for example for a scripted run.
 
 ## Usage
 
@@ -122,7 +147,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 ## Limits
 
 - One grid, one object per cell. There are no layers and no ground tiles in the file.
-- One map per game build.
+- One map file is one map. How a game moves between maps is in `dev-docs/PLAN-map-transitions.md`.
 - Maps with triggers, paths or nested data may outgrow this format (roadmap items 4 and 5).
 - A visual editor is a roadmap item. It must keep this format as the source of truth.
 
@@ -136,4 +161,5 @@ Inline in `game-kit` `map.rs`. Each game tests that its own map file parses (cou
 - Origin: `top-left` and `bottom-left` files with the same drawing give the same objects, and an unknown origin is an error.
 - Legend: a character that is not in the legend names its line, reserved keys (`|`, `.`, space) are errors, and a marker such as `player_start` comes back as an ordinary object.
 - Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw`, `jitter` and `cell` values, an unknown kind, comments and optional keys.
+- Exits and entries: `map_areas.rs` tests the area notation, the edge rules, objects in areas, overlaps and a `top-left` file. `map_links.rs` tests the checks between maps.
 - Other: comments, blank lines and Windows line endings, and objects come back in a fixed order (top row first, then left to right).

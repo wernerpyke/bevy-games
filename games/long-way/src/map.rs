@@ -1,13 +1,13 @@
 //! Long Way's map: loads the map file and names the object kinds. The parser is `game_kit::map`. See
 //! `games/long-way/docs/maps.md` for the kinds.
 
-use crate::camera::map_rect;
+use crate::camera::{MAP_ORIGIN, map_rect};
 use crate::rocks::FOOTPRINT_CELLS;
 use bevy::prelude::*;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionWorld, register_blockers};
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
-use game_kit::map::{Map, MapObject, parse};
+use game_kit::map::{Map, MapObject, PLAYER_START, parse};
 use game_kit::reload::ReloadMap;
 
 /// The map file Long Way loads, relative to the game folder. A native run reads it from disk, so F1 reloads it. The
@@ -26,7 +26,7 @@ fn load_map() -> Result<Map, String> {
 }
 
 /// The legend names the parser accepts.
-const KIND_NAMES: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree"];
+const KIND_NAMES: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree", PLAYER_START];
 
 pub struct MapPlugin;
 
@@ -103,28 +103,55 @@ impl Group {
     }
 }
 
-/// The group of each object of the map, in the order of `map.objects`. Every kind of Long Way blocks, so every object
-/// counts. Footprints are 2x2 cells, so objects 2 cells apart touch and objects 3 cells apart do not. A new blocking
-/// kind must be counted here too.
+/// The group of each object of the map, in the order of `map.objects`. Rocks and trees block, so they count. Markers
+/// (the player start) block nothing and are not counted: they get a group of 1 that nobody reads. Footprints are 2x2
+/// cells, so objects 2 cells apart touch and objects 3 cells apart do not. A new blocking kind must be counted here
+/// too.
 pub fn blocking_groups(map: &Map) -> Vec<Group> {
-    let anchors: Vec<IVec2> = map.objects.iter().map(|o| o.cell).collect();
+    let blocking: Vec<usize> = (0..map.objects.len())
+        .filter(|&i| !Kind::of(&map.objects[i]).is_marker())
+        .collect();
+    let anchors: Vec<IVec2> = blocking.iter().map(|&i| map.objects[i].cell).collect();
     let footprint = IVec2::splat(FOOTPRINT_CELLS as i32);
     let sizes = group_sizes(&neighbour_groups(
         &anchors,
         footprint,
         Adjacency::EdgesAndCorners,
     ));
-    anchors
-        .iter()
-        .zip(sizes)
-        .map(|(cell, size)| Group {
+    let mut groups = vec![
+        Group {
+            size: 1,
+            neighbour_above: false
+        };
+        map.objects.len()
+    ];
+    for ((&index, cell), size) in blocking.iter().zip(&anchors).zip(sizes) {
+        groups[index] = Group {
             size,
             neighbour_above: anchors.iter().any(|other| {
                 let d = *other - *cell;
                 (1..=footprint.y).contains(&d.y) && d.x.abs() <= footprint.x
             }),
-        })
-        .collect()
+        };
+    }
+    groups
+}
+
+/// World position of the player's feet at the `player_start` marker: the centre of its cell. `None` when the map has no
+/// marker. A second marker is reported and ignored.
+pub fn player_start_feet(map: &Map) -> Option<Vec2> {
+    let mut starts = map
+        .objects
+        .iter()
+        .filter(|o| Kind::of(o) == Kind::PlayerStart);
+    let start = starts.next()?;
+    if starts.next().is_some() {
+        warn!(
+            "map {}: more than one player_start, using the first",
+            map.name
+        );
+    }
+    Some(MAP_ORIGIN + (start.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size)
 }
 
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
@@ -134,11 +161,18 @@ pub enum Kind {
     Rock1,
     GreenTree,
     RedTree,
+    /// Where the player starts. It has no art and blocks nothing.
+    PlayerStart,
 }
 
 impl Kind {
     pub fn is_rock(self) -> bool {
         matches!(self, Kind::Rock0 | Kind::Rock1)
+    }
+
+    /// A marker is read by the game and never drawn or blocked.
+    pub fn is_marker(self) -> bool {
+        matches!(self, Kind::PlayerStart)
     }
 
     fn from_name(name: &str) -> Option<Kind> {
@@ -147,6 +181,7 @@ impl Kind {
             "rock_1" => Some(Kind::Rock1),
             "green_tree" => Some(Kind::GreenTree),
             "red_tree" => Some(Kind::RedTree),
+            PLAYER_START => Some(Kind::PlayerStart),
             _ => None,
         }
     }

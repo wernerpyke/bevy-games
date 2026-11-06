@@ -3,8 +3,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::map_rect;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
-use crate::map::CurrentMap;
-use crate::map::MapEntity;
+use crate::map::{CurrentMap, MapEntity, player_start_feet};
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 
@@ -50,14 +49,18 @@ fn hunter_layers() -> Vec<String> {
     layers
 }
 
-/// Spawns the player at the bottom middle of the map. The camera stops at the map edge, so this is also the bottom
-/// middle of the screen.
+/// Spawns the player with the feet at the centre of the `player_start` cell of the map. A map without the marker
+/// is reported and the player starts at the bottom middle.
 pub fn spawn_player(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {
-    let area = map_rect(map.0.size);
-    let start = Vec2::new(
-        (area.min.x + area.max.x) / 2.0,
-        area.min.y + PLAYER_FEET_OFFSET,
-    );
+    let feet = player_start_feet(&map.0).unwrap_or_else(|| {
+        error!(
+            "map {}: no player_start marker, starting at the bottom middle",
+            map.0.name
+        );
+        let area = map_rect(map.0.size);
+        Vec2::new((area.min.x + area.max.x) / 2.0, area.min.y)
+    });
+    let start = feet + Vec2::new(0.0, PLAYER_FEET_OFFSET);
     commands.spawn((
         MapEntity,
         game_kit::Controlled,
