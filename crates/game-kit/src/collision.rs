@@ -884,8 +884,35 @@ mod tests {
             Rect::new(10.0, 10.0, 20.0, 20.0),
         ]);
         let end = resolve(Vec2::new(10.0, -5.0), Vec2::new(10.0, 30.0), &edges).feet;
-        // Walking up the line between the first rectangle and the corner of the second stops at that corner.
-        assert_eq!(end, Vec2::new(10.0, 10.0));
+        // Walking up the line between the first rectangle and the corner of the second stops just short of the corner.
+        assert_eq!(end, Vec2::new(10.0, 10.0 - outline::FILLER_HALF.y));
+    }
+
+    #[test]
+    fn feet_stopped_at_a_corner_contact_can_back_away_but_not_cross() {
+        let edges = edges_of(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(10.0, 10.0, 20.0, 20.0),
+        ]);
+        let stop = Vec2::new(10.0, 10.0 - outline::FILLER_HALF.y);
+        // It can go back down and out to the right, the side it came from.
+        assert_eq!(resolve(stop, Vec2::new(10.0, -5.0), &edges).feet.y, -5.0);
+        assert_eq!(resolve(stop, Vec2::new(25.0, stop.y), &edges).feet.x, 25.0);
+        // It cannot go up or left, into the other quadrant.
+        assert_eq!(resolve(stop, Vec2::new(10.0, 30.0), &edges).feet, stop);
+        assert_eq!(resolve(stop, Vec2::new(-5.0, stop.y), &edges).feet, stop);
+    }
+
+    #[test]
+    fn a_diagonal_move_through_a_corner_contact_stops_on_the_side_it_came_from() {
+        let edges = edges_of(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(10.0, 10.0, 20.0, 20.0),
+        ]);
+        let from_below = resolve(Vec2::new(14.0, 6.0), Vec2::new(6.0, 14.0), &edges).feet;
+        assert_eq!(from_below, Vec2::new(10.0, 10.0 - outline::FILLER_HALF.y));
+        let from_above = resolve(Vec2::new(6.0, 14.0), Vec2::new(14.0, 6.0), &edges).feet;
+        assert_eq!(from_above, Vec2::new(10.0, 10.0 + outline::FILLER_HALF.y));
     }
 
     #[test]

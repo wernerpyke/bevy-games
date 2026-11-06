@@ -537,4 +537,18 @@ mod tests {
             &edges
         ));
     }
+
+    #[test]
+    fn a_path_does_not_squeeze_through_a_corner_contact() {
+        let blocks = [
+            Rect::new(61.0, 61.0, 101.0, 101.0),
+            Rect::new(101.0, 101.0, 141.0, 141.0),
+        ];
+        let nav = grid(&blocks);
+        let (from, to) = (Vec2::new(121.0, 81.0), Vec2::new(81.0, 121.0));
+        assert!(segment_blocked(from, to, &edges_of(&blocks)));
+        let path = nav.find_path(from, to).expect("a path around");
+        assert!(legal(&path, from, &edges_of(&blocks)));
+        assert!(path.len() > 2, "the path goes around: {path:?}");
+    }
 }

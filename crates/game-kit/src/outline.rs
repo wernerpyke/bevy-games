@@ -5,7 +5,7 @@
 //! are a point. Rectangles that touch or overlap form one cluster. The edges of a cluster are the boundary of
 //! the union of its rectangles. Edges between two rectangles of the same cluster do not exist.
 
-use bevy::math::Rect;
+use bevy::math::{Rect, Vec2};
 
 /// Coordinates closer than this are treated as equal, so rounding noise cannot open a hairline gap between
 /// two rectangles that are meant to touch.
@@ -35,8 +35,8 @@ pub struct Edge {
     /// True when the blocked side is the side with larger x (vertical) or larger y (horizontal).
     pub blocked_positive: bool,
     /// True when the outline turns inward at this end (the blocked region fills three of the four cells around
-    /// the corner, or two cells that touch only at the corner). The end point itself then counts as part of the
-    /// edge, see `covers`.
+    /// the corner). The end point itself then counts as part of the edge, see `covers`. Rectangles that touch only at
+    /// a corner get a filler first (`corner_fillers`), so there is no such end at a corner contact.
     pub from_concave: bool,
     pub to_concave: bool,
 }
@@ -78,6 +78,9 @@ pub struct Cluster {
 /// Groups `rects` into clusters and finds the outline of each. Clusters are ordered by their lowest member
 /// index. Rectangles with no area are ignored.
 pub fn build(rects: &[Rect]) -> Vec<Cluster> {
+    let real = rects.len();
+    let with_fillers: Vec<Rect> = rects.iter().copied().chain(corner_fillers(rects)).collect();
+    let rects = &with_fillers[..];
     let valid: Vec<usize> = (0..rects.len())
         .filter(|&i| {
             let r = rects[i];
@@ -127,6 +130,9 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
             clusters.len() - 1
         });
         cluster_of_rect[k] = cluster;
+        if valid[k] >= real {
+            continue;
+        }
         let rect = rects[valid[k]];
         let c = &mut clusters[cluster];
         c.members.push(valid[k]);
@@ -165,13 +171,12 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
                     })
             })
         });
-        if !touches_empty {
+        if !touches_empty && valid[k] < real {
             clusters[cluster_of_rect[k]].interior.push(valid[k]);
         }
     }
 
-    // An inward corner has exactly three filled cells around its vertex (k, l). Two filled cells that only touch
-    // at the vertex (a checkerboard) count too: there is no gap to walk through, so both edges include the vertex.
+    // An inward corner has exactly three filled cells around its vertex (k, l). Corner contacts are closed by fillers.
     let concave = |k: usize, l: usize| -> bool {
         let filled = |i: Option<usize>, j: Option<usize>| match (i, j) {
             (Some(i), Some(j)) if i < cols && j < rows => owner[j * cols + i].is_some(),
@@ -183,7 +188,7 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
             filled(k.checked_sub(1), Some(l)),
             filled(Some(k), Some(l)),
         ];
-        [bl, br, tl, tr].iter().filter(|f| **f).count() == 3 || (bl == tr && br == tl && bl != br)
+        [bl, br, tl, tr].iter().filter(|f| **f).count() == 3
     };
     let cell = |i: Option<usize>, j: Option<usize>| -> Option<usize> {
         match (i, j) {
@@ -251,6 +256,60 @@ pub fn build(rects: &[Rect]) -> Vec<Cluster> {
         });
     }
     clusters
+}
+
+/// Half the size of the filler that closes a corner contact, in world units. Far above `TOLERANCE` and `EPSILON`,
+/// below a pixel. It is taller than wide on purpose: a 45 degree line through the vertex (a nav diagonal) then enters
+/// each small square through the middle of an edge, where an edge test sees it, and not exactly through its corners,
+/// where it would pass.
+pub const FILLER_HALF: Vec2 = Vec2::new(0.25, 0.5);
+
+/// A small rectangle at every vertex where two rectangles touch only at a corner and the other two quadrants around it
+/// are empty. Without it the vertex is a zero width gap: feet that stop on it are on all four edges at once and cannot
+/// move, and feet that leave it on the other side would have squeezed through the gap. The square makes the two
+/// rectangles one solid shape, so the feet stop just short of the vertex and can only back away.
+fn corner_fillers(rects: &[Rect]) -> Vec<Rect> {
+    let near = |a: f32, b: f32| (a - b).abs() <= EPSILON;
+    let covered = |p: Vec2| {
+        rects
+            .iter()
+            .any(|r| p.x > r.min.x && p.x < r.max.x && p.y > r.min.y && p.y < r.max.y)
+    };
+    let mut points: Vec<Vec2> = Vec::new();
+    for (i, a) in rects.iter().enumerate() {
+        for b in &rects[i + 1..] {
+            let vertex = if near(a.max.x, b.min.x) && near(a.max.y, b.min.y) {
+                Some(a.max)
+            } else if near(a.min.x, b.max.x) && near(a.min.y, b.max.y) {
+                Some(a.min)
+            } else if near(a.max.x, b.min.x) && near(a.min.y, b.max.y) {
+                Some(Vec2::new(a.max.x, a.min.y))
+            } else if near(a.min.x, b.max.x) && near(a.max.y, b.min.y) {
+                Some(Vec2::new(a.min.x, a.max.y))
+            } else {
+                None
+            };
+            let Some(p) = vertex else { continue };
+            let d = 2.0 * EPSILON;
+            let others_empty = [
+                Vec2::new(-d, d),
+                Vec2::new(d, -d),
+                Vec2::new(-d, -d),
+                Vec2::new(d, d),
+            ]
+            .iter()
+            .filter(|o| !covered(p + **o))
+            .count()
+                == 2;
+            if others_empty && !points.iter().any(|q| near(q.x, p.x) && near(q.y, p.y)) {
+                points.push(p);
+            }
+        }
+    }
+    points
+        .into_iter()
+        .map(|p| Rect::from_center_half_size(p, FILLER_HALF))
+        .collect()
 }
 
 /// A rectangle as index ranges into the compressed coordinate lists.
@@ -521,26 +580,51 @@ mod tests {
     }
 
     #[test]
-    fn the_vertex_where_two_rectangles_touch_at_a_corner_counts_as_an_inward_corner() {
+    fn a_corner_contact_is_closed_by_a_small_filler_square() {
         let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 10.0, 20.0, 20.0)]);
-        let at_vertex = |e: &&Edge| match e.orientation {
-            Orientation::Horizontal => e.from == 10.0 || e.to == 10.0,
-            Orientation::Vertical => e.from == 10.0 || e.to == 10.0,
-        };
-        let ends: Vec<bool> = clusters[0]
+        assert_eq!(clusters.len(), 1);
+        let at = |v: f32| (v - 10.0).abs() < 1e-6;
+        let edge_end_at_vertex = clusters[0]
             .edges
             .iter()
-            .filter(|e| (e.at == 10.0) && at_vertex(e))
-            .flat_map(|e| {
-                [
-                    (e.from == 10.0).then_some(e.from_concave),
-                    (e.to == 10.0).then_some(e.to_concave),
-                ]
-            })
-            .flatten()
-            .collect();
-        assert_eq!(ends.len(), 4, "four edge ends meet at (10, 10)");
-        assert!(ends.iter().all(|concave| *concave));
+            .any(|e| at(e.at) && (at(e.from) || at(e.to)));
+        assert!(!edge_end_at_vertex, "no edge ends at the vertex (10, 10)");
+        assert_eq!(
+            clusters[0].members,
+            vec![0, 1],
+            "the filler is not a member"
+        );
+        assert_eq!(clusters[0].bounds, rect(0.0, 0.0, 20.0, 20.0));
+    }
+
+    #[test]
+    fn no_filler_is_added_where_a_third_rectangle_fills_a_quadrant_or_the_rectangles_are_apart() {
+        let shortest = |rects: &[Rect]| {
+            build(rects)
+                .iter()
+                .flat_map(|c| c.edges.iter().map(|e| e.to - e.from))
+                .fold(f32::MAX, f32::min)
+        };
+        let l_shape = [
+            rect(0.0, 0.0, 10.0, 10.0),
+            rect(10.0, 10.0, 20.0, 20.0),
+            rect(0.0, 10.0, 10.0, 20.0),
+        ];
+        assert!(shortest(&l_shape) >= 10.0);
+        let apart = [rect(0.0, 0.0, 10.0, 10.0), rect(10.5, 10.5, 20.0, 20.0)];
+        assert!(shortest(&apart) >= 9.0);
+    }
+
+    #[test]
+    fn a_checkerboard_of_four_rectangles_has_a_filler_at_each_inner_vertex() {
+        let clusters = build(&[
+            rect(0.0, 0.0, 10.0, 10.0),
+            rect(10.0, 10.0, 20.0, 20.0),
+            rect(20.0, 0.0, 30.0, 10.0),
+            rect(30.0, 10.0, 40.0, 20.0),
+        ]);
+        assert_eq!(clusters.len(), 1);
+        assert_eq!(clusters[0].members, vec![0, 1, 2, 3]);
     }
 
     #[test]

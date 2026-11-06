@@ -533,4 +533,25 @@ mod tests {
         );
         assert_eq!(result, Step::HitBlocked(Vec2::new(198.0, 52.0)));
     }
+
+    #[test]
+    fn a_shot_through_a_corner_contact_is_a_hit() {
+        let edges: Vec<Edge> = outline::build(&[
+            Rect::new(0.0, 0.0, 10.0, 10.0),
+            Rect::new(10.0, 10.0, 20.0, 20.0),
+        ])
+        .iter()
+        .flat_map(|c| c.edges.iter().copied())
+        .collect();
+        let bounds = Rect::new(-50.0, -50.0, 50.0, 50.0);
+        // This line passes exactly through the vertex (10, 10).
+        let shot = step(
+            Vec2::new(14.0, 6.0),
+            Vec2::new(-8.0, 8.0),
+            1.0,
+            &edges,
+            bounds,
+        );
+        assert!(matches!(shot, Step::HitBlocked(_)), "{shot:?}");
+    }
 }

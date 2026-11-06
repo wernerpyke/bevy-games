@@ -57,7 +57,7 @@ Values are for a cell size of 64. `SlideTuning::for_cell_size` scales speed, ran
 2. Each cluster has edges. An edge knows its side (`blocked_positive`) and whether each end is concave.
 3. A cluster member is interior when no cell it covers has an empty 4-neighbour. The flag is information only. Interior members stay in the input of `build`, because one can fill a hole. Collision uses edges only, so interior members cost nothing per frame.
 4. A convex end is excluded from the face (`covers`), so feet on a corner line can walk along the outside. A concave end is included, because past it the feet would be inside the shape.
-5. A vertex where two rectangles touch only at a corner counts as concave for all four edge ends there, so there is no zero width gap to walk through.
+5. A vertex where two rectangles touch only at a corner (and the other two quadrants are empty) gets a small filler rectangle, 0.5 wide and 1.0 high, centred on it (`outline::FILLER_HALF`, `adr-x29`). The two rectangles become one shape, so there is no zero width gap to walk through, and feet stop just short of the vertex and can only back away. Fillers are not members of the cluster and do not change its bounds.
 6. Positions within `TOLERANCE` of an end count as at the end.
 
 ### B. Moving
