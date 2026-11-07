@@ -25,3 +25,8 @@ Kinds are the names a map legend uses (`maps.md`). Each is defined in code (`map
 | `marker_red` | `features/Markers.aseprite` | `marker_red` |
 | `green_tree` | `features/Green tree.aseprite` | none, all frames loop |
 | `red_tree` | `features/Red tree.aseprite` | none, all frames loop |
+| `green_tree_medium` | `features/green_tree_medium.aseprite` | none, one frame |
+| `red_tree_medium` | `features/red_tree_medium.aseprite` | none, one frame |
+| `red_tree_small` | `features/red_tree_small.aseprite` | none, one frame |
+| `green_shrub` | `features/green_shrub.aseprite` | none, one frame |
+| `green_shrub_small` | `features/green_shrub_small.aseprite` | none, one frame |

@@ -32,9 +32,20 @@ Considerations. The editor reads and writes the same files as the game, and a ro
 
 Known issues. The file has no footprint data, so the editor needs the sizes from the game (`Kind` and its art) to draw footprints. Layers and objects bigger than one cell were left out of the format on purpose, and an editor may bring them back (item 4). Seeded generated maps (item 4) would need a way to save a generated result and then edit it as a normal map.
 
-### 7. Re-assess the group footprint rule
+### 7. Groups: tune by playing, then mixed footprint sizes
 
-An item that stands alone blocks a thin band and a member of a group blocks its whole footprint (`adr-x20`, `adr-rt9`, `adr-lw14`). Check by playing whether this feels right and whether the area per member should change. Considerations: a thinner footprint for tall trees so the player can walk closer behind a grove; a footprint per kind; corner contact linking items (8 neighbours) so that a single diagonal neighbour turns a passable tree into a solid one; a deliberate gap size; and the Long Way top inset that is dropped when a member sits above (`Group::neighbour_above`). Known issue: a lone rock in Long Way now has a 12.8 px band, which the developer has not yet tried in play.
+Goal: a planting of trees, shrubs and rocks of different sizes becomes one solid shape where the player sees one, stays passable where the player sees a gap, and the developer can tell why. Today every kind has a rectangular footprint (`Kind::footprint`), and objects are grouped when their footprints overlap or touch, also at a corner (`adr-lw14`, `adr-lw23`). A member of a group blocks its anchor cell (a tree: its trunk cell, `adr-lw18`) and a lone object blocks a thin band (`adr-x20`, `adr-rt9`). This is simple, and it has two weak points that showed up when the Zen Garden trees and shrubs were added: the canopy counts as much as the trunk, and the rule is invisible.
+
+Steps, in the order we suggest:
+
+1. Show groups in the debug tools: draw each footprint, colour it by group and print the group size, and let the scripted run print the groups of a map. This costs little, and it makes every later step easier to judge.
+2. Check by playing whether the current rules feel right and whether the area per member should change. Questions: a thinner footprint for tall trees so the player can walk closer behind a grove; a deliberate gap size; and the Long Way top inset that is dropped when a member sits above (`Group::neighbour_above`). Known issue: a lone rock in Long Way has a 12.8 px band, which the developer has not yet tried in play.
+3. Give each kind a solid shape apart from its footprint: the cells that hold the trunk or base (the medium green tree has its trunk in its left cell, `green_tree` in its right cell). Group on the solid cells and keep the footprint for placement and sorting. Then a canopy corner touching a shrub no longer makes a wall. Preferably the art file says it, as a named Aseprite slice such as `solid` next to the footprint, so the art stays the source of truth as for animation speed (`adr-a6`). Check that `bevy_aseprite_ultra` reads slices before choosing. Otherwise keep a table per kind in code (today: `Kind::footprint` and the `art` table in `scenery.rs`).
+4. Decide by gap width, not by cell adjacency: the player is 28 px wide, so two blocked boxes closer than that already merge in the outline. A rule that closes only gaps the player cannot fit through would make a grove feel the same as it looks. A solid hedge or wall would still need its own kind or a legend parameter, so a developer can ask for a solid line on purpose and not by a lucky layout.
+5. Corner contact: keep it for solid cells, because two cells that touch only at a corner leave no gap the player can use. Drop it for canopy cells. Today a single diagonal neighbour turns a passable tree into a solid one.
+6. The visual map editor (item 6) should show footprints, solid cells and groups, so a developer sees the effect of a placement while drawing.
+
+Known issues: a shrub placed diagonally next to the empty canopy cell of a medium green tree (`1.txt`, col 6 row 1) becomes a full-cell block, as the rule says (`adr-lw23`). The kit groups items of one size only, so the game expands footprints into cells before calling it. A per-item footprint in `game_kit::groups` would be cleaner, and R-Town would have to follow.
 
 ### 8. Keyboard and mouse input in the game-kit
 

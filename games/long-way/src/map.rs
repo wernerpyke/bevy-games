@@ -41,6 +41,11 @@ const KIND_NAMES: &[&str] = &[
     "lantern_red",
     "marker",
     "marker_red",
+    "green_tree_medium",
+    "red_tree_medium",
+    "red_tree_small",
+    "green_shrub",
+    "green_shrub_small",
     PLAYER_START,
 ];
 
@@ -110,6 +115,7 @@ fn load_hook(
     crate::rocks::spawn_rocks(&mut commands, &server, map, &load);
     crate::trees::spawn_trees(&mut commands, &server, map, &load);
     crate::markers::spawn_markers(&mut commands, &server, map, &load);
+    crate::scenery::spawn_scenery(&mut commands, &server, map, &load);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): reads the current map file again and loads it again. A file with an
@@ -136,10 +142,11 @@ impl Group {
     }
 }
 
-/// The group of each object of the map, in the order of `map.objects`. Rocks and trees block, so they count. Markers
-/// (the player start), lanterns and markers are not counted: they get a group of 1 that nobody reads. Footprints are 2x2
-/// cells, so objects 2 cells apart touch and objects 3 cells apart do not. A new blocking kind must be counted here
-/// too.
+/// The group of each object of the map, in the order of `map.objects`. Rocks, trees and the Zen Garden scenery block, so they
+/// count. The player start, lanterns and markers are not counted: they get a group of 1 that nobody reads. Each kind has its
+/// own footprint (`Kind::footprint`). Every object is expanded into the cells of its footprint and the kit groups the cells
+/// (size 1), so two objects are linked when their footprints overlap or touch, whatever their sizes. Two 2x2 objects 2 cells
+/// apart touch and 3 cells apart do not. A new blocking kind must be counted here too.
 pub fn blocking_groups(map: &Map) -> Vec<Group> {
     let blocking: Vec<usize> = (0..map.objects.len())
         .filter(|&i| {
@@ -147,13 +154,24 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
             !kind.is_marker() && !kind.is_small()
         })
         .collect();
-    let anchors: Vec<IVec2> = blocking.iter().map(|&i| map.objects[i].cell).collect();
-    let footprint = IVec2::splat(FOOTPRINT_CELLS as i32);
-    let sizes = group_sizes(&neighbour_groups(
-        &anchors,
-        footprint,
-        Adjacency::EdgesAndCorners,
-    ));
+    let boxes: Vec<(IVec2, IVec2)> = blocking
+        .iter()
+        .map(|&i| (map.objects[i].cell, Kind::of(&map.objects[i]).footprint()))
+        .collect();
+    let mut cells = Vec::new();
+    let mut first_cell = Vec::with_capacity(boxes.len());
+    for &(anchor, size) in &boxes {
+        first_cell.push(cells.len());
+        for dy in 0..size.y {
+            for dx in 0..size.x {
+                cells.push(anchor + IVec2::new(dx, dy));
+            }
+        }
+    }
+    // The cells of one object touch, so they share a group id. That id is the group of the object.
+    let cell_groups = neighbour_groups(&cells, IVec2::ONE, Adjacency::EdgesAndCorners);
+    let item_groups: Vec<usize> = first_cell.iter().map(|&c| cell_groups[c]).collect();
+    let sizes = group_sizes(&item_groups);
     let mut groups = vec![
         Group {
             size: 1,
@@ -161,16 +179,22 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
         };
         map.objects.len()
     ];
-    for ((&index, cell), size) in blocking.iter().zip(&anchors).zip(sizes) {
+    for ((&index, &(anchor, size)), group_size) in blocking.iter().zip(&boxes).zip(sizes) {
         groups[index] = Group {
-            size,
-            neighbour_above: anchors.iter().any(|other| {
-                let d = *other - *cell;
-                (1..=footprint.y).contains(&d.y) && d.x.abs() <= footprint.x
-            }),
+            size: group_size,
+            neighbour_above: boxes
+                .iter()
+                .any(|&(other, other_size)| touches_top(anchor, size, other, other_size)),
         };
     }
     groups
+}
+
+/// Whether the footprint of `other` overlaps or touches the top row of the footprint at `anchor` (corners count): its lowest
+/// row is the top row of the footprint or the row above it, and its columns reach the footprint or touch it.
+fn touches_top(anchor: IVec2, size: IVec2, other: IVec2, other_size: IVec2) -> bool {
+    let d = other - anchor;
+    (size.y - 1..=size.y).contains(&d.y) && d.x <= size.x && d.x + other_size.x >= 0
 }
 
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
@@ -184,6 +208,12 @@ pub enum Kind {
     LanternRed,
     Marker,
     MarkerRed,
+    /// Zen Garden trees and shrubs (`scenery.rs`). They block like a tree trunk and join the groups (`adr-lw23`).
+    GreenTreeMedium,
+    RedTreeMedium,
+    RedTreeSmall,
+    GreenShrub,
+    GreenShrubSmall,
     /// Where the player starts. It has no art and blocks nothing.
     PlayerStart,
 }
@@ -201,6 +231,15 @@ impl Kind {
         )
     }
 
+    /// The cells a kind covers, in x and y, from its anchor cell up and to the right. Grouping uses it (`blocking_groups`).
+    pub fn footprint(self) -> IVec2 {
+        match self {
+            Kind::RedTreeMedium => IVec2::new(1, 2),
+            Kind::RedTreeSmall | Kind::GreenShrub | Kind::GreenShrubSmall => IVec2::ONE,
+            _ => IVec2::splat(FOOTPRINT_CELLS as i32),
+        }
+    }
+
     /// A marker is read by the game and never drawn or blocked.
     pub fn is_marker(self) -> bool {
         matches!(self, Kind::PlayerStart)
@@ -216,6 +255,11 @@ impl Kind {
             "lantern_red" => Some(Kind::LanternRed),
             "marker" => Some(Kind::Marker),
             "marker_red" => Some(Kind::MarkerRed),
+            "green_tree_medium" => Some(Kind::GreenTreeMedium),
+            "red_tree_medium" => Some(Kind::RedTreeMedium),
+            "red_tree_small" => Some(Kind::RedTreeSmall),
+            "green_shrub" => Some(Kind::GreenShrub),
+            "green_shrub_small" => Some(Kind::GreenShrubSmall),
             PLAYER_START => Some(Kind::PlayerStart),
             _ => None,
         }
@@ -225,5 +269,92 @@ impl Kind {
     pub fn of(object: &MapObject) -> Kind {
         Kind::from_name(&object.kind)
             .unwrap_or_else(|| panic!("map object of unknown kind `{}`", object.kind))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A map of 8 by 6 cells with `objects` as (legend character, x, y), cell (0, 0) at the bottom left.
+    fn map_with(objects: &[(char, i32, i32)]) -> Map {
+        let mut text = String::from(
+            "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: 8x6\nlegend:\n  \".\": empty\n  \"R\": rock_0\n  \"G\": green_tree\n  \"s\": green_shrub\n  \"t\": red_tree_medium\n---\n",
+        );
+        for y in (0..6).rev() {
+            let row: Vec<String> = (0..8)
+                .map(|x| {
+                    objects
+                        .iter()
+                        .find(|o| o.1 == x && o.2 == y)
+                        .map_or('.', |o| o.0)
+                        .to_string()
+                })
+                .collect();
+            text.push_str(&format!(" {y} |{}|\n", row.join(" ")));
+        }
+        parse("test.txt", &text, KIND_NAMES).unwrap()
+    }
+
+    fn size_at(map: &Map, groups: &[Group], x: i32, y: i32) -> usize {
+        let i = map
+            .objects
+            .iter()
+            .position(|o| o.cell == IVec2::new(x, y))
+            .unwrap();
+        groups[i].size
+    }
+
+    use game_kit::map::parse;
+
+    #[test]
+    fn big_objects_group_when_two_cells_apart_and_not_when_three() {
+        let map = map_with(&[('G', 0, 0), ('R', 2, 0), ('G', 5, 0)]);
+        let groups = blocking_groups(&map);
+        assert_eq!(size_at(&map, &groups, 0, 0), 2);
+        assert_eq!(size_at(&map, &groups, 2, 0), 2);
+        assert_eq!(size_at(&map, &groups, 5, 0), 1);
+    }
+
+    #[test]
+    fn one_cell_shrubs_group_only_when_they_touch() {
+        let apart = map_with(&[('s', 0, 0), ('s', 2, 0)]);
+        let groups = blocking_groups(&apart);
+        assert_eq!(size_at(&apart, &groups, 0, 0), 1);
+        let touching = map_with(&[('s', 0, 0), ('s', 1, 1)]);
+        let groups = blocking_groups(&touching);
+        assert_eq!(size_at(&touching, &groups, 0, 0), 2);
+    }
+
+    #[test]
+    fn kinds_of_different_sizes_form_one_group() {
+        // The tree covers cells x 0..2, y 0..2. The shrub at (2, 2) touches its top right corner. The tall red tree
+        // covers x 3, y 1..3 and touches the shrub.
+        let map = map_with(&[('G', 0, 0), ('s', 2, 2), ('t', 3, 3), ('s', 6, 0)]);
+        let groups = blocking_groups(&map);
+        assert_eq!(size_at(&map, &groups, 0, 0), 3);
+        assert_eq!(size_at(&map, &groups, 3, 3), 3);
+        assert_eq!(size_at(&map, &groups, 6, 0), 1);
+    }
+
+    #[test]
+    fn the_top_of_a_footprint_is_touched_from_above_and_from_the_side_corners() {
+        let two = IVec2::splat(2);
+        let at = |x, y| touches_top(IVec2::ZERO, two, IVec2::new(x, y), two);
+        assert!(at(0, 1) && at(1, 2) && at(-2, 2) && at(2, 2));
+        assert!(!at(0, 3) && !at(3, 2) && !at(-3, 2) && !at(0, 0));
+        // A 1 by 2 footprint covers rows 0 and 1, so the row above it is 2.
+        assert!(touches_top(
+            IVec2::ZERO,
+            IVec2::new(1, 2),
+            IVec2::new(0, 2),
+            IVec2::ONE
+        ));
+        assert!(!touches_top(
+            IVec2::ZERO,
+            IVec2::new(1, 2),
+            IVec2::new(0, 3),
+            IVec2::ONE
+        ));
     }
 }

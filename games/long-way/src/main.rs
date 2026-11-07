@@ -4,6 +4,7 @@ mod map;
 mod markers;
 mod player;
 mod rocks;
+mod scenery;
 mod trees;
 
 use bevy::prelude::*;

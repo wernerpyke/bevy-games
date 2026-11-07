@@ -19,7 +19,7 @@ Blocking items that touch form a group. A game gives an item that stands alone a
 
 | Parameter | R-Town | Long Way |
 |---|---|---|
-| Item size in cells | 1 x 1 | 2 x 2 |
+| Item size in cells | 1 x 1 | per kind: rocks and trees 2 x 2, Zen Garden kinds 2 x 2, 1 x 2 or 1 x 1 |
 | Adjacency | `EdgesAndCorners` | `EdgesAndCorners` |
 | Area when alone | base band, 4 px deep | tree: trunk band, rock: bottom 10% of the footprint |
 | Area in a group | the whole cell | rock: the footprint rule, tree: the trunk cell (`games/long-way/docs/collision.md`, `adr-lw18`) |

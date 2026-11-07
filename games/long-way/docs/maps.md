@@ -33,6 +33,9 @@ Long Way leaves a map by touching a marker (`adr-lw21`, `adr-x33`, rule 24 of th
 | `rock_0`, `rock_1` | `features/Rocks.aseprite` | Variants of a rock |
 | `green_tree` | `features/Green tree.aseprite` | Animated, 8 frames |
 | `red_tree` | `features/Red tree.aseprite` | Animated, 8 frames |
+| `green_tree_medium` | `features/green_tree_medium.aseprite` | Zen Garden. Cell space 2x2, canvas 128x128 with its bottom left corner on the cell, like `green_tree`. Blocks the trunk foot |
+| `red_tree_medium` | `features/red_tree_medium.aseprite` | Zen Garden. Cell space 1x2, canvas 84x128 (wider than the cell), trunk foot at the bottom middle. Blocks the trunk foot |
+| `red_tree_small`, `green_shrub`, `green_shrub_small` | `features/red_tree_small.aseprite`, `green_shrub.aseprite`, `green_shrub_small.aseprite` | Zen Garden. Cell space 1x1, canvas 64x64, bottom of the art on the bottom of the cell. Shrubs block like a lone rock, the small tree like a tree trunk |
 | `lantern`, `lantern_red`, `marker`, `marker_red` | `features/Markers.aseprite` | 28x35 px (70% of the player's body height), drawn at scale 1 and centred in its cell. Blocks the middle 80% of its width and the bottom half of its height, rounded to whole pixels (22x18) (`adr-lw20`). Not part of a group. `exit_to=<map id>` on the legend entry makes a marker a door (see Exits). |
 | `player_start` | none | A marker. The player starts at the centre of its cell (`adr-lw19`), and arrives there from another map (`adr-lw21`). It blocks nothing. Write it `"@"` in the legend. |
 
@@ -46,13 +49,17 @@ You may draw the cells that a rock or tree covers with blanks, to see how far it
 
 Characters that are next to each other overlap by one cell. This is on purpose: it makes a pile of rocks that looks like one cluster. A solid block of 4 by 3 characters gives a cluster of 5 by 4 cells.
 
+## Scenery (Zen Garden trees and shrubs)
+
+The five Zen Garden kinds are one character each, for example `g` for `green_tree_medium`, `r` for `red_tree_medium`, `t` for `red_tree_small`, `b` for `green_shrub` and `s` for `green_shrub_small`. They are in the legend of every map. The character is the bottom left cell of the object's cell space (2x2 for `green_tree_medium`, 1x2 for `red_tree_medium`, 1x1 for the rest). The canvas of `green_tree_medium` has its bottom left corner on that cell, like `green_tree`. The other four hang from the bottom middle of their cell space. Trees block like `green_tree`: the foot of the trunk (the lowest 12 rows of the art, plus the player's half width on each side) and the bottom 10% of the canvas height. Shrubs use the same rule, with a foot as wide as the one of the red tree of their size (`green_shrub` like `red_tree_medium`, `green_shrub_small` like `red_tree_small`), centred on the art, and a band of 10% of the height of the drawn shrub. All five join the groups of rocks and trees (`adr-lw23`): each is grouped by its own cell space, and in a group it blocks exactly its anchor cell, 64 by 64. Code: `scenery.rs` (pixel values of each kind are in its `art` table).
+
 ## Lanterns and markers
 
 A lantern or marker is one character, for example `l` for `lantern`, `L` for `lantern_red`, `m` for `marker` or `M` for `marker_red`. All four have the same size and collision. Its character is its cell, and the art is centred in that cell. The player cannot walk through its bottom half and walks behind the top half. Lanterns and markers do not count in a cluster of rocks and trees (`adr-lw20`).
 
 ## Trees
 
-A tree is one character, for example `g` for `green_tree`. The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). A tree that touches another tree or a rock is in a cluster and then blocks one cell, the bottom right cell of its footprint (the trunk cell) (`adr-lw18`). Four trees two cells apart in both directions touch and form a grove (see `1.txt`, cells (1,1) to (3,3)).
+A tree is one character, for example `G` for `green_tree` (and `R` for `red_tree`). The trunk blocks the player. The player can walk behind the tree from above and stops at its base line from below (`adr-lw1`). A tree that touches another tree or a rock is in a cluster and then blocks one cell, the bottom right cell of its footprint (the trunk cell) (`adr-lw18`). Four trees two cells apart in both directions touch and form a grove (see `1.txt`, cells (1,1) to (3,3)).
 
 ## Rocks and collision
 

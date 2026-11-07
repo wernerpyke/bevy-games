@@ -7,8 +7,13 @@ legend:
   ".": empty
   "0": rock_0
   "1": rock_1
-  "g": green_tree
-  "r": red_tree
+  "G": green_tree
+  "R": red_tree
+  "g": green_tree_medium
+  "r": red_tree_medium
+  "t": red_tree_small
+  "b": green_shrub
+  "s": green_shrub_small
   "l": lantern
   "L": lantern_red
   "m": marker
@@ -20,8 +25,8 @@ legend:
  9 |. . . . . . . . . .|
  8 |@ . . . . . . . . .|
  7 |. . . . . . . . . .|
- 6 |. . . r r . . . . .|
- 5 |. . . r r . . . . .|
+ 6 |. . . R R . . . . .|
+ 5 |. . . R R . . . . .|
  4 |. . . . . . . . . .|
  3 |. . . . . . . . . .|
  2 |. . . . . . . . . .|

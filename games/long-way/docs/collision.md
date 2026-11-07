@@ -42,11 +42,12 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 
 ## Groups (`adr-lw14`)
 
-Objects whose 2x2 footprints overlap or touch (anchors at most 2 cells apart, also at a corner) form a group, whatever the kinds.
+Objects whose footprints overlap or touch (also at a corner) form a group, whatever the kinds. Rocks and trees cover 2x2 cells, so their anchors are at most 2 cells apart. The Zen Garden kinds cover their own cell space: `green_tree_medium` 2x2, `red_tree_medium` 1x2, the other three 1x1 (`Kind::footprint`, `adr-lw23`).
 
 - A tree alone: the trunk band above. A rock alone: the bottom 10% of the footprint height (12.8 at a cell size of 64), with the rock sides (inset 10%, grown by 20).
 - In a group, a rock blocks the rock footprint area above. A member with a member above it (`Group::neighbour_above`) has no top inset, so the shapes merge.
 - In a group, a tree blocks exactly one map cell: the bottom right cell of its footprint, which holds the trunk. The box is 64 by 64 with no widening, so it lines up with the F3 grid and boxes of neighbours touch with no gap (`adr-lw18`). The player can enter the cells between them.
+- In a group, each Zen Garden kind blocks exactly its anchor cell (64 by 64), which holds its trunk or base. Alone, a tree blocks the trunk band above and a shrub a band as wide as the red tree of its size.
 - Footprints 3 cells apart do not touch, so they stay separate.
 
 ## Slide values

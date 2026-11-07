@@ -14,6 +14,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw18 | A tree in a cluster blocks one map cell, the trunk cell |
 | adr-lw19 | The player starts at the `player_start` marker |
 | adr-lw21 | Long Way leaves a map by touching a marker |
+| adr-lw23 | Zen Garden trees and shrubs join the groups with their own footprints |
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
@@ -138,3 +139,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The developer wants a visible object to walk into, not an invisible strip on the map edge. Arriving at the start cell keeps every map to one way in.
 
 **How to apply.** Map 1: `m` leads to map 2 and `M` to map 3. Map 2: `m` leads to map 3. Map 3 has no exit. Each map needs one `@`. Map files: `games/long-way/docs/maps.md`.
+
+## adr-lw23. Zen Garden trees and shrubs join the groups with their own footprints (2026-11-07)
+
+**Decision.** The five Zen Garden kinds (`green_tree_medium` 2x2, `red_tree_medium` 1x2, `red_tree_small`, `green_shrub` and `green_shrub_small` 1x1) take part in the neighbour groups of `adr-lw14`, together with rocks and trees. Each kind has its own footprint (`Kind::footprint`). In a group, each of the five blocks exactly its anchor cell, 64 by 64, which holds its trunk or base (the rule of `adr-lw18` for the trunk cell). Alone, a tree blocks its trunk foot and the bottom 10% of its canvas, and a shrub blocks a foot as wide as the red tree of its size and the bottom 10% of its drawn height.
+
+**Rationale.** A planting such as the one in `1.txt`, columns 0 to 4, rows 1 to 4, mixes sizes and has to be one solid shape, or the player slips between the plants. The kit groups items of one size only. The game expands each item into the cells of its footprint and groups the cells with size 1, so a 2x2 object behaves as before, and a 1x1 shrub does not link to objects two cells away. This needs no kit change. The anchor cell is the trunk cell for all five, because the medium green tree has its trunk in its left cell (its canvas hangs from the bottom left), where `green_tree` has it in its right cell.
+
+**How to apply.** A new blocking kind gets a footprint in `Kind::footprint` and is counted in `blocking_groups` (not a marker or a lantern). Rules: `games/long-way/docs/collision.md`, "Groups". Values per kind: the `art` table in `scenery.rs`.
