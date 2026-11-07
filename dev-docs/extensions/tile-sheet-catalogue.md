@@ -48,6 +48,18 @@ These rules came from the Zen Garden pack and apply to any pack.
 9. **Cut from the original sheet.** Keep the pixels exact: no resampling, no colour change at cut time. Resizing or palette work is a separate step.
 10. **Do not create a catalogue for named files.** Packs that already ship named single files (for example `Koi1.png`, `Fountaintop2.png`) are read directly.
 
+### Cutting a sprite
+
+`./dev-scripts/aseprite.sh extract_block <original sheet.png> col=<c> row=<r> cols=<w> rows=<h> tile=<px> scale=<n> anchor=<mode> out=<file.aseprite>`. The input is the original sheet, not the catalogue.
+
+1. The block (`cols` x `rows` tiles) is the **cell space** the sprite is anchored in.
+2. `anchor=bottom`: the lowest opaque pixel row moves to the bottom of the cell space. Left and right stay as drawn. Use it for shrubs, rocks and small trees.
+3. `anchor=trunk`: the lowest opaque row is the trunk foot. The foot moves to the bottom middle of the cell space, and the canvas is widened where the crown would be cut off, with the foot on the exact middle column. Use it for trees, so the game can place the canvas by its bottom middle.
+4. `anchor=none`: cut the block as drawn.
+5. The canvas is never smaller than the cell space. If the art is taller, the canvas grows upward, so the canvas bottom stays the cell bottom.
+6. `scale` is applied last, nearest neighbour, inside Aseprite. The pack has 32 px tiles and Long Way has 64 px cells, so use `scale=2`.
+7. The result has one layer and one frame, with the sheet's own colours.
+
 ## Usage
 
 1. Run the command above, or open an existing catalogue in Aseprite.

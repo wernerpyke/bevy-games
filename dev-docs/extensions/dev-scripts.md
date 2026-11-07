@@ -23,5 +23,6 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `set_durations` | `.aseprite` | `tags=a,b` or `all`, `ms=`, `apply=1`, `out=` | Sets the frame duration of those tags. A dry run (lists the frames it would change) unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first |
 | `crop` | `.png` | `out=`, `scale=`, `cx cy w h view_height=` or `x y w h` | Cropped and scaled PNG |
 | `catalogue` | sheet `.png` | `tile=` (or `tilew tileh`), `out=`, `backdrop=` | `.aseprite` copy of the sheet at 1:1 with column and row rulers and a grid. See `tile-sheet-catalogue.md` |
+| `extract_block` | original sheet `.png` | `col row cols rows tile=`, `scale=`, `anchor=bottom\|trunk\|none`, `out=` | One-frame `.aseprite` of that block, anchored in its cell space and scaled. See `tile-sheet-catalogue.md` |
 
 Why Lua and not `aseprite --crop`: the CLI `--crop` gave the wrong region and `--frame-range` is ignored together with `--sheet`.

@@ -20,6 +20,13 @@ Long Way (`games/long-way/assets/art/`):
 - `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
 - `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256 (32x32 art scaled 8x), with `dev-scripts/aseprite/frames_from_pngs.lua`: native 32x32, 2 frames, drawn in the game at a whole number scale (4x = 128 px), tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
 - `features/Markers.aseprite` (built from `input/lantern.png` and `input/lantern_red.png` (160x200, with a glow) and `input/marker.png` and `input/marker_red.png` (120x196), with `dev-scripts/aseprite/frames_from_pngs.lua` at `width=28 height=35` (nearest neighbour, each PNG resized on its own, so the markers are stretched a little wider): 10 frames, tags `lantern` (1 frame), `lantern_red` (1 frame), `marker` (4 frames) and `marker_red` (4 frames). The marker frames last 250 ms each and loop (set with `set_durations`). Renamed from `Lanterns.aseprite`; drawn at scale 1, 70% of the player's body height, own colour palette, not the game palette). The PNGs stay in `input/`.
+- `features/green_tree_medium.aseprite`, `red_tree_medium.aseprite`, `red_tree_small.aseprite`, `green_shrub.aseprite`, `green_shrub_small.aseprite` (Zen Garden `Main_Tilemap.png`, cut on 2026-11-07 with `dev-scripts/aseprite/extract_block.lua`, 1 frame each, no tags, own colour palette, not the game palette, scaled 2x with nearest neighbour so 1 tile (32 px) is 1 cell (64 px)). Source block (col, row, size in tiles) and result:
+  - `green_tree_medium`: c20 r4, 2x2, `anchor=trunk`, 128x128. The trunk foot is at the bottom middle of the 2x2 cell space.
+  - `red_tree_medium`: c23 r6, 1x2, `anchor=trunk`, 84x128. The crown is wider than the 1x2 cell space, so the canvas is widened (64 to 84 px) and the trunk foot is on the middle column of the canvas.
+  - `red_tree_small`: c22 r4, 1x1, `anchor=bottom`, 64x64. The lowest pixel row is the bottom of the cell.
+  - `green_shrub`: c22 r5, 1x1, `anchor=bottom`, 64x64.
+  - `green_shrub_small`: c23 r5, 1x1, `anchor=bottom`, 64x64.
+  The game draws the bottom middle of each canvas at the bottom middle of its cell space. Not yet used in code.
 
 ## Zen Garden pack (`input/zen-garden/`)
 
