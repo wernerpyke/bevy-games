@@ -16,11 +16,11 @@ A text file that a human edits to draw a whole map. One character is one cell. T
 |---|---|---|
 | Parser: `parse(file, source, kinds)`, `Map`, `MapObject`, `MapError` | `crates/game-kit/src/map.rs` | Shared. Object kinds are names (adr-x13). |
 | Exits and entries: `Area`, `MapExit`, `MapEntry`, the in-file checks | `crates/game-kit/src/map_areas.rs` | Shared |
-| Links between maps: `validate_links` | `crates/game-kit/src/map_links.rs` | Shared. Not used by a game yet. |
+| Links between maps: `validate_links` | `crates/game-kit/src/map_links.rs` | Shared. Run by the map registry. |
 | Loading and `Kind` | `games/<game>/src/map.rs` | Per game |
 | Spawning | per game | Per game |
 
-Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
+Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
 
 ## Specification
 
@@ -135,6 +135,8 @@ entries:
 21. No object may stand in an area. The one exception is a `player_start` marker in an entry area. Two exits may not overlap, and an entry may not overlap an exit (the player would be sent back at once).
 22. Between maps (`validate_links`, when a game registers its maps): the exit leads to a registered map and an entry of that map, and the two have the same length, so the position along the strip carries over. A seamless exit needs its entry on the opposite edge (a top exit joins a bottom entry) and may not lead to its own map.
 23. **Start marker.** `"@": player_start` is an ordinary marker (rule 5). A game reads its cell as the start of the player. A map that is only entered from another map needs none. Add one to a later map to be able to start in it directly, for example for a scripted run.
+   `start_feet(map, origin)` gives its position (the centre of the cell).
+24. **Exit objects.** A legend entry may have `exit_to=<map id>`, for example `"m": marker exit_to=2` (`adr-x33`). Touching the object sends the player to that map, at its `player_start`. The parser reads it as an ordinary parameter (`MapObject::exit_to`). Between maps (`validate_links`) the map must be registered and have exactly one `player_start`, and the error names the legend line. The game decides where the object can be touched (`ExitTrigger`). There is no `transition` key: it is always a scene transition. Do not put such an object inside an exit area (rule 21). A map may use exit areas, exit objects, or both.
 
 ## Usage
 
@@ -161,5 +163,5 @@ Inline in `game-kit` `map.rs`. Each game tests that its own map file parses (cou
 - Origin: `top-left` and `bottom-left` files with the same drawing give the same objects, and an unknown origin is an error.
 - Legend: a character that is not in the legend names its line, reserved keys (`|`, `.`, space) are errors, and a marker such as `player_start` comes back as an ordinary object.
 - Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw`, `jitter` and `cell` values, an unknown kind, comments and optional keys.
-- Exits and entries: `map_areas.rs` tests the area notation, the edge rules, objects in areas, overlaps and a `top-left` file. `map_links.rs` tests the checks between maps.
+- Exits and entries: `map_areas.rs` tests the area notation, the edge rules, objects in areas, overlaps and a `top-left` file. `map_links.rs` tests the checks between maps. It also tests `exit_to` (unknown map, a target without exactly one start). `map.rs` tests `exit_to` and `start_feet`.
 - Other: comments, blank lines and Windows line endings, and objects come back in a fixed order (top row first, then left to right).

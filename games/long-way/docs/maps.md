@@ -9,21 +9,22 @@ How to write a map file for Long Way. The file format itself is the [map files e
 - Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576). The view is 8 by 8 cells (`adr-lw17`). A map larger than 8 cells scrolls (`adr-lw16`), and a smaller one is centred. The size is read from the file, so you can change it freely. The player starts at the `player_start` marker (`adr-lw19`).
 - Use a fixed-width font and turn off word wrap. Each cell takes two characters, so a row of 32 cells is 63 characters between the bars.
 
-## Exits and entries
+## Exits
 
-The format is in the [map files extension](../../../dev-docs/extensions/map-files.md) (rules 16 to 23, `adr-x30`). Long Way has three maps joined like this:
+Long Way leaves a map by touching a marker (`adr-lw21`, `adr-x33`, rule 24 of the [map files extension](../../../dev-docs/extensions/map-files.md)). The legend entry names the target map, and the player arrives at the `@` of that map. The maps have no `exits:` or `entries:` blocks.
 
-| From | Exit | Area | To | Entry | Area |
-|---|---|---|---|---|---|
-| 1 | `to_2` | `3..4,9` (top edge) | 2 | `from_1` | `3..4,0` (bottom edge) |
-| 1 | `to_3` | `9,7` (right edge) | 3 | `from_1` | `0,7` (left edge) |
-| 2 | `to_3` | `9,4..5` (right edge) | 3 | `from_2` | `0,8..9` (left edge) |
+| Map | Legend entry | Leads to |
+|---|---|---|
+| 1 | `"m": marker exit_to=2` | map 2 |
+| 1 | `"M": marker_red exit_to=3` | map 3 |
+| 2 | `"m": marker exit_to=3` | map 3 |
+| 3 | none | no way out |
 
-- Walking into an exit fades the screen, loads the target map and puts the player in the entry at the same position along the strip (`dev-docs/extensions/map-transitions.md`). The 1 to 2 exit is `transition=seamless`: map 2 is loaded above map 1, aligned strip on strip, and the player walks across (`adr-x32`). The two other exits are `scene`. Map 3 is reached from maps 1 and 2, so only one link to it can be seamless unless the three maps fit together without overlapping.
-- Every exit and its entry have the same length. The player keeps their position along the strip.
-- Write the cells of an exit or entry area as blanks in the grid. Keep trees and rocks out of them.
-- Map 1 has the real start (`@` at cell (4,0)). Map 2 also has an `@`, at the cell of its entry, so a scripted run can start there.
-- In a seamless join the player can leave a map only through the doorway (the exit strip). Everywhere else the map edge is a wall. The first map is removed after it has been out of view for 1 second.
+- Touching means the feet reach the edge of the blocked area of the marker plus 2 pixels (`TOUCH_MARGIN` in `markers.rs`). The screen fades, the target map loads, and the player stands on its `@` with the same facing as before (`dev-docs/extensions/map-transitions.md`).
+- Every map needs exactly one `@`, because a marker may lead to it. The game stops at start if a link names an unknown map or a map without one `@`.
+- A marker without `exit_to`, and every lantern, only blocks the player.
+- All links are scene transitions. Exit areas and seamless joins (`adr-x30`, `adr-x32`) still work in the kit, but no Long Way map uses them. Do not put a marker with `exit_to` inside an exit area.
+- Start a scripted run in a map with `rust.sh script long-way "<commands>" 2.txt --debug`. `goto:<map>` in a script arrives at the `@`.
 
 ## Kinds you can use in a legend
 
@@ -32,8 +33,8 @@ The format is in the [map files extension](../../../dev-docs/extensions/map-file
 | `rock_0`, `rock_1` | `features/Rocks.aseprite` | Variants of a rock |
 | `green_tree` | `features/Green tree.aseprite` | Animated, 8 frames |
 | `red_tree` | `features/Red tree.aseprite` | Animated, 8 frames |
-| `lantern`, `lantern_red`, `marker`, `marker_red` | `features/Markers.aseprite` | 28x35 px (70% of the player's body height), drawn at scale 1 and centred in its cell. Blocks the middle 80% of its width and the bottom half of its height, rounded to whole pixels (22x18) (`adr-lw20`). Not part of a group. |
-| `player_start` | none | A marker. The player starts at the centre of its cell (`adr-lw19`). It blocks nothing. Write it `"@"` in the legend. |
+| `lantern`, `lantern_red`, `marker`, `marker_red` | `features/Markers.aseprite` | 28x35 px (70% of the player's body height), drawn at scale 1 and centred in its cell. Blocks the middle 80% of its width and the bottom half of its height, rounded to whole pixels (22x18) (`adr-lw20`). Not part of a group. `exit_to=<map id>` on the legend entry makes a marker a door (see Exits). |
+| `player_start` | none | A marker. The player starts at the centre of its cell (`adr-lw19`), and arrives there from another map (`adr-lw21`). It blocks nothing. Write it `"@"` in the legend. |
 
 `draw` (rock size in pixels, a multiple of 32, default 128) applies to rocks only. `jitter` also shifts trees.
 

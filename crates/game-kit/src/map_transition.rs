@@ -25,7 +25,7 @@ use crate::collision::register_blockers;
 use crate::debug::{DebugGrids, DebugInfo, GridRegion};
 use crate::depth::DepthSort;
 use crate::layers::FADE_Z_INDEX;
-use crate::map::{Area, Edge, Facing, Map, MapEntry, MapExit, Transition, parse};
+use crate::map::{Area, Edge, Facing, Map, MapEntry, MapExit, Transition, parse, start_feet};
 use crate::map_links::{LinkedMap, validate_links};
 
 /// One map file a game registers. `file` is relative to the game folder: a native run reads it from disk (so F1 reloads
@@ -271,7 +271,8 @@ pub struct ExitUse {
 #[derive(Message, Clone, Debug)]
 pub struct RequestMapChange {
     pub to: String,
-    pub entry: String,
+    /// The entry of the target map. `None` puts the player at its `player_start` and keeps their facing.
+    pub entry: Option<String>,
     pub transition: Transition,
     /// The exit that was used. `None` (a `goto` from a script) puts the player in the middle of the entry.
     pub source: Option<ExitUse>,
@@ -529,11 +530,32 @@ fn spawn_fade_overlay(mut commands: Commands, transition: Res<MapTransition>) {
     ));
 }
 
-/// Starts a transition when the feet of the controlled entity enter an exit.
+/// An object of a map that sends the player to another map when the feet touch `area` (world units, the edges count as
+/// inside). The game adds it with a `MapId`, so it goes with its map. The player arrives at the `player_start` of the
+/// target map and keeps their facing, and the change is always a scene transition. The map file names the target with
+/// `exit_to` on the legend entry (`MapObject::exit_to`), and the game makes the area.
+#[derive(Component, Clone, Debug)]
+pub struct ExitTrigger {
+    pub area: Rect,
+    pub to: String,
+}
+
+/// The trigger among `triggers` that the feet touch, if any.
+pub fn trigger_at<'a>(
+    triggers: impl IntoIterator<Item = &'a ExitTrigger>,
+    feet: Vec2,
+) -> Option<&'a ExitTrigger> {
+    triggers
+        .into_iter()
+        .find(|t| feet.cmpge(t.area.min).all() && feet.cmple(t.area.max).all())
+}
+
+/// Starts a transition when the feet of the controlled entity enter an exit or touch an `ExitTrigger`.
 fn detect_exit(
     mut transition: ResMut<MapTransition>,
     active: Res<ActiveMaps>,
     registry: Res<MapRegistry>,
+    triggers: Query<(&ExitTrigger, &MapId)>,
     target: Query<(&Transform, &DepthSort), With<Controlled>>,
     mut requests: MessageWriter<RequestMapChange>,
 ) {
@@ -550,8 +572,31 @@ fn detect_exit(
         transform.translation.x,
         sort.feet_y(transform.translation.y),
     );
+    let touched = trigger_at(
+        triggers
+            .iter()
+            .filter(|(_, id)| id.0 == current.id)
+            .map(|(trigger, _)| trigger),
+        feet,
+    );
     match exit_at(&registered.map, current.origin, feet) {
-        None => transition.armed = true,
+        None => match touched {
+            None => transition.armed = true,
+            Some(trigger) if transition.armed => {
+                transition.armed = false;
+                info!(
+                    "maps: touched an exit of `{}`, going to `{}`",
+                    current.id, trigger.to
+                );
+                requests.write(RequestMapChange {
+                    to: trigger.to.clone(),
+                    entry: None,
+                    transition: Transition::Scene,
+                    source: None,
+                });
+            }
+            Some(_) => {}
+        },
         Some(exit) if transition.armed => {
             transition.armed = false;
             info!(
@@ -560,7 +605,7 @@ fn detect_exit(
             );
             requests.write(RequestMapChange {
                 to: exit.to.clone(),
-                entry: exit.entry.clone(),
+                entry: Some(exit.entry.clone()),
                 transition: exit.transition,
                 source: Some(ExitUse {
                     from: current.id.clone(),
@@ -582,12 +627,13 @@ fn accept_request(
             continue;
         }
         let seamless = request.transition == Transition::Seamless;
-        if seamless && request.source.is_none() {
+        let can_join = request.source.is_some() && request.entry.is_some();
+        if seamless && !can_join {
             warn!(
-                "maps: a seamless transition needs the exit that was used, using a scene transition"
+                "maps: a seamless transition needs the exit that was used and an entry, using a scene transition"
             );
         }
-        transition.phase = if seamless && request.source.is_some() {
+        transition.phase = if seamless && can_join {
             Phase::Seamless {
                 request: request.clone(),
             }
@@ -629,12 +675,21 @@ fn plan_switch(world: &World, request: &RequestMapChange) -> Result<Switch, Stri
     let to = registry
         .get(&request.to)
         .ok_or_else(|| format!("map `{}` is not registered", request.to))?;
+    let Some(entry_name) = &request.entry else {
+        let feet = start_feet(&to.map, origin)
+            .ok_or_else(|| format!("map `{}` has no `player_start`", request.to))?;
+        return Ok(Switch {
+            id: request.to.clone(),
+            origin,
+            arrival: Arrival { feet, facing: None },
+        });
+    };
     let entry = to
         .map
         .entries
         .iter()
-        .find(|entry| entry.name == request.entry)
-        .ok_or_else(|| format!("map `{}` has no entry `{}`", request.to, request.entry))?;
+        .find(|entry| entry.name == *entry_name)
+        .ok_or_else(|| format!("map `{}` has no entry `{entry_name}`", request.to))?;
     let offset = request.source.as_ref().and_then(|used| {
         let from = registry.get(&used.from)?;
         let exit = from.map.exits.iter().find(|exit| exit.name == used.exit)?;
@@ -883,12 +938,16 @@ fn begin_seamless(world: &mut World, request: &RequestMapChange) -> Result<(), S
         let to = registry
             .get(&request.to)
             .ok_or_else(|| format!("map `{}` is not registered", request.to))?;
+        let entry_name = request
+            .entry
+            .as_ref()
+            .ok_or_else(|| "a seamless transition needs an entry".to_string())?;
         let entry = to
             .map
             .entries
             .iter()
-            .find(|entry| entry.name == request.entry)
-            .ok_or_else(|| format!("map `{}` has no entry `{}`", request.to, request.entry))?;
+            .find(|entry| entry.name == *entry_name)
+            .ok_or_else(|| format!("map `{}` has no entry `{entry_name}`", request.to))?;
         let origin = seamless_origin(from_active.origin, &from.map, exit, &to.map, entry)
             .ok_or_else(|| format!("exit `{}` does not lie along one edge", exit.name))?;
         let rect = Rect::from_corners(origin, origin + to.map.size.as_vec2() * to.map.cell_size);
@@ -1106,7 +1165,7 @@ fn show_map_id(active: Res<ActiveMaps>, info: Option<ResMut<DebugInfo>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::parse;
+    use crate::map::{PLAYER_START, parse};
 
     fn cell(x: i32, y: i32) -> IVec2 {
         IVec2::new(x, y)
@@ -1125,7 +1184,7 @@ mod tests {
     fn request() -> RequestMapChange {
         RequestMapChange {
             to: "2".into(),
-            entry: "e".into(),
+            entry: Some("e".into()),
             transition: Transition::Scene,
             source: None,
         }
@@ -1332,8 +1391,26 @@ mod tests {
     #[derive(Resource, Default)]
     struct Log(Vec<String>);
 
-    fn load_hook(In(load): In<MapLoad>, mut log: ResMut<Log>, mut commands: Commands) {
+    /// A trigger that the test hook spawns with map 2, leading back to map 1.
+    #[derive(Resource)]
+    struct TriggerInMap2(Rect);
+
+    fn load_hook(
+        In(load): In<MapLoad>,
+        mut log: ResMut<Log>,
+        mut commands: Commands,
+        extra: Option<Res<TriggerInMap2>>,
+    ) {
         log.0.push(format!("load {} at {}", load.id, load.origin));
+        if let (Some(extra), "2") = (extra, load.id.as_str()) {
+            commands.spawn((
+                MapId(load.id.clone()),
+                ExitTrigger {
+                    area: extra.0,
+                    to: "1".into(),
+                },
+            ));
+        }
         commands.spawn(MapId(load.id));
     }
 
@@ -1516,7 +1593,7 @@ mod tests {
         put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
         app.world_mut().write_message(RequestMapChange {
             to: "2".into(),
-            entry: "from_1".into(),
+            entry: Some("from_1".into()),
             transition: Transition::Scene,
             source: None,
         });
@@ -1526,6 +1603,151 @@ mod tests {
         assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(320.0, 32.0));
     }
 
+    /// A 10 by 10 map with a `player_start` at `start` and no exits.
+    fn registered_with_start(id: &str, start: (usize, usize)) -> RegisteredMap {
+        let head = format!(
+            "---\nmap: {id}\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": empty\n  \"@\": player_start\n---\n"
+        );
+        let rows: String = (0..10)
+            .rev()
+            .map(|y| {
+                let row: Vec<&str> = (0..10)
+                    .map(|x| if (x, y) == start { "@" } else { "." })
+                    .collect();
+                format!("{y:>2} |{}|\n", row.join(" "))
+            })
+            .collect();
+        RegisteredMap {
+            id: id.into(),
+            file: format!("{id}.txt"),
+            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START]).unwrap(),
+        }
+    }
+
+    /// Two maps with a start in map 2 at cell (4,0), and a trigger of map 1 over the area (100..160, 100..160).
+    fn app_with_trigger() -> App {
+        let one = registered_with_start("1", (0, 0));
+        let two = registered_with_start("2", (4, 0));
+        let registry = MapRegistry::from_parsed(vec![one, two]).unwrap();
+        let mut app = app_with_two_maps();
+        app.insert_resource(registry);
+        app.world_mut().spawn((
+            MapId("1".into()),
+            ExitTrigger {
+                area: Rect::from_corners(ORIGIN + Vec2::splat(100.0), ORIGIN + Vec2::splat(160.0)),
+                to: "2".into(),
+            },
+        ));
+        app
+    }
+
+    #[test]
+    fn a_request_without_an_entry_arrives_at_the_player_start_and_keeps_the_facing() {
+        let mut app = app_with_trigger();
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.world_mut().write_message(RequestMapChange {
+            to: "2".into(),
+            entry: None,
+            transition: Transition::Scene,
+            source: None,
+        });
+        app.update();
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        // Cell (4,0) of 64 px cells: the centre is (288, 32).
+        assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(288.0, 32.0));
+        assert_eq!(
+            app.world().resource::<Log>().0.last().unwrap(),
+            "arrive None"
+        );
+    }
+
+    #[test]
+    fn a_request_without_an_entry_to_a_map_without_a_start_leaves_the_world_alone() {
+        let mut app = app_with_two_maps();
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.world_mut().write_message(RequestMapChange {
+            to: "2".into(),
+            entry: None,
+            transition: Transition::Scene,
+            source: None,
+        });
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "1");
+        assert!(app.world().resource::<MapTransition>().is_idle());
+        assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(300.0, 300.0));
+    }
+
+    #[test]
+    fn touching_a_trigger_sends_the_player_to_the_start_of_its_map() {
+        let mut app = app_with_trigger();
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        // The edge of the area counts as touching.
+        set_feet(&mut app, ORIGIN + Vec2::new(160.0, 130.0));
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(288.0, 32.0));
+        assert!(app.world().resource::<MapTransition>().is_idle());
+    }
+
+    #[test]
+    fn a_trigger_fires_once_and_the_player_is_armed_again_outside() {
+        let mut app = app_with_trigger();
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(130.0, 130.0));
+        for _ in 0..3 {
+            app.update();
+        }
+        let loads = |app: &App| {
+            app.world()
+                .resource::<Log>()
+                .0
+                .iter()
+                .filter(|line| line.starts_with("load"))
+                .count()
+        };
+        assert_eq!(loads(&app), 2);
+        // Map 2 has no trigger. The map of the trigger is gone, so walking back in does nothing and nothing loops.
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(loads(&app), 2);
+        assert!(app.world().resource::<MapTransition>().armed);
+    }
+
+    #[test]
+    fn a_player_who_arrives_in_a_trigger_does_not_fire_it_at_once() {
+        let mut app = app_with_trigger();
+        // Map 2 has a trigger over its start cell (4,0), so the player arrives inside it.
+        app.insert_resource(TriggerInMap2(Rect::from_corners(
+            ORIGIN + Vec2::new(256.0, 0.0),
+            ORIGIN + Vec2::new(320.0, 64.0),
+        )));
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(130.0, 130.0));
+        for _ in 0..6 {
+            app.update();
+        }
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        assert!(!app.world().resource::<MapTransition>().armed);
+        // It fires again only after the feet have left it.
+        set_feet(&mut app, ORIGIN + Vec2::new(450.0, 300.0));
+        app.update();
+        assert!(app.world().resource::<MapTransition>().armed);
+    }
+
     #[test]
     fn a_request_for_an_unknown_map_leaves_the_world_alone() {
         let mut app = app_with_two_maps();
@@ -1533,7 +1755,7 @@ mod tests {
         put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
         app.world_mut().write_message(RequestMapChange {
             to: "9".into(),
-            entry: "x".into(),
+            entry: Some("x".into()),
             transition: Transition::Scene,
             source: None,
         });
@@ -1554,7 +1776,7 @@ mod tests {
         for _ in 0..2 {
             app.world_mut().write_message(RequestMapChange {
                 to: "2".into(),
-                entry: "from_1".into(),
+                entry: Some("from_1".into()),
                 transition: Transition::Scene,
                 source: None,
             });

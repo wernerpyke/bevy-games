@@ -9,6 +9,7 @@ How a game moves the player from one map to another. The format of the exits and
 | Exits, entries, links between maps | `game-kit` `map_areas.rs`, `map_links.rs` | Built (`adr-x30`) |
 | Registry, lifecycle, fade (scene transition) | `game-kit` `map_transition.rs` | Built (`adr-x31`) |
 | Seamless transition, doorways, eased camera bounds, grid per active map | `game-kit` `map_transition.rs`, `camera.rs`, `debug.rs` | Built (`adr-x32`) |
+| Exit objects (`exit_to`), arrival at `player_start` | `game-kit` `map.rs`, `map_links.rs`, `map_transition.rs` | Built (`adr-x33`) |
 
 ## How a scene transition runs
 
@@ -85,7 +86,41 @@ sequenceDiagram
     K->>C: bounds target = box of the new map
 ```
 
-Constraints, checked when the maps are registered (`validate_links`, `adr-x30`): the entry is on the opposite edge of the exit and has the same length, and an exit does not lead to its own map. Checked when a map joins: it must not overlap an active map. Map 3 is reached from maps 1 and 2 in Long Way, so only one of those links should be seamless unless the three maps fit together.
+Constraints, checked when the maps are registered (`validate_links`, `adr-x30`): the entry is on the opposite edge of the exit and has the same length, and an exit does not lead to its own map. Checked when a map joins: it must not overlap an active map.
+
+## Exit by touching an object
+
+A legend entry with `exit_to=<map id>` makes an object an exit (`adr-x33`, rule 24 of [map-files.md](map-files.md)). The game adds `ExitTrigger { area, to }` with a `MapId` when it spawns the object. `detect_exit` tests the feet against the triggers of the current map and against the exit areas, and both use the same `armed` flag: it is false after a transition until the feet are outside every exit area and every trigger, so arriving inside a trigger does not fire it.
+
+The request is `RequestMapChange { to, entry: None, transition: Scene, source: None }`. `entry: None` puts the player at the `player_start` of the target map (`start_feet`) and keeps their facing (`Arrival.facing` is `None`). A map without a `player_start` is refused and the world stays as it was. A marker exit is never seamless: a seamless link needs an exit strip on a map edge to place the next map.
+
+```mermaid
+---
+title: Exit object
+config:
+  theme: neutral
+  sequence:
+    useMaxWidth: true
+    wrap: false
+    mirrorActors: false
+    showSequenceNumbers: true
+---
+sequenceDiagram
+    participant P as Player
+    participant K as Kit (map_transition)
+    participant G as Game hooks
+    P->>K: feet reach an ExitTrigger area
+    K->>K: RequestMapChange (entry None), input locked
+    K->>K: fade out
+    rect rgb(235, 235, 235)
+    Note over K,G: one frame, screen covered
+    K->>K: despawn every MapId entity
+    K->>G: load(id, origin)
+    K->>G: rebuild
+    K->>G: arrive(player_start feet, no facing)
+    end
+    K->>K: fade in, input unlocked
+```
 
 ## Where the player arrives
 
@@ -99,6 +134,7 @@ The player keeps their position along the strip. The offset is measured in world
    - `load`: `In<MapLoad>`. Spawn the objects of the map and add `MapId(id)` to each one.
    - `rebuild`: clear `CollisionWorld` and add the blocked areas of the entities that exist. Runs after every load.
    - `arrive`: `In<Arrival>`. Move the player to `arrival.feet` and set the facing. The player has no `MapId`.
+   - To use exit objects, add `ExitTrigger` to the entities of objects whose `exit_to` is set (Long Way: `markers.rs`).
 3. Keep the player inside `ActiveMaps::walkable(margin_min, margin_max)` with `clamp_to_union` (one map is the same as a clamp to its rectangle). Read `MapTransition::locks_input()` to stop the player during a fade.
 4. F1: call `reload_current_map(world)` from the `ReloadMap` handler.
 
@@ -108,15 +144,16 @@ Long Way: `games/long-way/src/map.rs` (hooks, registration), `rocks.rs` (`rebuil
 
 - `rust.sh script long-way "<commands>" [map-file] --debug`. The optional map file starts the game in that map (the player appears at its `player_start`). `rust.sh run long-way 2.txt` does the same for a normal run.
 - A seamless transition is a walk: `teleport` below the exit, then `hold:up:<seconds>`. Take screenshots at the seam and after the old map has been out of view for a second. The log lines of `collision:` show every rebuild (the number of clusters changes when a map joins or leaves).
-- `goto:<map>:<entry>` starts a scene transition and waits until it is done. The player is put in the middle of the entry.
+- `goto:<map>:<entry>` starts a scene transition and waits until it is done. The player is put in the middle of the entry. `goto:<map>` arrives at the `player_start` of the map.
 - A walk into an exit also works: `teleport` next to it, then `hold:<direction>:<seconds>`. Add `wait` before a screenshot, because the fade takes 0.3 s out and 0.3 s in.
 
 ## Limits
 
 - A seamless exit needs the exit that was used (`source`). A `goto` is always a scene transition.
+- A marker exit cannot be seamless, and it does not keep the position along a strip.
 - Return exits are not built: the walk back works only while the first map is still loaded.
 - Enemies and projectiles across a seam are not handled. `CameraBounds` is an eased box here, so a system that reads it as the playable area (enemy movement, nav) should not be used with seamless maps yet.
-- Cross-seam rocks and trees do form one cluster, since collision is in world units. Long Way's map 1 and 2 have no object near the seam, so this was not seen on screen.
+- Cross-seam rocks and trees do form one cluster, since collision is in world units. Long Way no longer uses seamless links, so this was not seen on screen.
 - A map is rebuilt from its file on every load. What the player changed in a map is not kept (see "Returning to a previous map" below).
 - The first map is loaded in `PostStartup`. The player is spawned at the start map's `player_start` in `Startup`.
 

@@ -3,10 +3,9 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
-use crate::map::player_start_feet;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
-use game_kit::map::Facing as EntryFacing;
+use game_kit::map::{Facing as EntryFacing, start_feet};
 use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
 
 /// Walk speed in art pixels per second.
@@ -67,7 +66,7 @@ pub fn spawn_player(
         return;
     };
     let map = &registered.map;
-    let feet = player_start_feet(map, MAP_ORIGIN).unwrap_or_else(|| {
+    let feet = start_feet(map, MAP_ORIGIN).unwrap_or_else(|| {
         error!(
             "map {}: no player_start marker, starting at the bottom middle",
             map.name

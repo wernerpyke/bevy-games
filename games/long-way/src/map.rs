@@ -173,23 +173,6 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
     groups
 }
 
-/// World position of the player's feet at the `player_start` marker: the centre of its cell. `None` when the map has no
-/// marker. A second marker is reported and ignored.
-pub fn player_start_feet(map: &Map, origin: Vec2) -> Option<Vec2> {
-    let mut starts = map
-        .objects
-        .iter()
-        .filter(|o| Kind::of(o) == Kind::PlayerStart);
-    let start = starts.next()?;
-    if starts.next().is_some() {
-        warn!(
-            "map {}: more than one player_start, using the first",
-            map.name
-        );
-    }
-    Some(origin + (start.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size)
-}
-
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Kind {

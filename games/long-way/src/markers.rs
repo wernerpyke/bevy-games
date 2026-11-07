@@ -10,7 +10,7 @@ use crate::rocks::{SORT_BIAS, footprint_corner};
 use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
 use game_kit::map::{Map, MapObject};
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::{ExitTrigger, MapId, MapLoad};
 
 /// Size of `Markers.aseprite` in pixels. The height is 70% of `PLAYER_BODY_HEIGHT` (50), and the width keeps the aspect of the source.
 const MARKER_WIDTH: f32 = 28.0;
@@ -19,6 +19,9 @@ const MARKER_HEIGHT: f32 = 35.0;
 const BLOCKED_FRACTION: f32 = 0.5;
 /// Part of the lantern width, centred, that blocks the player.
 const BLOCKED_WIDTH_FRACTION: f32 = 0.8;
+/// How far the touch area of an exit marker reaches beyond the blocked area. The feet cannot enter the blocked area, so
+/// "touching" means reaching its edge.
+const TOUCH_MARGIN: f32 = 2.0;
 
 fn tag(kind: Kind) -> Option<&'static str> {
     match kind {
@@ -68,9 +71,10 @@ fn spawn_marker(
         left + MARKER_WIDTH / 2.0,
         corner.y.round() + MARKER_HEIGHT / 2.0,
     );
-    commands.spawn((
+    let blocked = blocked_area(corner, map.cell_size);
+    let mut entity = commands.spawn((
         MapId(load.id.clone()),
-        Blocker(blocked_area(corner, map.cell_size)),
+        Blocker(blocked),
         DepthSort {
             feet_offset: MARKER_HEIGHT / 2.0 - SORT_BIAS,
         },
@@ -81,4 +85,14 @@ fn spawn_marker(
         Sprite::default(),
         Transform::from_translation(centre.extend(0.0)),
     ));
+    // `exit_to` in the legend makes the marker an exit (`adr-x33`).
+    if let Some(to) = object.exit_to() {
+        entity.insert(ExitTrigger {
+            area: Rect::from_corners(
+                blocked.min - Vec2::splat(TOUCH_MARGIN),
+                blocked.max + Vec2::splat(TOUCH_MARGIN),
+            ),
+            to: to.to_string(),
+        });
+    }
 }

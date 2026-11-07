@@ -25,7 +25,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use bevy::math::IVec2;
+use bevy::log::warn;
+use bevy::math::{IVec2, Vec2};
 
 use crate::map_areas::{self, RawLink};
 pub use crate::map_areas::{Area, Edge, Facing, MapEntry, MapExit, PLAYER_START, Transition};
@@ -38,6 +39,28 @@ pub struct MapObject {
     pub cell: IVec2,
     /// The `key=value` parameters that follow the kind in the legend. Empty for most objects.
     pub params: Params,
+}
+
+impl MapObject {
+    /// The id of the map that touching this object leads to: the `exit_to` parameter of its legend entry. The kit only
+    /// reads the text. `check_links` checks that the map exists, and the game makes the touch area.
+    pub fn exit_to(&self) -> Option<&str> {
+        self.params.get("exit_to")
+    }
+}
+
+/// Where the player's feet stand at the `player_start` marker of `map`: the centre of its cell, for a map whose cell (0,0)
+/// is at `origin`. `None` when the map has no marker. A second marker is reported and ignored.
+pub fn start_feet(map: &Map, origin: Vec2) -> Option<Vec2> {
+    let mut starts = map.objects.iter().filter(|o| o.kind == PLAYER_START);
+    let start = starts.next()?;
+    if starts.next().is_some() {
+        warn!(
+            "map {}: more than one {PLAYER_START}, using the first",
+            map.name
+        );
+    }
+    Some(origin + (start.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size)
 }
 
 /// Parameters written after a kind name in the legend, in file order. Values are text, and the game says what each
@@ -868,6 +891,30 @@ mod text_tests {
         assert_eq!(spawner.params.f32("missing"), Ok(None));
         assert!(spawner.params.f32("strategy").is_err());
         assert!(map.objects[1].params.is_empty());
+    }
+
+    #[test]
+    fn exit_to_is_read_from_the_legend_entry() {
+        let kinds = ["marker", "tree_big"];
+        let source = legend_map("  \"a\": marker exit_to=2\n  \"b\": tree_big\n");
+        let map = parse("t.txt", &source, &kinds).unwrap();
+        assert_eq!(map.objects[0].exit_to(), Some("2"));
+        assert_eq!(map.objects[1].exit_to(), None);
+    }
+
+    #[test]
+    fn the_start_is_the_centre_of_the_player_start_cell() {
+        let kinds = ["tree_big", PLAYER_START];
+        let source = legend_map("  \"a\": tree_big\n  \"b\": player_start\n");
+        let map = parse("t.txt", &source, &kinds).unwrap();
+        // Cell (1,0) of 16 px cells, map origin (100, 200).
+        assert_eq!(
+            start_feet(&map, Vec2::new(100.0, 200.0)),
+            Some(Vec2::new(124.0, 208.0))
+        );
+        let source = legend_map("  \"a\": tree_big\n  \"b\": tree_big\n");
+        let map = parse("t.txt", &source, &kinds).unwrap();
+        assert_eq!(start_feet(&map, Vec2::ZERO), None);
     }
 
     #[test]

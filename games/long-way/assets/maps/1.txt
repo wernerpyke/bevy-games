@@ -11,18 +11,15 @@ legend:
   "r": red_tree
   "l": lantern
   "L": lantern_red
-  "m": marker
-  "M": marker_red
+  "m": marker exit_to=2
+  "M": marker_red exit_to=3
   "@": player_start
-exits:
-  to_2: area=3..4,9 to=2 entry=from_1 transition=scene
-  to_3: area=9,7 to=3 entry=from_1 transition=scene
 ---
    |0                  |
    |0 1 2 3 4 5 6 7 8 9|
- 9 |. . . m     . . . .|
+ 9 |. . . m . . . . . .|
  8 |. . . . . . . . . M|
- 7 |. g . . . . . . .  |
+ 7 |. g . . . . . . . .|
  6 |. . . . . . r . . .|
  5 |. . . . . . . . . .|
  4 |. . g . . . . . . .|

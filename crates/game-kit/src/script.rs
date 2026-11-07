@@ -12,6 +12,7 @@
 //!   Add a `wait` before it after a `teleport`, so the frame shows the new position.
 //! - `goto:<map>:<entry>`           start a scene transition to an entry of a registered map and wait until it is done
 //!   (`map_transition.rs`). The player is put in the middle of the entry
+//! - `goto:<map>`                   the same, and the player arrives at the `player_start` of the map
 //! - `quit`
 //!
 //! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`. Game specific commands
@@ -68,7 +69,7 @@ enum Command {
     Hold(Vec<KeyCode>, f32),
     Wait(f32),
     Screenshot(String),
-    Goto(String, String),
+    Goto(String, Option<String>),
     Quit,
 }
 
@@ -111,8 +112,9 @@ fn parse(text: &str) -> VecDeque<Command> {
                 {
                     Command::Screenshot(name.to_string())
                 }
+                ["goto", map] if !map.is_empty() => Command::Goto(map.to_string(), None),
                 ["goto", map, entry] if !map.is_empty() && !entry.is_empty() => {
-                    Command::Goto(map.to_string(), entry.to_string())
+                    Command::Goto(map.to_string(), Some(entry.to_string()))
                 }
                 ["quit"] => Command::Quit,
                 _ => None?,
@@ -235,7 +237,7 @@ fn run_script(
         }
         Command::Goto(map, entry) => {
             if !script.goto_sent {
-                info!("script: goto map {map} entry {entry}");
+                info!("script: goto map {map} entry {entry:?}");
                 link.changes.write(RequestMapChange {
                     to: map.clone(),
                     entry: entry.clone(),
@@ -252,7 +254,7 @@ fn run_script(
                 // A request for an unknown map is refused and never shows as busy, so stop waiting after 5 seconds.
                 if idle && ((script.goto_busy && arrived) || script.elapsed > 5.0) {
                     if !arrived {
-                        warn!("script: goto {map} {entry} did not arrive");
+                        warn!("script: goto {map} {entry:?} did not arrive");
                     }
                     true
                 } else {
@@ -312,12 +314,13 @@ mod tests {
     }
 
     #[test]
-    fn goto_needs_a_map_and_an_entry() {
-        let commands = parse("goto:2:from_1;goto:2;goto::x");
-        assert_eq!(commands.len(), 1);
+    fn goto_takes_a_map_and_an_optional_entry() {
+        let commands = parse("goto:2:from_1;goto:2;goto::x;goto:");
+        assert_eq!(commands.len(), 2);
         assert!(
-            matches!(&commands[0], Command::Goto(map, entry) if map == "2" && entry == "from_1")
+            matches!(&commands[0], Command::Goto(map, Some(entry)) if map == "2" && entry == "from_1")
         );
+        assert!(matches!(&commands[1], Command::Goto(map, None) if map == "2"));
     }
 
     #[test]

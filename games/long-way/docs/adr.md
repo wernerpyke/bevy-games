@@ -13,6 +13,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw17 | The view is a square of 8 by 8 cells, no game tests for collision |
 | adr-lw18 | A tree in a cluster blocks one map cell, the trunk cell |
 | adr-lw19 | The player starts at the `player_start` marker |
+| adr-lw21 | Long Way leaves a map by touching a marker |
 
 ## adr-lw1. Custom tree collision with a blocked band, no physics crate (2026-10-31)
 
@@ -129,3 +130,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The source PNGs are 160x200 with a glow, not a pixel grid. Resizing to 28x35 once in the `.aseprite` file keeps the pixel art rule of a whole number scale (1). The first size was one cell (52x64) and was too large next to the player, so it was reduced on 2026-11-06.
 
 **How to apply.** Constants are in `src/markers.rs`. The collision box is a plain rectangle, so a lantern next to a rock or tree gets its own edge and does not merge into their cluster rule.
+
+## adr-lw21. Long Way leaves a map by touching a marker (2026-11-07)
+
+**Decision.** In Long Way the markers `m` and `M` are the doors between maps. A legend entry such as `"m": marker exit_to=2` makes a marker lead to map 2, and the player arrives at the `@` of that map (`adr-x33`). The touch area is the blocked area of the marker plus 2 pixels (`TOUCH_MARGIN` in `markers.rs`), because the feet cannot enter the blocked area. The player keeps their facing. The maps no longer have `exits:` or `entries:` blocks, and all links are scene transitions.
+
+**Rationale.** The developer wants a visible object to walk into, not an invisible strip on the map edge. Arriving at the start cell keeps every map to one way in.
+
+**How to apply.** Map 1: `m` leads to map 2 and `M` to map 3. Map 2: `m` leads to map 3. Map 3 has no exit. Each map needs one `@`. Map files: `games/long-way/docs/maps.md`.

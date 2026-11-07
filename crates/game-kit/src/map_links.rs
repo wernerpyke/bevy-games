@@ -9,7 +9,7 @@
 //!   because the maps are placed side by side and never turned.
 
 use crate::map::{Map, MapError};
-use crate::map_areas::Transition;
+use crate::map_areas::{PLAYER_START, Transition};
 
 /// A parsed map with the id the game registered it under and the file it came from (for error messages).
 pub struct LinkedMap<'a> {
@@ -109,6 +109,45 @@ pub fn validate_links(maps: &[LinkedMap]) -> Result<(), MapError> {
             }
         }
     }
+    for from in maps {
+        check_object_exits(from, maps)?;
+    }
+    Ok(())
+}
+
+/// Checks the `exit_to` of every object: it names a registered map, and that map has exactly one `player_start`,
+/// because the player arrives there.
+fn check_object_exits(from: &LinkedMap, maps: &[LinkedMap]) -> Result<(), MapError> {
+    for object in &from.map.objects {
+        let Some(target) = object.exit_to() else {
+            continue;
+        };
+        let fail = |message: String| MapError {
+            file: from.file.to_string(),
+            line: object.params.line(),
+            message,
+        };
+        let Some(to) = maps.iter().find(|m| m.id == target) else {
+            let known: Vec<&str> = maps.iter().map(|m| m.id).collect();
+            return Err(fail(format!(
+                "`{}` leads to map `{target}`, which is not registered (registered: {})",
+                object.kind,
+                known.join(", ")
+            )));
+        };
+        let starts = to
+            .map
+            .objects
+            .iter()
+            .filter(|o| o.kind == PLAYER_START)
+            .count();
+        if starts != 1 {
+            return Err(fail(format!(
+                "`{}` leads to map `{target}`, which has {starts} `{PLAYER_START}` markers, it needs exactly one",
+                object.kind
+            )));
+        }
+    }
     Ok(())
 }
 
@@ -156,6 +195,46 @@ mod tests {
 
     fn entry_map(area: &str) -> Map {
         map(10, 10, &format!("entries:\n  e: area={area}\n"))
+    }
+
+    /// A 3 by 1 map with a marker `m` that leads to map `to` (when given) and a row of `cells`.
+    fn marker_map(to: Option<&str>, cells: &str) -> Map {
+        let exit = to.map(|to| format!(" exit_to={to}")).unwrap_or_default();
+        let text = format!(
+            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 3x1\nlegend:\n  \".\": empty\n  \"m\": marker{exit}\n  \"@\": player_start\n---\n 0 |{cells}|\n"
+        );
+        parse("t.txt", &text, &["marker", PLAYER_START]).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    #[test]
+    fn a_marker_exit_needs_a_registered_map_with_one_start() {
+        let first = marker_map(Some("2"), "m . .");
+        let second = marker_map(None, ". @ .");
+        check(&[("1", &first), ("2", &second)]).unwrap();
+        // A marker that leads to its own map is allowed when the map has a start.
+        let looping = marker_map(Some("1"), "m . @");
+        check(&[("1", &looping)]).unwrap();
+    }
+
+    #[test]
+    fn a_marker_exit_to_an_unknown_map_names_the_legend_line() {
+        let first = marker_map(Some("9"), "m . .");
+        let e = problem(&[("1", &first)]);
+        assert_eq!((e.file.as_str(), e.line), ("m.txt", 8));
+        assert!(
+            e.message.contains("map `9`") && e.message.contains("registered: 1"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn a_marker_exit_to_a_map_without_exactly_one_start_is_an_error() {
+        let first = marker_map(Some("2"), "m . .");
+        for cells in [". . .", "@ . @"] {
+            let second = marker_map(None, cells);
+            let e = problem(&[("1", &first), ("2", &second)]);
+            assert!(e.message.contains("exactly one"), "{cells}: {e}");
+        }
     }
 
     #[test]
