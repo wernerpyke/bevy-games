@@ -1,7 +1,7 @@
 //! Reusable visual debug tools. F2 toggles the info box, F3 toggles the grid.
 //! The collision overlay lives in `collision_debug.rs` and follows F3.
 //!
-//! The grid and the info box follow the camera (`Camera2d` with an orthographic projection), so they work for a fixed
+//! The grid and the info box follow the camera (the `GameCamera`, orthographic), so they work for a fixed
 //! or a scrolling view. The info box reports on the entity with the `Controlled` component.
 //!
 //! To show a value in the info box from any system, take `ResMut<DebugInfo>` and call `set`.
@@ -16,7 +16,7 @@ use bevy::prelude::*;
 use bevy::sprite::Anchor;
 
 use crate::Controlled;
-use crate::camera::visible_rect;
+use crate::camera::{GameCamera, visible_rect};
 use crate::depth::DepthSort;
 use crate::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
 
@@ -295,7 +295,7 @@ fn rebuild_grid(
     mut commands: Commands,
     settings: Res<DebugSettings>,
     grids: Res<DebugGrids>,
-    camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
+    camera: Single<(&GlobalTransform, &Projection), With<GameCamera>>,
     root: Single<(Entity, &mut Visibility), With<GridRoot>>,
     mut last: Local<Option<GridKey>>,
 ) {
@@ -411,7 +411,7 @@ fn rebuild_grid(
 /// Keeps the column numbers on the top edge and the row numbers on the left edge of the view while the camera moves.
 fn pin_grid_labels(
     settings: Res<DebugSettings>,
-    camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
+    camera: Single<(&GlobalTransform, &Projection), With<GameCamera>>,
     mut columns: Query<(&ColumnLabel, &mut Transform), Without<RowLabel>>,
     mut rows: Query<(&RowLabel, &mut Transform), Without<ColumnLabel>>,
 ) {
@@ -434,7 +434,7 @@ fn pin_grid_labels(
 /// "<name> x/y" and "<name> cell" use grid coordinates. "<name> world" is the raw world position.
 fn report_target(
     target: Single<(&Transform, &DepthSort), With<Controlled>>,
-    camera: Single<(&GlobalTransform, &Projection), With<Camera2d>>,
+    camera: Single<(&GlobalTransform, &Projection), With<GameCamera>>,
     settings: Res<DebugSettings>,
     grids: Res<DebugGrids>,
     mut info: ResMut<DebugInfo>,

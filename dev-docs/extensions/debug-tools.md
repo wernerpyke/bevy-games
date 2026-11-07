@@ -27,7 +27,7 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`, `adr-x28`.
 
 ### Grid (key F3)
 
-1. Lines at every `cell_size`, in `grid_color`, over the area the camera shows (the `Camera2d` with an orthographic projection). Thin sprites on `grid_z` (default `GRID_DEBUG_Z`). The grid follows a scrolling camera: it is rebuilt when the camera crosses a line.
+1. Lines at every `cell_size`, in `grid_color`, over the area the camera shows (the `GameCamera`, orthographic). Thin sprites on `grid_z` (default `GRID_DEBUG_Z`). The grid follows a scrolling camera: it is rebuilt when the camera crosses a line.
 2. Column numbers stay on the top edge and row numbers on the left edge of the view, also while the camera moves.
 3. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` or `World(Vec2)`. `BottomLeft` is the corner of the visible area, which moves when the window is resized or the camera moves. Use `World(Vec2)` for a fixed origin.
 3b. `DebugGrids` (a resource, empty by default) holds one `GridRegion { origin, rect }` per map. When it is not empty the grid is drawn once per region in view: lines only inside the region, numbers counted from the region origin, the info box "cell" and "x/y" counted from the region that holds the feet. `map_transition.rs` fills it from the active maps. Column labels stay on the top edge of the view but not above their map, row labels on the left edge but not left of their map. The lines at the top and right edge of a map have no label. With no regions there is one grid from `grid_origin`, as before.

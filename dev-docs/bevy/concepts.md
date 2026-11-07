@@ -207,6 +207,10 @@ World units here equal art pixels, so a 60 pixel sprite is 60 units wide. Screen
 
 World coordinates: the centre is (0, 0), x grows right and y grows up.
 
+### Viewports and a second camera
+
+A camera can draw into part of the window only: `Camera::viewport` is a rectangle in physical pixels, origin top left. `FixedVertical` then maps the view height to the viewport height, so a smaller region keeps the art scale. The HUD bar is a second camera with its own region (`crates/game-kit/src/screen.rs`). Bevy UI has no `RenderLayers`: `UiTargetCamera(camera)` on a root node says which camera draws it, and `IsDefaultUiCamera` marks the camera for roots with no target. `UiScale` is a resource that multiplies every UI size, which we use to write UI in art pixels. Because two cameras exist, kit code finds the world camera with the `GameCamera` marker and not with `Camera2d`.
+
 ## Draw order (z)
 
 In 2D, the `z` of a `Transform` decides what draws on top: a higher `z` draws in front. Sprites with equal `z` have no fixed order and can flicker. Bevy does not sort by `y` for you, and has no layer system for 2D. `RenderLayers` only chooses which camera sees an entity. Our solution (sorting by feet and named layers) is in `dev-docs/extensions/draw-order.md`.
@@ -272,7 +276,13 @@ The map transition uses three of them. The kit decides when a map loads and unlo
 
 ## States
 
-**Not used yet.** Bevy has built-in app states (loading, menu, playing, game over) that switch groups of systems on and off. The `bevy_state` feature is part of the default app features we depend on. The architecture defaults in `CLAUDE.md` plan to use it for app flow (loading, menu, playing) and a sub-state for the play mode.
+Bevy app states switch groups of systems on and off and run code when a state is entered or left. The `bevy_state` feature is part of the default app features we depend on. The kit defines `AppState` (`Loading`, `Title`, `Playing`, `GameOver`) in `crates/game-kit/src/app_state.rs`.
+
+- A state is an `enum` with `#[derive(States)]`. `app.insert_state(first)` registers it. `NextState<S>` (`next.set(..)`) asks for a change, and Bevy applies it before the next `Update`.
+- `OnEnter(S::X)` and `OnExit(S::X)` are schedules: put systems there to run once on entry or exit. `run_if(in_state(S::X))` runs a system every frame while in that state.
+- A sub state (`#[derive(SubStates)]` with `#[source(AppState = AppState::Playing)]`, `app.add_sub_state::<PlayState>()`) exists only while its source state has that value. Pause is a sub state: it needs no code for the other screens.
+- `DespawnOnExit(state)` on an entity removes it when that state is left. A screen root uses it, so leaving the title removes the title.
+- `Time<Virtual>::pause()` stops the clock that `Res<Time>` reads in `Update`, so everything that uses `time.delta_secs()` freezes. `Time<Real>` keeps running.
 
 ## Cargo features and build profiles
 

@@ -57,7 +57,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/` with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.
 - Games are self-contained. A game never depends on another game's crate or reads another game's assets.
 - Art is copied into the game that uses it. A palette or sprite used by two games is copied twice.
-- Shared code lives in `crates/game-kit/` (`adr-x12`): collision, outline, depth sort, layers, map parser, camera, debug tools and the script runner. Move code there only when two games use it, and ask first. A game keeps its own values, object kinds, art and rules. The kit has no assets and no game types. Build and test it alone with `./dev-scripts/rust.sh test game-kit`.
+- Shared code lives in `crates/game-kit/` (`adr-x12`): collision, outline, depth sort, layers, map parser, camera, screen layout, HUD and app states, debug tools and the script runner. Move code there only when two games use it, and ask first. A game keeps its own values, object kinds, art and rules. The kit has no assets and no game types. Build and test it alone with `./dev-scripts/rust.sh test game-kit`.
 - Dependency versions are set once in the root `Cargo.toml` under `[workspace.dependencies]`. Games use `bevy.workspace = true`. Build profiles are set only in the root `Cargo.toml`.
 - All commands name the game. When a request does not say which game, ask.
 
@@ -104,7 +104,7 @@ Pipeline, palette rules and the list of copied files: `games/long-way/docs/art-p
 Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all of them. Call it bare: no pipes, `;` or `$(...)`.
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
-- Run: `./dev-scripts/rust.sh run <game>` (add `--debug` to start with the F2 info box and the F3 grid visible; the flag is not passed to cargo)
+- Run: `./dev-scripts/rust.sh run <game>` (add `--debug` to start with the F2 info box and the F3 grid visible, and `--skip-title` to skip a title screen; the flags are not passed to cargo)
 - Scripted run: `./dev-scripts/rust.sh script <game> "<commands>" [map-file]` (the optional map file starts the game in that map, for example `2.txt`), for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the F2 info box, the F3 grid and the collision and movement overlays are drawn. Without the flag they start hidden (F2 and F3 still toggle them). Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
 - Zoomed screenshot: `./dev-scripts/shot.sh <game> <name> "<commands>" cx=<x> cy=<y> w=<w> h=<h> scale=<n>` (world units, saves `target/screenshots/<name>_crop.png`). Aseprite checks: `./dev-scripts/aseprite.sh <check|frame_grid|sheet_analysis|crop> <file> key=value ...`. Details: `dev-docs/extensions/dev-scripts.md`. Allowlist: `Bash(./dev-scripts/shot.sh:*)`, `Bash(./dev-scripts/aseprite.sh:*)`.
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`

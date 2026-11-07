@@ -20,7 +20,7 @@ use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
 
 use crate::Controlled;
-use crate::camera::{CameraBounds, CameraSmoothing, visible_rect};
+use crate::camera::{CameraBounds, CameraSmoothing, GameCamera, visible_rect};
 use crate::collision::register_blockers;
 use crate::debug::{DebugGrids, DebugInfo, GridRegion};
 use crate::depth::DepthSort;
@@ -1046,7 +1046,8 @@ fn unload_hidden(world: &mut World) {
         return;
     }
     let visible = {
-        let mut cameras = world.query_filtered::<(&GlobalTransform, &Projection), With<Camera2d>>();
+        let mut cameras =
+            world.query_filtered::<(&GlobalTransform, &Projection), With<GameCamera>>();
         cameras
             .single(world)
             .ok()
@@ -2050,6 +2051,7 @@ mod tests {
         app.world_mut()
             .spawn((
                 Camera2d,
+                GameCamera,
                 GlobalTransform::from(Transform::from_translation(centre.extend(0.0))),
                 Projection::Orthographic(OrthographicProjection {
                     area: Rect::new(-100.0, -100.0, 100.0, 100.0),

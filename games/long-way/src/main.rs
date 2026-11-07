@@ -1,5 +1,6 @@
 mod camera;
 mod collision;
+mod hud;
 mod map;
 mod markers;
 mod player;
@@ -17,7 +18,7 @@ fn main() {
                 .set(ImagePlugin::default_nearest())
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resolution: (camera::WINDOW_SIZE, camera::WINDOW_SIZE).into(),
+                        resolution: (camera::WINDOW_WIDTH, camera::WINDOW_HEIGHT).into(),
                         ..default()
                     }),
                     ..default()
@@ -30,6 +31,18 @@ fn main() {
                 clear_color: camera::CLEAR_COLOR,
             },
             game_kit::camera::CameraFollowPlugin,
+            game_kit::screen::ScreenPlugin {
+                mode: game_kit::screen::ScreenMode::BarTop {
+                    ratio: camera::HUD_BAR_RATIO,
+                },
+                hud_background: camera::HUD_BACKGROUND,
+            },
+            // Long Way has no title, pause dialog or game over screen yet: it starts in the game and has no pause key.
+            game_kit::app_state::AppFlowPlugin {
+                pause_key: None,
+                ..game_kit::app_state::AppFlowPlugin::new(game_kit::app_state::AppState::Playing)
+            },
+            hud::HudPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

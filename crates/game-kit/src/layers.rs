@@ -12,6 +12,7 @@
 //! | Feature debug | sprite z | `FEATURE_DEBUG_Z` |
 //! | Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 //! | HUD | UI `GlobalZIndex` | `HUD_Z_INDEX` |
+//! | Pause dim | UI `GlobalZIndex` | `DIM_Z_INDEX` |
 //! | UI (dialogs) | UI `GlobalZIndex` | `UI_Z_INDEX` |
 //! | Map fade | UI `GlobalZIndex` | `FADE_Z_INDEX` |
 //!
@@ -36,6 +37,8 @@ pub const FEATURE_DEBUG_INTERIOR_Z: f32 = 201.0;
 pub const FEATURE_DEBUG_FEET_Z: f32 = 202.0;
 /// Z index of the HUD: the info box and other always-on-screen readouts.
 pub const HUD_Z_INDEX: i32 = 0;
+/// Z index of the dim layer over the HUD and the game while paused (`app_state.rs`), below the pause dialog.
+pub const DIM_Z_INDEX: i32 = 50;
 /// Z index of dialogs and menus, above the HUD.
 pub const UI_Z_INDEX: i32 = 100;
 /// Z index of the full-screen fade of a map transition (`map_transition.rs`), above the UI.
@@ -53,5 +56,5 @@ const _: () = {
     );
     // `OrthographicProjection::default_2d` shows z from -1000 to 1000.
     assert!(BACKGROUND_Z > -1000.0 && MOVEMENT_DEBUG_Z < 1000.0);
-    assert!(HUD_Z_INDEX < UI_Z_INDEX && UI_Z_INDEX < FADE_Z_INDEX);
+    assert!(HUD_Z_INDEX < DIM_Z_INDEX && DIM_Z_INDEX < UI_Z_INDEX && UI_Z_INDEX < FADE_Z_INDEX);
 };

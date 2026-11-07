@@ -7,8 +7,15 @@ use bevy::transform::TransformSystems;
 
 use crate::Controlled;
 
-/// Spawns the 2D camera at the world origin and sets the clear colour. A game that scrolls moves the `Camera2d`
-/// entity itself.
+/// Marks the camera that shows the world. Every kit system that needs the world camera asks for this marker and not
+/// for `Camera2d`, because a second camera (the `HudCamera`, `screen.rs`) would make a `Single<.., With<Camera2d>>`
+/// match two entities and Bevy skips such a system without a warning. See `dev-docs/adr/EXTENSIONS.md` adr-x34.
+#[derive(Component)]
+pub struct GameCamera;
+
+/// Spawns the 2D camera (a `GameCamera`) at the world origin and sets the clear colour. A game that scrolls moves
+/// that entity itself. The camera is also the default UI camera, so UI roots without a `UiTargetCamera` (the debug
+/// info box, the map fade) are drawn in the game region.
 pub struct PixelCameraPlugin {
     /// Height of the view in world units (art pixels). On-screen size of a sprite is its height divided by this,
     /// as a share of the screen height.
@@ -29,6 +36,8 @@ impl Plugin for PixelCameraPlugin {
 fn spawn_camera(mut commands: Commands, view_height: f32) {
     commands.spawn((
         Camera2d,
+        GameCamera,
+        IsDefaultUiCamera,
         Msaa::Off,
         Projection::Orthographic(OrthographicProjection {
             scaling_mode: ScalingMode::FixedVertical {
@@ -112,8 +121,8 @@ impl Plugin for CameraFollowPlugin {
 }
 
 fn follow_controlled(
-    target: Single<&Transform, (With<Controlled>, Without<Camera2d>)>,
-    mut camera: Single<(&mut Transform, &Projection), With<Camera2d>>,
+    target: Single<&Transform, (With<Controlled>, Without<GameCamera>)>,
+    mut camera: Single<(&mut Transform, &Projection), With<GameCamera>>,
     bounds: Option<Res<CameraBounds>>,
     smoothing: Option<ResMut<CameraSmoothing>>,
     time: Res<Time>,
@@ -222,6 +231,26 @@ mod tests {
             ScalingMode::FixedVertical { viewport_height } if viewport_height == 240.0
         ));
         assert_eq!(app.world().resource::<ClearColor>().0, Color::BLACK);
+    }
+
+    #[test]
+    fn a_second_camera_does_not_stop_the_game_camera_following() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, CameraFollowPlugin));
+        let projection = Projection::Orthographic(OrthographicProjection {
+            area: Rect::new(-100.0, -100.0, 100.0, 100.0),
+            ..OrthographicProjection::default_2d()
+        });
+        let game = app
+            .world_mut()
+            .spawn((Camera2d, GameCamera, projection, Transform::default()))
+            .id();
+        app.world_mut().spawn((Camera2d, Transform::default()));
+        app.world_mut()
+            .spawn((Controlled, Transform::from_xyz(40.0, 25.0, 0.0)));
+        app.update();
+        let moved = app.world().get::<Transform>(game).unwrap().translation;
+        assert_eq!(moved.truncate(), Vec2::new(40.0, 25.0));
     }
 
     #[test]

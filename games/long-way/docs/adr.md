@@ -102,7 +102,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw17. The view is a square of 8 by 8 cells, and the game has no collision tests (2026-11-06)
 
-**Decision.** The window is square (`WINDOW_SIZE`, 720) and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells. This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map (changed by `adr-lw19`). Long Way has no unit tests for collision, placement or the bundled map. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics).
+**Decision.** The game region of the window is square and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells (the window was square, 720, until the HUD bar of `adr-lw24`). This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map (changed by `adr-lw19`). Long Way has no unit tests for collision, placement or the bundled map. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics).
 
 **Rationale.** The developer is experimenting with map sizes. A test that fixes the size and object cells of the bundled map fails on every edit. The collision rules are general and the kit tests them (`adr-x4`).
 
@@ -147,3 +147,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** A planting such as the one in `1.txt`, columns 0 to 4, rows 1 to 4, mixes sizes and has to be one solid shape, or the player slips between the plants. The kit groups items of one size only. The game expands each item into the cells of its footprint and groups the cells with size 1, so a 2x2 object behaves as before, and a 1x1 shrub does not link to objects two cells away. This needs no kit change. The anchor cell is the trunk cell for all five, because the medium green tree has its trunk in its left cell (its canvas hangs from the bottom left), where `green_tree` has it in its right cell.
 
 **How to apply.** A new blocking kind gets a footprint in `Kind::footprint` and is counted in `blocking_groups` (not a marker or a lantern). Rules: `games/long-way/docs/collision.md`, "Groups". Values per kind: the `art` table in `scenery.rs`.
+
+## adr-lw24. Long Way has a HUD bar above the game view (2026-11-07)
+
+**Decision.** The HUD is a bar above the game view, 100% of the view width and 31.25% (5/16) of the view height: 512 by 160 art pixels (`adr-x34`). The window is 576 by 756 (the game region is 576 by 576, the bar is 576 by 180, a scale of 1.125 = 9/8). It must fit a laptop screen: macOS shrinks a taller window, and the view then shows more than 8 by 8 cells (720 by 945 was tried and did not fit a 1600 pixel high display). The bar has its own background and content, and the map-transition fade does not cover it. The HUD starts with one text label, `Long Way`, in a simple Courier-like open-licence font (name and licence recorded in `art-pipeline.md`). Long Way has no title, pause or game over screen yet. The overlay mode is not built for Long Way.
+
+**Rationale.** A bar keeps icons and text off the world, so the 8 by 8 cell view and the art scale stay as they are. The same scale as today means no art or map value changes.
+
+**How to apply.** `camera.rs` holds the window size, the view height and the bar size. See roadmap item 13.

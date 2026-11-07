@@ -1,10 +1,21 @@
 use bevy::prelude::*;
 
-/// Height of the game view in art pixels: 8 cells. The window is square (`WINDOW_SIZE`), so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so about one 10th of the screen height. The camera follows the player and stops at the map edge.
+/// Height of the game view in art pixels: 8 cells. The game region of the window is square, so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so about one 10th of the screen height. The camera follows the player and stops at the map edge.
 pub const VIEW_HEIGHT: f32 = 512.0;
 
-/// Side of the square game window in logical pixels.
-pub const WINDOW_SIZE: u32 = 720;
+/// Size of the game window in logical pixels. The game region is the lower 576 by 576 (the view scale is 576 / `VIEW_HEIGHT` = 1.125), the HUD bar above it is 576 by 180 (`adr-lw24`).
+pub const WINDOW_WIDTH: u32 = 576;
+pub const WINDOW_HEIGHT: u32 = 756;
+
+/// Height of the HUD bar as a share of the game view height: the bar is the view width wide and 5/16 as high (160 art pixels, 2.5 cells).
+pub const HUD_BAR_RATIO: f32 = 0.3125;
+
+/// Palette colours `#314b8e` and `#e78d7b`.
+pub const HUD_BACKGROUND: Color = Color::srgb(0.1922, 0.2941, 0.5569);
+pub const HUD_TEXT: Color = Color::srgb(0.9059, 0.5529, 0.4824);
+
+/// Size of the HUD text in art pixels.
+pub const HUD_FONT_SIZE: f32 = 32.0;
 
 /// Background colour behind the world.
 pub const CLEAR_COLOR: Color = Color::srgb(0.16, 0.17, 0.2);

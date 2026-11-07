@@ -17,6 +17,9 @@ Single entry point for players and users: quick start, controls, common commands
 
 # starts with the F2 info box and the F3 grid visible
 ./dev-scripts/rust.sh run r-town --debug
+
+# skips the title screen (a game with a title screen only; scripted runs always skip it)
+./dev-scripts/rust.sh run long-way --skip-title
 ```
 
 The first build takes several minutes.

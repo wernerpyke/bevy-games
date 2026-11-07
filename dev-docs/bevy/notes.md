@@ -82,3 +82,18 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - `Time` in `Update` is virtual time, and it never advances more than 0.25 seconds per frame (`Time<Virtual>` max delta). `TimeUpdateStrategy::ManualDuration(Duration::from_millis(600))` therefore gives 0.25 s per `app.update()`. Count updates for timers in a test, or use a step of 250 ms or less.
 - A `Camera2d` in a `MinimalPlugins` test has no transform propagation: insert `GlobalTransform` yourself, and set `OrthographicProjection::area` (it is zero until the render systems run), or `visible_rect` returns `None`.
 - A map or tool that needs both `&mut World` and queries in one system: read what you need into owned values first (ids, rectangles), then change the world.
+
+## Viewports and a HUD camera (verified in `screen.rs`, `hud.rs`)
+
+- `Camera::viewport = Some(Viewport { physical_position, physical_size, ..default() })` limits a camera to a rectangle of the window (origin top left, physical pixels). `ScalingMode::FixedVertical` then maps the view height to the viewport height.
+- The first camera on a window clears the whole window, whatever its viewport. A second camera for a region sets `clear_color: ClearColorConfig::None` and a `Camera::order` above the first, and the region gets its background from a UI node.
+- A second `Camera2d` also draws world sprites in its region. Give it `RenderLayers::layer(1)` (the world is on layer 0).
+- A UI root without `UiTargetCamera` goes to the camera with `IsDefaultUiCamera`, or else to the highest `order` camera on the primary window. Put `IsDefaultUiCamera` on the game camera, so the debug box and the fade stay in the game region, and give the HUD root `UiTargetCamera(hud_camera)`.
+- A root node with `width: percent(100)` fills the viewport of its target camera, and its drawing is clipped to it (seen in a screenshot).
+- `UiScale` (`bevy::ui::UiScale`, a resource) multiplies the window scale factor for all UI and for `TextFont` sizes. Art pixel UI: `game_region_physical_height / (view_height * window.scale_factor())`.
+- `TextFont::from_font_size(32.0).with_font(server.load("fonts/X.ttf"))`. `font` is a `FontSource` in 0.20.
+- `app.insert_state(S::X)`, `app.add_sub_state::<Sub>()`, `OnEnter(S::X)`, `OnExit(S::X)`, `in_state(S::X)`, `DespawnOnExit(S::X)`, `NextState<S>` with `.set(..)` (verified in `app_state.rs`, `examples/state/sub_states.rs`). A headless test needs `bevy::state::app::StatesPlugin` and `init_resource::<ButtonInput<KeyCode>>()`, and the state change shows after two `app.update()` calls. A pause toggle needs `Time<Virtual>::pause()` and `unpause()`.
+- A sub state is removed with its source, and its `OnExit` runs, so leaving `Playing` while `Paused` still runs the `OnExit(Paused)` system.
+- `bevy::picking::Pickable { should_block_lower: true, is_hoverable: false }` on a UI node stops picking below it.
+- A system with `Single<(&mut Camera, ..), With<A>>` and `Single<&mut Camera, With<B>>` needs `Without<B>` and `Without<A>` filters, or Bevy reports a query conflict. A long tuple in a `Single` trips clippy `type_complexity`: use a `type` alias.
+- Test without a window: `App::new().add_plugins(MinimalPlugins)`, `init_resource::<UiScale>()`, and spawn `(Window { resolution: (720, 1080).into(), ..default() }, PrimaryWindow)`. `Window::physical_size()` works without a backend.

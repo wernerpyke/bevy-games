@@ -7,7 +7,7 @@
 # Usage:
 #   ./dev-scripts/rust.sh build [game]        # build one game, or all
 #   ./dev-scripts/rust.sh test [game]         # test one game, or all
-#   ./dev-scripts/rust.sh run <game> [map-file] [--debug]
+#   ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title]
 #                                             # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map).
 #                                             # --debug turns on the F2 info box and the F3 grid (off without it)
 #   ./dev-scripts/rust.sh lint                # cargo fmt --check + clippy -D warnings (all games)
@@ -37,10 +37,12 @@ case "${1:-}" in
     ;;
   run)
     shift
-    # --debug is not a cargo argument: it sets GAME_KIT_DEBUG, which the kit debug tools read.
+    # --debug and --skip-title are not cargo arguments: they set GAME_KIT_DEBUG and GAME_KIT_SKIP_TITLE, which the kit reads.
     args=(); debug=0
     for arg in "$@"; do
-      if [ "$arg" = "--debug" ]; then debug=1; else args+=("$arg"); fi
+      if [ "$arg" = "--debug" ]; then debug=1
+      elif [ "$arg" = "--skip-title" ]; then export GAME_KIT_SKIP_TITLE=1
+      else args+=("$arg"); fi
     done
     set -- ${args[@]+"${args[@]}"}
     if [ "$debug" = 1 ]; then export GAME_KIT_DEBUG=1; fi
@@ -65,6 +67,8 @@ case "${1:-}" in
     ;;
   script)
     shift
+    # A scripted run never shows the title screen: the script drives the player.
+    export GAME_KIT_SKIP_TITLE=1
     args=(); debug=0
     for arg in "$@"; do
       if [ "$arg" = "--debug" ]; then debug=1; else args+=("$arg"); fi
