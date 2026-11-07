@@ -32,7 +32,17 @@ const MAPS: &[MapSource] = &[
 ];
 
 /// The legend names the parser accepts.
-const KIND_NAMES: &[&str] = &["rock_0", "rock_1", "green_tree", "red_tree", PLAYER_START];
+const KIND_NAMES: &[&str] = &[
+    "rock_0",
+    "rock_1",
+    "green_tree",
+    "red_tree",
+    "lantern",
+    "lantern_red",
+    "marker",
+    "marker_red",
+    PLAYER_START,
+];
 
 /// The map the game starts in: the id from the file name in `LONG_WAY_MAP` (`rust.sh run long-way 2.txt` sets it), else
 /// map 1. A map that is not the first needs a `player_start` marker to start in.
@@ -99,6 +109,7 @@ fn load_hook(
     }
     crate::rocks::spawn_rocks(&mut commands, &server, map, &load);
     crate::trees::spawn_trees(&mut commands, &server, map, &load);
+    crate::markers::spawn_markers(&mut commands, &server, map, &load);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): reads the current map file again and loads it again. A file with an
@@ -126,12 +137,15 @@ impl Group {
 }
 
 /// The group of each object of the map, in the order of `map.objects`. Rocks and trees block, so they count. Markers
-/// (the player start) block nothing and are not counted: they get a group of 1 that nobody reads. Footprints are 2x2
+/// (the player start), lanterns and markers are not counted: they get a group of 1 that nobody reads. Footprints are 2x2
 /// cells, so objects 2 cells apart touch and objects 3 cells apart do not. A new blocking kind must be counted here
 /// too.
 pub fn blocking_groups(map: &Map) -> Vec<Group> {
     let blocking: Vec<usize> = (0..map.objects.len())
-        .filter(|&i| !Kind::of(&map.objects[i]).is_marker())
+        .filter(|&i| {
+            let kind = Kind::of(&map.objects[i]);
+            !kind.is_marker() && !kind.is_small()
+        })
         .collect();
     let anchors: Vec<IVec2> = blocking.iter().map(|&i| map.objects[i].cell).collect();
     let footprint = IVec2::splat(FOOTPRINT_CELLS as i32);
@@ -183,6 +197,10 @@ pub enum Kind {
     Rock1,
     GreenTree,
     RedTree,
+    Lantern,
+    LanternRed,
+    Marker,
+    MarkerRed,
     /// Where the player starts. It has no art and blocks nothing.
     PlayerStart,
 }
@@ -190,6 +208,14 @@ pub enum Kind {
 impl Kind {
     pub fn is_rock(self) -> bool {
         matches!(self, Kind::Rock0 | Kind::Rock1)
+    }
+
+    /// Lanterns and markers are small, block on their own and are not part of a group of 2x2 footprints.
+    pub fn is_small(self) -> bool {
+        matches!(
+            self,
+            Kind::Lantern | Kind::LanternRed | Kind::Marker | Kind::MarkerRed
+        )
     }
 
     /// A marker is read by the game and never drawn or blocked.
@@ -203,6 +229,10 @@ impl Kind {
             "rock_1" => Some(Kind::Rock1),
             "green_tree" => Some(Kind::GreenTree),
             "red_tree" => Some(Kind::RedTree),
+            "lantern" => Some(Kind::Lantern),
+            "lantern_red" => Some(Kind::LanternRed),
+            "marker" => Some(Kind::Marker),
+            "marker_red" => Some(Kind::MarkerRed),
             PLAYER_START => Some(Kind::PlayerStart),
             _ => None,
         }

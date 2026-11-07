@@ -19,6 +19,7 @@ Long Way (`games/long-way/assets/art/`):
 - `features/Green tree.aseprite` (from `features/`, resized in our copy from 512x512 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 12 colour palette, not the game palette)
 - `features/Red tree.aseprite` (from `features/`, resized in our copy from 64x64 to 128x128 with `dev-scripts/aseprite/resize.lua`, 8 frames, no tags, 6 colour palette, not the game palette)
 - `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256 (32x32 art scaled 8x), with `dev-scripts/aseprite/frames_from_pngs.lua`: native 32x32, 2 frames, drawn in the game at a whole number scale (4x = 128 px), tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
+- `features/Markers.aseprite` (built from `input/lantern.png` and `input/lantern_red.png` (160x200, with a glow) and `input/marker.png` and `input/marker_red.png` (120x196), with `dev-scripts/aseprite/frames_from_pngs.lua` at `width=28 height=35` (nearest neighbour, each PNG resized on its own, so the markers are stretched a little wider): 4 frames, tags `lantern`, `lantern_red`, `marker` and `marker_red`. Renamed from `Lanterns.aseprite`; drawn at scale 1, 70% of the player's body height, own colour palette, not the game palette). The PNGs stay in `input/`.
 
 ## Pipeline
 
@@ -27,7 +28,7 @@ Source of truth: `.aseprite` files in each game's `assets/art/` (`games/<name>/a
 Tools:
 - `./dev-scripts/aseprite.sh` runs `check`, `frame_grid`, `sheet_analysis` and `crop` (`dev-docs/extensions/dev-scripts.md`).
 - Aseprite CLI, run as `aseprite --batch --script <script.lua>`. Binary: `/Applications/Aseprite.app/Contents/MacOS/aseprite`.
-- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes. `resize.lua` resizes. `tagged_sheets.lua` builds one file from several sprite sheets (one tag per sheet, durations from the Aseprite JSON, body re-centred on a new canvas).
+- Lua scripts in `dev-scripts/aseprite/`. Claude writes and runs them. `pack_pngs.lua` packs PNGs of different sizes into one file (bottom centre of a shared canvas, one tag per image). `frames_from_pngs.lua` needs equal sizes, or a `width` and `height` to resize every PNG to. `resize.lua` resizes. `tagged_sheets.lua` builds one file from several sprite sheets (one tag per sheet, durations from the Aseprite JSON, body re-centred on a new canvas).
 
 Rules:
 - The art never sets game mechanics. Feet, hitbox and collision come from constants in code (Long Way: `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH`, `PLAYER_BODY_HEIGHT` in `collision.rs`), not from the pixels. Moving or bobbing a sprite inside a frame is a visual change only. The `check` script reports bounds and a feet row from the pixels, so read those as a visual check, not a game value.

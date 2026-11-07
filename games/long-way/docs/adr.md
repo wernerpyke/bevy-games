@@ -121,3 +121,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** Several maps need their own starts, and a later map with a marker can be started directly for a scripted run (`adr-x30`). R-Town already works this way.
 
 **How to apply.** Put one `@` in each map that the game can start in. Do not put it inside an exit area. Reading it is `player_start_feet` in `games/long-way/src/map.rs`.
+
+## adr-lw20. Lanterns are 70% of the player height and block 80% of their width and half their height (2026-11-06)
+
+**Decision.** `lantern`, `lantern_red`, `marker` and `marker_red` are map kinds (the markers share the lantern size and collision) (`features/Markers.aseprite`, scale 1, now 28x35 px, 70% of `PLAYER_BODY_HEIGHT`). The art is centred in the cell of its map character. Each lantern blocks the middle 80% of its width and the bottom 50% of its height, rounded to whole pixels (22x18) (first the full width grown by the player's half width, narrowed on 2026-11-06 because it looked too wide). The box is not widened by the player, as in `adr-lw18`. It is a `Blocker`, as a tree trunk is, and it does not count in the groups of `adr-lw14` and `adr-lw18` (its footprint is not 2x2).
+
+**Rationale.** The source PNGs are 160x200 with a glow, not a pixel grid. Resizing to 28x35 once in the `.aseprite` file keeps the pixel art rule of a whole number scale (1). The first size was one cell (52x64) and was too large next to the player, so it was reduced on 2026-11-06.
+
+**How to apply.** Constants are in `src/markers.rs`. The collision box is a plain rectangle, so a lantern next to a rock or tree gets its own edge and does not merge into their cluster rule.

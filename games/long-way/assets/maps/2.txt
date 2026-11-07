@@ -9,9 +9,13 @@ legend:
   "1": rock_1
   "g": green_tree
   "r": red_tree
+  "l": lantern
+  "L": lantern_red
+  "m": marker
+  "M": marker_red
   "@": player_start
 entries:
-  from_1: area=3..6,0 facing=up
+  from_1: area=3..4,0 facing=up
 exits:
   to_3: area=9,4..5 to=3 entry=from_2 transition=scene
 ---
@@ -26,4 +30,4 @@ exits:
  3 |. . . . . . . . . .|
  2 |. . . . . . . . . .|
  1 |. . . . . . . . . .|
- 0 |. . .   @     . . .|
+ 0 |. . .   @ . . . . .|

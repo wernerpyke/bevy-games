@@ -15,8 +15,8 @@ The format is in the [map files extension](../../../dev-docs/extensions/map-file
 
 | From | Exit | Area | To | Entry | Area |
 |---|---|---|---|---|---|
-| 1 | `to_2` | `3..6,9` (top edge) | 2 | `from_1` | `3..6,0` (bottom edge) |
-| 1 | `to_3` | `9,8..9` (right edge) | 3 | `from_1` | `0,6..7` (left edge) |
+| 1 | `to_2` | `3..4,9` (top edge) | 2 | `from_1` | `3..4,0` (bottom edge) |
+| 1 | `to_3` | `9,7` (right edge) | 3 | `from_1` | `0,7` (left edge) |
 | 2 | `to_3` | `9,4..5` (right edge) | 3 | `from_2` | `0,8..9` (left edge) |
 
 - Walking into an exit fades the screen, loads the target map and puts the player in the entry at the same position along the strip (`dev-docs/extensions/map-transitions.md`). The 1 to 2 exit is `transition=seamless`: map 2 is loaded above map 1, aligned strip on strip, and the player walks across (`adr-x32`). The two other exits are `scene`. Map 3 is reached from maps 1 and 2, so only one link to it can be seamless unless the three maps fit together without overlapping.
@@ -32,6 +32,7 @@ The format is in the [map files extension](../../../dev-docs/extensions/map-file
 | `rock_0`, `rock_1` | `features/Rocks.aseprite` | Variants of a rock |
 | `green_tree` | `features/Green tree.aseprite` | Animated, 8 frames |
 | `red_tree` | `features/Red tree.aseprite` | Animated, 8 frames |
+| `lantern`, `lantern_red`, `marker`, `marker_red` | `features/Markers.aseprite` | 28x35 px (70% of the player's body height), drawn at scale 1 and centred in its cell. Blocks the middle 80% of its width and the bottom half of its height, rounded to whole pixels (22x18) (`adr-lw20`). Not part of a group. |
 | `player_start` | none | A marker. The player starts at the centre of its cell (`adr-lw19`). It blocks nothing. Write it `"@"` in the legend. |
 
 `draw` (rock size in pixels, a multiple of 32, default 128) applies to rocks only. `jitter` also shifts trees.
@@ -43,6 +44,10 @@ One rock covers 2 by 2 cells. The character you write is the bottom left cell of
 You may draw the cells that a rock or tree covers with blanks, to see how far it reaches. A `.` in those cells means the same. The game takes the size from the kind, not from the drawing.
 
 Characters that are next to each other overlap by one cell. This is on purpose: it makes a pile of rocks that looks like one cluster. A solid block of 4 by 3 characters gives a cluster of 5 by 4 cells.
+
+## Lanterns and markers
+
+A lantern or marker is one character, for example `l` for `lantern`, `L` for `lantern_red`, `m` for `marker` or `M` for `marker_red`. All four have the same size and collision. Its character is its cell, and the art is centred in that cell. The player cannot walk through its bottom half and walks behind the top half. Lanterns and markers do not count in a cluster of rocks and trees (`adr-lw20`).
 
 ## Trees
 

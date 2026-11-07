@@ -1,5 +1,6 @@
--- Build a new .aseprite file with one frame per PNG (all PNGs must be the same size), optionally
--- resize it with nearest-neighbour scaling, and tag each frame with the PNG file name.
+-- Build a new .aseprite file with one frame per PNG, optionally resize every PNG to width x height with
+-- nearest-neighbour scaling, and tag each frame with the PNG file name. Without width and height all PNGs
+-- must be the same size.
 --
 -- Usage:
 --   aseprite -b --script-param out=<file.aseprite> --script-param files=<a.png>,<b.png> \
@@ -17,11 +18,29 @@ for path in string.gmatch(files, "[^,]+") do
   table.insert(paths, path)
 end
 
-local first = Image { fromFile = paths[1] }
+local width = tonumber(app.params["width"])
+local height = tonumber(app.params["height"])
+local resize = width and height
+
+-- One PNG as an image, resized with nearest-neighbour scaling when a target size is given.
+local function load_image(path)
+  local image = Image { fromFile = path }
+  if not resize or (image.width == width and image.height == height) then
+    return image
+  end
+  local tmp = Sprite(image.width, image.height, ColorMode.RGB)
+  tmp:newCel(tmp.layers[1], tmp.frames[1], image, Point(0, 0))
+  app.command.SpriteSize { ui = false, width = width, height = height, lockRatio = false, method = "nearest" }
+  local resized = Image(tmp.cels[1].image)
+  tmp:close()
+  return resized
+end
+
+local first = load_image(paths[1])
 local spr = Sprite(first.width, first.height, ColorMode.RGB)
 local layer = spr.layers[1]
 for i, path in ipairs(paths) do
-  local image = Image { fromFile = path }
+  local image = load_image(path)
   if image.width ~= spr.width or image.height ~= spr.height then
     print("✗ " .. path .. " is not the same size as the first PNG")
     return
@@ -34,12 +53,6 @@ end
 for i, path in ipairs(paths) do
   local tag = spr:newTag(i, i)
   tag.name = app.fs.fileTitle(path)
-end
-
-local width = tonumber(app.params["width"])
-local height = tonumber(app.params["height"])
-if width and height then
-  app.command.SpriteSize { ui = false, width = width, height = height, lockRatio = false, method = "nearest" }
 end
 
 spr:saveAs(out)

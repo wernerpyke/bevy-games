@@ -1,6 +1,7 @@
 mod camera;
 mod collision;
 mod map;
+mod markers;
 mod player;
 mod rocks;
 mod trees;

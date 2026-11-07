@@ -15,6 +15,7 @@ games/long-way/
     ├── player.rs       PlayerPlugin: player spawn, movement, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
+    ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
     ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
@@ -31,7 +32,7 @@ games/long-way/
 | [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
-Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`.
+Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`.
 
 ## Long Way values for the pixel art extension
 

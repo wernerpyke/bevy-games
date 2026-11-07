@@ -9,9 +9,13 @@ legend:
   "1": rock_1
   "g": green_tree
   "r": red_tree
+  "l": lantern
+  "L": lantern_red
+  "m": marker
+  "M": marker_red
   "@": player_start
 entries:
-  from_1: area=0,6..7 facing=right
+  from_1: area=0,7 facing=right
   from_2: area=0,8..9 facing=right
 ---
    |0                  |
@@ -19,7 +23,7 @@ entries:
  9 |  . . . . . . . . .|
  8 |@ . . . . . . . . .|
  7 |  . . . . . . . . .|
- 6 |  . . r r . . . . .|
+ 6 |. . . r r . . . . .|
  5 |. . . r r . . . . .|
  4 |. . . . . . . . . .|
  3 |. . . . . . . . . .|
