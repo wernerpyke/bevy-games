@@ -31,7 +31,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [dev-scripts.md](dev-scripts.md) | Zoomed screenshots and Aseprite checks (`shot.sh`, `aseprite.sh`) | `dev-scripts/` | |
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | lw5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |
-| [pixel-art.md](pixel-art.md) | View height scale, animation tag switching | `game-kit` `camera.rs`, `player.rs` | e7 |
+| [pixel-art.md](pixel-art.md) | View height scale, animation tag switching, animation speed | `game-kit` `camera.rs`, `player.rs` | e7, a6 |
 
 ## Entry template
 

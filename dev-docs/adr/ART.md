@@ -39,3 +39,11 @@
 **Rationale.** The Hunter pack uses its own colours. Mapping them to the 19 old colours would change the look of the character. A bigger palette keeps the pack art as drawn. Appending keeps the player, the rocks and the trees unchanged, because sprites refer to colours, not to index numbers, only inside Aseprite.
 
 **How to apply.** Run the script with the palette and the sprite that needs the colours. It adds only colours that are not yet in the palette. Update the colour count in `art-pipeline.md`. This amends `adr-a4`: "only these colours" now means "only colours in the current palette".
+
+## adr-a6. Animation speed is set as frame durations in the `.aseprite` file (2026-11-07)
+
+**Decision.** How fast a fixed animation plays is set in the `.aseprite` file, as the duration of each frame. Code does not scale it with `Animation::with_speed`. The loop is the library default. The markers of Long Way use 250 ms per frame. `speed` stays allowed for a rate that follows the game state, such as a run animation tied to the walk speed.
+
+**Rationale.** The file is the source of truth for art (`art-pipeline.md`). A speed factor in code only works while every frame has the duration the code assumes, and nothing warns when the art changes. In the file the timing can differ per frame and per tag, and the Aseprite preview shows what the game will show. We first set the speed in code (0.4 times the 100 ms of the file) and moved it into the file the same day.
+
+**How to apply.** Set durations in Aseprite or with `dev-scripts/aseprite/set_durations.lua` (`apply=1` writes), and read them with `check`. Rules in `dev-docs/extensions/pixel-art.md`, "Animation speed".

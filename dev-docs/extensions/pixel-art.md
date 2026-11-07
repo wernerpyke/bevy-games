@@ -35,6 +35,13 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 9. A file with no tags plays all frames with `Animation::default()`.
 10. A tag may also name one frame, to pick a variant (a rock type) and not to animate.
 
+### Animation speed
+
+11. The timing of an animation is art data. Set it as frame durations in the `.aseprite` file (Aseprite: select the frames, Frame Properties, Duration). The file is then the one place that says how fast a tag plays, and the Aseprite preview matches the game. Per frame and per tag timing is possible only this way.
+12. Do not slow down or speed up a fixed animation with `Animation::with_speed` or `ase.animation.speed`. A code constant that assumes the durations in the file breaks without a message when the art changes. Use `speed` only when the rate depends on the game state (for example a run animation that follows the walk speed, rule 8).
+13. Check durations with `./dev-scripts/aseprite.sh check <file>` (tags, frames and ms) and set them with `./dev-scripts/aseprite.sh set_durations <file> tags=<a,b|all> ms=<n> [apply=1]` (`dev-scripts.md`). It is a dry run until `apply=1`. Close the file in Aseprite before applying, and note that it overwrites uncommitted art changes in that file.
+14. A tag loops by default (`AnimationRepeat::Loop`). Say so in the code only when a tag must play once or a set number of times.
+
 ## Usage
 
 - Add `PixelCameraPlugin { view_height, clear_color }` with the game's own `VIEW_HEIGHT` constant. Change that constant to change how large everything looks. The camera is spawned at the world origin. A game that scrolls adds `CameraFollowPlugin` and inserts `CameraBounds(Rect)` once the map size is known. The camera follows the `Controlled` entity, stops at the bounds and is rounded to whole world units (adr-x17).

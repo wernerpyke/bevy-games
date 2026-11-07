@@ -1,6 +1,6 @@
 # Dev scripts for screenshots and art checks
 
-All scripts take the game, file and sizes as arguments. They never change the input file. Screenshots and grids go in `target/screenshots/`. Delete them after the check (`CLAUDE.md`, "Disk use").
+All scripts take the game, file and sizes as arguments. They never change the input file, except `set_durations` with `apply=1`. Screenshots and grids go in `target/screenshots/`. Delete them after the check (`CLAUDE.md`, "Disk use").
 
 ## Zoomed screenshot
 
@@ -20,6 +20,7 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `check` | `.aseprite` | `palette=<file>`, `edge=<px>` | Canvas, colour mode, layers, tags (frames, durations), colours outside the palette, bounds and feet row per frame, frames cut off at the edge |
 | `frame_grid` | `.aseprite` | `out=`, `tag=` or `frames=a-b`, `cols=`, `scale=`, `gap=` | One PNG grid of the visible layers |
 | `sheet_analysis` | sheet `.png` | `frame=WxH` | Bounds and colour count per frame, all colours of the sheet |
+| `set_durations` | `.aseprite` | `tags=a,b` or `all`, `ms=`, `apply=1`, `out=` | Sets the frame duration of those tags. A dry run (lists the frames it would change) unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first |
 | `crop` | `.png` | `out=`, `scale=`, `cx cy w h view_height=` or `x y w h` | Cropped and scaled PNG |
 
 Why Lua and not `aseprite --crop`: the CLI `--crop` gave the wrong region and `--frame-range` is ignored together with `--sheet`.

@@ -22,6 +22,8 @@ const BLOCKED_WIDTH_FRACTION: f32 = 0.8;
 /// How far the touch area of an exit marker reaches beyond the blocked area. The feet cannot enter the blocked area, so
 /// "touching" means reaching its edge.
 const TOUCH_MARGIN: f32 = 2.0;
+/// The touch area (blocked area plus margin) is this many times wider and higher, around the same centre, so an exit is easier to reach.
+const TOUCH_SCALE: f32 = 2.0;
 
 fn tag(kind: Kind) -> Option<&'static str> {
     match kind {
@@ -44,6 +46,15 @@ fn blocked_area(corner: Vec2, cell: f32) -> Rect {
         left + width,
         corner.y + (BLOCKED_FRACTION * MARKER_HEIGHT).round(),
     )
+}
+
+/// The area of an exit marker that the feet must reach: the blocked area plus `TOUCH_MARGIN`, scaled by `TOUCH_SCALE` around its centre.
+fn touch_area(blocked: Rect) -> Rect {
+    let reach = Rect::from_corners(
+        blocked.min - Vec2::splat(TOUCH_MARGIN),
+        blocked.max + Vec2::splat(TOUCH_MARGIN),
+    );
+    Rect::from_center_size(reach.center(), reach.size() * TOUCH_SCALE)
 }
 
 /// Spawns the lanterns and markers of one map. Their areas are blockers, which `rebuild_collision` adds to the collision world.
@@ -88,10 +99,7 @@ fn spawn_marker(
     // `exit_to` in the legend makes the marker an exit (`adr-x33`).
     if let Some(to) = object.exit_to() {
         entity.insert(ExitTrigger {
-            area: Rect::from_corners(
-                blocked.min - Vec2::splat(TOUCH_MARGIN),
-                blocked.max + Vec2::splat(TOUCH_MARGIN),
-            ),
+            area: touch_area(blocked),
             to: to.to_string(),
         });
     }

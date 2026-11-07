@@ -133,7 +133,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw21. Long Way leaves a map by touching a marker (2026-11-07)
 
-**Decision.** In Long Way the markers `m` and `M` are the doors between maps. A legend entry such as `"m": marker exit_to=2` makes a marker lead to map 2, and the player arrives at the `@` of that map (`adr-x33`). The touch area is the blocked area of the marker plus 2 pixels (`TOUCH_MARGIN` in `markers.rs`), because the feet cannot enter the blocked area. The player keeps their facing. The maps no longer have `exits:` or `entries:` blocks, and all links are scene transitions.
+**Decision.** In Long Way the markers `m` and `M` are the doors between maps. A legend entry such as `"m": marker exit_to=2` makes a marker lead to map 2, and the player arrives at the `@` of that map (`adr-x33`). The touch area is the blocked area of the marker plus 2 pixels (`TOUCH_MARGIN` in `markers.rs`), because the feet cannot enter the blocked area. It is then doubled in width and height around the same centre (`TOUCH_SCALE`, changed 2026-11-07) so a door is easier to reach. The blocked area is unchanged. The player keeps their facing. The maps no longer have `exits:` or `entries:` blocks, and all links are scene transitions.
 
 **Rationale.** The developer wants a visible object to walk into, not an invisible strip on the map edge. Arriving at the start cell keeps every map to one way in.
 

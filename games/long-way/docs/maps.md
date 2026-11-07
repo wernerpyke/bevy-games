@@ -20,7 +20,7 @@ Long Way leaves a map by touching a marker (`adr-lw21`, `adr-x33`, rule 24 of th
 | 2 | `"m": marker exit_to=3` | map 3 |
 | 3 | none | no way out |
 
-- Touching means the feet reach the edge of the blocked area of the marker plus 2 pixels (`TOUCH_MARGIN` in `markers.rs`). The screen fades, the target map loads, and the player stands on its `@` with the same facing as before (`dev-docs/extensions/map-transitions.md`).
+- Touching means the feet reach the touch area of the marker: its blocked area plus 2 pixels (`TOUCH_MARGIN`), made twice as wide and high around the same centre (`TOUCH_SCALE`, both in `markers.rs`). That is 52 by 44 pixels. The screen fades, the target map loads, and the player stands on its `@` with the same facing as before (`dev-docs/extensions/map-transitions.md`).
 - Every map needs exactly one `@`, because a marker may lead to it. The game stops at start if a link names an unknown map or a map without one `@`.
 - A marker without `exit_to`, and every lantern, only blocks the player.
 - All links are scene transitions. Exit areas and seamless joins (`adr-x30`, `adr-x32`) still work in the kit, but no Long Way map uses them. Do not put a marker with `exit_to` inside an exit area.

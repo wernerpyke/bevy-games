@@ -95,6 +95,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 
 Pipeline, palette rules and the list of copied files: `games/long-way/docs/art-pipeline.md`. Read it before any art work. Key rules:
 - `.aseprite` files are the source of truth. Exports in `assets/generated/` are never edited by hand.
+- **Animation speed is set as frame durations in the `.aseprite` file, not in code** (`adr-a6`). Do not use `Animation::with_speed` for a fixed animation. Read durations with `./dev-scripts/aseprite.sh check`, and change them with `set_durations` (dry run until `apply=1`; it overwrites the file, so look at `git status` first). Rules: `dev-docs/extensions/pixel-art.md`, "Animation speed".
 - **Do NOT copy, import, convert or reference any file from `~/Dark/graveyard_shift/diodrama-assets/` until the user names that file.** Never modify or delete anything there.
 - Mark Claude-drawn placeholders with the `_placeholder` suffix.
 
