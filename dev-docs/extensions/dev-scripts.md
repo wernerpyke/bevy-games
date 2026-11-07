@@ -25,5 +25,6 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `catalogue` | sheet `.png` | `tile=` (or `tilew tileh`), `out=`, `backdrop=` | `.aseprite` copy of the sheet at 1:1 with column and row rulers and a grid. See `tile-sheet-catalogue.md` |
 | `extract_block` | original sheet `.png` | `col row cols rows tile=`, `scale=`, `anchor=bottom\|trunk\|none`, `out=` | One-frame `.aseprite` of that block, anchored in its cell space and scaled. See `tile-sheet-catalogue.md` |
 | `remap_colors` | `.aseprite` (RGB) | `map=from:to,...` (RRGGBB hex), `apply=1`, `out=` | Replaces exact colours in every cel. A dry run (lists pixel counts per pair and untouched colours) unless `apply=1`. Use before `extend_palette` (`adr-a8`) |
+| `remove_colors` | `.aseprite` (RGB) | `colors=RRGGBB,...`, `apply=1`, `out=` | Makes every pixel of those exact colours transparent in every cel. A dry run (lists pixel counts) unless `apply=1` |
 
 Why Lua and not `aseprite --crop`: the CLI `--crop` gave the wrong region and `--frame-range` is ignored together with `--sheet`.

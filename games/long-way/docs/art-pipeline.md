@@ -27,6 +27,7 @@ Long Way (`games/long-way/assets/art/`):
   - `green_shrub`: c22 r5, 1x1, `anchor=bottom`, 64x64.
   - `green_shrub_small`: c23 r5, 1x1, `anchor=bottom`, 64x64.
   The game draws `green_tree_medium` with its canvas bottom left on the cell and the other four with the bottom middle of the canvas on the bottom middle of their cell space (`scenery.rs`).
+- `pickups/pickups.aseprite` (built on 2026-11-07 from the user's `input/pickups.aseprite`, 66x317, 8 frames with a blue, a red and a violet fireball stacked in each frame. Brown-grey stray pixels (palette indexes 1 to 8 plus 5 near duplicates) and the pale diagonal streaks (11 blended colours, healed to the neighbouring ramp colour) were removed. Cut with no scaling into 64x96 cells (each fireball is at most 64x95 px and touches the canvas edge), 24 frames, tags `pickup_blue`, `pickup_red` and `pickup_violet` (8 frames each, 100 ms per frame). One layer `Pickup`. 13 colours (3 ramps of 5 colours sharing one white core), own palette, not the game palette. `input/` is git-ignored, so the source and its backup are not in the repo. Not used in the game yet.)
 
 ## Zen Garden pack (`input/zen-garden/`)
 

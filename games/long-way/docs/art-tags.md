@@ -10,6 +10,7 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 | `features/Red tree.aseprite` | none (all 8 frames loop) |
 | `features/Rocks.aseprite` | `rock_0` (frame 1), `rock_1` (frame 2). Each tag is one frame and is a rock variant, not an animation. |
 | `features/Markers.aseprite` | `lantern` (frame 1), `lantern_red` (frame 2), `marker` (frame 3), `marker_red` (frame 4). One frame each, a variant not an animation. Each tag is a map kind of the same name. |
+| `pickups/pickups.aseprite` | `pickup_blue` (frames 1-8), `pickup_red` (frames 9-16), `pickup_violet` (frames 17-24). Each tag is an 8 frame pulse loop (100 ms per frame, set in the file). One layer, `Pickup`. |
 
 ## Map kinds
 
