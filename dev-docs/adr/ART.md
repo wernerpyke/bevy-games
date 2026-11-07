@@ -55,3 +55,11 @@
 **Rationale.** The numbered tiles (587 files for Zen Garden) have no coordinates and split an object such as a pagoda over many files, so a person cannot find or name anything. The sheet shows objects whole, and the rulers give the person a way to point at them. A scaled copy of the full PNG adds a second source that can drift from the original. The sheet background in Zen Garden was already transparent, so the catalogue only needs a backdrop layer to show it.
 
 **How to apply.** Rules and usage in `dev-docs/extensions/tile-sheet-catalogue.md`. Record each extracted sprite in `games/<game>/docs/art-pipeline.md`.
+
+## adr-a8. Pack art is nudged onto the game palette, and a colour is added only when nothing close exists (2026-11-07)
+
+**Decision.** Sprites taken from a bought pack are moved onto the game palette. A colour that has a close palette colour is replaced by it. A colour with no close match is appended to the palette (`adr-a5`) instead of being forced onto a wrong colour. The first use was the five Zen Garden trees and shrubs: 8 colours were mapped, 4 were added (36 colours in total), and the pack's `#4b6396` was merged into `#425faa`.
+
+**Rationale.** The game palette is mostly grey, with one bright green. A strict nearest-colour mapping turned the green trees grey and the blue shadows into one bright cyan, which lost the look of the art. Adding every pack colour would grow the palette with near duplicates and would not align the art at all. The hybrid keeps the look and moves the outline, greys, light green and browns onto the colours the game already has. Compared on a side by side preview before the choice.
+
+**How to apply.** Compare the colours of the sprite with the palette first. Replace the close matches with `dev-scripts/aseprite/remap_colors.lua` (dry run until `apply=1`). Add the rest with `extend_palette.lua`, then run `check palette=` to confirm no colour is outside the palette. A pair is "close" when it looks like the same colour in a side by side preview, not by a fixed distance. Update the colour count in `art-pipeline.md`.

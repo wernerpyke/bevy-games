@@ -58,7 +58,7 @@ These rules came from the Zen Garden pack and apply to any pack.
 4. `anchor=none`: cut the block as drawn.
 5. The canvas is never smaller than the cell space. If the art is taller, the canvas grows upward, so the canvas bottom stays the cell bottom.
 6. `scale` is applied last, nearest neighbour, inside Aseprite. The pack has 32 px tiles and Long Way has 64 px cells, so use `scale=2`.
-7. The result has one layer and one frame, with the sheet's own colours.
+7. The result has one layer and one frame, with the sheet's own colours. To align it with a game palette, see `adr-a8` and `remap_colors`.
 
 ## Usage
 
