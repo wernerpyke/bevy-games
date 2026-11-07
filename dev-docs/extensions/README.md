@@ -32,6 +32,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | lw5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |
 | [pixel-art.md](pixel-art.md) | View height scale, animation tag switching, animation speed | `game-kit` `camera.rs`, `player.rs` | e7, a6 |
+| [tile-sheet-catalogue.md](tile-sheet-catalogue.md) | Make a bought tile sheet readable (rulers and grid, 1:1) and cut sprites by position | `dev-scripts/aseprite/catalogue.lua` | a7 |
 
 ## Entry template
 

@@ -21,6 +21,10 @@ Long Way (`games/long-way/assets/art/`):
 - `features/Rocks.aseprite` (built from `features/sprites/rock_0.png` and `rock_1.png`, both 256x256 (32x32 art scaled 8x), with `dev-scripts/aseprite/frames_from_pngs.lua`: native 32x32, 2 frames, drawn in the game at a whole number scale (4x = 128 px), tags `rock_0` and `rock_1`, own colour palette, not the game palette). The PNGs are not kept in the repo.
 - `features/Markers.aseprite` (built from `input/lantern.png` and `input/lantern_red.png` (160x200, with a glow) and `input/marker.png` and `input/marker_red.png` (120x196), with `dev-scripts/aseprite/frames_from_pngs.lua` at `width=28 height=35` (nearest neighbour, each PNG resized on its own, so the markers are stretched a little wider): 10 frames, tags `lantern` (1 frame), `lantern_red` (1 frame), `marker` (4 frames) and `marker_red` (4 frames). The marker frames last 250 ms each and loop (set with `set_durations`). Renamed from `Lanterns.aseprite`; drawn at scale 1, 70% of the player's body height, own colour palette, not the game palette). The PNGs stay in `input/`.
 
+## Zen Garden pack (`input/zen-garden/`)
+
+The user has a commercial licence for the GuttyKreum Zen Garden pack, for Long Way only. Use `Non-RPGMaker_Tilemap/Main_Tilemap.png` (32x32 tiles, transparent background) through `Main_Tilemap_catalogue.aseprite`, and the named files in `AnimationedTiles/`. Do not use the numbered `Tiles/` folder or the `RPGMakerVXAce/` sheets (`adr-a7`). The user finds a sprite in the catalogue and gives its top left column and row and its size in tiles. Method and rules: `dev-docs/extensions/tile-sheet-catalogue.md`. Extracted sprites are listed under "Files copied so far" with their source position.
+
 ## Pipeline
 
 Source of truth: `.aseprite` files in each game's `assets/art/` (`games/<name>/assets/art/`). Exported files go in `games/<name>/assets/generated/` and are generated, not edited by hand. Lua scripts in `dev-scripts/aseprite/` are shared by all games and take the game as an argument.

@@ -47,3 +47,11 @@
 **Rationale.** The file is the source of truth for art (`art-pipeline.md`). A speed factor in code only works while every frame has the duration the code assumes, and nothing warns when the art changes. In the file the timing can differ per frame and per tag, and the Aseprite preview shows what the game will show. We first set the speed in code (0.4 times the 100 ms of the file) and moved it into the file the same day.
 
 **How to apply.** Set durations in Aseprite or with `dev-scripts/aseprite/set_durations.lua` (`apply=1` writes), and read them with `check`. Rules in `dev-docs/extensions/pixel-art.md`, "Animation speed".
+
+## adr-a7. Tile sheets are catalogued at 1:1 and cut by position, not used as pre-cut tiles (2026-11-07)
+
+**Decision.** A bought tile sheet is turned into an `.aseprite` catalogue (`dev-scripts/aseprite/catalogue.lua`): the sheet at 1:1 with a column and row ruler in a margin, a grid and a backdrop layer. A sprite is requested by its top left column and row and its size in tiles, and Claude cuts it from the original sheet one sprite at a time. The numbered single-tile folder of a pack (the Zen Garden `Tiles/` folder) is not used. The source PNG is never scaled. Scaling happens on a single extracted sprite, in Aseprite.
+
+**Rationale.** The numbered tiles (587 files for Zen Garden) have no coordinates and split an object such as a pagoda over many files, so a person cannot find or name anything. The sheet shows objects whole, and the rulers give the person a way to point at them. A scaled copy of the full PNG adds a second source that can drift from the original. The sheet background in Zen Garden was already transparent, so the catalogue only needs a backdrop layer to show it.
+
+**How to apply.** Rules and usage in `dev-docs/extensions/tile-sheet-catalogue.md`. Record each extracted sprite in `games/<game>/docs/art-pipeline.md`.
