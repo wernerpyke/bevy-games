@@ -14,6 +14,7 @@ How art size on screen is set, and how Aseprite tags drive animation.
 | Camera: `PixelCameraPlugin { view_height, clear_color }`, `CameraFollowPlugin`, `CameraBounds`, `visible_rect`, `half_view` | `crates/game-kit/src/camera.rs` | Shared |
 | `VIEW_HEIGHT`, `CELL_SIZE`, `MAP_ORIGIN` | `games/long-way/src/camera.rs` | One set of values per game |
 | Tag switching: `play_if_changed`. Spawn helpers: `tag_sprite`, `tag_animation`, `all_frames_sprite`, `all_frames_animation` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
+| Still frame: `StaticFrame` |  `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
 | Random start frame: `RandomStartFrame`, `AnimationHelpPlugin` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
 
 Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` and `art-tags.md`.
@@ -48,6 +49,10 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 15. Copies of one looping animation (trees, pickups) move in step and look uniform. Add `RandomStartFrame { seed }` to the entity with its `AseAnimation`. When the Aseprite file has loaded, `AnimationHelpPlugin` moves the animation to a frame of its tag (all frames when it has no tag) picked by the seed, and removes the component.
 16. Use `RandomStartFrame::for_cell(map_name, cell)` for map objects. The seed comes from the map name and the cell, so the frame is the same on every load, on F1 reload and when the map is entered again. Two objects in different cells differ.
 17. It sets the start only. Every copy then runs at the speed set in the file (rule 11). It does not work for a one-shot animation.
+
+### Still frame
+
+18. `StaticFrame { relative }` shows one frame and never plays, for an icon. It sets the frame (counted from the first frame of the tag, kept inside the range) once the file has loaded, then stops the animation. Long Way draws its energy icons in the HUD from the pickup art this way, at the size of the pickup in the world.
 
 ## Usage
 

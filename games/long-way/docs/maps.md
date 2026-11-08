@@ -80,7 +80,7 @@ The five Zen Garden kinds are one character each, for example `g` for `green_tre
 
 ## Pickups
 
-A pickup is one digit: `1` `energy_blue`, `2` `energy_red`, `3` `energy_violet`, `4` `energy_black`. Its character is its cell. See `1.txt` row 5. The HUD line under the title shows what the player has collected.
+A pickup is one digit: `1` `energy_blue`, `2` `energy_red`, `3` `energy_violet`, `4` `energy_black`. Its character is its cell. See `1.txt` row 5. The HUD under the title shows an icon and a count for each colour the player has collected.
 
 ## Lanterns and markers
 

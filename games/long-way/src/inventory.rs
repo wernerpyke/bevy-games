@@ -27,6 +27,16 @@ impl Energy {
         }
     }
 
+    /// The tag of its colour in `pickups.aseprite`.
+    pub fn pickup_tag(self) -> &'static str {
+        match self {
+            Energy::Blue => "pickup_blue",
+            Energy::Red => "pickup_red",
+            Energy::Violet => "pickup_violet",
+            Energy::Black => "pickup_black",
+        }
+    }
+
     fn index(self) -> usize {
         self as usize
     }

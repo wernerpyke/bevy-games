@@ -31,7 +31,7 @@ Map items that do not block the player. The player collects one by touching it.
 
 ## Usage
 
-Add `CollectablePlugin` after `MapTransitionPlugin`. Spawn items in the map load hook. Long Way: `pickups.rs` (spawn), `inventory.rs` (counts per energy colour, `Inventory`), `hud.rs` (a temporary text line).
+Add `CollectablePlugin` after `MapTransitionPlugin`. Spawn items in the map load hook. Long Way: `pickups.rs` (spawn), `inventory.rs` (counts per energy colour, `Inventory`), `hud.rs` (an icon and a count for each energy).
 
 ## Limits
 

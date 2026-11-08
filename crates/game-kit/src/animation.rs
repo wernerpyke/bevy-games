@@ -78,11 +78,30 @@ pub fn play_if_changed(ase: &mut AseAnimation, tag: &str, speed: f32) -> bool {
     true
 }
 
+/// Shows one frame and never plays: put it on an entity with an `AseAnimation` (for an icon). `relative` counts from the first
+/// frame of the tag, or of the file when there is no tag, and is kept inside the range. Once the Aseprite file has
+/// loaded, the plugin sets the frame and stops the animation, then removes this component.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct StaticFrame {
+    pub relative: u16,
+}
+
+/// The frames of the tag of `animation`, or of the whole file without a tag. None when the tag does not exist.
+fn frame_range(
+    aseprite: &Aseprite,
+    animation: &AseAnimation,
+) -> Option<std::ops::RangeInclusive<u16>> {
+    match animation.animation.tag.as_ref() {
+        Some(tag) => aseprite.tags.get(tag).map(|meta| meta.range.clone()),
+        None => Some(0..=(aseprite.frame_durations.len().max(1) as u16 - 1)),
+    }
+}
+
 pub struct AnimationHelpPlugin;
 
 impl Plugin for AnimationHelpPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, apply_random_start);
+        app.add_systems(Update, (apply_random_start, apply_static_frame));
     }
 }
 
@@ -102,15 +121,9 @@ fn apply_random_start(
         let Some(aseprite) = asprites.get(&animation.aseprite) else {
             continue;
         };
-        let range = match animation.animation.tag.as_ref() {
-            Some(tag) => match aseprite.tags.get(tag) {
-                Some(meta) => meta.range.clone(),
-                None => {
-                    commands.entity(entity).remove::<RandomStartFrame>();
-                    continue;
-                }
-            },
-            None => 0..=(aseprite.frame_durations.len().max(1) as u16 - 1),
+        let Some(range) = frame_range(aseprite, animation) else {
+            commands.entity(entity).remove::<RandomStartFrame>();
+            continue;
         };
         let frames = range.end() - range.start() + 1;
         let offset = start_offset(start.seed, frames);
@@ -118,6 +131,27 @@ fn apply_random_start(
         state.current_frame = range.start() + offset;
         state.elapsed = std::time::Duration::ZERO;
         commands.entity(entity).remove::<RandomStartFrame>();
+    }
+}
+
+/// Waits for the Aseprite asset, then shows the frame and stops the animation.
+fn apply_static_frame(
+    mut commands: Commands,
+    mut query: Query<(Entity, &mut AseAnimation, &mut AnimationState, &StaticFrame)>,
+    asprites: Res<Assets<Aseprite>>,
+) {
+    for (entity, mut animation, mut state, frame) in &mut query {
+        let Some(aseprite) = asprites.get(&animation.aseprite) else {
+            continue;
+        };
+        if let Some(range) = frame_range(aseprite, &animation) {
+            let relative = frame.relative.min(range.end() - range.start());
+            state.relative_frame = relative;
+            state.current_frame = range.start() + relative;
+            state.elapsed = std::time::Duration::ZERO;
+            animation.animation.playing = false;
+        }
+        commands.entity(entity).remove::<StaticFrame>();
     }
 }
 

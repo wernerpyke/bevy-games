@@ -17,6 +17,8 @@ const ART_WIDTH: f32 = 64.0;
 const ART_HEIGHT: f32 = 96.0;
 /// Drawn size as a multiple of the art size.
 const PICKUP_SCALE: f32 = 0.25;
+/// The drawn size of a pickup in art pixels. The HUD icons use the same size.
+pub const DRAWN_SIZE: Vec2 = Vec2::new(ART_WIDTH * PICKUP_SCALE, ART_HEIGHT * PICKUP_SCALE);
 /// The touch box: 52 wide (the touch width of an exit marker, `markers.rs`) and one cell high, centred on the bottom of the cell. It reaches 32 pixels below the base of the pickup, so a player walking past in front of it collects it.
 const TOUCH_SIZE: Vec2 = Vec2::new(52.0, 64.0);
 const TOUCH_CENTRE_Y: f32 = 0.0;
@@ -52,8 +54,7 @@ fn spawn_pickup(
     load: &MapLoad,
 ) {
     let corner = footprint_corner(object, map, load.origin);
-    let width = ART_WIDTH * PICKUP_SCALE;
-    let height = ART_HEIGHT * PICKUP_SCALE;
+    let (width, height) = (DRAWN_SIZE.x, DRAWN_SIZE.y);
     let centre = Vec2::new(
         corner.x + map.cell_size / 2.0,
         corner.y.round() + height / 2.0,

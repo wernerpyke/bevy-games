@@ -1,24 +1,35 @@
 use bevy::prelude::*;
-use game_kit::animation::all_frames_animation;
+use game_kit::animation::{StaticFrame, all_frames_animation, tag_animation};
 use game_kit::hud::{Hud, label};
 
 use crate::camera::{HUD_FONT_SIZE, HUD_TEXT};
-use crate::inventory::Inventory;
+use crate::inventory::{Energy, Inventory};
+use crate::pickups::DRAWN_SIZE;
 
-/// The content of the HUD bar: the `backgrounds/hud.aseprite` picture (512 by 160 art pixels, the size of the bar) and
-/// one text label (`adr-lw24`, `adr-lw25`).
+/// The content of the HUD bar: the `backgrounds/hud.aseprite` picture (512 by 160 art pixels, the size of the bar), one
+/// text label and the energy counts (`adr-lw24`, `adr-lw25`, `adr-lw27`).
 pub struct HudPlugin;
 
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PostStartup, spawn_hud_content)
-            .add_systems(Update, update_energy_label);
+            .add_systems(Update, update_energy_counts);
     }
 }
 
-/// The text line with the energy counts. Temporary until the HUD art has a place for them.
+/// Size of the count next to an energy icon, in art pixels.
+const ENERGY_FONT_SIZE: f32 = 24.0;
+/// The frame of the pickup pulse shown as the icon, counted from the first frame of the tag: a full flame.
+const ICON_FRAME: u16 = 3;
+/// Position of the energy row in the HUD bar, from its top left corner, and the gaps in it, in art pixels.
+const ENERGY_LEFT: f32 = 8.0;
+const ENERGY_TOP: f32 = 64.0;
+const ENERGY_GAP: f32 = 16.0;
+const ICON_COUNT_GAP: f32 = 4.0;
+
+/// The count text next to the icon of one energy.
 #[derive(Component)]
-struct EnergyLabel;
+struct EnergyCount(Energy);
 
 fn spawn_hud_content(
     mut commands: Commands,
@@ -26,6 +37,8 @@ fn spawn_hud_content(
     server: Res<AssetServer>,
 ) {
     let font = TextFont::from_font_size(HUD_FONT_SIZE)
+        .with_font(server.load("fonts/CourierPrime-Regular.ttf"));
+    let count_font = TextFont::from_font_size(ENERGY_FONT_SIZE)
         .with_font(server.load("fonts/CourierPrime-Regular.ttf"));
     // The picture is its own full-size child, not on the padded `Hud` node: padding would shrink it.
     commands.entity(*hud).with_children(|hud| {
@@ -41,22 +54,50 @@ fn spawn_hud_content(
             all_frames_animation(&server, "art/backgrounds/hud.aseprite"),
             ImageNode::default().with_mode(NodeImageMode::Stretch),
         ));
-        hud.spawn(label("Long Way", font.clone(), HUD_TEXT));
-        hud.spawn((
-            EnergyLabel,
-            label(Inventory::default().summary(), font, HUD_TEXT),
-            Node {
-                position_type: PositionType::Absolute,
-                left: px(8),
-                top: px(64),
-                ..default()
-            },
-        ));
+        hud.spawn(label("Long Way", font, HUD_TEXT));
+        hud.spawn(Node {
+            position_type: PositionType::Absolute,
+            left: px(ENERGY_LEFT),
+            top: px(ENERGY_TOP),
+            align_items: AlignItems::Center,
+            column_gap: px(ENERGY_GAP),
+            ..default()
+        })
+        .with_children(|row| {
+            for energy in Energy::ALL {
+                row.spawn(Node {
+                    align_items: AlignItems::Center,
+                    column_gap: px(ICON_COUNT_GAP),
+                    ..default()
+                })
+                .with_children(|entry| {
+                    // A still frame of the pickup art at the size the pickup is drawn in the world.
+                    entry.spawn((
+                        Node {
+                            width: px(DRAWN_SIZE.x),
+                            height: px(DRAWN_SIZE.y),
+                            ..default()
+                        },
+                        tag_animation(&server, "art/pickups/pickups.aseprite", energy.pickup_tag()),
+                        StaticFrame {
+                            relative: ICON_FRAME,
+                        },
+                        ImageNode::default().with_mode(NodeImageMode::Stretch),
+                    ));
+                    entry.spawn((
+                        EnergyCount(energy),
+                        label("0", count_font.clone(), HUD_TEXT),
+                    ));
+                });
+            }
+        });
     });
 }
 
-fn update_energy_label(inventory: Res<Inventory>, mut label: Single<&mut Text, With<EnergyLabel>>) {
+fn update_energy_counts(inventory: Res<Inventory>, mut counts: Query<(&EnergyCount, &mut Text)>) {
     if inventory.is_changed() {
-        label.0 = inventory.summary();
+        for (count, mut text) in &mut counts {
+            text.0 = inventory.count(count.0).to_string();
+        }
     }
 }
