@@ -12,8 +12,8 @@ background:
   tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
 legend:
   ".": empty
-  "0": rock_0
-  "1": rock_1
+  "O": rock_0
+  "o": rock_1
   "G": green_tree
   "R": red_tree
   "g": green_tree_medium
@@ -25,6 +25,10 @@ legend:
   "L": lantern_red
   "m": marker exit_to=2
   "M": marker_red exit_to=3
+  "1": energy_blue
+  "2": energy_red
+  "3": energy_violet
+  "4": energy_black
   "@": player_start
 ---
    |0                  |
@@ -33,9 +37,9 @@ legend:
  8 |. . . . . . . . . M|
  7 |. g . . . . . . . .|
  6 |. g g . . . r t . .|
- 5 |. . . . . . . . . .|
+ 5 |. . . . . 2 . 3 . 4|
  4 |. . g . . . . . . .|
  3 |g r G R G . . s . .|
- 2 |. r R r g . . . . .|
- 1 |. G . G . . . b . .|
+ 2 |. r R r g . . 1 . .|
+ 1 |. G . G . . . 1 . .|
  0 |. . . . @ . . . . .|

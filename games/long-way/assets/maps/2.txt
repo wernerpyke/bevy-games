@@ -12,8 +12,8 @@ background:
   tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
 legend:
   ".": empty
-  "0": rock_0
-  "1": rock_1
+  "O": rock_0
+  "o": rock_1
   "G": green_tree
   "R": red_tree
   "g": green_tree_medium

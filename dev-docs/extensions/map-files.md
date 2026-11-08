@@ -167,6 +167,20 @@ entries:
     The parser (`map.rs`, `Map::background`) checks the syntax and names the line of each error: a missing `color` or `mode`, a bad `mode`, colour, `fill`, `jitter`, `scale` or `seed`, a `fill` above 0 without `tiles`, a repeated tile name, an unknown key, a key or the block given twice.
     `map_background::place_tiles` decides which cells get an image, which image, and where. Each cell rolls its own dice from a hash of the map name, the `seed` and the cell number. So the ground is the same on every load, on F1 reload and on the web, it does not depend on the order of the cells, and a map that grows keeps the images of its old cells. The number of images varies from map to map, because it is a chance per cell. An image is centred on its cell, shifted by the jitter, and moved inwards so it stays inside the map. The game draws the colour as a rectangle of the map size and the images above it (`layers.rs`, `BACKGROUND_Z` and `BACKGROUND_TILES_Z`).
 
+## Legend conventions
+
+Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow them for new legends. The parser does not check them.
+
+| Group | Character | Example (Long Way) |
+|---|---|---|
+| Player | `@` | `"@": player_start` |
+| Features (rocks, trees, shrubs, lanterns, markers) | Letters. Upper and lower case tell variants of the same family apart | `"G": green_tree`, `"g": green_tree_medium`, `"O": rock_0`, `"o": rock_1` |
+| Enemies | Special characters, for example `! # $ % & * +` | none yet |
+| Pickups | Digits | `"1": energy_blue` |
+
+- `.`, `|` and a space stay reserved (rule 3).
+- R-Town keeps its older legend (digits for water) until the user asks for a change.
+
 ## Usage
 
 - Add a new object kind to the game's name list and `Kind` enum, to the module that spawns it, and to the legend.

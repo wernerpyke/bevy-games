@@ -46,6 +46,10 @@ const KIND_NAMES: &[&str] = &[
     "red_tree_small",
     "green_shrub",
     "green_shrub_small",
+    "energy_blue",
+    "energy_red",
+    "energy_violet",
+    "energy_black",
     PLAYER_START,
 ];
 
@@ -127,6 +131,7 @@ fn load_hook(
     crate::trees::spawn_trees(&mut commands, &server, map, &load);
     crate::markers::spawn_markers(&mut commands, &server, map, &load);
     crate::scenery::spawn_scenery(&mut commands, &server, map, &load);
+    crate::pickups::spawn_pickups(&mut commands, &server, map, &load);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): reads the current map file again and loads it again. A file with an
@@ -162,7 +167,7 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
     let blocking: Vec<usize> = (0..map.objects.len())
         .filter(|&i| {
             let kind = Kind::of(&map.objects[i]);
-            !kind.is_marker() && !kind.is_small()
+            !kind.is_marker() && !kind.is_small() && !kind.is_pickup()
         })
         .collect();
     let boxes: Vec<(IVec2, IVec2)> = blocking
@@ -225,6 +230,11 @@ pub enum Kind {
     RedTreeSmall,
     GreenShrub,
     GreenShrubSmall,
+    /// Energy pickups (`pickups.rs`). They do not block and are not part of a group.
+    EnergyBlue,
+    EnergyRed,
+    EnergyViolet,
+    EnergyBlack,
     /// Where the player starts. It has no art and blocks nothing.
     PlayerStart,
 }
@@ -251,6 +261,14 @@ impl Kind {
         }
     }
 
+    /// A pickup is collected by touch and never blocks.
+    pub fn is_pickup(self) -> bool {
+        matches!(
+            self,
+            Kind::EnergyBlue | Kind::EnergyRed | Kind::EnergyViolet | Kind::EnergyBlack
+        )
+    }
+
     /// A marker is read by the game and never drawn or blocked.
     pub fn is_marker(self) -> bool {
         matches!(self, Kind::PlayerStart)
@@ -271,6 +289,10 @@ impl Kind {
             "red_tree_small" => Some(Kind::RedTreeSmall),
             "green_shrub" => Some(Kind::GreenShrub),
             "green_shrub_small" => Some(Kind::GreenShrubSmall),
+            "energy_blue" => Some(Kind::EnergyBlue),
+            "energy_red" => Some(Kind::EnergyRed),
+            "energy_violet" => Some(Kind::EnergyViolet),
+            "energy_black" => Some(Kind::EnergyBlack),
             PLAYER_START => Some(Kind::PlayerStart),
             _ => None,
         }

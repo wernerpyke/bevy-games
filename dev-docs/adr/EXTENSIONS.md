@@ -298,3 +298,19 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** The ground belongs to the map, so it is written in the map file, and a designer can tune it without code. A block leaves room for the pattern mode. `mode` has no default so that adding the pattern mode never changes how an old map reads. Each cell rolls its own dice from a hash of the map name, the `seed` and the cell, so the ground is the same on every load, F1 reload and platform, does not depend on the order of the cells, and keeps the images of old cells when a map grows. An exact count was rejected because the dice roll is simpler and a changing count does not matter for decoration. The hash is FNV-1a and SplitMix64 written in the kit, because `DefaultHasher` does not promise the same numbers on every platform, and a test fixes the result. The placement is in the kit at the developer's request. Only Long Way calls it today. The rectangle is a sprite per map and not `ClearColor`, because the kit can place several maps in one world (`adr-x30`, `adr-x32`). Each image has its own tiny z step (`layers.rs`), so overlapping images do not flicker.
 
 **How to apply.** Rule 25 of `dev-docs/extensions/map-files.md`. A game loads the block in its map load hook, calls `place_tiles` with the drawn size of one image (art size times `scale`), checks the tile names at start and draws the result. Values for Long Way: `games/long-way/docs/adr.md` `adr-lw26`.
+
+## adr-x37. Map legend characters follow a fixed convention (2026-11-08)
+
+**Decision.** In a map legend, the player is `@`, features are letters (upper and lower case separate variants of one family, for example `G` and `g`), enemies are special characters (`! # $ % & * +`) and pickups are digits. `.`, `|` and a space stay reserved. The parser does not enforce this. Long Way rocks moved from `0` and `1` to `O` and `o` so that digits are free for pickups.
+
+**Rationale.** A reader can tell the group of an object from its character alone, so a large map is easier to read. Pickups are the group that grows with the game design, and ten digits are enough for their kinds. Enforcing the groups in the parser would tie the kit to game concepts (`adr-x13`).
+
+**How to apply.** `dev-docs/extensions/map-files.md`, "Legend conventions". Use these characters when a new kind is added to any legend. R-Town keeps its legend until the user asks.
+
+## adr-x38. The kit has a touch trigger for collectable items, and the game keeps the inventory (2026-11-08)
+
+**Decision.** The kit owns `Collectable { area, kind }` (with a `MapId`), the `Collected { kind }` message and `CollectablePlugin`. When the feet of the `Controlled` entity touch the area of an item of the current map, the plugin sends `Collected` and despawns the item. The game owns the art, the item kinds, the touch area size and the player state (the inventory). The kit has no inventory type.
+
+**Rationale.** The touch test is the same for every game that has pickups, and it follows `ExitTrigger`. The shape of player state is not known yet: it will probably grow past counts (health, keys), so a kit inventory would be built on a guess. Kinds are strings from the legend, so the kit has no game types (`adr-x13`). Placed in the kit at the developer's request, before a second game needs it (`adr-x12`).
+
+**How to apply.** `dev-docs/extensions/collectables.md`. Long Way: `adr-lw27`.

@@ -2,8 +2,10 @@ mod background;
 mod camera;
 mod collision;
 mod hud;
+mod inventory;
 mod map;
 mod markers;
+mod pickups;
 mod player;
 mod rocks;
 mod scenery;
@@ -43,6 +45,8 @@ fn main() {
                 ..game_kit::app_state::AppFlowPlugin::new(game_kit::app_state::AppState::Playing)
             },
             hud::HudPlugin,
+            game_kit::collectable::CollectablePlugin,
+            inventory::InventoryPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

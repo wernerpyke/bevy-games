@@ -12,11 +12,13 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
-    ├── hud.rs          HudPlugin: the content of the HUD bar (one text label). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── hud.rs          HudPlugin: the content of the HUD bar (two text labels: the title and the energy counts). The bar is `game_kit::screen` and `game_kit::hud`
     ├── player.rs       PlayerPlugin: player spawn, movement, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
+    ├── pickups.rs      `spawn_pickups`: energy pickups of one map, each with a `Collectable`
+    ├── inventory.rs    `Inventory` (energy counts), `InventoryPlugin`: fills it from `Collected`
     ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
@@ -28,13 +30,14 @@ games/long-way/
 | [Collision](../../../dev-docs/extensions/collision.md) | `collision.rs`, `outline.rs` in `crates/game-kit` (plus the game specific `Trunk`, `PLAYER_*` and `rocks.rs`) |
 | [Draw order](../../../dev-docs/extensions/draw-order.md) | `depth.rs`, `layers.rs` in `crates/game-kit` |
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` (plus the parser in `crates/game-kit`) |
+| [Collectables](../../../dev-docs/extensions/collectables.md) | `pickups.rs`, `inventory.rs` (plus `collectable.rs` in `crates/game-kit`) |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
 | [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` in `crates/game-kit` |
 | [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
 | [Screen layout](../../../dev-docs/extensions/screen-layout.md) | `camera.rs`, `hud.rs`, `main.rs` (plus `screen.rs`, `hud.rs`, `app_state.rs` in `crates/game-kit`) |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
-Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`.
+Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`.
 
 ## Long Way values for the pixel art extension
 

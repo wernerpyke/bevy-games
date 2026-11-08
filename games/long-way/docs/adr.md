@@ -171,3 +171,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** A flat clear colour made the map look empty. Small loose images over a dark ground make it organic without a tile editor. The images are sparse, so the fill rate is low. Jitter and scale let the developer tune the look from the map file.
 
 **How to apply.** Values and tile names: `games/long-way/docs/maps.md`, "Backgrounds". The art file is recorded in `art-pipeline.md`.
+
+## adr-lw27. Four energy pickups fill a counted inventory (2026-11-08)
+
+**Decision.** The map kinds `energy_blue`, `energy_red`, `energy_violet` and `energy_black` (legend digits `1` to `4`, `adr-x37`) are pickups drawn from `pickups/pickups.aseprite` at a quarter of its art size (16 by 24 pixels). Touching the touch box of a pickup (52 by 64) collects it (`adr-x38`). The `Inventory` resource keeps one count per colour, and a temporary HUD text line shows them (`B 1  R 0  V 2  K 0`). Energy has no use and no cap yet.
+
+**Rationale.** The design only says the four colours are four kinds of energy, so the smallest useful state is a count each. The pickup art is 64 by 96 and would be taller than the player at full size, so it is drawn small. The touch box is 52 wide (the touch width of an exit marker) and one cell high, centred on the base of the pickup. A smaller box made pickups hard to collect: a player walking past in front of one, at 16 pixels below its base, missed it. The text line is a placeholder that proves the counts without waiting for HUD art.
+
+**How to apply.** Values and kinds: `games/long-way/docs/maps.md`. Code: `pickups.rs`, `inventory.rs`, `hud.rs`.

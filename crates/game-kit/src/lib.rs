@@ -2,6 +2,7 @@
 
 pub mod app_state;
 pub mod camera;
+pub mod collectable;
 pub mod collision;
 pub mod collision_debug;
 pub mod debug;
