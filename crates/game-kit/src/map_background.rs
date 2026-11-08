@@ -25,7 +25,7 @@ pub struct TilePlacement {
 }
 
 /// FNV-1a over the bytes of the map name.
-fn hash_name(name: &str) -> u64 {
+pub(crate) fn hash_name(name: &str) -> u64 {
     let mut hash = 0xCBF2_9CE4_8422_2325u64;
     for byte in name.bytes() {
         hash ^= byte as u64;
@@ -35,7 +35,7 @@ fn hash_name(name: &str) -> u64 {
 }
 
 /// The dice of one cell.
-fn cell_rng(name_hash: u64, seed: u64, cell: IVec2) -> Rng {
+pub(crate) fn cell_rng(name_hash: u64, seed: u64, cell: IVec2) -> Rng {
     let packed = ((cell.x as u32 as u64) << 32) | cell.y as u32 as u64;
     let base = Rng::new(name_hash ^ seed.wrapping_mul(0x9E37_79B9_7F4A_7C15)).next_u64();
     Rng::new(Rng::new(base ^ packed).next_u64())

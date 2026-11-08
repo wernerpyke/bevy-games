@@ -2,7 +2,7 @@
 //! the whole cell. It lies on the ground, so it has no depth sort and no walking behind it.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 use game_kit::collision::Blocker;
 use game_kit::layers::BACKGROUND_Z;
 
@@ -73,11 +73,7 @@ pub fn spawn_water(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
         commands.spawn((
             MapEntity,
             Blocker(cell_area(object.cell)),
-            AseAnimation {
-                aseprite: server.load("art/features/water.aseprite"),
-                animation: Animation::tag(part.name()),
-            },
-            Sprite::default(),
+            tag_sprite(&server, "art/features/water.aseprite", part.name()),
             Transform::from_translation(centre.extend(WATER_Z)),
         ));
     }

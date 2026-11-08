@@ -5,7 +5,7 @@
 //! A projectile that hits an enemy removes it.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
 use game_kit::map::{MapObject, Params};
@@ -190,11 +190,7 @@ fn spawn_enemies(
             WalkSprite {
                 canvas_height: CANVAS_HEIGHT,
             },
-            AseAnimation {
-                aseprite: server.load("art/characters/monsters.aseprite"),
-                animation: Animation::tag(kind.tag()),
-            },
-            Sprite::default(),
+            tag_sprite(&server, "art/characters/monsters.aseprite", kind.tag()),
             Transform::from_xyz(0.0, CANVAS_HEIGHT / 2.0, 0.0),
         ));
         debug!(

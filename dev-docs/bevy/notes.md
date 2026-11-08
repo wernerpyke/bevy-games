@@ -67,6 +67,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Spawn `AseAnimation { aseprite: server.load("art/characters/Hunter.aseprite"), animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop) }` with `Sprite::default()`.
 - Switch animation: `ase.animation.play_loop("Walk")`. Tag names are case sensitive and match the Aseprite tags. Call it only when the tag changes.
 - A file with no tags: `animation: Animation::default()` plays all frames in a loop. A named tag that does not exist is an error.
+- Frame state is the public component `AnimationState { relative_frame, current_frame, elapsed, .. }`, added with `AseAnimation`. The frame range of a tag is `Assets<Aseprite>::get(handle).tags[tag].range` (`RangeInclusive<u16>`), known only after the asset has loaded. Setting `current_frame` outside the range makes the animation system reset it to the start. Used by `game-kit` `animation.rs`.
 
 ## One-shot systems and UI overlays (verified in `map_transition.rs`)
 

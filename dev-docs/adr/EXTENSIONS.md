@@ -314,3 +314,13 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Rationale.** The touch test is the same for every game that has pickups, and it follows `ExitTrigger`. The shape of player state is not known yet: it will probably grow past counts (health, keys), so a kit inventory would be built on a guess. Kinds are strings from the legend, so the kit has no game types (`adr-x13`). Placed in the kit at the developer's request, before a second game needs it (`adr-x12`).
 
 **How to apply.** `dev-docs/extensions/collectables.md`. Long Way: `adr-lw27`.
+
+## adr-x39. The kit starts looping animations at a seeded random frame, and depends on `bevy_aseprite_ultra` (2026-11-08)
+
+**Decision.** `game_kit::animation` has `RandomStartFrame { seed }` and `AnimationHelpPlugin`. When the Aseprite file of an entity has loaded, the plugin sets `AnimationState` to a frame of the tag (or of the whole file) chosen from the seed, and removes the component. `RandomStartFrame::for_cell(map_name, cell)` builds the seed from the map name and the cell with the hash of `map_background`. The kit now depends on `bevy_aseprite_ultra` (the version is pinned once in the root `Cargo.toml`).
+
+**Rationale.** Copies of one animation that start together look uniform. A seed from the map and cell gives the same start on every load, F1 reload and platform, as the map backgrounds do (`adr-x36`). The kit takes the dependency at the developer's request (`adr-x12`): R-Town's animated water can use the same component. Both games already compile the crate, so no new crate reaches the web build, but the kit now cannot be used without it.
+
+**Also in the kit (same day).** The spawn helpers `tag_sprite`, `tag_animation`, `all_frames_sprite` and `all_frames_animation`, and `play_if_changed` (switch tag only when it differs, set the speed). Both games used the spawn boilerplate in many places, and the tag switch came from Long Way `animate_player`, which no longer keeps its own `playing` field. R-Town's walk flip and bob stays in R-Town (one game uses it).
+
+**How to apply.** `dev-docs/extensions/pixel-art.md`, "Random start frame". Add `AnimationHelpPlugin` and put `RandomStartFrame::for_cell(..)` in the spawn bundle. Long Way: trees (`trees.rs`) and pickups (`pickups.rs`).

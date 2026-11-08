@@ -3,7 +3,7 @@
 //! height (`adr-lw20`).
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 
 use crate::map::Kind;
 use crate::rocks::{SORT_BIAS, footprint_corner};
@@ -89,11 +89,7 @@ fn spawn_marker(
         DepthSort {
             feet_offset: MARKER_HEIGHT / 2.0 - SORT_BIAS,
         },
-        AseAnimation {
-            aseprite: server.load("art/features/Markers.aseprite"),
-            animation: Animation::tag(tag),
-        },
-        Sprite::default(),
+        tag_sprite(server, "art/features/Markers.aseprite", tag),
         Transform::from_translation(centre.extend(0.0)),
     ));
     // `exit_to` in the legend makes the marker an exit (`adr-x33`).

@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::all_frames_animation;
 use game_kit::hud::{Hud, label};
 
 use crate::camera::{HUD_FONT_SIZE, HUD_TEXT};
@@ -38,10 +38,7 @@ fn spawn_hud_content(
                 height: percent(100),
                 ..default()
             },
-            AseAnimation {
-                aseprite: server.load("art/backgrounds/hud.aseprite"),
-                animation: Animation::default(),
-            },
+            all_frames_animation(&server, "art/backgrounds/hud.aseprite"),
             ImageNode::default().with_mode(NodeImageMode::Stretch),
         ));
         hud.spawn(label("Long Way", font.clone(), HUD_TEXT));

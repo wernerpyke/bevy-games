@@ -29,6 +29,11 @@ fn main() {
         )
         .add_plugins(AsepriteUltraPlugin)
         .add_plugins((
+            game_kit::animation::AnimationHelpPlugin,
+            game_kit::collectable::CollectablePlugin,
+            inventory::InventoryPlugin,
+        ))
+        .add_plugins((
             game_kit::camera::PixelCameraPlugin {
                 view_height: camera::VIEW_HEIGHT,
                 clear_color: camera::CLEAR_COLOR,
@@ -45,8 +50,6 @@ fn main() {
                 ..game_kit::app_state::AppFlowPlugin::new(game_kit::app_state::AppState::Playing)
             },
             hud::HudPlugin,
-            game_kit::collectable::CollectablePlugin,
-            inventory::InventoryPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

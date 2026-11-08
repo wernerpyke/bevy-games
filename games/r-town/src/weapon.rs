@@ -2,7 +2,7 @@
 //! the hits and the removal are `game_kit::projectile`.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 use game_kit::depth::DepthSort;
 use game_kit::projectile::{Projectile, ProjectileSprite};
 
@@ -45,11 +45,7 @@ fn fire(
         ))
         .with_child((
             ProjectileSprite,
-            AseAnimation {
-                aseprite: server.load("art/features/projectiles.aseprite"),
-                animation: Animation::tag("proj_8"),
-            },
-            Sprite::default(),
+            tag_sprite(&server, "art/features/projectiles.aseprite", "proj_8"),
             Transform::from_xyz(0.0, PROJECTILE_HEIGHT, 0.0),
         ));
 }

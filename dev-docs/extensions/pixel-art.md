@@ -13,7 +13,8 @@ How art size on screen is set, and how Aseprite tags drive animation.
 |---|---|---|
 | Camera: `PixelCameraPlugin { view_height, clear_color }`, `CameraFollowPlugin`, `CameraBounds`, `visible_rect`, `half_view` | `crates/game-kit/src/camera.rs` | Shared |
 | `VIEW_HEIGHT`, `CELL_SIZE`, `MAP_ORIGIN` | `games/long-way/src/camera.rs` | One set of values per game |
-| Tag switching | `games/long-way/src/player.rs` | Pattern only |
+| Tag switching: `play_if_changed`. Spawn helpers: `tag_sprite`, `tag_animation`, `all_frames_sprite`, `all_frames_animation` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
+| Random start frame: `RandomStartFrame`, `AnimationHelpPlugin` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
 
 Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` and `art-tags.md`.
 
@@ -42,10 +43,18 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 13. Check durations with `./dev-scripts/aseprite.sh check <file>` (tags, frames and ms) and set them with `./dev-scripts/aseprite.sh set_durations <file> tags=<a,b|all> ms=<n> [apply=1]` (`dev-scripts.md`). It is a dry run until `apply=1`. Close the file in Aseprite before applying, and note that it overwrites uncommitted art changes in that file.
 14. A tag loops by default (`AnimationRepeat::Loop`). Say so in the code only when a tag must play once or a set number of times.
 
+### Random start frame
+
+15. Copies of one looping animation (trees, pickups) move in step and look uniform. Add `RandomStartFrame { seed }` to the entity with its `AseAnimation`. When the Aseprite file has loaded, `AnimationHelpPlugin` moves the animation to a frame of its tag (all frames when it has no tag) picked by the seed, and removes the component.
+16. Use `RandomStartFrame::for_cell(map_name, cell)` for map objects. The seed comes from the map name and the cell, so the frame is the same on every load, on F1 reload and when the map is entered again. Two objects in different cells differ.
+17. It sets the start only. Every copy then runs at the speed set in the file (rule 11). It does not work for a one-shot animation.
+
 ## Usage
 
 - Add `PixelCameraPlugin { view_height, clear_color }` with the game's own `VIEW_HEIGHT` constant. Change that constant to change how large everything looks. The camera is spawned at the world origin. A game that scrolls adds `CameraFollowPlugin` and inserts `CameraBounds(Rect)` once the map size is known. The camera follows the `Controlled` entity, stops at the bounds and is rounded to whole world units (adr-x17).
-- For a character, keep a `playing: &'static str` field and write `if wanted != player.playing { ase.animation.play_loop(wanted); ase.animation.speed = speed; player.playing = wanted; }`.
+- Add `AnimationHelpPlugin` (and `RandomStartFrame` on entities) to vary the start frame of copies of one animation. Long Way does this for trees and pickups.
+- For a character, call `play_if_changed(&mut ase, tag, speed)` every frame with the tag the state asks for. It switches (and sets the speed) only when the tag differs from the one playing, so the animation does not restart. Long Way: `animate_player`.
+- Spawn with `tag_sprite(&server, path, tag)` (a tag, plus a default `Sprite`) or `all_frames_sprite(&server, path)` (a file without tags). Use the `_animation` variants when the entity has its own sprite or an `ImageNode`. Paths are `&'static str`.
 
 ## Limits
 

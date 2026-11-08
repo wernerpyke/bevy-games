@@ -3,7 +3,7 @@
 //! `pickups/pickups.aseprite` (one tag per colour, animation speed set in the file).
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::{RandomStartFrame, tag_animation};
 
 use crate::map::Kind;
 use crate::rocks::{SORT_BIAS, footprint_corner};
@@ -70,10 +70,8 @@ fn spawn_pickup(
         DepthSort {
             feet_offset: height / 2.0 - SORT_BIAS,
         },
-        AseAnimation {
-            aseprite: server.load("art/pickups/pickups.aseprite"),
-            animation: Animation::tag(tag),
-        },
+        tag_animation(server, "art/pickups/pickups.aseprite", tag),
+        RandomStartFrame::for_cell(&map.name, object.cell),
         Sprite {
             custom_size: Some(Vec2::new(width, height)),
             ..default()

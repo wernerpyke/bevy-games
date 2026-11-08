@@ -2,7 +2,8 @@
 //! footprint has its bottom left corner at the character's cell. The tree canvas fills the footprint.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::RandomStartFrame;
+use game_kit::animation::all_frames_animation;
 
 use crate::collision::Trunk;
 use crate::map::{Group, Kind, blocking_groups};
@@ -83,10 +84,8 @@ fn spawn_tree(
         DepthSort {
             feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,
         },
-        AseAnimation {
-            aseprite: server.load(path),
-            animation: Animation::default(),
-        },
+        all_frames_animation(server, path),
+        RandomStartFrame::for_cell(&map.name, object.cell),
         Sprite::default(),
         Transform::from_translation(centre.extend(0.0)),
     ));

@@ -2,7 +2,7 @@
 //! bottom centre of the cell. Only the base blocks the player (`adr-rt5`), so the player walks behind the rest.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 use game_kit::collision::Blocker;
 use game_kit::depth::DepthSort;
 use game_kit::map::MapObject;
@@ -102,11 +102,11 @@ pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
                 Visibility::default(),
             ))
             .with_child((
-                AseAnimation {
-                    aseprite: server.load("art/features/background-elements.aseprite"),
-                    animation: Animation::tag(art.tag),
-                },
-                Sprite::default(),
+                tag_sprite(
+                    &server,
+                    "art/features/background-elements.aseprite",
+                    art.tag,
+                ),
                 Transform::from_xyz(0.0, CANVAS_HEIGHT / 2.0, 0.0),
             ));
     }

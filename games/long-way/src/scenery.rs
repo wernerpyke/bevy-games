@@ -9,7 +9,7 @@
 
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::all_frames_animation;
 
 use crate::collision::Trunk;
 use crate::map::{Group, Kind, blocking_groups};
@@ -164,10 +164,7 @@ pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, l
             DepthSort {
                 feet_offset: -SORT_BIAS,
             },
-            AseAnimation {
-                aseprite: server.load(art.path),
-                animation: Animation::default(),
-            },
+            all_frames_animation(server, art.path),
             Sprite::default(),
             anchor,
             Transform::from_translation(base.extend(0.0)),

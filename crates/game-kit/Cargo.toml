@@ -5,4 +5,5 @@ edition.workspace = true
 
 [dependencies]
 bevy = { workspace = true, features = ["ui_api"] }
+bevy_aseprite_ultra.workspace = true
 pathfinding.workspace = true

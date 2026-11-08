@@ -3,7 +3,7 @@
 //! scaled by a whole number so every art pixel stays the same size on screen.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::tag_sprite;
 
 use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::{Group, Kind, blocking_groups};
@@ -165,11 +165,7 @@ pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, loa
             Rock,
             MapId(load.id.clone()),
             RockArea(blocked_area(object, map, load.origin, group)),
-            AseAnimation {
-                aseprite: server.load("art/features/Rocks.aseprite"),
-                animation: Animation::tag(tag),
-            },
-            Sprite::default(),
+            tag_sprite(server, "art/features/Rocks.aseprite", tag),
             DepthSort {
                 feet_offset: placement.feet_offset,
             },

@@ -2,8 +2,8 @@
 //! child, so the walking bob moves the sprite and not the feet that collision uses.
 
 use bevy::prelude::*;
-use bevy_aseprite_ultra::prelude::*;
 use game_kit::Controlled;
+use game_kit::animation::tag_sprite;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
@@ -76,11 +76,7 @@ pub(crate) fn spawn_player(
             WalkSprite {
                 canvas_height: CANVAS_HEIGHT,
             },
-            AseAnimation {
-                aseprite: server.load("art/characters/characters.aseprite"),
-                animation: Animation::tag("char_9"),
-            },
-            Sprite::default(),
+            tag_sprite(&server, "art/characters/characters.aseprite", "char_9"),
             Transform::from_xyz(0.0, CANVAS_HEIGHT / 2.0, 0.0),
         ));
 }

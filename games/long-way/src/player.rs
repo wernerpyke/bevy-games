@@ -3,6 +3,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
+use game_kit::animation::play_if_changed;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 use game_kit::map::{Facing as EntryFacing, start_feet};
@@ -37,8 +38,6 @@ enum Facing {
 pub struct Player {
     facing: Facing,
     walking: bool,
-    /// Tag currently playing, so the animation only restarts when it changes.
-    playing: &'static str,
 }
 
 /// Layers of `Hunter.aseprite` that the game draws, by name.
@@ -80,7 +79,6 @@ pub fn spawn_player(
         Player {
             facing: Facing::Down,
             walking: false,
-            playing: "Idle",
         },
         AseAnimation {
             aseprite: server
@@ -177,23 +175,20 @@ fn move_player(
     }
 }
 
-fn animate_player(mut query: Query<(&mut AseAnimation, &mut Player)>) {
-    for (mut ase, mut player) in &mut query {
+fn animate_player(mut query: Query<(&mut AseAnimation, &Player)>) {
+    for (mut ase, player) in &mut query {
         let tag = match (player.walking, player.facing) {
             (false, _) => "Idle",
             (true, Facing::Side) => "Run",
             (true, Facing::Up) => "Up",
             (true, Facing::Down) => "Down",
         };
-        if tag != player.playing {
-            ase.animation.play_loop(tag);
-            ase.animation.speed = if player.walking {
-                WALK_ANIMATION_SPEED
-            } else {
-                1.0
-            };
-            player.playing = tag;
-        }
+        let speed = if player.walking {
+            WALK_ANIMATION_SPEED
+        } else {
+            1.0
+        };
+        play_if_changed(&mut ase, tag, speed);
     }
 }
 

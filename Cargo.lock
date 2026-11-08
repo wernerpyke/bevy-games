@@ -2787,6 +2787,7 @@ name = "game-kit"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_aseprite_ultra",
  "pathfinding",
 ]
 
