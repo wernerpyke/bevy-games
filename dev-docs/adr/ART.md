@@ -71,3 +71,11 @@
 **Rationale.** One palette for the world art keeps the look consistent and lets `check` and `set_palette` verify files. The accents of the trees are the look of the art, so they are not merged with a near colour. A merge with a distance under about 12 is invisible and saves a colour.
 
 **How to apply.** Replacing a palette colour changes its index value, so every file that used it must be remapped first (`remap_colors`, then `set_palette`). This amends `adr-a5`: "existing indexes never move" still holds, but a value may be replaced when two near colours are consolidated, and then the files are remapped.
+
+## adr-a10. The ghost joins the game palette with one new dark red (2026-11-08)
+
+**Decision.** `characters/ghost.aseprite` (enemy, from a bought pack) is moved onto the game palette, which grows by one colour to 56: index 55 `#430202`, the dark red around the ghost's eyes. The ghost's pupils `#850101` map to `#8c0707` (distance 11), its greys to `#414439` and `#a9b2a2`, and its two stray dark reds `#600101` and `#3e0404` to `#430202`. The blood splatters of the pack art are removed, so their three colours (`#540000`, `#d70505`, `#dd0000`) are not added.
+
+**Rationale.** The ghost has five dark reds and two bright ones, but only its eyes are kept. The eyes need a bright red and a dark red. The palette had the bright one. Mapping the dark red to `#1b141c` made the eye sockets nearly black, and mapping it to `#5b283b` changed its hue, so one colour was added. Future enemies can share it. Pack reds are pure saturated red and the palette's reds are muted, so the splatter colours were not adopted.
+
+**How to apply.** Same method as `adr-a8`. Reds for later enemies should reuse `#8c0707`, `#430202` and `#e13737` before a new red is added.
