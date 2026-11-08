@@ -28,5 +28,7 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `set_palette` | `.aseprite` (RGB) | `palette=<file>`, `apply=1` | Gives the file the palette of another file without changing a pixel. Refuses (and saves nothing) when a visible colour is not in that palette. A dry run unless `apply=1` |
 | `new_sprite` | a palette `.aseprite` | `out=`, `width=`, `height=`, `fill=<palette index>`, `layer=` | Makes a new RGB file with that palette, one layer, optionally filled with one colour. Does not overwrite |
 | `remove_colors` | `.aseprite` (RGB) | `colors=RRGGBB,...`, `apply=1`, `out=` | Makes every pixel of those exact colours transparent in every cel. A dry run (lists pixel counts) unless `apply=1` |
+| `keep_largest_part` | `.aseprite` (RGB) | `apply=1`, `out=` | Clears every part of each cel that is not joined to its largest part (8 way). Removes loose marks. A dry run (the default) lists the pixels. |
+| `tagged_stacks` | PNG sheets (a script, not `aseprite.sh`) | `out=`, `frame=WxH`, `sheets=Tag=file.png,...`, `direction=vertical\|horizontal\|auto`, `duration=` | Builds one `.aseprite` from sheets of frames stacked in a column or a row, one tag per sheet, frames unchanged. Run with `aseprite -b --script dev-scripts/aseprite/tagged_stacks.lua`. |
 
 Why Lua and not `aseprite --crop`: the CLI `--crop` gave the wrong region and `--frame-range` is ignored together with `--sheet`.
