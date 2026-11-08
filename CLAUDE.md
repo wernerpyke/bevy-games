@@ -57,7 +57,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Every game is a workspace member in `games/<name>/` with its own `src/` and `assets/`. Crate name and folder name are the same, in kebab-case.
 - Games are self-contained. A game never depends on another game's crate or reads another game's assets.
 - Art is copied into the game that uses it. A palette or sprite used by two games is copied twice.
-- Shared code lives in `crates/game-kit/` (`adr-x12`): collision, outline, depth sort, layers, map parser, camera, screen layout, HUD and app states, debug tools and the script runner. Move code there only when two games use it, and ask first. A game keeps its own values, object kinds, art and rules. The kit has no assets and no game types. Build and test it alone with `./dev-scripts/rust.sh test game-kit`.
+- Shared code lives in `crates/game-kit/` (`adr-x12`): collision, outline, depth sort, layers, map parser, camera, screen layout, HUD and app states, map backgrounds, debug tools and the script runner. Move code there only when two games use it, and ask first. A game keeps its own values, object kinds, art and rules. The kit has no assets and no game types. Build and test it alone with `./dev-scripts/rust.sh test game-kit`.
 - Dependency versions are set once in the root `Cargo.toml` under `[workspace.dependencies]`. Games use `bevy.workspace = true`. Build profiles are set only in the root `Cargo.toml`.
 - All commands name the game. When a request does not say which game, ask.
 

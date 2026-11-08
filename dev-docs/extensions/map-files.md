@@ -16,11 +16,12 @@ A text file that a human edits to draw a whole map. One character is one cell. T
 |---|---|---|
 | Parser: `parse(file, source, kinds)`, `Map`, `MapObject`, `MapError` | `crates/game-kit/src/map.rs` | Shared. Object kinds are names (adr-x13). |
 | Exits and entries: `Area`, `MapExit`, `MapEntry`, the in-file checks | `crates/game-kit/src/map_areas.rs` | Shared |
+| Background: `Background`, `BackgroundMode`, and `place_tiles` (which cells get which image) | `crates/game-kit/src/map.rs`, `crates/game-kit/src/map_background.rs` | Shared. The game draws the images |
 | Links between maps: `validate_links` | `crates/game-kit/src/map_links.rs` | Shared. Run by the map registry. |
 | Loading and `Kind` | `games/<game>/src/map.rs` | Per game |
 | Spawning | per game | Per game |
 
-Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
+Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-x36` (backgrounds), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
 
 ## Specification
 
@@ -80,6 +81,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 | `jitter` | no | Largest random shift of each object in pixels. Default 0 |
 | `exits` | no | Zones that lead to other maps. See "Exits and entries" |
 | `entries` | no | Places where the player arrives from another map. See "Exits and entries" |
+| `background` | no | The ground of the map: a colour and tile images. See rule 25 |
 
 3. A legend character is one character, in quotes. `.` always means empty and is written `".": empty`. The keys `.`, `|` and a space are reserved and cannot name an object kind.
 4. The game defines the set of kinds. It passes the names it knows to `parse`, which reports any other name with its line. Objects carry the name as a `String`, and the game converts it to its own enum (adr-x13).
@@ -138,6 +140,33 @@ entries:
    `start_feet(map, origin)` gives its position (the centre of the cell).
 24. **Exit objects.** A legend entry may have `exit_to=<map id>`, for example `"m": marker exit_to=2` (`adr-x33`). Touching the object sends the player to that map, at its `player_start`. The parser reads it as an ordinary parameter (`MapObject::exit_to`). Between maps (`validate_links`) the map must be registered and have exactly one `player_start`, and the error names the legend line. The game decides where the object can be touched (`ExitTrigger`). There is no `transition` key: it is always a scene transition. Do not put such an object inside an exit area (rule 21). A map may use exit areas, exit objects, or both.
 
+### Background
+
+25. **Background.** An optional `background:` block in the front matter gives the ground of the map: a colour, and tile images drawn over it (`adr-x36`). Indented `key: value` lines, like the legend:
+
+    ```
+    background:
+      color: "#292829"
+      mode: random
+      fill: 0.2
+      jitter: 16
+      scale: 2
+      tiles: grass_0 grass_1 flowers_0
+    ```
+
+    | Key | Needed | Meaning |
+    |---|---|---|
+    | `color` | yes | Hex colour `#rrggbb`. Quote it: an unquoted `#` starts a comment |
+    | `mode` | yes | `random` or `pattern`. No default. `pattern` (a repeating fill) is reserved: the parser rejects it with "not implemented yet" |
+    | `fill` | no | Chance, 0 to 1, that a cell gets an image. Default 0 (colour only) |
+    | `tiles` | with `fill` above 0 | Image names separated by blanks, each equally likely. The game checks the names, the kit does not know the art |
+    | `jitter` | no | Largest random shift of an image in pixels on each axis. Default 0. Separate from the map key `jitter` |
+    | `scale` | no | A number above 0, the size of an image as a multiple of its art size. Default 1. `0.5` is allowed |
+    | `seed` | no | A whole number that changes the dice. Default 0 |
+
+    The parser (`map.rs`, `Map::background`) checks the syntax and names the line of each error: a missing `color` or `mode`, a bad `mode`, colour, `fill`, `jitter`, `scale` or `seed`, a `fill` above 0 without `tiles`, a repeated tile name, an unknown key, a key or the block given twice.
+    `map_background::place_tiles` decides which cells get an image, which image, and where. Each cell rolls its own dice from a hash of the map name, the `seed` and the cell number. So the ground is the same on every load, on F1 reload and on the web, it does not depend on the order of the cells, and a map that grows keeps the images of its old cells. The number of images varies from map to map, because it is a chance per cell. An image is centred on its cell, shifted by the jitter, and moved inwards so it stays inside the map. The game draws the colour as a rectangle of the map size and the images above it (`layers.rs`, `BACKGROUND_Z` and `BACKGROUND_TILES_Z`).
+
 ## Usage
 
 - Add a new object kind to the game's name list and `Kind` enum, to the module that spawns it, and to the legend.
@@ -164,4 +193,5 @@ Inline in `game-kit` `map.rs`. Each game tests that its own map file parses (cou
 - Legend: a character that is not in the legend names its line, reserved keys (`|`, `.`, space) are errors, and a marker such as `player_start` comes back as an ordinary object.
 - Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw`, `jitter` and `cell` values, an unknown kind, comments and optional keys.
 - Exits and entries: `map_areas.rs` tests the area notation, the edge rules, objects in areas, overlaps and a `top-left` file. `map_links.rs` tests the checks between maps. It also tests `exit_to` (unknown map, a target without exactly one start). `map.rs` tests `exit_to` and `start_feet`.
+- Background: a full block, defaults, a block with only a colour and a mode, no block, every error with its line, `scale` (including `0.5`), a repeated key or block, and the map key `jitter` kept apart. `map_background.rs` tests the placement: fill 0 and 1, the same result for the same input, a different seed, the share close to `fill`, jitter and the clamp inside the map, a map that grows, and a fixed expected list so the hash never changes.
 - Other: comments, blank lines and Windows line endings, and objects come back in a fixed order (top row first, then left to right).

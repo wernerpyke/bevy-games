@@ -10,6 +10,8 @@
 //! - `size`: width and height in cells, written `WxH`. Required.
 //! - `draw`: drawn size of an object in pixels. Optional, the game gives the default.
 //! - `jitter`: largest random offset in pixels. Default 0.
+//! - `background`: an optional indented block with the ground of the map: `color`, `mode`, `fill`, `jitter`, `scale`,
+//!   `tiles` and `seed` (`Background`). The game draws it. See `dev-docs/extensions/map-files.md`.
 //! - `legend`: indented `char: kind` lines. A kind may be followed by `key=value` parameters, for example
 //!   `"S": spawn_skeleton every=10 radius=120` (`Params`). The game reads them by name. `.` is always empty. Quote the character
 //!   (for example `"#"`), because an unquoted `#` starts a comment.
@@ -25,6 +27,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use bevy::color::Srgba;
 use bevy::log::warn;
 use bevy::math::{IVec2, Vec2};
 
@@ -126,6 +129,34 @@ pub enum Origin {
     TopLeft,
 }
 
+/// How the tile images of a background are placed (`mode` key of the `background:` block). `Pattern` (a repeating
+/// fill) is reserved: the parser rejects it until it is built.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BackgroundMode {
+    Random,
+    Pattern,
+}
+
+/// The ground of a map, from the `background:` block: a colour, and tile images drawn over it. The kit only reads
+/// and checks it. The game knows the tile names and draws them. See `dev-docs/extensions/map-files.md`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Background {
+    pub color: Srgba,
+    pub mode: BackgroundMode,
+    /// Share of the cells that get a tile image, 0 to 1.
+    pub fill: f32,
+    /// Largest random shift of each tile image in pixels, on each axis.
+    pub jitter: f32,
+    /// The images are drawn at this multiple of their art size, above 0. Default 1.
+    pub scale: f32,
+    /// Tile image names. Not empty when `fill` is above 0.
+    pub tiles: Vec<String>,
+    /// Changes which cells get which image. Default 0.
+    pub seed: u64,
+    /// The line of `background:` in the file.
+    pub line: usize,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     pub name: String,
@@ -137,6 +168,8 @@ pub struct Map {
     /// The `draw` key, if the file has one.
     pub draw_size: Option<f32>,
     pub jitter: f32,
+    /// The ground of the map, from the `background:` block. `None` when the file has none.
+    pub background: Option<Background>,
     pub objects: Vec<MapObject>,
     /// Zones that lead to other maps, from the `exits:` block. Empty when the file has none.
     pub exits: Vec<MapExit>,
@@ -160,6 +193,214 @@ impl fmt::Display for MapError {
 
 impl std::error::Error for MapError {}
 
+/// The `background:` block as it is read, line by line.
+struct RawBackground {
+    line: usize,
+    color: Option<Srgba>,
+    mode: Option<BackgroundMode>,
+    fill: Option<f32>,
+    jitter: Option<f32>,
+    scale: Option<f32>,
+    tiles: Option<Vec<String>>,
+    seed: Option<u64>,
+}
+
+impl RawBackground {
+    fn new(line: usize) -> Self {
+        Self {
+            line,
+            color: None,
+            mode: None,
+            fill: None,
+            jitter: None,
+            scale: None,
+            tiles: None,
+            seed: None,
+        }
+    }
+
+    /// Checks that the block is complete and consistent.
+    fn finish(self, fail: &Fail) -> Result<Background, MapError> {
+        let line = self.line;
+        let color = self
+            .color
+            .ok_or_else(|| fail(line, "`background` needs a `color`".into()))?;
+        let mode = self.mode.ok_or_else(|| {
+            fail(
+                line,
+                "`background` needs a `mode` (`random` or `pattern`)".into(),
+            )
+        })?;
+        let fill = self.fill.unwrap_or(0.0);
+        let tiles = self.tiles.unwrap_or_default();
+        if fill > 0.0 && tiles.is_empty() {
+            return Err(fail(
+                line,
+                "`background` has a `fill` above 0 and needs `tiles`".into(),
+            ));
+        }
+        Ok(Background {
+            color,
+            mode,
+            fill,
+            jitter: self.jitter.unwrap_or(0.0),
+            scale: self.scale.unwrap_or(1.0),
+            tiles,
+            seed: self.seed.unwrap_or(0),
+            line,
+        })
+    }
+}
+
+/// Reads one indented line of the `background:` block.
+fn read_background_line(
+    raw: &mut RawBackground,
+    key: &str,
+    value: &str,
+    line: usize,
+    fail: &Fail,
+) -> Result<(), MapError> {
+    let twice = |key: &str| fail(line, format!("`{key}` is given twice in `background`"));
+    match key {
+        "color" => {
+            if raw.color.is_some() {
+                return Err(twice(key));
+            }
+            let text = value.trim_matches('"');
+            let valid = text.len() == 7 && text.starts_with('#');
+            raw.color = Some(
+                valid
+                    .then(|| Srgba::hex(text).ok())
+                    .flatten()
+                    .ok_or_else(|| {
+                        let hint = if value.is_empty() {
+                            " (quote it: an unquoted `#` starts a comment)"
+                        } else {
+                            ""
+                        };
+                        fail(
+                            line,
+                            format!(
+                                "`color` must be a hex colour like \"#314b8e\", found `{value}`{hint}"
+                            ),
+                        )
+                    })?,
+            );
+        }
+        "mode" => {
+            if raw.mode.is_some() {
+                return Err(twice(key));
+            }
+            raw.mode = Some(match value {
+                "random" => BackgroundMode::Random,
+                "pattern" => {
+                    return Err(fail(
+                        line,
+                        "`mode: pattern` is not implemented yet, use `random`".into(),
+                    ));
+                }
+                _ => {
+                    return Err(fail(
+                        line,
+                        format!("`mode` must be `random` or `pattern`, found `{value}`"),
+                    ));
+                }
+            });
+        }
+        "fill" => {
+            if raw.fill.is_some() {
+                return Err(twice(key));
+            }
+            raw.fill = Some(
+                value
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|fill| (0.0..=1.0).contains(fill))
+                    .ok_or_else(|| {
+                        fail(
+                            line,
+                            format!("`fill` must be a number from 0 to 1, found `{value}`"),
+                        )
+                    })?,
+            );
+        }
+        "jitter" => {
+            if raw.jitter.is_some() {
+                return Err(twice(key));
+            }
+            raw.jitter = Some(
+                value
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|jitter| jitter.is_finite() && *jitter >= 0.0)
+                    .ok_or_else(|| {
+                        fail(
+                            line,
+                            format!("`jitter` must be a number of at least 0, found `{value}`"),
+                        )
+                    })?,
+            );
+        }
+        "scale" => {
+            if raw.scale.is_some() {
+                return Err(twice(key));
+            }
+            raw.scale = Some(
+                value
+                    .parse::<f32>()
+                    .ok()
+                    .filter(|scale| scale.is_finite() && *scale > 0.0)
+                    .ok_or_else(|| {
+                        fail(
+                            line,
+                            format!("`scale` must be a number above 0, found `{value}`"),
+                        )
+                    })?,
+            );
+        }
+        "seed" => {
+            if raw.seed.is_some() {
+                return Err(twice(key));
+            }
+            raw.seed = Some(value.parse::<u64>().map_err(|_| {
+                fail(
+                    line,
+                    format!("`seed` must be a whole number of at least 0, found `{value}`"),
+                )
+            })?);
+        }
+        "tiles" => {
+            if raw.tiles.is_some() {
+                return Err(twice(key));
+            }
+            let names: Vec<String> = value.split_whitespace().map(str::to_string).collect();
+            if names.is_empty() {
+                return Err(fail(line, "`tiles` needs at least one name".into()));
+            }
+            if let Some(name) = names
+                .iter()
+                .enumerate()
+                .find_map(|(i, name)| names[..i].contains(name).then_some(name))
+            {
+                return Err(fail(
+                    line,
+                    format!("tile `{name}` is listed twice in `tiles`"),
+                ));
+            }
+            raw.tiles = Some(names);
+        }
+        other => {
+            return Err(fail(
+                line,
+                format!(
+                    "unknown key `{other}` in `background` (known: color, mode, fill, jitter, scale, tiles, seed)"
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 /// Frontmatter values that have been read so far.
 #[derive(Default)]
 struct Header {
@@ -172,6 +413,7 @@ struct Header {
     legend: HashMap<char, (String, Params)>,
     exits: Vec<RawLink>,
     entries: Vec<RawLink>,
+    background: Option<RawBackground>,
 }
 
 /// The nested block that the indented lines belong to.
@@ -181,6 +423,7 @@ enum Block {
     Legend,
     Exits,
     Entries,
+    Background,
 }
 
 /// Reads the frontmatter. Returns the index of the closing `---` line, the header, the map name and the cell size.
@@ -235,6 +478,7 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
     let objects = parse_grid(&lines, close + 1, size, origin, &header.legend, &fail)?;
     let exits = map_areas::build_exits(&header.exits, origin, size, &fail)?;
     let entries = map_areas::build_entries(&header.entries, origin, size, &fail)?;
+    let background = header.background.map(|raw| raw.finish(&fail)).transpose()?;
     map_areas::check_areas(&exits, &entries, &objects, &fail)?;
 
     Ok(Map {
@@ -244,6 +488,7 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
         size,
         draw_size: header.draw_size,
         jitter: header.jitter.unwrap_or(0.0),
+        background,
         objects,
         exits,
         entries,
@@ -401,8 +646,16 @@ fn parse_header(
             if block == Block::None {
                 return Err(fail(
                     line,
-                    "indented line outside `legend`, `exits` and `entries`".into(),
+                    "indented line outside `legend`, `exits`, `entries` and `background`".into(),
                 ));
+            }
+            if block == Block::Background {
+                let raw = header
+                    .background
+                    .as_mut()
+                    .expect("a background block has a header entry");
+                read_background_line(raw, &key, value, line, fail)?;
+                continue;
             }
             if block != Block::Legend {
                 if key.is_empty() {
@@ -500,13 +753,20 @@ fn parse_header(
                     })?;
                 header.jitter = Some(jitter);
             }
-            "legend" | "exits" | "entries" => {
+            "legend" | "exits" | "entries" | "background" => {
                 if !value.is_empty() {
                     return Err(fail(line, format!("`{key}:` takes indented lines")));
                 }
                 block = match key.as_str() {
                     "legend" => Block::Legend,
                     "exits" => Block::Exits,
+                    "background" => {
+                        if header.background.is_some() {
+                            return Err(fail(line, "`background` is given twice".into()));
+                        }
+                        header.background = Some(RawBackground::new(line));
+                        Block::Background
+                    }
                     _ => Block::Entries,
                 };
             }
@@ -975,5 +1235,123 @@ mod text_tests {
         let e = error(&grid([DOTS; 4]).replace("bottom-left", "centre"));
         assert_eq!(e.line, 4);
         assert!(e.message.contains("`bottom-left` or `top-left`"), "{e}");
+    }
+
+    /// The test map with a `background:` block before the legend. `background:` is line 6, its keys follow.
+    fn with_background(block: &str) -> String {
+        grid([DOTS; 4]).replace("legend:\n", &format!("background:\n{block}legend:\n"))
+    }
+
+    const FULL_BACKGROUND: &str = "  color: \"#2a3f5b\"\n  mode: random\n  fill: 0.2\n  jitter: 16\n  scale: 2\n  seed: 3\n  tiles: grass_0 flowers_1\n";
+
+    #[test]
+    fn a_map_without_a_background_has_none() {
+        assert_eq!(parse_ok(&grid([DOTS; 4])).background, None);
+    }
+
+    #[test]
+    fn a_full_background_block_is_read() {
+        let map = parse_ok(&with_background(FULL_BACKGROUND));
+        let background = map.background.expect("a background");
+        assert_eq!(background.color, Srgba::hex("#2a3f5b").unwrap());
+        assert_eq!(background.mode, BackgroundMode::Random);
+        assert_eq!(background.fill, 0.2);
+        assert_eq!(background.jitter, 16.0);
+        assert_eq!(background.scale, 2.0);
+        assert_eq!(background.seed, 3);
+        assert_eq!(background.tiles, vec!["grass_0", "flowers_1"]);
+        assert_eq!(background.line, 6);
+        // The rest of the file is read as before.
+        assert_eq!(map.size, IVec2::new(6, 4));
+    }
+
+    #[test]
+    fn scale_may_be_a_fraction() {
+        for (text, expected) in [("0.5", 0.5), ("1.5", 1.5), ("4", 4.0)] {
+            let block = format!("  color: \"#000000\"\n  mode: random\n  scale: {text}\n");
+            assert_eq!(
+                parse_ok(&with_background(&block)).background.unwrap().scale,
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn a_background_with_only_a_colour_and_a_mode_has_defaults() {
+        let map = parse_ok(&with_background("  color: \"#000000\"\n  mode: random\n"));
+        let background = map.background.unwrap();
+        assert_eq!(background.fill, 0.0);
+        assert_eq!(background.jitter, 0.0);
+        assert_eq!(background.scale, 1.0);
+        assert_eq!(background.seed, 0);
+        assert!(background.tiles.is_empty());
+    }
+
+    #[test]
+    fn a_background_error_names_the_line() {
+        let ok = "  color: \"#2a3f5b\"\n  mode: random\n";
+        let cases: Vec<(String, usize, &str)> = vec![
+            ("  mode: random\n".into(), 6, "needs a `color`"),
+            ("  color: \"#000000\"\n".into(), 6, "needs a `mode`"),
+            (
+                "  color: \"#000000\"\n  mode: stripes\n".into(),
+                8,
+                "`random` or `pattern`",
+            ),
+            (
+                "  color: \"#000000\"\n  mode: pattern\n".into(),
+                8,
+                "not implemented yet",
+            ),
+            ("  color: #2a3f5b\n  mode: random\n".into(), 7, "quote it"),
+            (
+                "  color: \"2a3f5b\"\n  mode: random\n".into(),
+                7,
+                "hex colour",
+            ),
+            (
+                "  color: \"#2a3f5\"\n  mode: random\n".into(),
+                7,
+                "hex colour",
+            ),
+            (format!("{ok}  fill: 1.5\n  tiles: a\n"), 9, "from 0 to 1"),
+            (format!("{ok}  jitter: -1\n"), 9, "at least 0"),
+            (format!("{ok}  scale: 0\n"), 9, "number above 0"),
+            (format!("{ok}  scale: -2\n"), 9, "number above 0"),
+            (format!("{ok}  scale: big\n"), 9, "number above 0"),
+            (format!("{ok}  fill: 0.5\n"), 6, "needs `tiles`"),
+            (format!("{ok}  tiles: a b a\n"), 9, "listed twice"),
+            (format!("{ok}  size: 3\n"), 9, "unknown key `size`"),
+            (
+                "  color: \"#2a3f5b\"\n  color: \"#000000\"\n  mode: random\n".to_string(),
+                8,
+                "given twice",
+            ),
+            (format!("{ok}  seed: -2\n"), 9, "whole number"),
+        ];
+        for (block, line, text) in cases {
+            let e = error(&with_background(&block));
+            assert_eq!(e.line, line, "{block:?}: {e}");
+            assert!(e.message.contains(text), "{block:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn two_background_blocks_are_an_error() {
+        let source = grid([DOTS; 4]).replace(
+            "legend:\n",
+            "background:\n  color: \"#000000\"\n  mode: random\nbackground:\n  color: \"#000000\"\n  mode: random\nlegend:\n",
+        );
+        let e = error(&source);
+        assert_eq!(e.line, 9);
+        assert!(e.message.contains("given twice"), "{e}");
+    }
+
+    #[test]
+    fn the_map_key_jitter_and_the_background_jitter_are_separate() {
+        let source = with_background(FULL_BACKGROUND).replace("legend:\n", "jitter: 4\nlegend:\n");
+        let map = parse_ok(&source);
+        assert_eq!(map.jitter, 4.0);
+        assert_eq!(map.background.unwrap().jitter, 16.0);
     }
 }

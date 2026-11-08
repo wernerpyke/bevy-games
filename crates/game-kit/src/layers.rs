@@ -7,6 +7,7 @@
 //! | Layer | Kind | Value |
 //! |---|---|---|
 //! | Background | sprite z | `BACKGROUND_Z` |
+//! | Background tile images | sprite z | `BACKGROUND_TILES_Z` plus `BACKGROUND_TILE_Z_STEP` per image |
 //! | Grid debug | sprite z | `GRID_DEBUG_Z` |
 //! | World | sprite z | within `WORLD_HALF_BAND` of 0, set by `depth.rs` from the feet |
 //! | Feature debug | sprite z | `FEATURE_DEBUG_Z` |
@@ -20,8 +21,14 @@
 //! feet. Separate layers would stop a character walking behind a tree. The HUD and UI are drawn by `bevy_ui`
 //! after all sprites and gizmos, so they are always above the feature debug layer.
 
-/// Ground and tiles. Sublayers go between this and `GRID_DEBUG_Z` when a background exists.
+/// The ground colour of a map: a rectangle the size of the map. The tile images are above it, see `BACKGROUND_TILES_Z`.
 pub const BACKGROUND_Z: f32 = -500.0;
+/// The tile images of a map background (`map_background.rs`) start here. Images overlap when they are jittered or
+/// scaled, and sprites with the same z have no fixed order, so image number i is at `BACKGROUND_TILES_Z + i x
+/// BACKGROUND_TILE_Z_STEP`. Room for `BACKGROUND_TILES_MAX` images below the grid.
+pub const BACKGROUND_TILES_Z: f32 = -490.0;
+pub const BACKGROUND_TILE_Z_STEP: f32 = 0.001;
+pub const BACKGROUND_TILES_MAX: usize = 100_000;
 /// The F3 grid lines and their numbers.
 pub const GRID_DEBUG_Z: f32 = -200.0;
 /// The world layer spans z from `-WORLD_HALF_BAND` to `WORLD_HALF_BAND`. With `depth.rs` at 0.001 per unit of
@@ -48,6 +55,10 @@ pub const FADE_Z_INDEX: i32 = 1000;
 const _: () = {
     assert!(FEATURE_DEBUG_FEET_Z < MOVEMENT_DEBUG_Z);
     assert!(BACKGROUND_Z < GRID_DEBUG_Z);
+    assert!(BACKGROUND_Z < BACKGROUND_TILES_Z);
+    assert!(
+        BACKGROUND_TILES_Z + BACKGROUND_TILES_MAX as f32 * BACKGROUND_TILE_Z_STEP < GRID_DEBUG_Z
+    );
     assert!(GRID_DEBUG_Z < -WORLD_HALF_BAND);
     assert!(WORLD_HALF_BAND < FEATURE_DEBUG_Z);
     assert!(

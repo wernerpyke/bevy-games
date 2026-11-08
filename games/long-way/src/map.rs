@@ -84,6 +84,7 @@ impl Plugin for MapPlugin {
                 .register_system(crate::player::arrive_player),
         };
         app.insert_resource(hooks)
+            .add_systems(Startup, crate::background::check_tiles)
             .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
@@ -101,17 +102,27 @@ fn load_hook(
     };
     let map = &registered.map;
     info!(
-        "map: {} cell {} size {} draw {:?} jitter {}, {} objects",
+        "map: {} cell {} size {} draw {:?} jitter {}, {} objects, background {}",
         map.name,
         map.cell_size,
         map.size,
         map.draw_size,
         map.jitter,
-        map.objects.len()
+        map.objects.len(),
+        map.background
+            .as_ref()
+            .map_or("none".to_string(), |b| format!(
+                "{} fill {} jitter {} scale {}",
+                b.color.to_hex(),
+                b.fill,
+                b.jitter,
+                b.scale
+            ))
     );
     for object in &map.objects {
         debug!("map: {} at cell {}", object.kind, object.cell);
     }
+    crate::background::spawn_background(&mut commands, &server, map, &load);
     crate::rocks::spawn_rocks(&mut commands, &server, map, &load);
     crate::trees::spawn_trees(&mut commands, &server, map, &load);
     crate::markers::spawn_markers(&mut commands, &server, map, &load);

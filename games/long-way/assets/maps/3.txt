@@ -3,6 +3,13 @@ map: 3
 cell: 64
 origin: bottom-left
 size: 10x10
+background:
+  color: "#292829"
+  mode: random
+  fill: 0.2
+  jitter: 16
+  scale: 0.8
+  tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
 legend:
   ".": empty
   "0": rock_0

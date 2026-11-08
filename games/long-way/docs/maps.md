@@ -49,6 +49,30 @@ You may draw the cells that a rock or tree covers with blanks, to see how far it
 
 Characters that are next to each other overlap by one cell. This is on purpose: it makes a pile of rocks that looks like one cluster. A solid block of 4 by 3 characters gives a cluster of 5 by 4 cells.
 
+## Backgrounds
+
+Every map has a `background:` block before `legend:` (`adr-lw26`, rule 25 of the [map files extension](../../../dev-docs/extensions/map-files.md)):
+
+```
+background:
+  color: "#292829"
+  mode: random
+  fill: 0.2
+  jitter: 16
+  scale: 2
+  tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
+```
+
+- `color` is the ground. Use a colour of the game palette. Quote it.
+- `mode` is `random` (the only mode for now).
+- `fill` is the chance that a cell gets a tile image. `0.2` gives about one cell in five, and the number varies from map to map. A map with `fill: 0` has the colour only.
+- `jitter` shifts each image by up to that many pixels, so the images do not sit on a visible grid. 16 pixels is a quarter of a cell.
+- `scale` sets the image size as a multiple of its art size. The images are 32 by 32 art pixels, so `2` is 64 pixels (one cell), `1` is 32 pixels, `0.5` is 16 pixels and `4` is 128 pixels. A scale that is not a whole number draws some art pixels wider than others.
+- `tiles` lists the images. Names: `grass_0` to `grass_3` and `flowers_0`, `flowers_1` (tags in `art/backgrounds/ground_tiles.aseprite`). The game stops at start and names the file and line if a map lists another name.
+- `seed` (optional, default 0) re-rolls the ground. Change it if you do not like where the images landed.
+- The ground is the same on every load, on F1 reload and when you re-enter a map. Making a map bigger keeps the images of the cells it had.
+- The ground is a rectangle the size of the map, with the images above it. Both are below the F3 grid and the world. Code: `background.rs` (drawing) and `game_kit::map_background` (placement).
+
 ## Scenery (Zen Garden trees and shrubs)
 
 The five Zen Garden kinds are one character each, for example `g` for `green_tree_medium`, `r` for `red_tree_medium`, `t` for `red_tree_small`, `b` for `green_shrub` and `s` for `green_shrub_small`. They are in the legend of every map. The character is the bottom left cell of the object's cell space (2x2 for `green_tree_medium`, 1x2 for `red_tree_medium`, 1x1 for the rest). The canvas of `green_tree_medium` has its bottom left corner on that cell, like `green_tree`. The other four hang from the bottom middle of their cell space. Trees block like `green_tree`: the foot of the trunk (the lowest 12 rows of the art, plus the player's half width on each side) and the bottom 10% of the canvas height. Shrubs use the same rule, with a foot as wide as the one of the red tree of their size (`green_shrub` like `red_tree_medium`, `green_shrub_small` like `red_tree_small`), centred on the art, and a band of 10% of the height of the drawn shrub. All five join the groups of rocks and trees (`adr-lw23`): each is grouped by its own cell space, and in a group it blocks exactly its anchor cell, 64 by 64. Code: `scenery.rs` (pixel values of each kind are in its `art` table).

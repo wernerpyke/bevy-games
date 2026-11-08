@@ -12,6 +12,7 @@ pub mod hud;
 pub mod layers;
 pub mod map;
 pub mod map_areas;
+pub mod map_background;
 pub mod map_links;
 pub mod map_transition;
 pub mod movement;

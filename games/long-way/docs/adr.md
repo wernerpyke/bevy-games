@@ -163,3 +163,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The kit has no assets and no dependency on the Aseprite plugin (`adr-x12`). Two components on the `Hud` node need no kit change. The file is the bar size, so `UiScale` shows it at one art pixel per UI pixel and the art is not resampled.
 
 **How to apply.** Edit the `.aseprite` file only. If the bar ratio changes (`HUD_BAR_RATIO`), resize the file to the new bar size. Text and widgets go on top as children of `Hud` (`hud.rs`).
+
+## adr-lw26. Long Way maps have a dark ground with random grass and flower tiles (2026-11-08)
+
+**Decision.** Every map has a `background:` block (`adr-x36`) with `mode: random`, the six images of `art/backgrounds/ground_tiles.aseprite` (`grass_0` to `grass_3`, `flowers_0`, `flowers_1`), `fill: 0.2`, `jitter: 16` and `scale: 2`. One image is drawn at 2x (32 pixels of art, 64 pixels) on its cell. The ground colour is `#292829` (a game palette colour). The developer tunes map 1 (`fill: 0.4`, `scale: 0.5`) as a test, and works on the shadows of the sprites themselves.
+
+**Rationale.** A flat clear colour made the map look empty. Small loose images over a dark ground make it organic without a tile editor. The images are sparse, so the fill rate is low. Jitter and scale let the developer tune the look from the map file.
+
+**How to apply.** Values and tile names: `games/long-way/docs/maps.md`, "Backgrounds". The art file is recorded in `art-pipeline.md`.

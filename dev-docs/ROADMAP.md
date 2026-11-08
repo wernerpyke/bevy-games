@@ -22,6 +22,8 @@ Maps are text files with front matter and one drawn grid, one character per cell
 
 ### 5. Tiled backgrounds
 
+Update 2026-11-08: a decorative first step exists, a colour and random tile images per map (`adr-x36`, "Map backgrounds (random fill)" below). This item is still open for a real tile layer with blocking tiles.
+
 Give maps a ground made of tiles, so R-Town can draw grass, paths, stone and water instead of one flat colour (the placeholder `GROUND_COLOR` in `games/r-town/src/map.rs`). The pack's `0-tileset.png` (320x192, a 16 px grid of 20x12 tiles) is the first source. Considerations: how a map file describes a tile layer (a new section in the markdown format, or an external editor format such as Tiled, which ties in with item 6); whether a maintained crate fits the pinned Bevy version and wasm (for example `bevy_ecs_tilemap`, to be checked before any decision) or custom code, with the chunked drawing that a 60x60 map needs; where tiles sit in the draw order (`BACKGROUND_Z` and its sublayers in the kit layers); how blocking tiles such as water feed `CollisionWorld` (`adr-rt5`: water blocks the player), merged into the same clusters as objects; packing the terrain tiles into an `.aseprite` file with tags (`adr-rt1`, `adr-rt6`); and whether the kit or the game owns the tile layer.
 
 ### 6. Visual map editor
@@ -81,6 +83,10 @@ Goal: the kit and the games know the size and shape of the screen they run on an
 
 Considerations: read the monitor size and pick a window that fits (a 720 by 945 window did not fit this Mac: macOS shrank it and the view grew wider than 8 cells); fullscreen and free resize; what a very wide or very tall window does (show more world, letterbox, or limit the aspect ratio, and what the camera bounds and map edges then show); the integer scaling rule in `CLAUDE.md`, which the scale of 1.40625 already breaks (choose a whole number scale of the art, or accept a fractional one and say so); the web canvas size and the browser window (item 10); whether the HUD size is a fixed share of the view or adapts to the window shape, for example a phone-shaped window; high-DPI screens (scale factor 2 on this Mac); and tests for the layout function with many window shapes. Ask the user for the target screens (desktop only, or also phones and tablets on the web) before deciding.
 
+### 15. Repeating pattern backgrounds
+
+The `background:` block already has a mandatory `mode`, and `pattern` is reserved (`adr-x36`): the parser rejects it as not implemented. Build it: how a pattern is written in the map file (a short repeat of image names, or a tile image per cell row), how it combines with `jitter` and `scale`, and whether R-Town uses it for a tiled ground (item 5). Ask the user what a pattern should look like before inventing the format.
+
 ### 90. Further disk savings for `target/` (low priority)
 
 `target/` is 2.2 GB after a clean build and 3.2 GB with `lint`, `test` and `web` (it was 25 GB before debug info was removed, `adr-e8`). Only look at more savings if `target/` grows past the limit in `CLAUDE.md` ("Disk use") even with the routine. Options, each to be measured before it is kept: `split-debuginfo = "unpacked"` for `[profile.dev]` (macOS only), no incremental builds for dependencies, one shared `CARGO_TARGET_DIR` for all projects (saves space when they share a Bevy version, but all builds lock one folder), and `cargo-sweep` (`cargo install cargo-sweep`, then test that `--time` removes the right files on macOS; `rust.sh prune` already runs it when installed). Install `cargo-sweep` earlier if the project starts to use several Bevy versions or toolchains, or a shared target folder. Do not make `bevy/dynamic_linking` a default: it makes a second full set of outputs. Known learning: each game binary stays about 140 MB because Bevy is built at `opt-level = 3`. The savings came from `target/debug/deps`.
@@ -90,6 +96,10 @@ Considerations: read the monitor size and pick a window that fits (a 720 by 945 
 With the grid origin at the bottom left, the column "0" label (top edge) and the highest row label (left edge) overlap in the top left corner. Found in a screenshot on 2026-11-01. This is cosmetic and has low priority. Fix by moving the row labels, for example to the bottom of each cell, or by hiding the row label that sits on the top edge. The info box also covers the top left row labels, but F2 and F3 toggle each tool, so that needs no fix.
 
 ## Completed Items
+
+### Map backgrounds (random fill)
+
+Done 2026-11-08. A map file has an optional `background:` block: a colour, and tile images drawn over it with a chance per cell (`fill`), a shift (`jitter`) and a size (`scale`, any number above 0). The kit parses it and places the images (`map.rs`, `map_background.rs`, `adr-x36`). Long Way draws it from `ground_tiles.aseprite` (`background.rs`, `adr-lw26`). Each cell rolls its own dice from the map name, `seed` and the cell, so the ground is the same on every load. Not seen on screen: fill 0 and fill 1 (covered by unit tests) and the web build in a browser. The repeating pattern mode is item 15.
 
 ### Screen layout, HUD bar and app states
 
