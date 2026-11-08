@@ -13,7 +13,7 @@ Starting-point art lives in `~/Dark/graveyard_shift/diodrama-assets/` (55 `.asep
 ## Files copied so far
 
 Long Way (`games/long-way/assets/art/`):
-- `diodrama_palette.aseprite` (from `diodrama_palette.aseprite`, 19 colours, expanded to 32 on 2026-11-05 with the 13 Hunter colours, and to 36 on 2026-11-07 with 4 Zen Garden colours (indexes 32 to 35: `#508582`, `#425faa`, `#314b8e`, `#e78d7b`), see `adr-a5` and `adr-a8`). The game's palette.
+- `game.aseprite` (the palette; named `diodrama_palette.aseprite` until 2026-11-08; from the legacy `diodrama_palette.aseprite`, 19 colours, expanded to 32 on 2026-11-05 with the 13 Hunter colours, to 36 on 2026-11-07 with 4 Zen Garden colours (indexes 32 to 35: `#508582`, `#425faa`, `#314b8e`, `#e78d7b`), and to 44 on 2026-11-08 with 8 colours of the HUD background (indexes 36 to 43: `#1f1932`, `#78b9db`, `#5677af`, `#5285ac`, `#232f50`, `#415b94`, `#386764`, `#2a3f5b`), see `adr-a5` and `adr-a8`). The game's palette.
 - `characters/Guy.aseprite` (from `characters/guy/Guy.aseprite`, 60x60, 41 frames, tags: Idle, Walk, Up, Down, Block, Win)
 - `fonts/CourierPrime-Regular.ttf` and `fonts/OFL.txt` (Courier Prime, copyright 2015 The Courier Prime Project Authors, SIL Open Font Licence 1.1, from the Google Fonts repository on 2026-11-07, not edited. The licence text ships next to the font. Used by the HUD text, `adr-lw24`. Not drawn art: it is not on the palette and not pixel art.)
 - `characters/Hunter.aseprite` (built from the Clarice "nocturnal creature hunter" sprite pack in `input/hunter/`, which the user has a full commercial licence for and may edit. 128x128 (doubled with `resize.lua`), 46 frames, tags: Idle, Run, Hurt, Die, Up and Down. Up and Down were redrawn by the user (2026-11-05). Layers: Body, Weapon, background (never drawn). Built with `dev-scripts/aseprite/tagged_sheets.lua`. Details in `HUNTER-sprites.md`. On the game palette.)
@@ -29,6 +29,7 @@ Long Way (`games/long-way/assets/art/`):
   - `green_shrub_small`: c23 r5, 1x1, `anchor=bottom`, 64x64.
   The game draws `green_tree_medium` with its canvas bottom left on the cell and the other four with the bottom middle of the canvas on the bottom middle of their cell space (`scenery.rs`).
 - `pickups/pickups.aseprite` (built on 2026-11-07 from the user's `input/pickups.aseprite`, 66x317, 8 frames with a blue, a red and a violet fireball stacked in each frame. Brown-grey stray pixels (palette indexes 1 to 8 plus 5 near duplicates) and the pale diagonal streaks (11 blended colours, healed to the neighbouring ramp colour) were removed. Cut with no scaling into 64x96 cells (each fireball is at most 64x95 px and touches the canvas edge), 24 frames, tags `pickup_blue`, `pickup_red` and `pickup_violet` (8 frames each, 100 ms per frame). One layer `Pickup`. 13 colours (3 ramps of 5 colours sharing one white core), own palette, not the game palette. `input/` is git-ignored, so the source and its backup are not in the repo. Not used in the game yet.)
+- `backgrounds/hud.aseprite` (made on 2026-11-08 with `dev-scripts/aseprite/new_sprite.lua`: 512x160 art pixels, the HUD bar size at 5/16 of the view height (`adr-lw24`), 1 frame, one layer `Background` filled with palette index 34 (`#314b8e`), game palette. Drawn at 1 art pixel per UI pixel (`UiScale`), so it is as wide as the game view. A blank start for the user to draw on.)
 
 ## Zen Garden pack (`input/zen-garden/`)
 
@@ -46,7 +47,7 @@ Tools:
 Rules:
 - The art never sets game mechanics. Feet, hitbox and collision come from constants in code (Long Way: `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH`, `PLAYER_BODY_HEIGHT` in `collision.rs`), not from the pixels. Moving or bobbing a sprite inside a frame is a visual change only. The `check` script reports bounds and a feet row from the pixels, so read those as a visual check, not a game value.
 1. Write one shared helper first (`dev-scripts/aseprite/lib.lua`): new sprite, load palette, draw tile, outline, shade, tag frames, save. Sprite scripts call the helper. Do not repeat drawing code per sprite.
-2. Use one fixed palette per game. Long Way: `games/long-way/assets/art/diodrama_palette.aseprite` (36 colours, index 0 is transparent black `#000000a0`). Scripts must not use colours outside it.
+2. Use one fixed palette per game. Long Way: `games/long-way/assets/art/game.aseprite` (44 colours, index 0 is transparent black `#000000a0`). Scripts must not use colours outside it.
 3. Use one tile and sprite size grid (open question: size not chosen, for example 16x16 or 32x32). All sprites are multiples of it.
 4. Check each sprite visually: export a PNG scaled up with `--scale`, view it, fix, repeat. Stop after 3 rounds and ask the user if it still looks wrong.
 5. Claude draws placeholders, tiles, icons, UI, effects and simple animation. The user draws or refines characters and key art. Mark placeholders with the suffix `_placeholder` in the file name so they are easy to find.

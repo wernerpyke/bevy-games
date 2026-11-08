@@ -24,9 +24,9 @@
 
 **How to apply.** Claude never copies a file from the library without being told which one. After a copy, list the file in `games/long-way/docs/art-pipeline.md` under "Files copied so far", under the game it belongs to. The game is for personal use and the developer owns a licence for "Forest Graveyard", the source of the environment sprites, so redistribution is not a concern.
 
-## adr-a4. Project palette: `diodrama_palette.aseprite` (2026-10-31)
+## adr-a4. Project palette: `game.aseprite` (was `diodrama_palette.aseprite`) (2026-10-31)
 
-**Decision.** The Long Way palette is `games/long-way/assets/art/diodrama_palette.aseprite` (19 colours, copied from the legacy library). Each game chooses its own palette. The 20-colour `characters/guy/palette.aseprite` is not used.
+**Decision.** The Long Way palette is `games/long-way/assets/art/game.aseprite` (named `diodrama_palette.aseprite` until 2026-11-08) (19 colours, copied from the legacy library). Each game chooses its own palette. The 20-colour `characters/guy/palette.aseprite` is not used.
 
 **Rationale.** It is the palette embedded in `Guy.aseprite` and in most of the legacy character files, so existing art needs no recolouring.
 
@@ -34,7 +34,7 @@
 
 ## adr-a5. The Long Way palette may grow, by appending (2026-11-05)
 
-**Decision.** The palette in `diodrama_palette.aseprite` is expanded when new art needs colours. New colours are added at the end. Existing indexes never move. The first expansion added the 13 colours of the Hunter sprite pack (indexes 19 to 31, 32 colours in total). `dev-scripts/aseprite/extend_palette.lua` does it.
+**Decision.** The palette in `game.aseprite` is expanded when new art needs colours. New colours are added at the end. Existing indexes never move. The first expansion added the 13 colours of the Hunter sprite pack (indexes 19 to 31, 32 colours in total). `dev-scripts/aseprite/extend_palette.lua` does it.
 
 **Rationale.** The Hunter pack uses its own colours. Mapping them to the 19 old colours would change the look of the character. A bigger palette keeps the pack art as drawn. Appending keeps the player, the rocks and the trees unchanged, because sprites refer to colours, not to index numbers, only inside Aseprite.
 

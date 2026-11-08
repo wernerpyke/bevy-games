@@ -107,7 +107,7 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
    - Suggested bases: Idle and Run for body shape, hat, cloak and timing. The wall-hug pose shows the face from a different angle, so check it by eye as a reference for the front view. The user draws these.
 2. **Attacks (later).** The first version has no attacks. We want to build towards them. When we add them, the pack has one sideways slash and one special. Attacks up and down need new drawing. Keep the attack, charge, special and dash sheets with the source file so they are ready.
 3. **Weapon position.** The flame blade shows in idle at the lower left. For up and down views we must decide where it goes and where the flame sits (it is the main colour accent).
-4. **Palette.** Done (`adr-a5`): the 13 new colours were appended to `diodrama_palette.aseprite`.
+4. **Palette.** Done (`adr-a5`): the 13 new colours were appended to `game.aseprite`.
 5. **Canvas and anchor.** Done: 128x128, feet at y=120, collision values set (`adr-lw15`).
 6. **Block.** `Guy.aseprite` has it. The pack has no equivalent. Not used in code now. Open: draw later or drop the tag. (`Win` is dropped.)
 7. **Effects as separate sprites.** The dash effect is already a separate sheet. The slash arcs and the special attack effects are baked into the character frames. When we add attacks, we must split them out by hand into effect sprites (own file and tags) and remove them from the character frames. Not needed for the first version.
@@ -119,7 +119,7 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 - Canvas: 64x64 at first (one map cell), then doubled in Aseprite on 2026-11-05 to **128x128** (two cells) with nearest-neighbour scaling, so every art pixel is 2x2. The body is centred at x=64 and the feet are at y=120 (8 px margin at the bottom). In code the feet are 56 px below the canvas centre. It fits every frame, including the lying death frames. Effects are separate sprites.
 - Source: no per-animation `.aseprite` files in `input/`. `input/` stays read-only. One script builds the file from the PNGs and takes the frame durations from the JSON (`dev-scripts/aseprite/tagged_sheets.lua`).
 - First version: Idle, Run, Hurt and Die, plus placeholder Up and Down (taken from the jump sheets). No attacks. We add the attack, charge, special and dash sheets later with the same script.
-- Palette: done (`adr-a5`). 13 pack colours were appended to `diodrama_palette.aseprite` (indexes 19 to 31, 32 colours in total). Indexes 0 to 18 did not move. `dev-scripts/aseprite/extend_palette.lua` does this.
+- Palette: done (`adr-a5`). 13 pack colours were appended to `game.aseprite` (indexes 19 to 31, 32 colours in total). Indexes 0 to 18 did not move. `dev-scripts/aseprite/extend_palette.lua` does this.
 - Scale: the character is doubled in the art file, not in the game, so the game draws it at 1x. This gives more pixels to edit by hand. The rocks are drawn at 4x.
 - `Win` tag: dropped.
 
@@ -151,7 +151,7 @@ aseprite -b --script-param out=games/long-way/assets/art/characters/Hunter.asepr
   --script-param from=38,47 --script-param to=32,60 \
   --script-param placeholders=Up,Down \
   --script dev-scripts/aseprite/tagged_sheets.lua
-aseprite -b --script-param palette=games/long-way/assets/art/diodrama_palette.aseprite \
+aseprite -b --script-param palette=games/long-way/assets/art/game.aseprite \
   --script-param sprite=games/long-way/assets/art/characters/Hunter.aseprite \
   --script dev-scripts/aseprite/extend_palette.lua
 aseprite -b games/long-way/assets/art/characters/Hunter.aseprite \

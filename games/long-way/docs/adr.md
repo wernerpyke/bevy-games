@@ -155,3 +155,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** A bar keeps icons and text off the world, so the 8 by 8 cell view and the art scale stay as they are. The same scale as today means no art or map value changes.
 
 **How to apply.** `camera.rs` holds the window size, the view height and the bar size. See roadmap item 13.
+
+## adr-lw25. The HUD bar background is an Aseprite file (2026-11-08)
+
+**Decision.** The bar picture is `assets/art/backgrounds/hud.aseprite`, 512 by 160 art pixels, drawn as an `ImageNode` (stretch mode) with `AseAnimation` (`bevy_aseprite_ultra`) on its own absolute, full-size child of the `Hud` root, pinned with `left` and `top` 0, because the root has padding. The game does this, not `game-kit`.
+
+**Rationale.** The kit has no assets and no dependency on the Aseprite plugin (`adr-x12`). Two components on the `Hud` node need no kit change. The file is the bar size, so `UiScale` shows it at one art pixel per UI pixel and the art is not resampled.
+
+**How to apply.** Edit the `.aseprite` file only. If the bar ratio changes (`HUD_BAR_RATIO`), resize the file to the new bar size. Text and widgets go on top as children of `Hud` (`hud.rs`).

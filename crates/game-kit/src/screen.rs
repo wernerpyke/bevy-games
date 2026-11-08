@@ -13,7 +13,7 @@ use bevy::ui::UiScale;
 use bevy::window::PrimaryWindow;
 
 use crate::camera::GameCamera;
-use crate::hud::{Hud, HudCamera};
+use crate::hud::HudCamera;
 
 /// How the window is shared between the game and the HUD.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -103,8 +103,6 @@ pub struct ScreenLayout {
 pub struct ScreenPlugin {
     /// The layout while playing. Other screens are `Full` (`app_state.rs`).
     pub mode: ScreenMode,
-    /// Background of the HUD (the `Hud` root node) in a bar mode.
-    pub hud_background: Color,
 }
 
 impl Plugin for ScreenPlugin {
@@ -114,7 +112,6 @@ impl Plugin for ScreenPlugin {
             regions: regions(UVec2::ZERO, self.mode),
         })
         .insert_resource(PlayingLayout(self.mode))
-        .insert_resource(crate::hud::HudBackground(self.hud_background))
         .add_systems(Startup, crate::hud::spawn_hud)
         .add_systems(
             PostUpdate,
@@ -148,8 +145,6 @@ fn apply_layout(
     mut ui: ResMut<UiScale>,
     mut game: Single<GameCameraQuery, (With<GameCamera>, Without<HudCamera>)>,
     mut hud_camera: Single<&mut Camera, (With<HudCamera>, Without<GameCamera>)>,
-    mut hud: Single<&mut BackgroundColor, With<Hud>>,
-    background: Res<crate::hud::HudBackground>,
     mut last: Local<Option<Applied>>,
 ) {
     let size = window.physical_size();
@@ -175,11 +170,6 @@ fn apply_layout(
         }
         None => hud_camera.is_active = false,
     }
-    // Only a bar has a background. In the overlay mode the game shows through.
-    hud.0 = match now.mode {
-        ScreenMode::BarTop { .. } | ScreenMode::BarBottom { .. } => background.0,
-        _ => Color::NONE,
-    };
     if let Projection::Orthographic(orthographic) = &**projection
         && let ScalingMode::FixedVertical { viewport_height } = orthographic.scaling_mode
     {
@@ -274,10 +264,7 @@ mod tests {
                     view_height: 512.0,
                     clear_color: Color::BLACK,
                 },
-                ScreenPlugin {
-                    mode,
-                    hud_background: Color::WHITE,
-                },
+                ScreenPlugin { mode },
             ));
         app.world_mut().spawn((
             Window {
@@ -312,11 +299,6 @@ mod tests {
         assert_eq!(hud.physical_position, UVec2::ZERO);
         assert_eq!(hud.physical_size, UVec2::new(720, 360));
         assert_eq!(world.resource::<UiScale>().0, 720.0 / 512.0);
-        let background = world
-            .query_filtered::<&BackgroundColor, With<Hud>>()
-            .single(world)
-            .unwrap();
-        assert_eq!(background.0, Color::WHITE);
     }
 
     #[test]

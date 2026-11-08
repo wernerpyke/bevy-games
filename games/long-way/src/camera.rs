@@ -10,8 +10,7 @@ pub const WINDOW_HEIGHT: u32 = 756;
 /// Height of the HUD bar as a share of the game view height: the bar is the view width wide and 5/16 as high (160 art pixels, 2.5 cells).
 pub const HUD_BAR_RATIO: f32 = 0.3125;
 
-/// Palette colours `#314b8e` and `#e78d7b`.
-pub const HUD_BACKGROUND: Color = Color::srgb(0.1922, 0.2941, 0.5569);
+/// Palette colour `#e78d7b`.
 pub const HUD_TEXT: Color = Color::srgb(0.9059, 0.5529, 0.4824);
 
 /// Size of the HUD text in art pixels.

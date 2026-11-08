@@ -2,7 +2,7 @@
 -- durations, palette check, and the bounds of the visible pixels in every frame. Read only.
 --
 -- Usage (see dev-scripts/aseprite.sh):
---   aseprite -b <file.aseprite> --script-param palette=<diodrama_palette.aseprite> \
+--   aseprite -b <file.aseprite> --script-param palette=<game.aseprite> \
 --     --script dev-scripts/aseprite/check.lua
 --
 --   palette: optional .aseprite file. Every visible pixel colour must be in its palette.

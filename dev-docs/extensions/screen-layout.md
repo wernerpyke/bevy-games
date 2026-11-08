@@ -32,7 +32,6 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 |---|---|---|
 | View height in art pixels | `PixelCameraPlugin::view_height` | `VIEW_HEIGHT` 512 |
 | Layout while playing | `ScreenPlugin::mode` | `BarTop { ratio: HUD_BAR_RATIO }`, ratio 0.3125 (bar 160 art pixels, 576 by 180 on screen) |
-| HUD background | `ScreenPlugin::hud_background` | `HUD_BACKGROUND` |
 | Window size | the game's `WindowPlugin` | `WINDOW_WIDTH` 576, `WINDOW_HEIGHT` 756 (`camera.rs`) |
 | HUD content | children of the `Hud` entity | one `label`, `Long Way` |
 | First state, pause key, dim colour | `AppFlowPlugin` | `Playing`, no pause key, default dim |
@@ -50,7 +49,7 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 
 ### HUD
 
-7. The `Hud` root fills the HUD region and has the HUD background in a bar mode, and no background in the other modes.
+7. The `Hud` root fills the HUD region and draws no background. A game puts its own background (a picture or a colour) inside it or on it.
 8. A game adds its content as children of the `Hud` entity, for example in a `PostStartup` system with `Single<Entity, With<Hud>>`. The kit has generic widgets only (`label`). Icons and gauges are added when a game needs them.
 
 ### App states
@@ -65,7 +64,7 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 
 ## Usage
 
-1. Add `PixelCameraPlugin`, then `ScreenPlugin { mode, hud_background }`, then `AppFlowPlugin::new(start)`.
+1. Add `PixelCameraPlugin`, then `ScreenPlugin { mode }`, then `AppFlowPlugin::new(start)`.
 2. Set the window size so that the game region has the shape you want. At scale factor 2 the window must fit the monitor (macOS shrinks a taller window, and the game region then shows more than the view). Long Way: 576 by 756.
 3. Spawn the HUD content under `Hud`. Spawn each screen with `state_root` in `OnEnter`.
 4. Convert a mouse position with the game camera and its viewport (`Camera::viewport_to_world_2d`). Nothing does this yet.
@@ -81,6 +80,6 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 
 ## Tests
 
-- `screen.rs`: the regions for each mode and at odd sizes, the UI scale, and the plugin setting both cameras, the background and `UiScale`, and switching the HUD camera off.
+- `screen.rs`: the regions for each mode and at odd sizes, the UI scale, and the plugin setting both cameras and `UiScale`, and switching the HUD camera off.
 - `app_state.rs`: the start state with and without the skip, loading to title or game, the skip used once, the layout for each state, screen roots removed with their state, pause (clock, dim layers, dialog slot, HUD dim), leaving the game while paused, and no pause key.
 - `camera.rs`: a second camera does not stop the game camera following.

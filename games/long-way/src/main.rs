@@ -35,7 +35,6 @@ fn main() {
                 mode: game_kit::screen::ScreenMode::BarTop {
                     ratio: camera::HUD_BAR_RATIO,
                 },
-                hud_background: camera::HUD_BACKGROUND,
             },
             // Long Way has no title, pause dialog or game over screen yet: it starts in the game and has no pause key.
             game_kit::app_state::AppFlowPlugin {

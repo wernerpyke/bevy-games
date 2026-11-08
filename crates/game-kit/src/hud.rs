@@ -17,17 +17,12 @@ pub struct HudCamera;
 #[derive(Component)]
 pub struct Hud;
 
-/// Background colour of the `Hud` root in a bar mode.
-#[derive(Resource)]
-pub(crate) struct HudBackground(pub Color);
-
-pub(crate) fn spawn_hud(mut commands: Commands, background: Res<HudBackground>) {
+pub(crate) fn spawn_hud(mut commands: Commands) {
     let camera = commands.spawn(hud_camera_bundle()).id();
     commands.spawn((
         Hud,
         UiTargetCamera(camera),
         GlobalZIndex(HUD_Z_INDEX),
-        BackgroundColor(background.0),
         Node {
             position_type: PositionType::Absolute,
             width: percent(100),
