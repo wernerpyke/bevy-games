@@ -64,7 +64,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 ## bevy_aseprite_ultra 0.10.0
 
 - `app.add_plugins(AsepriteUltraPlugin)`; `use bevy_aseprite_ultra::prelude::*;`. It pulls in `bevy_ui` as a dependency.
-- Spawn `AseAnimation { aseprite: server.load("art/characters/Guy.aseprite"), animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop) }` with `Sprite::default()`.
+- Spawn `AseAnimation { aseprite: server.load("art/characters/Hunter.aseprite"), animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop) }` with `Sprite::default()`.
 - Switch animation: `ase.animation.play_loop("Walk")`. Tag names are case sensitive and match the Aseprite tags. Call it only when the tag changes.
 - A file with no tags: `animation: Animation::default()` plays all frames in a loop. A named tag that does not exist is an error.
 

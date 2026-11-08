@@ -4,7 +4,6 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 
 | File | Tags |
 |---|---|
-| `characters/Guy.aseprite` | `Idle`, `Walk`, `Up`, `Down`, `Block`, `Win` |
 | `characters/Hunter.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `HUNTER-sprites.md`. |
 | `features/Green tree.aseprite` | none (all 8 frames loop) |
 | `features/Red tree.aseprite` | none (all 8 frames loop) |

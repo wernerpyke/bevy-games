@@ -177,4 +177,4 @@ The build makes a 64x64 file. The last command doubles it to 128x128. Rebuilding
 1. **Test the up and down animations in motion.** The frames are drawn and the weapon is hidden. Watch them in the game, retune `WALK_ANIMATION_SPEED`, then settle the open questions: idle tags, flip rule and weapon. Update `animate_player` in `player.rs` and `art-tags.md` to match. Check each step with `script --debug` and zoomed screenshots.
 2. Wire up `Hurt` and `Die` when the game has something that hurts the player.
 3. Add attack, charge, special and dash later, with the effects as separate sprites.
-4. Move the lasting content of this file into `art-pipeline.md` once the up and down views are done, and delete `Guy.aseprite` if it is no longer needed.
+4. Move the lasting content of this file into `art-pipeline.md` once the up and down views are done. `Guy.aseprite` was deleted on 2026-11-08.
