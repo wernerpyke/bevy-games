@@ -186,7 +186,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** A message keeps the rule (no negative HP, no damage at 0) in one place, and the enemy code needs no knowledge of the player. A row that follows `max` needs no HUD change when max HP changes later. Icons are used and not a count because a lost point reads at a glance, and 3 points fit the bar. The game does not die at 0 yet because nothing can show or restart a game over, and a dead end would block testing the ghost.
 
-**How to apply.** Code: `hp.rs`, `hud.rs`, `player.rs` (adds `Hp`). Art: `art-pipeline.md` and `art-tags.md`. The ghost sends the message when it touches the player (`dev-docs/PLAN-ghost-enemy.md`).
+**How to apply.** Code: `hp.rs`, `hud.rs`, `player.rs` (adds `Hp`). Art: `art-pipeline.md` and `art-tags.md`. The ghost sends the message when it touches the player (`adr-lw29`).
 
 ## adr-lw29. The ghost is placed by a map marker when the map loads, patrols near its home and pursues once it sees the player (2026-11-09)
 
