@@ -35,7 +35,17 @@ fn crosses_edge(a: Vec2, b: Vec2, edge: &Edge) -> bool {
         return false;
     }
     let t = ((edge.at - from) / (to - from)).clamp(0.0, 1.0);
-    edge.covers(along_from + t * (along_to - along_from))
+    let along_change = along_to - along_from;
+    if edge.covers(along_from + t * along_change) {
+        return true;
+    }
+    // A segment that starts on the edge line at a convex end passes the end itself, but not when it heads on into the
+    // shape: look a little way along it (`collision::resolve` stops that move).
+    if (from - edge.at).abs() <= TOLERANCE {
+        let s = (2.0 * TOLERANCE / along_change.abs().max(f32::EPSILON)).min(1.0);
+        return edge.covers(along_from + s * along_change);
+    }
+    false
 }
 
 /// The 8 neighbours: east, north, west, south, then the four diagonals.
@@ -309,6 +319,51 @@ impl NavGrid {
         Some(self.smooth(points))
     }
 
+    /// Where a walk towards `to` can end. `to` itself when a path to it exists. Otherwise the grid point nearest to `to`
+    /// among the points that `from` can walk to, which is the closest an actor can get to a goal inside a blocked area,
+    /// outside the map, or enclosed. `None` for an empty grid or a start with no way onto it. It visits the whole
+    /// grid, so call it once for a click and not every frame.
+    pub fn nearest_reachable(&self, from: Vec2, to: Vec2) -> Option<Vec2> {
+        if self.is_empty() {
+            return None;
+        }
+        if self.line_free(from, to) {
+            return Some(to);
+        }
+        let goals = self.reachable_points(to, true);
+        let mut visited = vec![false; self.point_count()];
+        let mut stack = self.reachable_points(from, false);
+        for &start in &stack {
+            visited[start] = true;
+        }
+        let mut best: Option<(f32, usize)> = None;
+        while let Some(node) = stack.pop() {
+            if goals.contains(&node) {
+                return Some(to);
+            }
+            let (col, row) = self.col_row(node);
+            let distance = self.position(col, row).distance_squared(to);
+            if best.is_none_or(|(nearest, _)| distance < nearest) {
+                best = Some((distance, node));
+            }
+            let bits = self.links[node];
+            for (d, (dx, dy)) in DIRECTIONS.iter().enumerate() {
+                if bits & (1 << d) == 0 {
+                    continue;
+                }
+                let next = self.index((col as i32 + dx) as usize, (row as i32 + dy) as usize);
+                if !visited[next] {
+                    visited[next] = true;
+                    stack.push(next);
+                }
+            }
+        }
+        best.map(|(_, node)| {
+            let (col, row) = self.col_row(node);
+            self.position(col, row)
+        })
+    }
+
     /// Keeps the fewest points of a path such that each straight leg between them crosses no edge. The first point
     /// is dropped from the result.
     fn smooth(&self, points: Vec<Vec2>) -> Vec<Vec2> {
@@ -337,6 +392,15 @@ pub struct NavPlugin {
 #[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
 pub struct NavSet;
 
+/// An optional resource: the grid covers the map rectangle shrunk by these distances, so paths stay where the actor
+/// can stand (a player whose feet keep half a body width from the map edge). Without it the grid covers the whole
+/// rectangle. `min` is taken from the left and bottom, `max` from the right and top.
+#[derive(Resource, Clone, Copy, Debug, Default)]
+pub struct NavInset {
+    pub min: Vec2,
+    pub max: Vec2,
+}
+
 #[derive(Resource)]
 struct NavStep(f32);
 
@@ -349,9 +413,17 @@ impl Plugin for NavPlugin {
 }
 
 /// True when the map rectangle exists and it or the blocked areas changed (also on the first frame).
-fn needs_rebuild(world: Option<Res<CollisionWorld>>, bounds: Option<Res<CameraBounds>>) -> bool {
+fn needs_rebuild(
+    world: Option<Res<CollisionWorld>>,
+    bounds: Option<Res<CameraBounds>>,
+    inset: Option<Res<NavInset>>,
+) -> bool {
     match (world, bounds) {
-        (Some(world), Some(bounds)) => world.is_changed() || bounds.is_changed(),
+        (Some(world), Some(bounds)) => {
+            world.is_changed()
+                || bounds.is_changed()
+                || inset.is_some_and(|inset| inset.is_changed())
+        }
         _ => false,
     }
 }
@@ -360,10 +432,16 @@ fn rebuild_grid(
     world: Res<CollisionWorld>,
     bounds: Res<CameraBounds>,
     step: Res<NavStep>,
+    inset: Option<Res<NavInset>>,
     mut grid: ResMut<NavGrid>,
 ) {
     let started = bevy::platform::time::Instant::now();
-    *grid = NavGrid::build(world.edges(), bounds.0, step.0);
+    let inset = inset.map(|i| *i).unwrap_or_default();
+    let covered = Rect {
+        min: bounds.0.min + inset.min,
+        max: (bounds.0.max - inset.max).max(bounds.0.min + inset.min),
+    };
+    *grid = NavGrid::build(world.edges(), covered, step.0);
     debug!(
         "nav: grid of {} points (step {}) built in {:?}",
         grid.point_count(),
@@ -481,6 +559,78 @@ mod tests {
         assert_eq!(
             nav.find_path(Vec2::new(10.0, 20.0), Vec2::new(110.0, 110.0)),
             None
+        );
+    }
+
+    #[test]
+    fn a_leg_from_a_box_corner_into_the_box_is_blocked() {
+        // The start is exactly on the bottom left corner of the box, and the goal is on the far side of it.
+        let block = Rect::new(80.0, 80.0, 120.0, 120.0);
+        let edges = edges_of(&[block]);
+        let corner = Vec2::new(80.0, 80.0);
+        assert!(segment_blocked(corner, Vec2::new(90.0, 140.0), &edges));
+        assert!(segment_blocked(corner, Vec2::new(130.0, 130.0), &edges));
+        // Along the outside, or away from the box, it still passes.
+        assert!(!segment_blocked(corner, Vec2::new(80.0, 140.0), &edges));
+        assert!(!segment_blocked(corner, Vec2::new(60.0, 140.0), &edges));
+        assert!(!segment_blocked(corner, Vec2::new(140.0, 80.0), &edges));
+        assert!(!segment_blocked(corner, Vec2::new(60.0, 60.0), &edges));
+    }
+
+    #[test]
+    fn a_free_goal_is_its_own_nearest_reachable_point() {
+        let nav = grid(&[Rect::new(80.0, 80.0, 120.0, 120.0)]);
+        let (from, to) = (Vec2::new(10.0, 20.0), Vec2::new(150.0, 30.0));
+        assert_eq!(nav.nearest_reachable(from, to), Some(to));
+        let behind = Vec2::new(150.0, 100.0);
+        assert_eq!(nav.nearest_reachable(from, behind), Some(behind));
+    }
+
+    #[test]
+    fn a_goal_inside_a_blocked_area_ends_at_its_edge() {
+        let block = Rect::new(80.0, 80.0, 120.0, 120.0);
+        let nav = grid(&[block]);
+        let from = Vec2::new(10.0, 100.0);
+        let end = nav
+            .nearest_reachable(from, Vec2::new(90.0, 100.0))
+            .expect("a point");
+        assert!(
+            end.x <= 80.0 && end.x >= 74.0 && (end.y - 100.0).abs() <= 4.0,
+            "{end:?}"
+        );
+        assert!(nav.find_path(from, end).is_some());
+    }
+
+    #[test]
+    fn an_enclosed_goal_ends_outside_the_ring() {
+        let ring = [
+            Rect::new(90.0, 90.0, 130.0, 100.0),
+            Rect::new(90.0, 120.0, 130.0, 130.0),
+            Rect::new(90.0, 100.0, 100.0, 120.0),
+            Rect::new(120.0, 100.0, 130.0, 120.0),
+        ];
+        let nav = grid(&ring);
+        let from = Vec2::new(10.0, 110.0);
+        let end = nav
+            .nearest_reachable(from, Vec2::new(110.0, 110.0))
+            .expect("a point");
+        assert!(end.x < 90.0 && end.x > 80.0, "{end:?}");
+        assert!(nav.find_path(from, end).is_some());
+    }
+
+    #[test]
+    fn a_goal_outside_the_grid_ends_at_the_border() {
+        let nav = grid(&[]);
+        let from = Vec2::new(50.0, 50.0);
+        // A straight line is free in the open, so use a block between to force the search.
+        let nav_blocked = grid(&[Rect::new(80.0, 40.0, 84.0, 60.0)]);
+        let end = nav_blocked
+            .nearest_reachable(from, Vec2::new(500.0, 50.0))
+            .expect("a point");
+        assert!(end.x == 200.0 && (end.y - 50.0).abs() <= 4.0, "{end:?}");
+        assert_eq!(
+            nav.nearest_reachable(from, Vec2::new(500.0, 50.0)),
+            Some(Vec2::new(500.0, 50.0))
         );
     }
 

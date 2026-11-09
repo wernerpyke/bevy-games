@@ -42,7 +42,7 @@ fn draw(
     mut commands: Commands,
     settings: Res<DebugSettings>,
     root: Single<(Entity, &mut Visibility), With<DebugRoot>>,
-    movers: Query<(&Transform, &MoveGoal, &PathFollower), With<Mover>>,
+    movers: Query<(&Transform, &Mover, &MoveGoal, &PathFollower)>,
     spawners: Query<&Transform, With<Spawner>>,
 ) {
     let (root, mut visibility) = root.into_inner();
@@ -57,8 +57,11 @@ fn draw(
         .entity(root)
         .despawn_children()
         .with_children(|parent| {
-            for (transform, goal, follower) in &movers {
-                let mut from = transform.translation.truncate();
+            for (transform, mover, goal, follower) in &movers {
+                let mut from = Vec2::new(
+                    transform.translation.x,
+                    transform.translation.y - mover.feet_offset,
+                );
                 for to in follower.points() {
                     let (centre, length, angle) = line_between(from, to);
                     parent.spawn((

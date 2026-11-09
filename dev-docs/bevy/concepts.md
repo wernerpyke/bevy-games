@@ -156,6 +156,7 @@ A resource is a single global value. Ones we use:
 |---|---|
 | `Time` | `time.delta_secs()` is the time since the last frame. Multiply speeds by it. |
 | `ButtonInput<KeyCode>` | Keyboard state. `.pressed(KeyCode::ArrowLeft)` is true while held. |
+| `ButtonInput<MouseButton>` | Mouse buttons. `.just_pressed(MouseButton::Left)` is true in the frame the button goes down. The kit turns it into a `WorldClick` message (`pointer.rs`). |
 | `AssetServer` | Loads files from the game's `assets/` folder. |
 | `ClearColor` | The background colour. We insert our own in `CameraPlugin`. |
 

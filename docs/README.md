@@ -26,7 +26,8 @@ The first build takes several minutes.
 
 ## Controls
 
-- Arrow keys: walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug (they start hidden unless the game runs with `--debug`). Enemies (R-Town) kill the player on a touch: press F1 to start again.
+- Long Way: click with the left mouse button to walk to that place. The player goes around trees and rocks, and a click on a blocked place goes to the nearest place it can reach. A new click changes the goal. The arrow keys do nothing there.
+- R-Town: arrow keys walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug (they start hidden unless the game runs with `--debug`). Enemies (R-Town) kill the player on a touch: press F1 to start again.
 
 ## Troubleshooting
 

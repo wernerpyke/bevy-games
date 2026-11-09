@@ -5,11 +5,14 @@ use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
 use crate::hp::{Hp, PlayerHurt};
 use game_kit::animation::play_if_changed;
-use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
+use game_kit::collision::SlideAssist;
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
 use game_kit::map::{Facing as EntryFacing, start_feet};
 use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
+use game_kit::movement::{FollowSet, MoveGoal, MoveState, Mover, StrategySet};
+use game_kit::nav::{NavGrid, NavInset};
+use game_kit::pointer::WorldClick;
 
 /// Walk speed in art pixels per second.
 pub const WALK_SPEED: f32 = 300.0;
@@ -30,8 +33,19 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
-            .add_systems(Update, (move_player, hurt_player, animate_player).chain());
+        // Paths stay where the feet can stand (`limit_player`): half a body width from the sides, a body height from the top.
+        app.insert_resource(NavInset {
+            min: Vec2::new(PLAYER_HALF_WIDTH, 0.0),
+            max: Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
+        })
+        .add_systems(Startup, spawn_player)
+        .add_systems(Update, set_goal.in_set(StrategySet))
+        .add_systems(
+            Update,
+            (limit_player, hurt_player, animate_player)
+                .chain()
+                .after(FollowSet),
+        );
     }
 }
 
@@ -106,84 +120,103 @@ pub fn spawn_player(
         DepthSort {
             feet_offset: PLAYER_FEET_OFFSET,
         },
-        SlideAssist::default(),
+        Mover::new(WALK_SPEED).with_feet_offset(PLAYER_FEET_OFFSET),
         Transform::from_translation(start.extend(0.0)),
     ));
 }
 
-fn move_player(
-    input: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
+/// A left click sets the goal. The player walks there by the nav grid (`game_kit::movement`), around blocked cells. A
+/// click on a blocked place, or outside the walkable area, goes to the nearest place the player can reach.
+fn set_goal(
+    mut clicks: MessageReader<WorldClick>,
     active: Res<ActiveMaps>,
     transition: Res<MapTransition>,
-    world: Res<CollisionWorld>,
-    settings: Res<CollisionSettings>,
-    mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
+    nav: Res<NavGrid>,
+    mut query: Query<(&Transform, &mut MoveGoal), With<Player>>,
 ) {
-    // The feet stay inside a map, and the body stays below its top edge. They may cross from one map to another only
-    // through a doorway of a seamless exit.
-    let walkable = active.walkable(
-        Vec2::new(PLAYER_HALF_WIDTH, 0.0),
-        Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
-    );
-
-    // The player stands still while the screen fades.
+    let click = clicks
+        .read()
+        .filter(|click| click.button == MouseButton::Left)
+        .last();
+    let Some(click) = click else {
+        return;
+    };
+    // The player stands still while the screen fades, and the click is lost.
     if transition.locks_input() {
-        for (_, mut player, mut assist) in &mut query {
-            player.walking = false;
-            assist.reset();
-        }
         return;
     }
+    let walkable = walkable_areas(&active);
+    for (transform, mut goal) in &mut query {
+        let feet = feet_of(transform);
+        let wanted = clamp_to_union(&walkable, feet, click.position);
+        goal.0 = nav.nearest_reachable(feet, wanted);
+    }
+}
 
-    let mut direction = Vec2::ZERO;
-    if input.pressed(KeyCode::ArrowLeft) {
-        direction.x -= 1.0;
+/// The animation facing for a direction of walking. Sideways wins when it is as strong as the vertical part, so the
+/// sideways walk plays on a diagonal.
+fn facing_of(direction: Vec2) -> Facing {
+    if direction.x.abs() >= direction.y.abs() {
+        Facing::Side
+    } else if direction.y > 0.0 {
+        Facing::Up
+    } else {
+        Facing::Down
     }
-    if input.pressed(KeyCode::ArrowRight) {
-        direction.x += 1.0;
-    }
-    if input.pressed(KeyCode::ArrowUp) {
-        direction.y += 1.0;
-    }
-    if input.pressed(KeyCode::ArrowDown) {
-        direction.y -= 1.0;
-    }
+}
 
-    for (mut transform, mut player, mut assist) in &mut query {
-        player.walking = direction != Vec2::ZERO;
-        if !player.walking {
+fn feet_of(transform: &Transform) -> Vec2 {
+    transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET)
+}
+
+/// The areas the feet may stand in. They stay inside a map, and the body stays below its top edge. They may cross from one
+/// map to another only through a doorway of a seamless exit.
+fn walkable_areas(active: &ActiveMaps) -> Vec<Rect> {
+    active.walkable(
+        Vec2::new(PLAYER_HALF_WIDTH, 0.0),
+        Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
+    )
+}
+
+/// Keeps the feet in the walkable areas after `follow_goals` moved them (the mover only knows the rectangle of the
+/// camera), and turns what the mover did into the animation state. The player stands still while the screen fades.
+fn limit_player(
+    active: Res<ActiveMaps>,
+    transition: Res<MapTransition>,
+    mut query: Query<(
+        &mut Transform,
+        &mut Player,
+        &mut MoveGoal,
+        &MoveState,
+        &mut SlideAssist,
+    )>,
+) {
+    let walkable = walkable_areas(&active);
+    let locked = transition.locks_input();
+    for (mut transform, mut player, mut goal, state, mut assist) in &mut query {
+        if locked {
+            goal.0 = None;
             assist.reset();
+            player.walking = false;
             continue;
         }
-        let step = direction.normalize() * WALK_SPEED * time.delta_secs();
-        // Collision works on the feet, not the centre of the canvas.
-        let old_feet = transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET);
-        let feet = move_feet(
-            &settings,
-            &mut assist,
-            old_feet,
-            step,
-            time.delta_secs(),
-            world.edges(),
-        );
-        let feet = clamp_to_union(&walkable, old_feet, feet);
-        transform.translation.x = feet.x;
-        transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
+        player.walking = state.walking;
+        if !state.walking {
+            continue;
+        }
+        let feet = feet_of(&transform);
+        let limited = clamp_to_union(&walkable, feet, feet);
+        transform.translation.x = limited.x;
+        transform.translation.y = limited.y + PLAYER_FEET_OFFSET;
 
-        // Horizontal movement wins when walking diagonally, so the sideways walk plays.
-        if direction.x != 0.0 {
-            player.facing = Facing::Side;
-            let faces_right = direction.x > 0.0;
+        player.facing = facing_of(state.facing);
+        if player.facing == Facing::Side {
+            let faces_right = state.facing.x > 0.0;
             transform.scale.x = if faces_right == WALK_ART_FACES_RIGHT {
                 1.0
             } else {
                 -1.0
             };
-        } else if direction.y > 0.0 {
-            player.facing = Facing::Up;
-        } else {
-            player.facing = Facing::Down;
         }
     }
 }
@@ -238,7 +271,7 @@ fn hurt_player(
 pub fn arrive_player(
     In(arrival): In<Arrival>,
     active: Res<ActiveMaps>,
-    mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist)>,
+    mut query: Query<(&mut Transform, &mut Player, &mut SlideAssist, &mut MoveGoal)>,
 ) {
     // An entry at the edge of a map can put the feet where the body would be cut off by the edge of the view (the top
     // of the map) or outside the walkable area. Move them to the nearest place the player can stand, as `move_player` does.
@@ -247,7 +280,8 @@ pub fn arrive_player(
         Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
     );
     let feet = clamp_to_union(&walkable, arrival.feet, arrival.feet);
-    for (mut transform, mut player, mut assist) in &mut query {
+    for (mut transform, mut player, mut assist, mut goal) in &mut query {
+        goal.0 = None;
         transform.translation.x = feet.x;
         transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
         assist.reset();
@@ -300,6 +334,14 @@ mod tests {
             .animation
             .tag
             .clone()
+    }
+
+    #[test]
+    fn the_facing_follows_the_direction_of_walking() {
+        assert!(facing_of(Vec2::new(1.0, 0.2)) == Facing::Side);
+        assert!(facing_of(Vec2::new(-0.7, 0.7)) == Facing::Side);
+        assert!(facing_of(Vec2::new(0.2, 1.0)) == Facing::Up);
+        assert!(facing_of(Vec2::new(0.2, -1.0)) == Facing::Down);
     }
 
     #[test]

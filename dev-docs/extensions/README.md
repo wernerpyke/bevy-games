@@ -24,8 +24,9 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition.rs` | x30, x31, x32, lw19 |
 | [groups.md](groups.md) | Single items and neighbour groups for blocked areas | `game-kit` `groups.rs` | x20, rt9, lw14 |
 | [projectiles.md](projectiles.md) | Straight-flying projectiles that stop at blocked areas and the map edge | `game-kit` `projectile.rs` | x21, rt11 |
-| [nav.md](nav.md) | Grid path finding built from the collision outlines | `game-kit` `nav.rs` | x23, rt12 |
-| [enemy-movement.md](enemy-movement.md) | Goals, patrol, pursue and sentry strategies, touch messages, facing tags, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, x40, x41, rt12 |
+| [nav.md](nav.md) | Grid path finding built from the collision outlines, nearest reachable point | `game-kit` `nav.rs` | x23, x43, rt12 |
+| [pointer.md](pointer.md) | Mouse clicks as a world position message | `game-kit` `pointer.rs` | x42, lw30 |
+| [enemy-movement.md](enemy-movement.md) | Goals, patrol, pursue and sentry strategies, touch messages, facing tags, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, x40, x41, x43, rt12 |
 | [spawners.md](spawners.md) | Spawners with settings in the map legend | `game-kit` `spawner.rs`, `map.rs` | x25, rt12 |
 | [debug-tools.md](debug-tools.md) | Grid, info box, collision overlay | `game-kit` `debug.rs`, `collision_debug.rs` | lw3, lw6 |
 | [collectables.md](collectables.md) | Items the player collects by touch, `Collected` message | `game-kit` `collectable.rs` | x38, lw27 |

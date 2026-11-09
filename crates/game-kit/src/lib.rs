@@ -21,6 +21,7 @@ pub mod movement;
 pub mod movement_debug;
 pub mod nav;
 pub mod outline;
+pub mod pointer;
 pub mod projectile;
 pub mod reload;
 pub mod rng;

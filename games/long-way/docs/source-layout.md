@@ -13,7 +13,7 @@ games/long-way/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
     ├── hud.rs          HudPlugin: the content of the HUD bar (the title, one icon with a count for each energy, and the row of HP icons). The bar is `game_kit::screen` and `game_kit::hud`
-    ├── player.rs       PlayerPlugin: player spawn, movement, animation
+    ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
@@ -34,6 +34,7 @@ games/long-way/
 | [Map files](../../../dev-docs/extensions/map-files.md) | `map.rs` (plus the parser in `crates/game-kit`) |
 | [Collectables](../../../dev-docs/extensions/collectables.md) | `pickups.rs`, `inventory.rs` (plus `collectable.rs` in `crates/game-kit`) |
 | [Debug tools](../../../dev-docs/extensions/debug-tools.md) | `debug.rs`, `collision_debug.rs` in `crates/game-kit` |
+| [Pointer](../../../dev-docs/extensions/pointer.md) | `player.rs` (`set_goal`) (plus `pointer.rs`, `nav.rs`, `movement.rs` in `crates/game-kit`) |
 | [Development feedback](../../../dev-docs/extensions/dev-feedback.md) | `script.rs` in `crates/game-kit` |
 | [Plugin configuration](../../../dev-docs/extensions/plugin-configuration.md) | `collision.rs`, `debug.rs` in `crates/game-kit` |
 | [Screen layout](../../../dev-docs/extensions/screen-layout.md) | `camera.rs`, `hud.rs`, `main.rs` (plus `screen.rs`, `hud.rs`, `app_state.rs` in `crates/game-kit`) |

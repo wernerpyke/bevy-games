@@ -53,6 +53,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 ## Input and time
 
 - Keyboard: `Res<ButtonInput<KeyCode>>`, `.pressed(KeyCode::ArrowLeft)`.
+- Mouse: `Res<ButtonInput<MouseButton>>`, `.just_pressed(MouseButton::Left)`. Cursor: `Window::cursor_position()` (logical pixels, top left origin, `None` outside the window). To world: `camera.viewport_to_world_2d(&global_transform, cursor)`. Bevy subtracts the viewport origin itself (`viewport_to_ndc`), so pass the window position as it is. With a split screen the cursor can lie outside the camera viewport: test `camera.logical_viewport_rect()` first (`pointer::cursor_to_world`). `GlobalTransform` is the one of the last `PostUpdate`, so convert in `PreUpdate` when the camera moves in `Update`.
 - Frame time: `time.delta_secs()`.
 - Window resize events are `MessageReader<WindowResized>` (messages, not events).
 

@@ -77,6 +77,7 @@ fn main() {
         ))
         .add_plugins((
             game_kit::nav::NavPlugin { step: 4.0 },
+            game_kit::pointer::PointerPlugin,
             game_kit::movement::MovementPlugin::default(),
             game_kit::movement_debug::MovementDebugPlugin,
             game_kit::rng::RngPlugin {

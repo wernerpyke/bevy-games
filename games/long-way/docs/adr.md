@@ -154,7 +154,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** A bar keeps icons and text off the world, so the 8 by 8 cell view and the art scale stay as they are. The same scale as today means no art or map value changes.
 
-**How to apply.** `camera.rs` holds the window size, the view height and the bar size. See roadmap item 13.
+**How to apply.** `camera.rs` holds the window size, the view height and the bar size. See roadmap item 12.
 
 ## adr-lw25. The HUD bar background is an Aseprite file (2026-11-08)
 
@@ -182,7 +182,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw28. The player has 3 HP, asked for with a message, shown as a row of icons (2026-11-09)
 
-**Decision.** The player entity has `Hp { current, max }` (3 and 3 at the start, `hp.rs`). Other systems send `DamagePlayer { amount }` and never change `Hp`. Points never go below 0. At 0 the player stays alive: there is no game over screen yet (roadmap item 13), so the game logs it and damage stops. There is no invulnerability time. The HUD (`hud.rs`) draws one icon of `ui/hp.aseprite` (32 by 32, tags `Full` and `Empty`) for each point of `max`, in a row below the energy row, with the lost points as `Empty`. It builds the row again when `Hp` changes. When points are lost `hp.rs` sends `PlayerHurt`, and the player plays the `Hurt` tag of `Hunter.aseprite` once (it can walk again at once, and the walk animation waits until `Hurt` ends).
+**Decision.** The player entity has `Hp { current, max }` (3 and 3 at the start, `hp.rs`). Other systems send `DamagePlayer { amount }` and never change `Hp`. Points never go below 0. At 0 the player stays alive: there is no game over screen yet (roadmap item 12), so the game logs it and damage stops. There is no invulnerability time. The HUD (`hud.rs`) draws one icon of `ui/hp.aseprite` (32 by 32, tags `Full` and `Empty`) for each point of `max`, in a row below the energy row, with the lost points as `Empty`. It builds the row again when `Hp` changes. When points are lost `hp.rs` sends `PlayerHurt`, and the player plays the `Hurt` tag of `Hunter.aseprite` once (it can walk again at once, and the walk animation waits until `Hurt` ends).
 
 **Rationale.** A message keeps the rule (no negative HP, no damage at 0) in one place, and the enemy code needs no knowledge of the player. A row that follows `max` needs no HUD change when max HP changes later. Icons are used and not a count because a lost point reads at a glance, and 3 points fit the bar. The game does not die at 0 yet because nothing can show or restart a game over, and a dead end would block testing the ghost.
 
@@ -195,3 +195,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** A marker needs no spawner: the design wants every enemy of a map to exist from the start and only once, and reloading a map is the one reset (killing is a later feature, so no state is saved yet). The parameters stay in the map file, so a map decides how far each ghost patrols and sees. A ghost that dies on touch is the whole combat rule for now, and it cannot hit twice. On touch it stops and plays `Attack` once, the player loses 1 HP when that ends, then `Die` plays (2026-11-09, the user chose this over an alert cue). The art, the walk speed, the hit box and the damage are Long Way's values. The kit has no game types (`adr-x13`).
 
 **How to apply.** Code: `ghost.rs`, `hp.rs`, `map.rs` (`Kind::SpawnGhost`). Kinds: `games/long-way/docs/maps.md`. The art is `characters/ghost.aseprite` (`art-tags.md`).
+
+## adr-lw30. The player moves by mouse click only, to one goal at a time (2026-11-09)
+
+**Decision.** The player walks to the place where the left mouse button went down (`WorldClick`, `adr-x42`) and goes around blocked cells with the kit path finder (`Mover`, `adr-x43`). A new click replaces the goal while the player is walking. A click on a blocked place, or outside the walkable area, sends the player to the nearest place it can reach. There is no hold-to-follow, and the arrow keys no longer move the player. While the screen fades the click is dropped and the player stands still, and a map change clears the goal. A hit that hurts the player does not stop the walk.
+
+**Rationale.** The developer chose click to go only, the nearest reachable point, and removing the arrow keys (2026-11-09). One movement path is less code than two, and the nearest point means a click near a tree always does something. Hold-to-follow can be added later by sending the goal again while the button is down. `Player` keeps the animation state (`walking`, `facing`, `hurt`) and reads it from `MoveState`, so the art and `Hurt` are unchanged.
+
+**How to apply.** Code: `player.rs` (`set_goal`, `limit_player`, `facing_of`). Values: speed `WALK_SPEED` (300 px/s). `NavInset` is set from `PLAYER_HALF_WIDTH` and `PLAYER_BODY_HEIGHT` (`collision.rs`), so the ghosts, which share the grid, also do not path into those margins.

@@ -61,6 +61,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 
 ```
 ./dev-scripts/rust.sh script long-way "teleport:225:-150;hold:up:3;quit"
+./dev-scripts/rust.sh script long-way "wait:0.5;click:-704:-96;wait:4;screenshot:walk;quit" --debug
 ./dev-scripts/rust.sh script long-way "wait:0.5;screenshot:start;quit"
 ./dev-scripts/rust.sh test long-way
 ```
@@ -69,7 +70,7 @@ The script run keeps log lines that match `script:|collision:|WARN|ERROR|panicke
 
 ## Limits
 
-- Arrow keys only.
-- It teleports the entity marked `Controlled`, which also needs a `DepthSort`. Moves use the arrow keys only. A game specific command needs a registration API in the kit (adr-x15).
+- Keys: the arrow keys, `x`, `escape` and `f1` to `f3`. `click:<x>:<y>` sends a left click as a world position (`pointer.md`), so a game that moves by clicking can be scripted. It does not move a real cursor, so the window to world conversion is not tested by a script.
+- It teleports the entity marked `Controlled`, which also needs a `DepthSort`. A game specific command needs a registration API in the kit (adr-x15).
 - Screenshots work on native builds only.
 - Unit tests do not cover frame timing, drawing or input.

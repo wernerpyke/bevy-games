@@ -6,6 +6,7 @@
 //! - `teleport:<feet_x>:<feet_y>`   put the feet of the controlled entity at a position
 //! - `hold:<keys>:<seconds>`        hold arrow keys, `x` or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`. A
 //!   short hold of `x` (`hold:x:0.1`) is one key press
+//! - `click:<world_x>:<world_y>`    a left mouse click at a world position (`pointer::WorldClick`)
 //! - `wait:<seconds>`
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
 //!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
@@ -29,6 +30,7 @@ use crate::Controlled;
 use crate::depth::DepthSort;
 use crate::map::Transition;
 use crate::map_transition::{ActiveMaps, MapTransition, RequestMapChange};
+use crate::pointer::WorldClick;
 
 /// Seconds to wait after start before the script runs, so the window and world are up.
 const START_DELAY: f32 = 1.0;
@@ -49,6 +51,7 @@ impl Plugin for ScriptPlugin {
         let commands = parse(&text);
         info!("script: {} commands loaded", commands.len());
         app.add_message::<RequestMapChange>()
+            .add_message::<WorldClick>()
             .insert_resource(Script {
                 commands,
                 elapsed: -START_DELAY,
@@ -68,6 +71,7 @@ enum Command {
     Teleport(Vec2),
     Hold(Vec<KeyCode>, f32),
     Wait(f32),
+    Click(Vec2),
     Screenshot(String),
     Goto(String, Option<String>),
     Quit,
@@ -104,6 +108,7 @@ fn parse(text: &str) -> VecDeque<Command> {
                     Command::Hold(keys, seconds.parse().ok()?)
                 }
                 ["wait", seconds] => Command::Wait(seconds.parse().ok()?),
+                ["click", x, y] => Command::Click(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
                 ["screenshot", name]
                     if !name.is_empty()
                         && name
@@ -160,6 +165,7 @@ fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
 #[derive(SystemParam)]
 struct MapLink<'w> {
     changes: MessageWriter<'w, RequestMapChange>,
+    clicks: MessageWriter<'w, WorldClick>,
     transition: Option<Res<'w, MapTransition>>,
     maps: Option<Res<'w, ActiveMaps>>,
 }
@@ -212,6 +218,14 @@ fn run_script(
             }
         }
         Command::Wait(seconds) => script.elapsed >= *seconds,
+        Command::Click(position) => {
+            info!("script: click at {position:?}");
+            link.clicks.write(WorldClick {
+                position: *position,
+                button: MouseButton::Left,
+            });
+            true
+        }
         Command::Screenshot(name) => {
             if !script.shot_requested {
                 let dir = std::env::var(&script.screenshot_dir_variable)
@@ -312,6 +326,13 @@ mod tests {
         assert!(matches!(commands[2], Command::Wait(s) if s == 0.5));
         assert!(matches!(&commands[3], Command::Screenshot(name) if name == "a_1"));
         assert!(matches!(commands[4], Command::Quit));
+    }
+
+    #[test]
+    fn click_takes_a_world_position() {
+        let commands = parse("click:100:-20.5;click:1;click:a:b");
+        assert_eq!(commands.len(), 1);
+        assert!(matches!(commands[0], Command::Click(p) if p == Vec2::new(100.0, -20.5)));
     }
 
     #[test]

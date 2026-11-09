@@ -3,7 +3,8 @@
 //! reports in `MoveState` whether the entity is walking, which way it faces, and whether it arrived or the goal is
 //! unreachable. See `dev-docs/extensions/enemy-movement.md`.
 //!
-//! The entity's `Transform` x and y are its feet, as for the player (`DepthSort { feet_offset: 0.0 }`).
+//! The entity's feet are its `Transform` x and y, or lower by `Mover::feet_offset` (`DepthSort::feet_offset`, as for
+//! the player).
 
 use bevy::prelude::*;
 
@@ -68,6 +69,9 @@ pub struct Mover {
     pub edge_margin: f32,
     /// The entity has arrived when its feet are this close to the goal.
     pub arrive_distance: f32,
+    /// How far the feet are below the `Transform` (the same as `DepthSort::feet_offset`). 0 when the `Transform` is the
+    /// feet.
+    pub feet_offset: f32,
 }
 
 impl Mover {
@@ -76,11 +80,17 @@ impl Mover {
             speed,
             edge_margin: 0.0,
             arrive_distance: 2.0,
+            feet_offset: 0.0,
         }
     }
 
     pub fn with_edge_margin(mut self, margin: f32) -> Self {
         self.edge_margin = margin;
+        self
+    }
+
+    pub fn with_feet_offset(mut self, offset: f32) -> Self {
+        self.feet_offset = offset;
         self
     }
 }
@@ -155,7 +165,10 @@ fn follow_goals(
     *searches_left = budget.0;
     for (mut transform, mover, goal, mut state, mut follower, mut assist) in &mut movers {
         follower.since_search += dt;
-        let feet = transform.translation.truncate();
+        let feet = Vec2::new(
+            transform.translation.x,
+            transform.translation.y - mover.feet_offset,
+        );
         state.walking = false;
         let Some(goal) = goal.0 else {
             follower.clear();
@@ -233,7 +246,7 @@ fn follow_goals(
             follower.stalled = 0.0;
         }
         transform.translation.x = new.x;
-        transform.translation.y = new.y;
+        transform.translation.y = new.y + mover.feet_offset;
     }
 }
 
@@ -300,6 +313,25 @@ mod tests {
         );
         let state = app.world().get::<MoveState>(entity).unwrap();
         assert!(state.arrived && !state.unreachable);
+    }
+
+    #[test]
+    fn a_feet_offset_puts_the_feet_below_the_transform() {
+        let mut app = app_with(&[]);
+        let goal = Vec2::new(150.0, 40.0);
+        let entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(Vec3::new(30.0, 62.0, 0.0)),
+                Mover::new(80.0).with_feet_offset(22.0),
+                MoveGoal(Some(goal)),
+            ))
+            .id();
+        for _ in 0..300 {
+            app.update();
+        }
+        let at = feet(&app, entity);
+        assert!(at.distance(goal + Vec2::new(0.0, 22.0)) <= 2.5, "{at:?}");
     }
 
     #[test]
