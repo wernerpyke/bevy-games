@@ -13,6 +13,7 @@ use game_kit::movement::{FollowSet, MoveState, Mover};
 use game_kit::projectile::{HitCause, ProjectileHit, ProjectileTarget};
 use game_kit::spawner::{SpawnRequest, SpawnedBy, Spawner};
 use game_kit::strategies::Strategy;
+use game_kit::touch::Touchable;
 
 use crate::camera::CELL_SIZE;
 use crate::collision::FEET_HALF_WIDTH;
@@ -159,6 +160,7 @@ fn spawn_enemies(
             WalkAnimation::default(),
             kind.hit_box(),
             ProjectileTarget,
+            Touchable,
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(request.position.extend(0.0)),
             Visibility::default(),

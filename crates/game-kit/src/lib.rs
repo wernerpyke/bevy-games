@@ -28,6 +28,7 @@ pub mod screen;
 pub mod script;
 pub mod spawner;
 pub mod strategies;
+pub mod touch;
 
 use bevy::prelude::Component;
 

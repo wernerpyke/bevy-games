@@ -53,6 +53,7 @@ fn main() {
             },
             game_kit::spawner::SpawnerPlugin,
             game_kit::strategies::StrategiesPlugin,
+            game_kit::touch::TouchPlugin,
             enemy::EnemyPlugin,
             death::DeathPlugin,
             map::MapPlugin,

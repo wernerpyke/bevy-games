@@ -6,7 +6,7 @@ An entity with a `Mover` walks to its `MoveGoal`. A strategy is a component and 
 
 ## Status
 
-`crates/game-kit/src/movement.rs`, `strategies.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs`. Used by R-Town (`adr-rt12`). Decisions: `adr-x23` (path finding), `adr-x24` (strategies), `adr-x26` (random numbers), `adr-x27` (hit boxes), `adr-x40` (sentry).
+`crates/game-kit/src/movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs`. Used by R-Town (`adr-rt12`). Decisions: `adr-x23` (path finding), `adr-x24` (strategies), `adr-x26` (random numbers), `adr-x27` (hit boxes), `adr-x40` (sentry), `adr-x41` (touch, facing tags).
 
 ## Terms
 
@@ -35,6 +35,8 @@ An entity with a `Mover` walks to its `MoveGoal`. A strategy is a component and 
 6. `Pursue { target }` sets the goal to the position of the `Controlled` entity, or of `target`. Without a target entity the goal is `None`.
 6a. `Sentry { sight }` patrols like `RandomPatrol` (radius) until `can_see` is true for the `Controlled` entity: within `sight` and no blocked edge on the straight line between the feet. Then it pursues for good (`Sentry::alerted()`). Legend: `strategy=sentry radius=<px> sight=<px>`. Everything in `CollisionWorld` blocks sight. `adr-x40`.
 7. A game strategy is a component and a system `.in_set(StrategySet)` that sets `MoveGoal`. Evade, for example, would choose a point away from the player. The headless test `a_custom_strategy_can_drive_the_mover` shows the pattern.
+7a. `Touchable` plus a `HitBox` on an enemy makes `TouchPlugin` send `ControlledTouched { by }` in every frame in which its box overlaps the box of the `Controlled` entity. Read it `.after(TouchSet)`. Remove `Touchable` for one hit. The player needs a `HitBox` too, relative to its `Transform`. `adr-x41`.
+7b. `FacingTags { down, side, up, speed }` on the sprite child of an entity with `MoveState` plays `Down`, `Left` or `Up` for the way it faces and flips the sprite for the right (`view_of`). `adr-x41`.
 8. `HitBox { offset, half_size }` is relative to the ground point. `HitBox::rect_at(ground)` gives the world rectangle and `overlaps(a, b)` tests two rectangles (touching edges do not overlap).
 9. `Rng` and `GameRng` (`rng.rs`) give seedable random numbers: the environment variable `<PREFIX>_SEED` sets the seed for a repeatable run.
 10. `MovementDebugPlugin` shows paths, goals and spawners with the F3 grid switch (`debug-tools.md`).

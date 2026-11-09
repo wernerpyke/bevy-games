@@ -1,6 +1,6 @@
 # PLAN: the ghost enemy and player HP in Long Way
 
-Status: all open points settled. Step 1 done and committed (2026-11-09). Step 2 done, not committed. Next: step 3. Written 2026-11-09 from the review of the R-Town enemy code.
+Status: all open points settled. Steps 1 and 2 committed. Steps 3 and 4 done (2026-11-09), not committed. Next: step 5 (player HP).
 
 ## Goal
 
@@ -53,13 +53,13 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 - Long Way builds the ghost from the `spawn_ghost` object in its own load code (step 6), tagged with `MapId` so the kit removes it with the map. It checks the entry with `Strategy::from_params` and logs an error for a bad one.
 - Legend entry example: `spawn_ghost strategy=sentry radius=40 sight=90`. The legend character follows the convention in `dev-docs/extensions/map-files.md` (enemies are special characters).
 
-### 3. Kit: enemy touch message
+### 3. Kit: enemy touch message (done 2026-11-09)
 
-- A system that sends `PlayerTouched { enemy }` when the `HitBox` of the `Controlled` entity overlaps the `HitBox` of an entity marked as touchable. The game decides what the touch does. Tests in the kit.
+- Done: `touch.rs` with `Touchable`, `ControlledTouched { by }`, `TouchSet` and `TouchPlugin`: sent every frame while the `HitBox` of the `Controlled` entity overlaps that of a touchable entity. R-Town `death.rs` now reads it (its own overlap test and tests moved to the kit). `adr-x41`.
 
-### 4. Kit: facing to animation tag
+### 4. Kit: facing to animation tag (done 2026-11-09)
 
-- A helper that maps `MoveState.facing` to a tag name and a flip flag, for characters with `Down`, `Left` and `Up` tags where `Right` is `Left` flipped (`adr-a6` style, frame durations stay in the `.aseprite` file). Used with `play_if_changed`. Tests in the kit.
+- Done: `animation.rs` has `view_of(facing)` and `FacingTags { down, side, up, speed }` on the sprite child of an entity with `MoveState`. It plays `Down`, `Left` or `Up` and flips the sprite for the right, all the time. Removing it hands the animation back (for `Die`). `adr-x41`.
 
 ### 5. Long Way: player HP
 

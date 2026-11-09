@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::map_background::{cell_rng, hash_name};
+use crate::movement::{FollowSet, MoveState};
 use crate::rng::Rng;
 
 /// Put this on an entity with an `AseAnimation`. Once the Aseprite file has loaded, the plugin moves the animation
@@ -78,6 +79,71 @@ pub fn play_if_changed(ase: &mut AseAnimation, tag: &str, speed: f32) -> bool {
     true
 }
 
+/// The three views of a character drawn with a `Down`, a `Left` and an `Up` tag. `Right` is the `Left` tag flipped.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum View {
+    Down,
+    Side,
+    Up,
+}
+
+/// The view for a facing direction (y up) and whether the sprite is flipped, for art in which the side view looks
+/// left. The larger part of the direction wins, and sideways wins a tie, like the player of Long Way.
+pub fn view_of(facing: Vec2) -> (View, bool) {
+    if facing.x.abs() >= facing.y.abs() {
+        (View::Side, facing.x > 0.0)
+    } else if facing.y > 0.0 {
+        (View::Up, false)
+    } else {
+        (View::Down, false)
+    }
+}
+
+/// On the sprite child of an entity with `MoveState`: plays the tag for the way the entity faces and flips the sprite
+/// for the right side. It plays all the time, also while the entity stands (a character with no idle tag). Remove the
+/// component to play something else, for example a death.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct FacingTags {
+    pub down: &'static str,
+    pub side: &'static str,
+    pub up: &'static str,
+    /// Playback speed multiplier. 1.0 is the speed set in the Aseprite file (`adr-a6`).
+    pub speed: f32,
+}
+
+impl FacingTags {
+    pub fn new(down: &'static str, side: &'static str, up: &'static str) -> Self {
+        Self {
+            down,
+            side,
+            up,
+            speed: 1.0,
+        }
+    }
+
+    fn tag(&self, view: View) -> &'static str {
+        match view {
+            View::Down => self.down,
+            View::Side => self.side,
+            View::Up => self.up,
+        }
+    }
+}
+
+fn animate_facing(
+    movers: Query<&MoveState>,
+    mut sprites: Query<(&ChildOf, &FacingTags, &mut AseAnimation, &mut Sprite)>,
+) {
+    for (parent, tags, mut ase, mut sprite) in &mut sprites {
+        let Ok(state) = movers.get(parent.parent()) else {
+            continue;
+        };
+        let (view, flip) = view_of(state.facing);
+        play_if_changed(&mut ase, tags.tag(view), tags.speed);
+        sprite.flip_x = flip;
+    }
+}
+
 /// Shows one frame and never plays: put it on an entity with an `AseAnimation` (for an icon). `relative` counts from the first
 /// frame of the tag, or of the file when there is no tag, and is kept inside the range. Once the Aseprite file has
 /// loaded, the plugin sets the frame and stops the animation, then removes this component.
@@ -101,7 +167,8 @@ pub struct AnimationHelpPlugin;
 
 impl Plugin for AnimationHelpPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (apply_random_start, apply_static_frame));
+        app.add_systems(Update, (apply_random_start, apply_static_frame))
+            .add_systems(Update, animate_facing.after(FollowSet));
     }
 }
 
@@ -176,6 +243,65 @@ mod tests {
             seen[start_offset(seed, 8) as usize] = true;
         }
         assert!(seen.iter().all(|&s| s));
+    }
+
+    #[test]
+    fn the_larger_part_of_the_direction_picks_the_view() {
+        assert_eq!(view_of(Vec2::new(-1.0, 0.0)), (View::Side, false));
+        assert_eq!(view_of(Vec2::new(1.0, 0.0)), (View::Side, true));
+        assert_eq!(view_of(Vec2::new(0.0, 1.0)), (View::Up, false));
+        assert_eq!(view_of(Vec2::new(0.0, -1.0)), (View::Down, false));
+        assert_eq!(view_of(Vec2::new(0.3, 1.0)), (View::Up, false));
+        assert_eq!(view_of(Vec2::new(-1.0, -0.3)), (View::Side, false));
+        // A tie goes sideways.
+        assert_eq!(view_of(Vec2::new(1.0, 1.0)), (View::Side, true));
+    }
+
+    fn facing_app() -> (App, Entity, Entity) {
+        let mut app = App::new();
+        app.add_systems(Update, animate_facing);
+        let mover = app.world_mut().spawn(MoveState::default()).id();
+        let sprite = app
+            .world_mut()
+            .spawn((
+                ChildOf(mover),
+                FacingTags::new("Down", "Left", "Up"),
+                AseAnimation::default(),
+                Sprite::default(),
+            ))
+            .id();
+        (app, mover, sprite)
+    }
+
+    fn face(app: &mut App, mover: Entity, facing: Vec2) {
+        app.world_mut().get_mut::<MoveState>(mover).unwrap().facing = facing;
+        app.update();
+    }
+
+    #[test]
+    fn the_sprite_plays_the_tag_of_the_facing_and_flips_for_the_right() {
+        let (mut app, mover, sprite) = facing_app();
+        for (facing, tag, flip) in [
+            (Vec2::X, "Left", true),
+            (Vec2::NEG_X, "Left", false),
+            (Vec2::Y, "Up", false),
+            (Vec2::NEG_Y, "Down", false),
+        ] {
+            face(&mut app, mover, facing);
+            let ase = app.world().get::<AseAnimation>(sprite).unwrap();
+            assert_eq!(ase.animation.tag.as_deref(), Some(tag), "{facing:?}");
+            assert_eq!(app.world().get::<Sprite>(sprite).unwrap().flip_x, flip);
+        }
+    }
+
+    #[test]
+    fn without_facing_tags_the_animation_is_left_alone() {
+        let (mut app, mover, sprite) = facing_app();
+        face(&mut app, mover, Vec2::Y);
+        app.world_mut().entity_mut(sprite).remove::<FacingTags>();
+        face(&mut app, mover, Vec2::NEG_Y);
+        let ase = app.world().get::<AseAnimation>(sprite).unwrap();
+        assert_eq!(ase.animation.tag.as_deref(), Some("Up"));
     }
 
     #[test]

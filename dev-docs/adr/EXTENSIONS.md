@@ -334,3 +334,11 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Also in the kit (same day).** `strategies::Strategy` (`Patrol`, `Pursue`, `Sentry`) with `from_params` (reads `strategy=` and the parameters of the strategy it names, errors without the file name) and `insert` (adds the component). Both games parse the same legend entries, so R-Town's own copy was removed. The kit does not take enemy markers out of the map object list: a game that keeps all objects in `map.objects` (Long Way) picks its markers by kind, as it does for rocks and pickups.
 
 **How to apply.** `dev-docs/extensions/enemy-movement.md`. Add `StrategiesPlugin` (it needs `CollisionPlugin`), give the entity `Mover` and a `Strategy` from `Strategy::from_params(&object.params)` (or `Sentry::new(radius, sight)`). Read `Sentry::alerted()` for a cue.
+
+## adr-x41. The kit reports touches on the controlled entity and plays facing tags (2026-11-09)
+
+**Decision.** `game_kit::touch` has `Touchable` (on an entity with a `HitBox`), the message `ControlledTouched { by }` and `TouchPlugin`. The message is sent in every frame in which the hit box of the `Controlled` entity overlaps that of a touchable entity. A game reads it `.after(TouchSet)` and chooses the result. `game_kit::animation` has `FacingTags { down, side, up, speed }` for the sprite child of an entity with `MoveState`, and `view_of(facing)`: a sprite with the tags `Down`, `Left` (the side view, looking left) and `Up` plays the tag for the way the entity faces, flipped for the right. It plays all the time, and removing the component hands the animation back to the game.
+
+**Rationale.** R-Town killed the player on overlap and Long Way's ghost will cost HP on overlap: the test is the same, the result is not (`adr-x13`: no game types in the kit). Sending every frame keeps the kit free of state. A game that wants one hit removes `Touchable`. The facing rule matches the Long Way player (sideways wins a tie). R-Town's walk flip and bob stays in R-Town (`walk_animation.rs`): it is a different look, with no tags.
+
+**How to apply.** `dev-docs/extensions/enemy-movement.md`. R-Town uses the touch (`death.rs`). The ghost of Long Way uses both.
