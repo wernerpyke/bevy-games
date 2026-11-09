@@ -1,6 +1,6 @@
 # PLAN: the ghost enemy and player HP in Long Way
 
-Status: all open points settled. Step 1 done (2026-11-09, not committed). Next: step 2. Written 2026-11-09 from the review of the R-Town enemy code.
+Status: all open points settled. Step 1 done and committed (2026-11-09). Step 2 done, not committed. Next: step 3. Written 2026-11-09 from the review of the R-Town enemy code.
 
 ## Goal
 
@@ -46,12 +46,12 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 - Tests in the kit: a hidden player behind a wall does not alert, a visible player in range alerts, outside the range does not, it never goes back to patrol, parameters. Headless app test: a sentry walks around, then reaches the player.
 - Docs: update `dev-docs/extensions/enemy-movement.md` (strategy list, the "no sight rule" limit). ADR in `dev-docs/adr/EXTENSIONS.md` (next free `adr-x*`): why one composite strategy, why a one-way latch.
 
-### 2. Kit: enemies from map markers
+### 2. Kit: enemy strategy from a legend entry (done 2026-11-09, not committed)
 
-- A helper that takes the markers of the enemy kinds out of the parsed map objects and hands `(cell, kind, Params)` to the game, so the game builds the entity and tags it with the `MapId` (cleanup on map unload is already in `map_transition.rs`).
-- One shared `strategy_from_params` for `patrol`, `pursue` and `sentry`, with the error format `file:line: spawner ...` that R-Town uses.
-- Ask the user before step 2 if the shape of the helper is unclear when the code is read: R-Town's spawners are timer based and its map reload differs from Long Way's `MapHooks`. R-Town keeps its own spawners unless the user says otherwise.
-- Tests in the kit. Legend entry example: `spawn_ghost strategy=sentry radius=40 sight=90`. The legend character follows the convention in `dev-docs/extensions/map-files.md` (enemies are special characters).
+- Option A was chosen. Reading the code changed its shape: Long Way keeps every object in `map.objects` and each module picks its own kinds (`pickups.rs`), so a kit helper that takes markers out of the list is not needed. What both games share is the strategy parsing.
+- Done: `strategies::Strategy` (`Patrol`, `Pursue`, `Sentry`) with `from_params` and `insert`. R-Town now uses it (its own enum was removed), so the same legend entry works in both games. Kit and R-Town tests and lint pass.
+- Long Way builds the ghost from the `spawn_ghost` object in its own load code (step 6), tagged with `MapId` so the kit removes it with the map. It checks the entry with `Strategy::from_params` and logs an error for a bad one.
+- Legend entry example: `spawn_ghost strategy=sentry radius=40 sight=90`. The legend character follows the convention in `dev-docs/extensions/map-files.md` (enemies are special characters).
 
 ### 3. Kit: enemy touch message
 

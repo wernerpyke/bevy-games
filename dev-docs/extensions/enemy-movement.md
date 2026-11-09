@@ -41,7 +41,7 @@ An entity with a `Mover` walks to its `MoveGoal`. A strategy is a component and 
 
 ## Usage
 
-- Add `NavPlugin`, `MovementPlugin`, `StrategiesPlugin` (needs `CollisionPlugin`) and `RngPlugin`. Give an entity `Mover::new(speed)`, a strategy component, `WalkAnimation`-style data of the game and a `DepthSort`.
+- Add `NavPlugin`, `MovementPlugin`, `StrategiesPlugin` (needs `CollisionPlugin`) and `RngPlugin`. Give an entity `Mover::new(speed)`, a strategy (`Strategy::from_params` reads `strategy=` from a legend entry, `.insert(&mut entity)` adds it), `WalkAnimation`-style data of the game and a `DepthSort`.
 - Read `MoveState` for animation. R-Town copies it into `WalkAnimation` (`src/enemy.rs`).
 
 ## Limits

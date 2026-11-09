@@ -8,11 +8,11 @@ use bevy::prelude::*;
 use game_kit::animation::tag_sprite;
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
-use game_kit::map::{MapObject, Params};
+use game_kit::map::MapObject;
 use game_kit::movement::{FollowSet, MoveState, Mover};
 use game_kit::projectile::{HitCause, ProjectileHit, ProjectileTarget};
 use game_kit::spawner::{SpawnRequest, SpawnedBy, Spawner};
-use game_kit::strategies::{Pursue, RandomPatrol};
+use game_kit::strategies::Strategy;
 
 use crate::camera::CELL_SIZE;
 use crate::collision::FEET_HALF_WIDTH;
@@ -99,25 +99,6 @@ pub struct SpawnerDef {
     pub spawner: Spawner,
 }
 
-/// The movement strategy that a spawner names.
-enum Strategy {
-    Patrol(RandomPatrol),
-    Pursue(Pursue),
-}
-
-fn strategy_from_params(params: &Params) -> Result<Strategy, String> {
-    match params.get("strategy") {
-        Some("patrol") => RandomPatrol::from_params(params).map(Strategy::Patrol),
-        Some("pursue") => Pursue::from_params(params).map(Strategy::Pursue),
-        Some(other) => Err(format!(
-            "unknown strategy `{other}` (known: patrol, pursue)"
-        )),
-        None => {
-            Err("a spawner needs a parameter `strategy=patrol` or `strategy=pursue`".to_string())
-        }
-    }
-}
-
 /// Checks the legend parameters of a spawner object. The error names the file and the legend line.
 pub fn spawner_def(file: &str, object: &MapObject) -> Result<SpawnerDef, String> {
     let fail = |message: String| {
@@ -130,7 +111,7 @@ pub fn spawner_def(file: &str, object: &MapObject) -> Result<SpawnerDef, String>
     let kind = EnemyKind::from_spawner_name(&object.kind)
         .ok_or_else(|| fail("not an enemy spawner".to_string()))?;
     let spawner = Spawner::from_params(&object.params).map_err(&fail)?;
-    strategy_from_params(&object.params).map_err(&fail)?;
+    Strategy::from_params(&object.params).map_err(&fail)?;
     Ok(SpawnerDef {
         cell: object.cell,
         kind,
@@ -162,7 +143,7 @@ fn spawn_enemies(
         let Ok(&kind) = kinds.get(request.spawner) else {
             continue;
         };
-        let strategy = match strategy_from_params(&request.params) {
+        let strategy = match Strategy::from_params(&request.params) {
             Ok(strategy) => strategy,
             Err(message) => {
                 error!("enemy: {message}");
@@ -182,10 +163,7 @@ fn spawn_enemies(
             Transform::from_translation(request.position.extend(0.0)),
             Visibility::default(),
         ));
-        match strategy {
-            Strategy::Patrol(patrol) => enemy.insert(patrol),
-            Strategy::Pursue(pursue) => enemy.insert(pursue),
-        };
+        strategy.insert(&mut enemy);
         enemy.with_child((
             WalkSprite {
                 canvas_height: CANVAS_HEIGHT,
@@ -247,6 +225,7 @@ fn log_positions(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game_kit::map::Params;
 
     fn object(kind: &str, pairs: &[(&str, &str)]) -> MapObject {
         MapObject {

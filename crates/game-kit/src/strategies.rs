@@ -118,6 +118,42 @@ pub fn can_see(from: Vec2, to: Vec2, range: f32, edges: &[Edge]) -> bool {
     from.distance(to) <= range && !segment_blocked(from, to, edges)
 }
 
+/// The strategy that a legend entry names with `strategy=patrol|pursue|sentry`, with the parameters it needs. A game
+/// checks it when it reads the map and adds it to the enemy it spawns.
+#[derive(Clone, Copy, Debug)]
+pub enum Strategy {
+    Patrol(RandomPatrol),
+    Pursue(Pursue),
+    Sentry(Sentry),
+}
+
+impl Strategy {
+    /// Reads `strategy` and the parameters of that strategy. The error says what is wrong, without the file name.
+    pub fn from_params(params: &Params) -> Result<Self, String> {
+        match params.get("strategy") {
+            Some("patrol") => RandomPatrol::from_params(params).map(Strategy::Patrol),
+            Some("pursue") => Pursue::from_params(params).map(Strategy::Pursue),
+            Some("sentry") => Sentry::from_params(params).map(Strategy::Sentry),
+            Some(other) => Err(format!(
+                "unknown strategy `{other}` (known: patrol, pursue, sentry)"
+            )),
+            None => Err(
+                "an enemy needs a parameter `strategy=patrol`, `strategy=pursue` or `strategy=sentry`"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// Adds the strategy component to the entity.
+    pub fn insert(self, entity: &mut EntityCommands) {
+        match self {
+            Strategy::Patrol(patrol) => entity.insert(patrol),
+            Strategy::Pursue(pursue) => entity.insert(pursue),
+            Strategy::Sentry(sentry) => entity.insert(sentry),
+        };
+    }
+}
+
 /// A random point within `radius` of `from` that is inside `bounds` (when there are some) and that `reachable`
 /// accepts. Tries a few times, then gives up.
 pub fn pick_target(
@@ -454,6 +490,51 @@ mod tests {
         );
         let zero = Params::from_pairs(&[("radius", "40"), ("sight", "0")]);
         assert!(Sentry::from_params(&zero).unwrap_err().contains("above 0"));
+    }
+
+    #[test]
+    fn a_legend_entry_names_its_strategy() {
+        let kind = |pairs: &[(&str, &str)]| Strategy::from_params(&Params::from_pairs(pairs));
+        assert!(matches!(
+            kind(&[("strategy", "patrol"), ("radius", "30")]),
+            Ok(Strategy::Patrol(_))
+        ));
+        assert!(matches!(
+            kind(&[("strategy", "pursue")]),
+            Ok(Strategy::Pursue(_))
+        ));
+        assert!(matches!(
+            kind(&[("strategy", "sentry"), ("radius", "30"), ("sight", "90")]),
+            Ok(Strategy::Sentry(_))
+        ));
+        assert!(
+            kind(&[])
+                .unwrap_err()
+                .contains("needs a parameter `strategy")
+        );
+        assert!(
+            kind(&[("strategy", "evade")])
+                .unwrap_err()
+                .contains("unknown strategy `evade`")
+        );
+        // The parameters of the named strategy are checked too.
+        assert!(
+            kind(&[("strategy", "sentry"), ("radius", "30")])
+                .unwrap_err()
+                .contains("`sight=")
+        );
+    }
+
+    #[test]
+    fn insert_adds_the_component_of_the_strategy() {
+        let mut app = App::new();
+        let entity = app.world_mut().spawn_empty().id();
+        let strategy = Strategy::Sentry(Sentry::new(30.0, 90.0));
+        let mut commands = app.world_mut().commands();
+        strategy.insert(&mut commands.entity(entity));
+        app.world_mut().flush();
+        assert!(app.world().get::<Sentry>(entity).is_some());
+        assert!(app.world().get::<RandomPatrol>(entity).is_none());
     }
 
     fn spawn_sentry(app: &mut App, at: Vec2, radius: f32, sight: f32) -> Entity {
