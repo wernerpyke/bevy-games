@@ -14,6 +14,7 @@ pub struct HpPlugin;
 impl Plugin for HpPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DamagePlayer>()
+            .add_message::<PlayerHurt>()
             .add_systems(Update, apply_damage);
     }
 }
@@ -46,6 +47,10 @@ impl Hp {
     }
 }
 
+/// Sent when the player has lost hit points, so the player can show it (`Hurt` animation).
+#[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PlayerHurt;
+
 /// Asks to take hit points from the player.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct DamagePlayer {
@@ -55,6 +60,7 @@ pub struct DamagePlayer {
 fn apply_damage(
     mut damage: MessageReader<DamagePlayer>,
     mut players: Query<&mut Hp, With<Controlled>>,
+    mut hurt: MessageWriter<PlayerHurt>,
 ) {
     for hit in damage.read() {
         let Ok(mut hp) = players.single_mut() else {
@@ -64,6 +70,7 @@ fn apply_damage(
             continue;
         }
         hp.lose(hit.amount);
+        hurt.write(PlayerHurt);
         info!("hp: {} of {} left", hp.current, hp.max);
         if hp.is_empty() {
             info!("hp: no points left (no game over screen yet, the player stays)");

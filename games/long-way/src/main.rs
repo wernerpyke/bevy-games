@@ -1,6 +1,7 @@
 mod background;
 mod camera;
 mod collision;
+mod ghost;
 mod hp;
 mod hud;
 mod inventory;
@@ -34,6 +35,7 @@ fn main() {
             game_kit::collectable::CollectablePlugin,
             inventory::InventoryPlugin,
             hp::HpPlugin,
+            ghost::GhostPlugin,
         ))
         .add_plugins((
             game_kit::camera::PixelCameraPlugin {
@@ -72,6 +74,16 @@ fn main() {
             game_kit::script::ScriptPlugin {
                 env_prefix: "LONG_WAY",
             },
+        ))
+        .add_plugins((
+            game_kit::nav::NavPlugin { step: 4.0 },
+            game_kit::movement::MovementPlugin::default(),
+            game_kit::movement_debug::MovementDebugPlugin,
+            game_kit::rng::RngPlugin {
+                env_prefix: "LONG_WAY",
+            },
+            game_kit::strategies::StrategiesPlugin,
+            game_kit::touch::TouchPlugin,
         ))
         .run();
 }

@@ -15,6 +15,7 @@ use bevy::prelude::*;
 use crate::Controlled;
 use crate::camera::CameraBounds;
 use crate::collision::CollisionWorld;
+use crate::depth::DepthSort;
 use crate::map::Params;
 use crate::movement::{MoveGoal, MoveState, StrategySet};
 use crate::nav::{NavGrid, segment_blocked};
@@ -75,14 +76,17 @@ impl Pursue {
     }
 }
 
-/// Walks like `RandomPatrol` (within `radius` of where it is) until it sees the `Controlled` entity: within `sight`
-/// and with no blocked edge on the straight line between the feet. From then on it walks to that entity and never
-/// goes back to patrolling. It stands still when that entity does not exist.
+/// Walks like `RandomPatrol`, but within `radius` of the place where it started (its home, the feet in its first
+/// frame), so it keeps to a small area. It does this until it sees the `Controlled` entity: within `sight` and with no
+/// blocked edge on the straight line between the feet. From then on it walks to that entity and never goes back to
+/// patrolling. It stands still when that entity does not exist.
 #[derive(Component, Clone, Copy, Debug)]
 #[require(MoveGoal)]
 pub struct Sentry {
     pub sight: f32,
     patrol: RandomPatrol,
+    /// Where the patrol area is centred. Set in the first frame.
+    home: Option<Vec2>,
     alerted: bool,
 }
 
@@ -91,6 +95,7 @@ impl Sentry {
         Self {
             sight,
             patrol: RandomPatrol::new(radius),
+            home: None,
             alerted: false,
         }
     }
@@ -189,10 +194,12 @@ fn patrol(
     let dt = time.delta_secs();
     let bounds = bounds.map(|b| b.0);
     for (transform, mut patrol, mut goal, state) in &mut patrols {
+        let feet = transform.translation.truncate();
         patrol_step(
             &mut patrol,
             dt,
-            transform,
+            feet,
+            feet,
             &mut goal,
             state,
             &nav,
@@ -202,12 +209,14 @@ fn patrol(
     }
 }
 
-/// One frame of patrolling: keep walking to the goal, or wait, or pick a new place.
+/// One frame of patrolling: keep walking to the goal, or wait, or pick a new place within the radius of `around`
+/// that can be reached from `feet`.
 #[allow(clippy::too_many_arguments)]
 fn patrol_step(
     patrol: &mut RandomPatrol,
     dt: f32,
-    transform: &Transform,
+    feet: Vec2,
+    around: Vec2,
     goal: &mut MoveGoal,
     state: &MoveState,
     nav: &NavGrid,
@@ -223,8 +232,7 @@ fn patrol_step(
         goal.0 = None;
         return;
     }
-    let feet = transform.translation.truncate();
-    let target = pick_target(rng, feet, patrol.radius, bounds, PICK_TRIES, |point| {
+    let target = pick_target(rng, around, patrol.radius, bounds, PICK_TRIES, |point| {
         nav.find_path(feet, point).is_some()
     });
     match target {
@@ -236,9 +244,18 @@ fn patrol_step(
     }
 }
 
+/// The ground point of an entity: its feet. An entity with a `DepthSort` has its `Transform` at the centre of its
+/// sprite, so the feet are `feet_offset` below it (the Long Way player). Without one the `Transform` is the feet.
+fn ground_point(transform: &Transform, sort: Option<&DepthSort>) -> Vec2 {
+    let y = sort.map_or(transform.translation.y, |sort| {
+        sort.feet_y(transform.translation.y)
+    });
+    Vec2::new(transform.translation.x, y)
+}
+
 fn pursue(
-    positions: Query<&Transform, Without<Pursue>>,
-    player: Query<&Transform, (With<Controlled>, Without<Pursue>)>,
+    positions: Query<(&Transform, Option<&DepthSort>)>,
+    player: Query<(&Transform, Option<&DepthSort>), With<Controlled>>,
     mut pursuers: Query<(&Pursue, &mut MoveGoal)>,
 ) {
     let player = player.single().ok();
@@ -247,7 +264,7 @@ fn pursue(
             Some(entity) => positions.get(entity).ok(),
             None => player,
         };
-        goal.0 = target.map(|transform| transform.translation.truncate());
+        goal.0 = target.map(|(transform, sort)| ground_point(transform, sort));
     }
 }
 
@@ -258,7 +275,7 @@ fn sentry(
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
     rng: Option<ResMut<GameRng>>,
-    player: Query<&Transform, (With<Controlled>, Without<Sentry>)>,
+    player: Query<(&Transform, Option<&DepthSort>), With<Controlled>>,
     mut sentries: Query<(&Transform, &mut Sentry, &mut MoveGoal, &MoveState)>,
 ) {
     let Some(mut rng) = rng else {
@@ -266,9 +283,13 @@ fn sentry(
     };
     let dt = time.delta_secs();
     let bounds = bounds.map(|b| b.0);
-    let player = player.single().ok().map(|t| t.translation.truncate());
+    let player = player
+        .single()
+        .ok()
+        .map(|(transform, sort)| ground_point(transform, sort));
     for (transform, mut sentry, mut goal, state) in &mut sentries {
         let feet = transform.translation.truncate();
+        let home = *sentry.home.get_or_insert(feet);
         if !sentry.alerted
             && player.is_some_and(|at| can_see(feet, at, sentry.sight, world.edges()))
         {
@@ -280,7 +301,8 @@ fn sentry(
             patrol_step(
                 &mut sentry.patrol,
                 dt,
-                transform,
+                feet,
+                home,
                 &mut goal,
                 state,
                 &nav,
@@ -535,6 +557,57 @@ mod tests {
         app.world_mut().flush();
         assert!(app.world().get::<Sentry>(entity).is_some());
         assert!(app.world().get::<RandomPatrol>(entity).is_none());
+    }
+
+    #[test]
+    fn a_target_with_a_depth_sort_is_followed_by_its_feet() {
+        let mut app = app();
+        let pursuer = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(Vec3::new(50.0, 50.0, 0.0)),
+                Mover::new(80.0),
+                Pursue::default(),
+            ))
+            .id();
+        // The transform is the centre of the sprite, 56 above the feet (the Long Way player).
+        app.world_mut().spawn((
+            Transform::from_translation(Vec3::new(300.0, 156.0, 0.0)),
+            DepthSort { feet_offset: 56.0 },
+            Controlled,
+        ));
+        app.update();
+        assert_eq!(
+            app.world().get::<MoveGoal>(pursuer).unwrap().0,
+            Some(Vec2::new(300.0, 100.0))
+        );
+    }
+
+    #[test]
+    fn an_unalerted_sentry_keeps_to_the_area_around_its_home() {
+        let mut app = app();
+        let home = Vec2::new(200.0, 200.0);
+        let sentry = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(home.extend(0.0)),
+                Mover::new(80.0),
+                Sentry::new(30.0, 50.0),
+            ))
+            .id();
+        let mut farthest: f32 = 0.0;
+        for _ in 0..3000 {
+            app.update();
+            let at = app
+                .world()
+                .get::<Transform>(sentry)
+                .unwrap()
+                .translation
+                .truncate();
+            farthest = farthest.max(at.distance(home));
+        }
+        assert!(farthest > 10.0, "it walked: {farthest}");
+        assert!(farthest <= 30.0 + 6.0, "it stayed home: {farthest}");
     }
 
     fn spawn_sentry(app: &mut App, at: Vec2, radius: f32, sight: f32) -> Entity {

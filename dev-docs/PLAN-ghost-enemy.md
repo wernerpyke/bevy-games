@@ -1,6 +1,6 @@
 # PLAN: the ghost enemy and player HP in Long Way
 
-Status: all open points settled. Steps 1 to 4 committed. Step 5 done (2026-11-09), not committed. Next: step 6 (the ghost).
+Status: all open points settled. Steps 1 to 5 committed. Step 6 done and mostly checked in the game (2026-11-09), not committed. Next: finish step 7, then step 8.
 
 ## Goal
 
@@ -69,7 +69,7 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 - Tests only for rules that are not in the kit (HP cannot go below 0).
 - ADR in `games/long-way/docs/adr.md` (next free `adr-lw*`) for HP and the touch rule.
 
-### 6. Long Way: the ghost
+### 6. Long Way: the ghost (done 2026-11-09)
 
 - Add `NavPlugin`, `MovementPlugin`, `StrategiesPlugin`, `RngPlugin` and `MovementDebugPlugin` to `main.rs`. Check that `CameraBounds` is set for each map, and that the nav grid works with `MAP_ORIGIN` and rebuilds on a map change.
 - `ghost.rs`: kind values (speed, hit box, canvas), the entity built from the marker (`MapId` tag, `Mover`, `HitBox`, `DepthSort`, the strategy component, the Aseprite sprite with `Down`, `Left` and `Up` tags), animation from `MoveState` through the step 4 helper.
@@ -78,12 +78,15 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 - Add a `spawn_ghost` entry to a Long Way map legend for testing.
 - Document the object kind and values in `games/long-way/docs/` (source layout and object kinds). Update `art-tags.md` and `art-pipeline.md` to say the ghost is used in the game.
 
-### 7. Verify in the running game
+### 7. Verify in the running game (mostly done 2026-11-09; see the notes)
 
 - Reproduce with `./dev-scripts/rust.sh script long-way "..." --debug` (patrol, spot, chase, touch, HP going from 3 to 2). Take screenshots and delete them afterwards (`target/screenshots/`).
 - Write a failing test for any cause found, fix it, run the script again.
 - Say which parts were not seen on screen.
 - Run `./dev-scripts/rust.sh lint`, `test game-kit` and `web` (the new plugins must work on `wasm32`; check `RngPlugin` and the time source).
+- Seen on screen (scripted runs with `--debug`, map 1): the ghost placed at its marker, patrolling near its home, noticing the player, chasing along a path, touching the player (HP 3 to 2, the third heart turned `Empty`), and gone afterwards. With the player out of sight range for 12 s the ghost stayed near its home and the player kept 3 HP.
+- Found and fixed on the way: (1) `Pursue` and `Sentry` aimed at the player's `Transform`, which in Long Way is the centre of the canvas 56 px above the feet, so the kit now uses the feet (`DepthSort::feet_y`); (2) `Sentry` picked patrol targets around where it stood and so drifted away, so it now patrols around its home.
+- Not seen on screen: the `Die` animation frame by frame (it plays and the ghost is removed, but I did not look at single frames), a ghost that cannot see the player because of a rock or tree (covered by kit tests only), and the web build running (only compiled).
 
 ### 8. Migrate and clean up
 
@@ -91,6 +94,7 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 - Move technical context to `dev-docs/` (`extensions/enemy-movement.md`, `extensions/map-files.md`, `extensions/README.md`).
 - Update `dev-docs/bevy/notes.md` with any verified Bevy patterns. Add a section to `dev-docs/bevy/concepts.md` for any concept used for the first time.
 - Move the roadmap items that this finishes to **Completed Items** and renumber.
+- Record in the roadmap or the ADR: the hit lands when the ghost's `Attack` ends (user, 2026-11-09). Revisit this when several enemies attack at once.
 - Delete this plan file.
 - Commit only after the user confirms. Do not push.
 

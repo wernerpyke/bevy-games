@@ -4,8 +4,8 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 
 | File | Tags |
 |---|---|
-| `characters/Hunter.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `HUNTER-sprites.md`. |
-| `characters/ghost.aseprite` | `Down`, `Left`, `Up`, `Attack`. `Left` also serves `Right` as a flip. One layer, `Body`. Not used in the game yet. |
+| `characters/Hunter.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `HUNTER-sprites.md`. The player (`player.rs`) plays `Hurt` once when it loses HP (`PlayerHurt` message of `hp.rs`, `adr-lw28`). |
+| `characters/ghost.aseprite` | `Down`, `Left`, `Up` (4 frames, 200 ms), `Attack` (2 frames, 200 ms, played once on touch), `Die` (8 frames, 100 ms, played once). `Left` also serves `Right` as a flip. One layer, `Body`. The ghost (`ghost.rs`) uses `Down`, `Left`, `Up`, `Attack` and `Die`. |
 | `features/Green tree.aseprite` | none (all 8 frames loop) |
 | `features/Red tree.aseprite` | none (all 8 frames loop) |
 | `features/Rocks.aseprite` | `rock_0` (frame 1), `rock_1` (frame 2). Each tag is one frame and is a rock variant, not an animation. |
@@ -29,6 +29,7 @@ Kinds are the names a map legend uses (`maps.md`). Each is defined in code (`map
 | `energy_red` | `pickups/pickups.aseprite` | `pickup_red` |
 | `energy_violet` | `pickups/pickups.aseprite` | `pickup_violet` |
 | `energy_black` | `pickups/pickups.aseprite` | `pickup_black` |
+| `spawn_ghost` | `characters/ghost.aseprite` | `Down`, `Left`, `Up`, `Attack`, `Die` |
 | `green_tree` | `features/Green tree.aseprite` | none, all frames loop |
 | `red_tree` | `features/Red tree.aseprite` | none, all frames loop |
 | `green_tree_medium` | `features/green_tree_medium.aseprite` | none, one frame |

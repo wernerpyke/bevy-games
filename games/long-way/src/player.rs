@@ -3,19 +3,26 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
-use crate::hp::Hp;
+use crate::hp::{Hp, PlayerHurt};
 use game_kit::animation::play_if_changed;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
+use game_kit::hitbox::HitBox;
 use game_kit::map::{Facing as EntryFacing, start_feet};
 use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
 
 /// Walk speed in art pixels per second.
-const WALK_SPEED: f32 = 300.0;
+pub const WALK_SPEED: f32 = 300.0;
 /// Playback speed multiplier for the walking animations. 1.0 is the speed set in Aseprite.
 const WALK_ANIMATION_SPEED: f32 = 2.5;
 /// The `Run` tag in `Hunter.aseprite` is the sideways walk. Set to match the way the art faces.
 const WALK_ART_FACES_RIGHT: bool = true;
+/// The body that enemies touch (`game_kit::touch`). It is relative to the `Transform`, which is the centre of the canvas, so it
+/// runs from the feet (`PLAYER_FEET_OFFSET` below) up by the body height.
+const HIT_BOX: HitBox = HitBox {
+    offset: Vec2::new(0.0, PLAYER_BODY_HEIGHT / 2.0 - PLAYER_FEET_OFFSET),
+    half_size: Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT / 2.0),
+};
 /// Draw the `Weapon` layer of `Hunter.aseprite`. The `background` layer is never drawn.
 const SHOW_WEAPON: bool = false;
 
@@ -24,7 +31,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, spawn_player)
-            .add_systems(Update, (move_player, animate_player).chain());
+            .add_systems(Update, (move_player, hurt_player, animate_player).chain());
     }
 }
 
@@ -39,6 +46,8 @@ enum Facing {
 pub struct Player {
     facing: Facing,
     walking: bool,
+    /// The `Hurt` animation is playing. It plays once and takes over from walking and idle.
+    hurt: bool,
 }
 
 /// Layers of `Hunter.aseprite` that the game draws, by name.
@@ -78,9 +87,11 @@ pub fn spawn_player(
     commands.spawn((
         game_kit::Controlled,
         Hp::default(),
+        HIT_BOX,
         Player {
             facing: Facing::Down,
             walking: false,
+            hurt: false,
         },
         AseAnimation {
             aseprite: server
@@ -179,6 +190,9 @@ fn move_player(
 
 fn animate_player(mut query: Query<(&mut AseAnimation, &Player)>) {
     for (mut ase, player) in &mut query {
+        if player.hurt {
+            continue;
+        }
         let tag = match (player.walking, player.facing) {
             (false, _) => "Idle",
             (true, Facing::Side) => "Run",
@@ -191,6 +205,31 @@ fn animate_player(mut query: Query<(&mut AseAnimation, &Player)>) {
             1.0
         };
         play_if_changed(&mut ase, tag, speed);
+    }
+}
+
+/// Plays `Hurt` once when the player loses HP, and hands back to walking and idle when it has played.
+fn hurt_player(
+    mut hurt: MessageReader<PlayerHurt>,
+    mut finished: MessageReader<AnimationEvents>,
+    mut query: Query<(Entity, &mut AseAnimation, &mut Player)>,
+) {
+    let hits = hurt.read().count();
+    let ended: Vec<Entity> = finished
+        .read()
+        .filter_map(|event| match event {
+            AnimationEvents::Finished(entity) => Some(*entity),
+            _ => None,
+        })
+        .collect();
+    for (entity, mut ase, mut player) in &mut query {
+        if hits > 0 {
+            player.hurt = true;
+            ase.animation.play("Hurt", AnimationRepeat::Count(0));
+            ase.animation.speed = 1.0;
+        } else if player.hurt && ended.contains(&entity) {
+            player.hurt = false;
+        }
     }
 }
 
@@ -228,5 +267,58 @@ pub fn arrive_player(
                 -1.0
             };
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn app() -> (App, Entity) {
+        let mut app = App::new();
+        app.add_message::<PlayerHurt>()
+            .add_message::<AnimationEvents>()
+            .add_systems(Update, (hurt_player, animate_player).chain());
+        let player = app
+            .world_mut()
+            .spawn((
+                Player {
+                    facing: Facing::Down,
+                    walking: false,
+                    hurt: false,
+                },
+                AseAnimation::default(),
+            ))
+            .id();
+        (app, player)
+    }
+
+    fn tag(app: &App, player: Entity) -> Option<String> {
+        app.world()
+            .get::<AseAnimation>(player)
+            .unwrap()
+            .animation
+            .tag
+            .clone()
+    }
+
+    #[test]
+    fn a_hit_plays_hurt_once_and_idle_comes_back_when_it_ends() {
+        let (mut app, player) = app();
+        app.update();
+        assert_eq!(tag(&app, player).as_deref(), Some("Idle"));
+        app.world_mut().write_message(PlayerHurt);
+        app.update();
+        assert_eq!(tag(&app, player).as_deref(), Some("Hurt"));
+        let ase = app.world().get::<AseAnimation>(player).unwrap();
+        assert!(matches!(ase.animation.repeat, AnimationRepeat::Count(0)));
+        // Walking does not cut `Hurt` short.
+        app.world_mut().get_mut::<Player>(player).unwrap().walking = true;
+        app.update();
+        assert_eq!(tag(&app, player).as_deref(), Some("Hurt"));
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(player));
+        app.update();
+        assert_eq!(tag(&app, player).as_deref(), Some("Down"));
     }
 }

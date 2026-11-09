@@ -50,6 +50,7 @@ const KIND_NAMES: &[&str] = &[
     "energy_red",
     "energy_violet",
     "energy_black",
+    "spawn_ghost",
     PLAYER_START,
 ];
 
@@ -132,6 +133,7 @@ fn load_hook(
     crate::markers::spawn_markers(&mut commands, &server, map, &load);
     crate::scenery::spawn_scenery(&mut commands, &server, map, &load);
     crate::pickups::spawn_pickups(&mut commands, &server, map, &load);
+    crate::ghost::spawn_ghosts(&mut commands, &server, map, &load);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): reads the current map file again and loads it again. A file with an
@@ -235,6 +237,8 @@ pub enum Kind {
     EnergyRed,
     EnergyViolet,
     EnergyBlack,
+    /// Where a ghost is placed when the map loads (`ghost.rs`). It has no art of its own and blocks nothing.
+    SpawnGhost,
     /// Where the player starts. It has no art and blocks nothing.
     PlayerStart,
 }
@@ -271,7 +275,7 @@ impl Kind {
 
     /// A marker is read by the game and never drawn or blocked.
     pub fn is_marker(self) -> bool {
-        matches!(self, Kind::PlayerStart)
+        matches!(self, Kind::PlayerStart | Kind::SpawnGhost)
     }
 
     fn from_name(name: &str) -> Option<Kind> {
@@ -293,6 +297,7 @@ impl Kind {
             "energy_red" => Some(Kind::EnergyRed),
             "energy_violet" => Some(Kind::EnergyViolet),
             "energy_black" => Some(Kind::EnergyBlack),
+            "spawn_ghost" => Some(Kind::SpawnGhost),
             PLAYER_START => Some(Kind::PlayerStart),
             _ => None,
         }
