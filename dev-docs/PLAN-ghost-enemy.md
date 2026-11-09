@@ -1,6 +1,6 @@
 # PLAN: the ghost enemy and player HP in Long Way
 
-Status: planned, all open points settled, not started. Written 2026-11-09 from the review of the R-Town enemy code.
+Status: all open points settled. Step 1 done (2026-11-09, not committed). Next: step 2. Written 2026-11-09 from the review of the R-Town enemy code.
 
 ## Goal
 

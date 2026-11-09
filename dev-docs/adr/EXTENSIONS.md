@@ -324,3 +324,11 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 **Also in the kit (same day).** The spawn helpers `tag_sprite`, `tag_animation`, `all_frames_sprite` and `all_frames_animation`, and `play_if_changed` (switch tag only when it differs, set the speed). `StaticFrame { relative }` shows one frame without playing, for icons (Long Way HUD). Both games used the spawn boilerplate in many places, and the tag switch came from Long Way `animate_player`, which no longer keeps its own `playing` field. R-Town's walk flip and bob stays in R-Town (one game uses it).
 
 **How to apply.** `dev-docs/extensions/pixel-art.md`, "Random start frame". Add `AnimationHelpPlugin` and put `RandomStartFrame::for_cell(..)` in the spawn bundle. Long Way: trees (`trees.rs`) and pickups (`pickups.rs`).
+
+## adr-x40. `Sentry` is one strategy that patrols until it sees the player, then pursues for good (2026-11-09)
+
+**Decision.** The kit has `strategies::Sentry { sight, .. }` and `can_see(from, to, range, edges)`. A sentry patrols like `RandomPatrol` until the `Controlled` entity is within `sight` and no blocked edge of `CollisionWorld` crosses the straight line between the feet (`nav::segment_blocked`). It then walks to that entity and never goes back to patrolling. The legend parameters are `strategy=sentry radius=<px> sight=<px>`. Everything that blocks walking blocks sight.
+
+**Rationale.** Long Way's ghost needs a sight rule and R-Town's `Pursue` has none (`enemy-movement.md`). A second game wants it, so it belongs in the kit (`adr-x12`). One composite component keeps the one-way switch in one place. The alternative is a sight system that adds and removes `RandomPatrol` and `Pursue`: it spreads one behaviour over several components and systems, and the state would live in which components exist. Patrol logic is shared with `RandomPatrol` through one function, not copied. Giving up the chase is not a rule yet: the developer wants the chase to last.
+
+**How to apply.** `dev-docs/extensions/enemy-movement.md`. Add `StrategiesPlugin` (it needs `CollisionPlugin`), give the entity `Mover` and `Sentry::new(radius, sight)` or `Sentry::from_params`. Read `Sentry::alerted()` for a cue.

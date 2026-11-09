@@ -4,16 +4,21 @@
 //!
 //! - `RandomPatrol`: pick a random reachable place within a radius of the current place, walk there, pick again.
 //! - `Pursue`: walk to the player (the `Controlled` entity), or to another entity.
+//! - `Sentry`: patrol like `RandomPatrol` until the player is seen (`can_see`: in range and no edge between), then
+//!   pursue for good.
 //!
-//! `StrategiesPlugin` needs `MovementPlugin`, `NavPlugin` and `RngPlugin`.
+//! `StrategiesPlugin` needs `MovementPlugin`, `NavPlugin`, `RngPlugin` and `CollisionPlugin` (for the edges that
+//! block sight).
 
 use bevy::prelude::*;
 
 use crate::Controlled;
 use crate::camera::CameraBounds;
+use crate::collision::CollisionWorld;
 use crate::map::Params;
 use crate::movement::{MoveGoal, MoveState, StrategySet};
-use crate::nav::NavGrid;
+use crate::nav::{NavGrid, segment_blocked};
+use crate::outline::Edge;
 use crate::rng::{GameRng, Rng};
 
 /// Tries per pick of a patrol target.
@@ -25,7 +30,7 @@ pub struct StrategiesPlugin;
 
 impl Plugin for StrategiesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (patrol, pursue).in_set(StrategySet));
+        app.add_systems(Update, (patrol, pursue, sentry).in_set(StrategySet));
     }
 }
 
@@ -70,6 +75,49 @@ impl Pursue {
     }
 }
 
+/// Walks like `RandomPatrol` (within `radius` of where it is) until it sees the `Controlled` entity: within `sight`
+/// and with no blocked edge on the straight line between the feet. From then on it walks to that entity and never
+/// goes back to patrolling. It stands still when that entity does not exist.
+#[derive(Component, Clone, Copy, Debug)]
+#[require(MoveGoal)]
+pub struct Sentry {
+    pub sight: f32,
+    patrol: RandomPatrol,
+    alerted: bool,
+}
+
+impl Sentry {
+    pub fn new(radius: f32, sight: f32) -> Self {
+        Self {
+            sight,
+            patrol: RandomPatrol::new(radius),
+            alerted: false,
+        }
+    }
+
+    /// True once the player has been seen.
+    pub fn alerted(&self) -> bool {
+        self.alerted
+    }
+
+    /// Reads `radius` and `sight` (numbers above 0) from the legend parameters of a map entry.
+    pub fn from_params(params: &Params) -> Result<Self, String> {
+        let positive = |key: &str| match params.f32(key)? {
+            Some(value) if value > 0.0 => Ok(value),
+            Some(value) => Err(format!("parameter `{key}` must be above 0, found {value}")),
+            None => Err(format!(
+                "strategy `sentry` needs a parameter `{key}=<pixels>`"
+            )),
+        };
+        Ok(Self::new(positive("radius")?, positive("sight")?))
+    }
+}
+
+/// Whether `from` sees `to`: it is within `range` and no blocked edge crosses the straight line between them.
+pub fn can_see(from: Vec2, to: Vec2, range: f32, edges: &[Edge]) -> bool {
+    from.distance(to) <= range && !segment_blocked(from, to, edges)
+}
+
 /// A random point within `radius` of `from` that is inside `bounds` (when there are some) and that `reachable`
 /// accepts. Tries a few times, then gives up.
 pub fn pick_target(
@@ -103,31 +151,51 @@ fn patrol(
         return;
     };
     let dt = time.delta_secs();
+    let bounds = bounds.map(|b| b.0);
     for (transform, mut patrol, mut goal, state) in &mut patrols {
-        let walking_to_goal = goal.0.is_some() && !state.arrived && !state.unreachable;
-        if walking_to_goal {
-            continue;
-        }
-        if patrol.wait > 0.0 {
-            patrol.wait -= dt;
-            goal.0 = None;
-            continue;
-        }
-        let feet = transform.translation.truncate();
-        let target = pick_target(
+        patrol_step(
+            &mut patrol,
+            dt,
+            transform,
+            &mut goal,
+            state,
+            &nav,
+            bounds,
             &mut rng,
-            feet,
-            patrol.radius,
-            bounds.as_ref().map(|b| b.0),
-            PICK_TRIES,
-            |point| nav.find_path(feet, point).is_some(),
         );
-        match target {
-            Some(point) => goal.0 = Some(point),
-            None => {
-                goal.0 = None;
-                patrol.wait = NO_TARGET_WAIT;
-            }
+    }
+}
+
+/// One frame of patrolling: keep walking to the goal, or wait, or pick a new place.
+#[allow(clippy::too_many_arguments)]
+fn patrol_step(
+    patrol: &mut RandomPatrol,
+    dt: f32,
+    transform: &Transform,
+    goal: &mut MoveGoal,
+    state: &MoveState,
+    nav: &NavGrid,
+    bounds: Option<Rect>,
+    rng: &mut Rng,
+) {
+    let walking_to_goal = goal.0.is_some() && !state.arrived && !state.unreachable;
+    if walking_to_goal {
+        return;
+    }
+    if patrol.wait > 0.0 {
+        patrol.wait -= dt;
+        goal.0 = None;
+        return;
+    }
+    let feet = transform.translation.truncate();
+    let target = pick_target(rng, feet, patrol.radius, bounds, PICK_TRIES, |point| {
+        nav.find_path(feet, point).is_some()
+    });
+    match target {
+        Some(point) => goal.0 = Some(point),
+        None => {
+            goal.0 = None;
+            patrol.wait = NO_TARGET_WAIT;
         }
     }
 }
@@ -144,6 +212,46 @@ fn pursue(
             None => player,
         };
         goal.0 = target.map(|transform| transform.translation.truncate());
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn sentry(
+    time: Res<Time>,
+    nav: Res<NavGrid>,
+    world: Res<CollisionWorld>,
+    bounds: Option<Res<CameraBounds>>,
+    rng: Option<ResMut<GameRng>>,
+    player: Query<&Transform, (With<Controlled>, Without<Sentry>)>,
+    mut sentries: Query<(&Transform, &mut Sentry, &mut MoveGoal, &MoveState)>,
+) {
+    let Some(mut rng) = rng else {
+        return;
+    };
+    let dt = time.delta_secs();
+    let bounds = bounds.map(|b| b.0);
+    let player = player.single().ok().map(|t| t.translation.truncate());
+    for (transform, mut sentry, mut goal, state) in &mut sentries {
+        let feet = transform.translation.truncate();
+        if !sentry.alerted
+            && player.is_some_and(|at| can_see(feet, at, sentry.sight, world.edges()))
+        {
+            sentry.alerted = true;
+        }
+        if sentry.alerted {
+            goal.0 = player;
+        } else {
+            patrol_step(
+                &mut sentry.patrol,
+                dt,
+                transform,
+                &mut goal,
+                state,
+                &nav,
+                bounds,
+                &mut rng,
+            );
+        }
     }
 }
 
@@ -303,5 +411,118 @@ mod tests {
         app.world_mut().despawn(player);
         app.update();
         assert_eq!(app.world().get::<MoveGoal>(pursuer).unwrap().0, None);
+    }
+
+    fn wall_edges() -> Vec<Edge> {
+        crate::outline::build(&[Rect::new(90.0, 0.0, 110.0, 100.0)])
+            .iter()
+            .flat_map(|c| c.edges.iter().copied())
+            .collect()
+    }
+
+    #[test]
+    fn sight_needs_range_and_a_clear_line() {
+        let edges = wall_edges();
+        let (here, beside, behind) = (
+            Vec2::new(50.0, 50.0),
+            Vec2::new(50.0, 150.0),
+            Vec2::new(150.0, 50.0),
+        );
+        assert!(can_see(here, beside, 200.0, &edges));
+        assert!(!can_see(here, beside, 99.0, &edges));
+        assert!(!can_see(here, behind, 200.0, &edges));
+        assert!(can_see(behind, here, 200.0, &[]));
+    }
+
+    #[test]
+    fn sentry_parameters_are_read_and_checked() {
+        let ok = Params::from_pairs(&[("radius", "40"), ("sight", "90")]);
+        let sentry = Sentry::from_params(&ok).unwrap();
+        assert_eq!(sentry.sight, 90.0);
+        assert!(!sentry.alerted());
+        let no_sight = Params::from_pairs(&[("radius", "40")]);
+        assert!(
+            Sentry::from_params(&no_sight)
+                .unwrap_err()
+                .contains("`sight=")
+        );
+        let no_radius = Params::from_pairs(&[("sight", "90")]);
+        assert!(
+            Sentry::from_params(&no_radius)
+                .unwrap_err()
+                .contains("`radius=")
+        );
+        let zero = Params::from_pairs(&[("radius", "40"), ("sight", "0")]);
+        assert!(Sentry::from_params(&zero).unwrap_err().contains("above 0"));
+    }
+
+    fn spawn_sentry(app: &mut App, at: Vec2, radius: f32, sight: f32) -> Entity {
+        app.world_mut()
+            .spawn((
+                Transform::from_translation(at.extend(0.0)),
+                Mover::new(10.0),
+                Sentry::new(radius, sight),
+            ))
+            .id()
+    }
+
+    fn spawn_player(app: &mut App, at: Vec2) -> Entity {
+        app.world_mut()
+            .spawn((Transform::from_translation(at.extend(0.0)), Controlled))
+            .id()
+    }
+
+    fn run(app: &mut App, frames: usize) {
+        for _ in 0..frames {
+            app.update();
+        }
+    }
+
+    #[test]
+    fn a_sentry_patrols_while_the_player_is_out_of_range_or_hidden() {
+        let mut far = app();
+        let sentry = spawn_sentry(&mut far, Vec2::new(100.0, 200.0), 10.0, 50.0);
+        spawn_player(&mut far, Vec2::new(350.0, 200.0));
+        run(&mut far, 300);
+        assert!(!far.world().get::<Sentry>(sentry).unwrap().alerted());
+
+        let mut hidden = app();
+        hidden
+            .world_mut()
+            .resource_mut::<CollisionWorld>()
+            .add_blocked(&[Rect::new(190.0, 0.0, 210.0, 400.0)]);
+        let sentry = spawn_sentry(&mut hidden, Vec2::new(100.0, 200.0), 10.0, 400.0);
+        spawn_player(&mut hidden, Vec2::new(300.0, 200.0));
+        run(&mut hidden, 300);
+        assert!(!hidden.world().get::<Sentry>(sentry).unwrap().alerted());
+    }
+
+    #[test]
+    fn a_sentry_that_sees_the_player_pursues_for_good() {
+        let mut app = app();
+        let sentry = spawn_sentry(&mut app, Vec2::new(100.0, 200.0), 10.0, 100.0);
+        let player = spawn_player(&mut app, Vec2::new(150.0, 200.0));
+        run(&mut app, 2);
+        assert!(app.world().get::<Sentry>(sentry).unwrap().alerted());
+        assert_eq!(
+            app.world().get::<MoveGoal>(sentry).unwrap().0,
+            Some(Vec2::new(150.0, 200.0))
+        );
+        // Out of sight now, and still followed.
+        app.world_mut()
+            .get_mut::<Transform>(player)
+            .unwrap()
+            .translation = Vec3::new(380.0, 380.0, 0.0);
+        run(&mut app, 5);
+        assert!(app.world().get::<Sentry>(sentry).unwrap().alerted());
+        assert_eq!(
+            app.world().get::<MoveGoal>(sentry).unwrap().0,
+            Some(Vec2::new(380.0, 380.0))
+        );
+        // The player is gone: it stands still but stays alerted.
+        app.world_mut().despawn(player);
+        run(&mut app, 2);
+        assert_eq!(app.world().get::<MoveGoal>(sentry).unwrap().0, None);
+        assert!(app.world().get::<Sentry>(sentry).unwrap().alerted());
     }
 }
