@@ -1,6 +1,7 @@
 mod background;
 mod camera;
 mod collision;
+mod hp;
 mod hud;
 mod inventory;
 mod map;
@@ -32,6 +33,7 @@ fn main() {
             game_kit::animation::AnimationHelpPlugin,
             game_kit::collectable::CollectablePlugin,
             inventory::InventoryPlugin,
+            hp::HpPlugin,
         ))
         .add_plugins((
             game_kit::camera::PixelCameraPlugin {

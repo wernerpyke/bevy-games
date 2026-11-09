@@ -179,3 +179,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The design only says the four colours are four kinds of energy, so the smallest useful state is a count each. The pickup art is 64 by 96 and would be taller than the player at full size, so it is drawn small. The touch box is 52 wide (the touch width of an exit marker) and one cell high, centred on the base of the pickup. A smaller box made pickups hard to collect: a player walking past in front of one, at 16 pixels below its base, missed it. The pickups start their pulse at a random frame (`adr-x39`), so a row of them is not in step. The icons reuse the pickup art, so the HUD needs no new file. A still frame keeps the HUD calm, and the world pickups carry the motion.
 
 **How to apply.** Values and kinds: `games/long-way/docs/maps.md`. Code: `pickups.rs`, `inventory.rs`, `hud.rs`.
+
+## adr-lw28. The player has 3 HP, asked for with a message, shown as a row of icons (2026-11-09)
+
+**Decision.** The player entity has `Hp { current, max }` (3 and 3 at the start, `hp.rs`). Other systems send `DamagePlayer { amount }` and never change `Hp`. Points never go below 0. At 0 the player stays alive: there is no game over screen yet (roadmap item 13), so the game logs it and damage stops. There is no invulnerability time. The HUD (`hud.rs`) draws one icon of `ui/hp.aseprite` (32 by 32, tags `Full` and `Empty`) for each point of `max`, in a row below the energy row, with the lost points as `Empty`. It builds the row again when `Hp` changes.
+
+**Rationale.** A message keeps the rule (no negative HP, no damage at 0) in one place, and the enemy code needs no knowledge of the player. A row that follows `max` needs no HUD change when max HP changes later. Icons are used and not a count because a lost point reads at a glance, and 3 points fit the bar. The game does not die at 0 yet because nothing can show or restart a game over, and a dead end would block testing the ghost.
+
+**How to apply.** Code: `hp.rs`, `hud.rs`, `player.rs` (adds `Hp`). Art: `art-pipeline.md` and `art-tags.md`. The ghost sends the message when it touches the player (`dev-docs/PLAN-ghost-enemy.md`).

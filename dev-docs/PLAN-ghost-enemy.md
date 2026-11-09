@@ -1,6 +1,6 @@
 # PLAN: the ghost enemy and player HP in Long Way
 
-Status: all open points settled. Steps 1 and 2 committed. Steps 3 and 4 done (2026-11-09), not committed. Next: step 5 (player HP).
+Status: all open points settled. Steps 1 to 4 committed. Step 5 done (2026-11-09), not committed. Next: step 6 (the ghost).
 
 ## Goal
 
@@ -61,7 +61,7 @@ Spawner timer, `NavGrid`, `Mover` and `MoveGoal`, `RandomPatrol`, `Pursue`, `Hit
 
 - Done: `animation.rs` has `view_of(facing)` and `FacingTags { down, side, up, speed }` on the sprite child of an entity with `MoveState`. It plays `Down`, `Left` or `Up` and flips the sprite for the right, all the time. Removing it hands the animation back (for `Die`). `adr-x41`.
 
-### 5. Long Way: player HP
+### 5. Long Way: player HP (done 2026-11-09; the empty icon was not seen on screen yet, step 7 covers it)
 
 - `Hp { current, max }` component on the player (3 and 3 at start), with a `PlayerHit` or damage message so other systems do not call into `player.rs`.
 - HUD: a horizontal row of icons from `art/ui/hp.aseprite` (32x32, taller than the 24 px energy icons, so the row gets its own vertical position; tags `Full` frame 1 and `Empty` frame 2, one layer `Icon`; the user draws it). One icon per point of **max HP**. A point the player has lost shows the `Empty` frame, the others show `Full`. The row sits in the HUD bar next to the energy row (`hud.rs`), spawned with the same Aseprite tag and `StaticFrame` helpers, and updated when `Hp` changes. The row follows the max, so a later change of max HP (for example a pickup) needs no HUD change. The icon draws at 1 art pixel per HUD pixel.

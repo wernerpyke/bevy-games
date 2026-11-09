@@ -12,13 +12,14 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
-    ├── hud.rs          HudPlugin: the content of the HUD bar (the title and one icon with a count for each energy). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── hud.rs          HudPlugin: the content of the HUD bar (the title, one icon with a count for each energy, and the row of HP icons). The bar is `game_kit::screen` and `game_kit::hud`
     ├── player.rs       PlayerPlugin: player spawn, movement, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
     ├── pickups.rs      `spawn_pickups`: energy pickups of one map, each with a `Collectable`
     ├── inventory.rs    `Inventory` (energy counts), `InventoryPlugin`: fills it from `Collected`
+    ├── hp.rs           `Hp` (the player's hit points), `DamagePlayer` message, `HpPlugin` (`adr-lw28`)
     ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
@@ -37,7 +38,7 @@ games/long-way/
 | [Screen layout](../../../dev-docs/extensions/screen-layout.md) | `camera.rs`, `hud.rs`, `main.rs` (plus `screen.rs`, `hud.rs`, `app_state.rs` in `crates/game-kit`) |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
-Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`.
+Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`, `hp.rs`.
 
 ## Long Way values for the pixel art extension
 

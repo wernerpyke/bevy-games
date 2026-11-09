@@ -3,6 +3,7 @@ use bevy_aseprite_ultra::prelude::*;
 
 use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
+use crate::hp::Hp;
 use game_kit::animation::play_if_changed;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
@@ -76,6 +77,7 @@ pub fn spawn_player(
     let start = feet + Vec2::new(0.0, PLAYER_FEET_OFFSET);
     commands.spawn((
         game_kit::Controlled,
+        Hp::default(),
         Player {
             facing: Facing::Down,
             walking: false,
