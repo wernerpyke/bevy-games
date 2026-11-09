@@ -21,7 +21,7 @@ A text file that a human edits to draw a whole map. One character is one cell. T
 | Loading and `Kind` | `games/<game>/src/map.rs` | Per game |
 | Spawning | per game | Per game |
 
-Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-x36` (backgrounds), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. Research and options: `dev-docs/RESEARCH-map-layouts.md`.
+Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-x36` (backgrounds), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. The research on other formats was deleted after the decision. It is in git history as `dev-docs/RESEARCH-map-layouts.md`.
 
 ## Specification
 
@@ -193,8 +193,8 @@ Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow
 
 - One grid, one object per cell. There are no layers and no ground tiles in the file.
 - One map file is one map. How a game moves between maps is in `dev-docs/extensions/map-transitions.md`.
-- Maps with triggers, paths or nested data may outgrow this format (roadmap items 4 and 5).
-- A visual editor is a roadmap item. It must keep this format as the source of truth.
+- Maps with triggers, paths or nested data may outgrow this format (`rm4` and `rm5`).
+- A visual editor is `rm6`. It must keep this format as the source of truth.
 
 ## Tests
 

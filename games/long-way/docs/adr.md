@@ -23,7 +23,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 - **Bottom:** the tree's base. Walking up from below, the player stops with its feet on the base line, like at the bottom of a rock (`adr-lw13`). Changed 2026-11-02: before this the bottom was the base minus half of the player's height (30), with a 50% body overlap. Trees now sort at the base plus 1, as rocks do.
 - **Top:** the tree's base plus 10% of the tree height. Walking down from above, the player stops before the bottom 10% of the tree. Above this line the player can walk behind the tree, overlapping the trunk and canopy freely.
 
-**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (roadmap item 2 evaluates `avian2d`).
+**Rationale.** These are the developer's rules for a top-down view, and they are not a normal box collision. A rectangle test on feet positions expresses all three rules with four numbers. The game is a real-time top-down RPG (`adr-lw7`) and these rules are not physics, so a physics engine is not wanted for now (`rm2` evaluates `avian2d`).
 
 **How to apply.** The rule lives in `games/long-way/src/collision.rs` (the trunk shape) and in `crates/game-kit/src/collision.rs` (`resolve`, `move_feet`) as plain functions with unit tests, with no Bevy types except `Vec2` and `Rect`. Constants (`PLAYER_HALF_WIDTH`, `PLAYER_HEIGHT`, `OVERLAP_FROM_BELOW`, `BLOCKED_BOTTOM`) set the numbers. Trunk edges come from the art (`TRUNK_LEFT_PX` and `TRUNK_RIGHT_PX` in `trees.rs`). Each axis is resolved separately so the player slides along a trunk, and a move is stopped when it crosses an edge, so a large step cannot jump over a trunk. The values are listed in `games/long-way/docs/collision.md`.
 
@@ -43,7 +43,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 3. A rock is solid on all sides. The player walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
 5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `draw` and `jitter` stay as optional front matter keys (`pitch` went with the markdown format). Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
-6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is roadmap item 3.
+6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is `rm3`.
 7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F3 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
 8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).
 
@@ -154,7 +154,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** A bar keeps icons and text off the world, so the 8 by 8 cell view and the art scale stay as they are. The same scale as today means no art or map value changes.
 
-**How to apply.** `camera.rs` holds the window size, the view height and the bar size. See roadmap item 12.
+**How to apply.** `camera.rs` holds the window size, the view height and the bar size. See `rm12`.
 
 ## adr-lw25. The HUD bar background is an Aseprite file (2026-11-08)
 
@@ -182,7 +182,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw28. The player has 3 HP, asked for with a message, shown as a row of icons (2026-11-09)
 
-**Decision.** The player entity has `Hp { current, max }` (3 and 3 at the start, `hp.rs`). Other systems send `DamagePlayer { amount }` and never change `Hp`. Points never go below 0. At 0 the player stays alive: there is no game over screen yet (roadmap item 12), so the game logs it and damage stops. There is no invulnerability time. The HUD (`hud.rs`) draws one icon of `ui/hp.aseprite` (32 by 32, tags `Full` and `Empty`) for each point of `max`, in a row below the energy row, with the lost points as `Empty`. It builds the row again when `Hp` changes. When points are lost `hp.rs` sends `PlayerHurt`, and the player plays the `Hurt` tag of `Hunter.aseprite` once (it can walk again at once, and the walk animation waits until `Hurt` ends).
+**Decision.** The player entity has `Hp { current, max }` (3 and 3 at the start, `hp.rs`). Other systems send `DamagePlayer { amount }` and never change `Hp`. Points never go below 0. At 0 the player stays alive: there is no game over screen yet (`rm12`), so the game logs it and damage stops. There is no invulnerability time. The HUD (`hud.rs`) draws one icon of `ui/hp.aseprite` (32 by 32, tags `Full` and `Empty`) for each point of `max`, in a row below the energy row, with the lost points as `Empty`. It builds the row again when `Hp` changes. When points are lost `hp.rs` sends `PlayerHurt`, and the player plays the `Hurt` tag of `Hunter.aseprite` once (it can walk again at once, and the walk animation waits until `Hurt` ends).
 
 **Rationale.** A message keeps the rule (no negative HP, no damage at 0) in one place, and the enemy code needs no knowledge of the player. A row that follows `max` needs no HUD change when max HP changes later. Icons are used and not a count because a lost point reads at a glance, and 3 points fit the bar. The game does not die at 0 yet because nothing can show or restart a game over, and a dead end would block testing the ghost.
 

@@ -1,94 +1,8 @@
 # Extensions: decisions
 
-Decisions about reusable code that Long Way implements first. They were `adr-lw2` to `adr-lw11` until 2026-11-02, when the prefix changed to `x` and the numbers stayed: `adr-lw2` is now `adr-x2`. Game only decisions are in `games/long-way/docs/adr.md` (`adr-lw1`, `adr-lw7`, `adr-lw8`, `adr-lw12`, `adr-lw13`).
+Decisions about reusable code that Long Way implements first. They were `adr-lw2` to `adr-lw11` until 2026-11-02, when the prefix changed to `x` and the numbers stayed (`adr-lw2` is now `adr-x2`). Game only decisions are in `games/long-way/docs/adr.md` and `games/r-town/docs/adr.md`.
 
-## adr-x2. Draw order sorted by feet (2026-10-31)
-
-**Decision.** Entities with a `DepthSort` component get their z set from the y position of their feet: the lower the feet on screen, the closer to the camera.
-
-**Rationale.** The player must draw behind a tree when its feet are above its base and in front when below. A fixed z cannot do both. The same sort line also decides collision, so what the player sees matches where it can walk.
-
-**How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), because equal z flickers (found with the rock rows, 2026-11-01). The sort runs in `Update` with no ordering against movement, so z can lag one frame.
-
-## adr-x3. Collision debug overlay (2026-10-31, changed 2026-11-01)
-
-**Decision.** A debug overlay shows the collision. First version: F1, gizmos, red trunk boxes and green feet circles. Now (`collision_debug.rs`): it follows the F3 grid switch and is drawn as sprites on the feature debug layer (`adr-x9`). Yellow lines are every outline edge (with a tick on the blocked side), cyan boxes are interior rocks, green squares are the feet of every depth-sorted entity. The red trunk boxes are gone because the yellow outline already covers trunks. F1 does nothing in the kit. R-Town uses F1 to reload its map (`adr-x19`).
-
-**Rationale.** Collision rules are hard to check by eye, and Claude cannot watch the window.
-
-**How to apply.** Keep the overlay while collision work continues. Remove it or put it behind a debug feature before any release build.
-
-## adr-x4. Forgiving collision: `allow_sliding` (2026-10-31)
-
-**Decision.** `CollisionPlugin` takes an `allow_sliding` flag. Long Way sets it to `true`. When true:
-1. The player slides along a trunk when walking diagonally into it.
-2. Walking straight into a face stops the player, which shows the collision.
-3. If the player keeps pushing for 0.2 seconds (first 0.5, shortened on 2026-10-31 after the developer tried it) and its feet are within 35% of the face length from an edge (capped at 64 pixels, see `adr-x10`, which also covers faces of merged outlines and notches), it is slid sideways at 120 units per second to that edge, then walks on past the trunk. This works from below (slide left or right), from above, and into the trunk sides (slide up or down).
-Pushing into the middle of a face never slides the player, so it must walk around.
-
-When false, any blocked move leaves the player where it was. There is no sliding of any kind.
-
-**Rationale.** Hitting a trunk by a few pixels should not make the player back off and line up again. The pause makes the collision visible before the game helps. Pushing into the middle is a clear signal that the player means to reach the trunk, so no help is given there.
-
-**How to apply.** `SLIDE_DELAY`, `SLIDE_SPEED` and `SLIDE_RANGE_FRACTION` in `collision.rs` set the numbers. Entities that move with `move_feet` need a `SlideAssist` component, and call `reset()` on it when they are not trying to move. The setting is a resource (`CollisionSettings`) set by the plugin. Assisted sliding only starts when the input is straight along one axis. The collision rule from `adr-lw1` is unchanged. The push direction is stored as signs (for example (0, 1)), not as a normalised float, because comparing floats made the timer reset every few frames (`adr-x5`).
-
-## adr-x5. Debug strategy: logging and scripted input (2026-10-31)
-
-**Decision.** Behaviour is checked in two ways besides unit tests:
-1. **Logging.** Game code logs state changes, not every frame, with `debug!` under the crate's module path (for example `long_way::collision`). `info!` is for script progress. Enable with `RUST_LOG=long_way=debug`.
-2. **Scripted input.** If the `LONG_WAY_SCRIPT` environment variable is set, `script.rs` (now in `crates/game-kit`, adr-x15) presses keys in the running game and logs the feet position of the controlled entity every 0.25 seconds. Commands: `teleport:<x>:<y>`, `hold:<keys>:<seconds>`, `wait:<seconds>`, `screenshot:<name>`, `quit`. `screenshot` saves the window to `target/screenshots/<name>.png` (Bevy `Screenshot` with `save_to_disk`, native only) so Claude can open the PNG and check what is drawn (added 2026-11-01). Use `wait` before it after a `teleport`. It does nothing when the variable is not set. Run it with `./dev-scripts/rust.sh script long-way "<commands>"`.
-
-**Rationale.** Unit tests passed for `allow_sliding` but the feature did not work in the real game. Claude cannot play the game, so it needs a way to reproduce a problem in the real app, with real frame times. The scripted run reproduced it, and the log lines ("blocked" repeating) showed the cause: the push direction was compared as floats, and rounding noise between frames kept resetting the push timer. A unit test with varying frame times now covers it.
-
-**How to apply.** When a behaviour does not work in the real game, first reproduce it with a script, then write a failing test that captures the cause, then fix it, then rerun the script. Do not report a fix as working from unit tests alone. Do not compare floats for equality to detect a change of state: compare signs or discrete values. Keep logs to transitions so a run stays readable. New game logic that needs this kind of check should log its own transitions in the same way.
-
-
-## adr-x6. Reusable visual debug tools in `debug.rs` (2026-11-01)
-
-**Decision.** `crates/game-kit/src/debug.rs` (moved from Long Way on 2026-11-02, `adr-x12`) holds visual debug tools, one tool per system, added over time. `DebugPlugin { cell_size, grid_color }` is configured in `main.rs`. The first two tools:
-1. **Grid (F3).** Lines at every `cell_size` (64) in `grid_color` (red), over the visible area, drawn as thin sprites at `GRID_Z` (-10): below the player and the trees (about -1 to 1), above a future background, which must use a lower z. Gizmos are not used because they always draw on top. Column numbers run along the top edge and row numbers along the left edge. `grid_origin` sets where (0, 0) is: `Center`, `BottomLeft` (used by Long Way) or `World(Vec2)`. `BottomLeft` is the corner of the visible area, and the view width follows the window aspect ratio, so that corner moves sideways in world units when the window is resized. Use `World(Vec2)` for a fixed origin.
-2. **Info box (F2).** A text box at the top left. Any system shows a value with `ResMut<DebugInfo>` and `info.set("label", value)`. Rows keep the order of first use. The first rows are the player's feet x/y and grid cell (in grid coordinates, relative to the origin) and its raw world position.
-
-Both start visible. The collision overlay is in `collision_debug.rs` and follows F3 (`adr-x3`).
-
-**Rationale.** The developer wants one place to add debug visuals as needs come up. The `DebugInfo` resource lets other plugins report values without calling into `debug.rs` directly. The player's feet are shown, not the sprite centre, because collision uses the feet.
-
-**How to apply.** Add a new tool as a new system in `DebugPlugin`, with a key toggle in `toggle_tools` and a field in `DebugSettings`. Report values from any system through `DebugInfo`. The code stays in the game crate until a second game needs it (`adr-w6`). Remove or gate the tools behind a debug feature before a release build.
-
-## adr-x9. Draw order layers (2026-11-01)
-
-**Decision.** Everything on screen belongs to a named layer, from back to front, defined in the kit's `layers.rs` (`crates/game-kit`), which a game may override or extend (`adr-x14`, changed 2026-11-02; before this each game had its own file). Sprite layers are bands of z. HUD and UI layers use `GlobalZIndex`. Features and characters share one world layer, sorted together by their feet (`depth.rs`). Debug drawings have their own layers above the world. The layers Long Way uses are in `adr-lw12` (`games/long-way/docs/adr.md`).
-
-**Rationale.** Bevy has no layer system for 2D draw order: sprites are sorted by z, equal z has no fixed order, `RenderLayers` only picks which camera sees an entity, and 2D gizmos are always drawn last, on top of everything. The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-x2`). Separate layers would stop that. The debug layer is above the world, so debug lines also draw over the player.
-
-**How to apply.** Never write a bare z number outside the kit's `layers.rs` or the game's own layers module (`adr-x14`). `bevy_ui` draws after all sprites and gizmos, so the HUD and UI are always above the feature debug layer. A background must use a z below `GRID_DEBUG_Z`. `depth.rs` has a debug assertion that feet stay inside the world band (y within about 100000). Debug drawings that must follow the layers are sprites, not gizmos. The collision overlay in `collision_debug.rs` follows this rule.
-
-## adr-x10. Sliding along merged outlines, into notches (2026-11-01)
-
-**Decision.** Blocked rectangles that touch or overlap are merged into one outline per cluster (`outline.rs`). The player collides with the outline edges only, and `allow_sliding` (`adr-x4`) works on those edges. The slide rules for an outline are:
-1. The range is the smaller of 35% of the face and 64 pixels (`SLIDE_RANGE_CAP`), measured from the nearer end.
-2. An end at an inward (concave) corner never slides the player. Past it there is only solid ground.
-3. At a convex end, the player always slides. If the way on is open for 192 pixels (`SLIDE_CLEARANCE`) it stops exactly on the end. If a face blocks it (a notch or an overhang), it stops 0.5 pixels past the end (`SLIDE_PAST_CORNER`) and walks on until that face stops it. Example: pushing up into the bottom face of the test cluster from world x 463, the player slides to x 440.3 and walks up to y 64.
-4. All blocked areas (trunks and rocks) are merged by one `outline::build`, so a trunk touching a rock is one cluster. Two rectangles that touch only at a corner leave no gap: that vertex counts as an inward corner. A slide target is passed through `resolve`, so it never ends inside another shape.
-
-The blocked area and sort line of a rock are game rules, in `adr-lw13` (`games/long-way/docs/adr.md`).
-
-**Rationale.** The first version refused to slide when the way past the end was blocked within 192 pixels, to avoid pushing the player into pockets. The developer tried it at a notch under an overhang and wanted the player to slide to the corner and walk on, stopping at the back of the notch (2026-11-01). Sliding into an inward corner is still refused, because it only puts the player inside the next rock.
-
-**How to apply.** The rules are in `slide_to_nearest_edge` in `collision.rs`, with tests for pockets, notches and long faces. The numbers were accepted by the developer after play testing (2026-11-02). The full rules are in `dev-docs/extensions/collision.md`, the Long Way values in `games/long-way/docs/collision.md`.
-
-## adr-x11. Map file layout: Features and Map sections (2026-11-01)
-
-**Superseded by `adr-x18` (2026-11-02): a map is now one drawn grid. This record keeps the reasons it gave.**
-
-**Decision.** A map file is markdown with frontmatter and two sections the game reads (`dev-docs/extensions/map-files.md`):
-1. `# Features`: each `## Name` heading defines a feature with exactly one `cells` block. The bottom left character is the anchor.
-2. `# Map`: a bulleted list that places features, `- 'Name' at (x,y), (x,y) and (x,y)`. Positions are the anchor cell, in F3 grid numbers.
-Everything else in the file is notes for people. Trees are map kinds (`green_tree`, `red_tree`) placed the same way as rocks. Every format error stops loading and names the file and line.
-
-**Rationale.** The first format put `at=x,y` on each `cells` block, with a separate `name=` and `place` block for reuse. The developer wanted features described once, with comments, and placement in one readable list. A feature used several times is one bullet. It also lets the same file place trees, which need no change to the format, only a new kind in code.
-
-**How to apply.** The parser is `parse` in `map.rs` (plain Rust, unit tested). Add a new object kind in `Kind` and in the module that spawns it (`rocks.rs`, `trees.rs`), and name it in the legend. Do not add per-block options to `cells`. Roadmap item 5 considers other formats (YAML, TOML) if maps outgrow markdown. Roadmap item 5 covers a sturdier loader.
+The decisions are split by area, all with the prefix `x`. This file holds `adr-x12` and the index of the others. To find a decision, search for its ID: `grep -rn "^## adr-x23" dev-docs/adr`.
 
 ## adr-x12. Shared code lives in one kit crate, `crates/game-kit` (2026-11-02)
 
@@ -98,263 +12,48 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **How to apply.** A game supplies its values through plugin fields and marker components, not generics or Cargo features (`dev-docs/extensions/plugin-configuration.md`). Ask before adding game specific code to the kit.
 
-## adr-x13. Map object kinds are strings in the kit (2026-11-02)
 
-**Decision.** The map parser returns each object's kind as the legend name (`String`). Each game converts names to its own enum.
-
-**Rationale.** The kit must not change when a game adds an object. A generic parser over the game's enum was rejected: it spreads generics through the parser and plugin for little gain. A shared enum was rejected: every new object in any game would edit the kit.
-
-**How to apply.** An unknown name is reported by the game's conversion with the map file line, as the parser reports it today.
-
-## adr-x14. Kit holds default layers, games override (2026-11-02)
-
-**Decision.** The kit has a `layers` module with the default z values. Plugins take the values from plugin fields that default to those constants. A game overrides a value or adds its own layers in its own module. This changes adr-x9, which said every z number is in one file per game.
-
-**Rationale.** Both games start with the same draw order without copying it. A game that needs another layer can add it.
-
-**How to apply.** Still never write a bare z number in game code: use a name from the kit or the game's layers module. Keep the compile-time ordering checks in the kit. A game that overrides a value must keep the checks true.
-
-## adr-x15. Scripted run tool is in the kit and extensible (2026-11-02)
-
-**Decision.** The kit owns the script parser and runner (teleport, hold, wait, screenshot, quit). The game marks its target entity with a `ScriptTarget` component and can register its own commands.
-
-**Rationale.** Both games get scripted runs and screenshots without copying (adr-x5). R-Town will need game commands such as attacks once combat exists.
-
-**How to apply.** Game commands are added through a registration API in the kit. Design that API with the first game command, not before.
-
-## adr-x16. Collision blockers are a kit component, slide values scale with the cell size (2026-11-02)
-
-**Decision.** The kit has a `Blocker(Rect)` component. A game grows each blocked area by the actor's size and spawns it as a `Blocker`, or calls `CollisionWorld::add_blocked`. The slide values are `SlideTuning` fields, and `CollisionPlugin { allow_sliding, cell_size }` computes them with `SlideTuning::for_cell_size`, which scales speed, range cap, clearance and past-corner from the values tuned at a cell size of 64.
-
-**Rationale.** The kit does not need to know a game's obstacle types (Long Way `Trunk`, R-Town houses). The actor size is already applied when a game builds the area, so `resolve` and `move_feet` need no size parameter. Long Way at cell size 64 keeps its exact values. R-Town at 16 gets a quarter, so the slide feels the same relative to the art.
-
-**How to apply.** Keep game rules (which part of a tree blocks, actor size) in the game. Keep the kit free of game types.
-
-Refinement (2026-11-02): `parse` takes the list of kind names the game knows and reports an unknown legend name itself, with the file line, as before. The game's conversion from name to enum then cannot fail. This keeps the parser error messages and their tests in the kit. The `draw` key is optional (`Option<f32>`) and the game gives the default.
-
-## adr-x17. Camera follow in the kit, debug sizes scale with the cell size (2026-11-02)
-
-**Decision.** `CameraFollowPlugin` moves the `Camera2d` to the `Controlled` entity and stops it at `CameraBounds` (a resource a game inserts once the map size is known). The camera position is rounded to a whole world unit. The debug grid and the collision overlay take their line thickness, tick length, label size and feet marker size from base values tuned for a cell size of 64, multiplied by `DebugSettings::scale` (cell size over 64).
-
-**Rationale.** A scrolling camera is needed by every game with a map larger than the view, and rounding keeps pixel art from shimmering when it scrolls. The debug sizes were world units chosen for Long Way's 1200 unit view. At R-Town's 240 unit view they were five times too large on screen.
-
-**How to apply.** Insert `CameraBounds` in the plugin that loads the map. Do not move the camera elsewhere, or the follow system overwrites it each frame.
-
-## adr-x18. Map files are one drawn grid in a text file (2026-11-02)
-
-**Decision.** A map file is plain text with front matter and a grid (`dev-docs/extensions/map-files.md`). It replaces the markdown format of `adr-x11`.
-1. The grid shows every cell of the map. One character is one cell. A legend in the front matter maps characters to object kinds. A blank or `.` is empty.
-2. Each grid row is `<label>|<cells>|`, and cell k is the character at offset 2k. Rulers help a reader. Row labels are zero-based and checked. Both `.` and blanks may draw a footprint, and the parser treats them the same.
-3. A character marks the anchor cell (bottom left) of an object. The footprint size belongs to the game. There are no layers, and one cell holds one object.
-4. `size: WxH` is in the file. `origin` is `bottom-left` or `top-left` and only sets how rows are labelled. `parse` always returns cells numbered from the bottom left, with y up.
-5. A legend entry may be a marker (R-Town `"@": player_start`). It is an ordinary object that the game reads and does not draw.
-6. The F3 grid can number rows from the top (`DebugSettings::rows_from_top`) so that it matches a `top-left` file.
-7. Parsing stays a small hand parser in `game-kit` with no new dependency. Every error names the file and line.
-
-**Rationale.** The developer wanted to see a whole map in one file, edit it in a text editor, and not install an editor or tool. A drawn grid shows gaps and clusters at a glance. The markdown format split a map into features and a placement list, so no one place showed the map. Research found no standard text map format (`dev-docs/RESEARCH-map-layouts.md`), and editor formats (Tiled, LDtk, Ogmo) need their editors. A seeded generator can later return the same `Map` value as the parser, so the format does not block generated maps.
-
-**How to apply.** Add a new kind to the game's name list and `Kind` enum and to the legend. Use fixed-width font and turn off word wrap when editing wide maps. Layers, larger objects with own settings, chunk files and a visual editor are roadmap items. The visual editor must keep this format as the source of truth.
-
-## adr-x19. Debug keys F2 info, F3 grid, F1 map reload (2026-11-03)
-
-**Decision.** The kit debug keys are F2 for the info box and F3 for the grid and the collision overlay (they were the other way round). (Revised by `adr-x28`: the kit now reads F1 and sends `ReloadMap`.) The collision overlay redraws when `CollisionWorld` changes, and `CollisionWorld::clear` lets a game replace its blocked areas. The script runner accepts `f1` to `f3` in `hold`, so a reload can be tested in a scripted run.
-
-**Rationale.** The developer wanted reload first, then the info box, then the grid, in the order they use them while editing a map. A reload must redraw the overlay, or the yellow outline shows the old map.
-
-**How to apply.** A game that reloads a map despawns what the map spawned, replaces the resources, spawns again, then calls `clear` and `add_blocked` with the new blockers.
-
-## adr-x20. Neighbour groups in the kit (2026-11-03)
-
-**Decision.** `crates/game-kit/src/groups.rs` finds groups of touching items on a cell grid (`neighbour_groups`, `group_sizes`, 8 neighbours or 4). A game uses the group size to choose the blocked area of an item: a thin one when it stands alone, a full one in a group. The function was moved into the kit at once, although the rule "move code to the kit when two games use it" (`adr-x12`) was not met yet, because R-Town and Long Way adopted it together.
-
-**Rationale.** The grouping is a plain grid algorithm with no game types, so the kit can unit test it alone. Two games with the same logic would copy it. The game keeps the values: footprint sizes, bands and kinds.
-
-**How to apply.** See `dev-docs/extensions/groups.md`.
-
-## adr-x21. Projectiles are in the kit and collide as a ground point (2026-11-04)
-
-**Decision.** `crates/game-kit/src/projectile.rs` has the projectile component, the plugin that moves it, the hit message and the turning of the sprite. It was written in the kit from the start, although the rule "move code to the kit when two games use it" (`adr-x12`) was not met yet, because it holds no game types and no assets and the developer asked for it. A projectile is a point on the ground that uses the same outline edges as a character's feet (`collision::resolve`). It does not have its own, exact blocked shapes.
-
-**Rationale.** Weapons are a general need for the games in this workspace, and the movement and removal rules are plain geometry that the kit can unit test alone. Reusing the edges needs no second set of areas. The cost is that the areas are grown sideways by the shooter's feet half width, so a shot stops up to 5 px early at the side of a tree, and a lone tree stops a shot only at its base band. This matches how the player meets trees. Exact shapes can be added if play testing shows a problem.
-
-**How to apply.** See `dev-docs/extensions/projectiles.md`.
-
-## adr-x22. Input starts in the game and moves to the kit later (2026-11-04)
-
-**Decision.** Input handling is a module of the game for now. R-Town has `src/input.rs` with a `PlayerInput` resource (move direction, fire) that is filled from the keyboard in `InputSet`. Gameplay systems read the resource and never `KeyCode`. The module moves to the kit when the mouse is added or a second game needs it (roadmap item 8).
-
-**Rationale.** The resource isolates the device, so a mouse becomes a second writer of the same resource. A kit module now would have one user and a guessed API. The later move is a file move.
-
-**How to apply.** Read `PlayerInput` with `.after(InputSet)`. The scripted run tool still works, because it writes key presses into `ButtonInput<KeyCode>` before the game reads them.
-
-## adr-x23. Path finding on a grid built from the collision edges (2026-11-04)
-
-**Decision.** `crates/game-kit/src/nav.rs` builds a grid of walk points (R-Town: every 4 px) and links two neighbours when a straight move crosses no outline edge from its free side. A* from the `pathfinding` crate (4.16.0, compiles for `wasm32-unknown-unknown`) searches it, and the path is smoothed to straight legs. The grid is built again when the collision areas or the map rectangle change.
-
-**Rationale.** The grid reuses the exact outlines, thin tree bands included, so there is no second description of the obstacles and paths follow the rule the walker follows. It is easy to test without a running world. A navigation mesh crate (`bevy_northstar` and others in `adr-e4`) is heavier and tied to a Bevy version. The cost is memory and a build time of about 9 ms for a 60x60 map, once per map load.
-
-**How to apply.** See `dev-docs/extensions/nav.md`. It is the first part of roadmap item 3.
-
-## adr-x24. Strategies are components that write a goal (2026-11-04)
-
-**Decision.** A movement strategy is a component with a system in `StrategySet` that writes `MoveGoal`. One kit system (`movement.rs`) turns the goal into a path and steps. The kit provides `RandomPatrol` and `Pursue`. A game adds its own strategy the same way.
-
-**Rationale.** It is the normal ECS style and needs no trait objects or boxed state. A strategy stays small and its pure parts are unit tested. The kit does not need to know the strategies of a game. A strategy can only say "go there": a special movement needs its own mover.
-
-**How to apply.** See `dev-docs/extensions/enemy-movement.md`.
-
-## adr-x25. Spawner settings are legend parameters (2026-11-04)
-
-**Decision.** A legend entry of a map file may have `key=value` parameters after its kind, for example `"S": spawn_skeleton every=10 strategy=patrol radius=120`. The parser keeps them in `MapObject.params` and the line number in `Params::line`. The game decides what they mean and reports errors with the file and the line. `Spawner` (`spawner.rs`) reads `every` and `max`.
-
-**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into roadmap item 4 (objects with settings).
-
-**How to apply.** See `dev-docs/extensions/spawners.md` and `map-files.md`.
-
-## adr-x26. A seedable random number generator in the kit (2026-11-04)
-
-**Decision.** `crates/game-kit/src/rng.rs` has `Rng` (SplitMix64) and `RngPlugin`, which adds `GameRng`. The seed is `<PREFIX>_SEED` when set, else the clock. The web build has no clock at start, so it starts from a constant and mixes in the time of the first frame.
-
-**Rationale.** The `rand` crate needs `getrandom` and extra setup for the web build. About 60 lines with no dependency are enough. A seed that we control makes scripted runs repeatable.
-
-**How to apply.** Take `ResMut<GameRng>` and call `f32`, `range` or `point_in_disc`. Set `R_TOWN_SEED=7` for a repeatable run.
-
-## adr-x27. Hit boxes, and projectiles hit at their flight height (2026-11-04)
-
-**Decision.** `HitBox { offset, half_size }` (`hitbox.rs`) is a body rectangle relative to the ground point, and it is not the feet box. A projectile hits an entity with `ProjectileTarget` and a `HitBox`, tested along its path (not only at its end point) and at its flight height (`Projectile::height`), and it stops at a blocked area first. The hit is `ProjectileHit` with `HitCause::Target(entity)`, and the game removes the target.
-
-**Rationale.** A body sits above the feet. A shot that flies at hand height along the ground line of the shooter hits a body that stands on the same line. Testing the ground line would miss it, as the first scripted run showed. Testing the path stops a long step from jumping over a thin target.
-
-**How to apply.** See `dev-docs/extensions/projectiles.md` and `enemy-movement.md`.
-
-## adr-x28. F1 sends `ReloadMap` from the kit, and `--debug` turns the debug tools on (2026-11-04)
-
-**Decision.** `game_kit::reload::ReloadPlugin` reads F1 and sends a `ReloadMap` message. The game reads it (R-Town: `reload_map.run_if(on_message::<ReloadMap>)`) and decides what a reload resets. The kit does not reload anything itself. The debug tools (F2 info box, F3 grid, collision and movement overlays) are off unless the run starts with `--debug`: `rust.sh run|script <game> --debug` sets `GAME_KIT_DEBUG=1`, and `DebugPlugin::start_visible` reads it. Without the flag the overlays start hidden, and F2 and F3 still toggle them.
-
-**Rationale.** The key belongs with the other debug keys, and a second game can reuse it without copying the binding. What a reload resets is game state (R-Town removes enemies and projectiles), so a message keeps the kit free of game types. Screens and screenshots are clean by default, and Claude asks for the overlays when it needs them. The keys keep working so the developer can still show them in a normal run. An environment variable fits the existing `<GAME>_SCRIPT` and `<GAME>_MAP` pattern and needs no argument parsing in the games.
-
-**How to apply.** A game adds `ReloadPlugin` and a system that runs on `ReloadMap`. Long Way reloads on it too (`map.rs`: rocks, trees and the player are tagged `MapEntity`, removed and spawned again). Claude adds `--debug` when testing or taking screenshots (`CLAUDE.md`). A web build has no environment, so the tools start hidden there and F2 and F3 show them. This replaces the part of `adr-x19` that left F1 to the game.
-
-## adr-x29. A corner contact between blocked areas is closed with a filler (2026-11-06)
-
-**Decision.** `outline::build` adds a filler rectangle (0.5 wide, 1.0 high, `FILLER_HALF`) at every vertex where two blocked areas touch only at a corner and the other two quadrants are empty. This replaces the rule that the four edge ends at such a vertex count as concave (`adr-x4`, rule 5 of `extensions/collision.md`).
-
-**Rationale.** With the old rule the feet could stop exactly on the vertex, where all four edges cover them and each blocks one direction, so the player could not move at all (Long Way, one-cell tree boxes on the grid). Letting the feet leave along the free boundary instead would let them squeeze through the gap in two steps. A filler makes one solid shape: the feet stop just short of the vertex and can only back away. The filler is taller than wide so that a 45 degree line (a nav diagonal) through the vertex enters it through the middle of an edge, not exactly through its corners, where the edge test passes it. R-Town widens its blocked cells sideways, so its areas overlap at corners and the filler never applies there (same clusters and edges on `test.txt`).
-
-**How to apply.** Nothing in a game. `resolve`, `move_feet`, projectiles and nav see ordinary edges. Tests: `outline.rs`, `collision.rs`, `projectile.rs` and `nav.rs` (names with "corner contact"). A line of another exact slope through a filler corner can still pass, the same limit as at any convex corner.
-
-## adr-x30. Exits and entries are front matter blocks, and `player_start` marks a start (2026-11-06)
-
-**Decision.** A map file can have two more nested front matter blocks, `exits:` and `entries:`, next to `legend:`. One line is `name: key=value ...`. An exit has `area`, `to` (map id), `entry` (entry name in the target map) and `transition` (`seamless` or `scene`). An entry has `area` and an optional `facing`. An `area` is a straight strip of cells: `x0..x1,y`, `x,y0..y1` or one cell `x,y`. A range on both axes is an error. Cells are numbered like the row labels of the file. The grid marks area cells with a blank by convention, as a reading aid. The parser reads the blocks (`crates/game-kit/src/map_areas.rs`) and a second function checks the files against each other (`map_links.rs`, `validate_links`): the target map and entry exist, and an exit and its entry have the same length. A seamless exit needs an entry on the opposite edge. A start marker is `player_start`, an ordinary legend object (`"@": player_start`), and the game reads its cell. A later map may also have one, so a scripted run can start in that map.
-
-**Rationale.** Exits are rectangles on a map edge, usually several cells wide. A block in the front matter says so in one line and keeps legend characters free for objects that block. A strip cannot be a diagonal or a block, so a wrong exit is not possible to write. The grid marks stay a reading aid because blank and `.` are already the same empty cell (rule 12 of the format). Every exit and entry has the same length so the position along the strip carries over to the other map, for scene transitions as well as seamless ones. Checking the links when the maps are registered turns a typo in a map file into an error with the file and line. `player_start` already existed in R-Town, so the games share one name for a start.
-
-**How to apply.** Write the blocks as in `dev-docs/extensions/map-files.md`. A map without the blocks parses as before, so R-Town is unchanged. A game that registers several maps calls `validate_links`. Moving between maps (the registry, the lifecycle, the camera) is in `dev-docs/extensions/map-transitions.md` (`adr-x31`, `adr-x32`).
-
-## adr-x31. A map transition is run by the kit through three game hooks (2026-11-06)
-
-**Decision.** `crates/game-kit/src/map_transition.rs` holds the lifecycle of a scene transition. The game registers its maps (`MapSource`, read and checked once by `MapRegistry`) and gives the kit three one-shot systems (`MapHooks`): `load` (spawn one map, every entity tagged `MapId`), `rebuild` (rebuild the collision world) and `arrive` (place the controlled entity and set its facing). The kit sends a `RequestMapChange` message when the feet of the `Controlled` entity enter an exit area (it arms again when the feet leave every exit), fades a full-screen overlay out, runs `unload` (removes every `MapId` entity), `load`, `rebuild` and `arrive` in one frame, and fades in. The player keeps the same position along the strip: the offset from the low end of the exit strip is carried to the entry strip, and moves to the other axis when the strips are on different kinds of edge (a transpose, not a rotation). Exit and entry have the same length for every transition. The state is a plain resource (`MapTransition`) and not a Bevy sub state. The F2 box shows the current map id. The script tool has `goto:<map>:<entry>`.
-
-**Rationale.** The order of load, rebuild and arrive matters, and all of it must happen while the screen is covered. Hooks run in one fixed order inside one frame, so no frame shows a half loaded map. Messages between separate systems would need system sets and sync points for the same result. The kit stays free of game types, because the game does the spawning and the facing. The game has no app states yet, and a sub state needs a parent state, so a resource carries the three phases. Keeping the position along the strip makes a wide door feel like one door. The transpose is easy to follow when editing maps: the start cell of an exit always maps to the start cell of its entry.
-
-**How to apply.** Add `MapTransitionPlugin { sources, kinds, start, origin, fade }`, insert `MapHooks` and tag every spawned map entity with `MapId`. Stop the player with `MapTransition::locks_input`. `reload_current_map` (F1) reads the current file again and runs `load` and `rebuild`. The first map is loaded in `PostStartup` after the collision blockers are registered, so `rebuild` must clear the world first. Seamless transitions use the same lifecycle (`adr-x32`). See `dev-docs/extensions/map-transitions.md`.
-
-## adr-x32. A seamless exit joins the next map into the world, the player crosses a doorway (2026-11-06)
-
-**Decision.** A `transition=seamless` exit loads the target map beside the current one and does not fade or lock the player. The new map is placed on the edge of the exit, shifted along it until the exit strip and the entry strip lie on top of each other (`seamless_origin`). The maps are never turned, so the entry must be on the opposite edge (`adr-x30`). Both maps are in `ActiveMaps`, with a `Doorway` for the link, and the game hooks run as for a scene transition (`adr-x31`). The current map is the one that holds the feet, and it changes when the player crosses the seam. A map that is not the current one is removed after it has been out of the camera view for 1 second (`UNLOAD_AFTER_SECS`). The player may leave a map only through a doorway: `ActiveMaps::walkable` gives the map areas shrunk by the body size plus a bridge over each doorway, and `clamp_to_union` keeps a move inside them. It chooses among the areas that hold the old feet and the ones that touch them, so a long step cannot jump a wall. The camera shows the current map only (changed 2026-11-06, before this it showed the box around both maps). The camera limits are the current map, plus the joined map while the feet are in the exit that leads to it (`camera_target`), so the player sees ahead and is not cut off at the seam. `CameraBounds` is that rectangle at once. The camera glides: it keeps following the player exactly, and when the bounds change only the difference that the change adds is eased out (`CameraSmoothing`, time constant `camera_ease_secs`, Long Way 0.9 s). After the player crosses the seam the bounds are the new map alone, and the camera moves on until none of the old map is in view. A map that would overlap an active map is refused. The F3 grid is drawn once per active map with its own numbers (`DebugGrids`).
-
-**Rationale.** The player walks on without a cut, and the two maps share one world space, so their collision, depth sort and camera work with no extra code. Collision is already in world units, so rocks and trees near the seam form clusters across it. The doorway rule keeps the map edges solid where there is no exit. Choosing the area by where the feet were stops a frame of lag from carrying the player through a wall into a map that is nearer than the one they were in. Maps that sit just outside the view are removed late so the one that was just loaded does not vanish before the camera reaches it. Easing the limits themselves was tried first. The camera follows the player at once, so it moved with the player and stopped when the player stopped, then crept on as the limits caught up: a quick move, a stop and a slow move. Easing out only the offset that the change of bounds adds gives one smooth glide that carries on while the player walks, and keeps the player in view. Labels at the top and right edge line of a map are not drawn, because the line belongs to the next map.
-
-**How to apply.** Set `transition=seamless` on an exit whose entry is on the opposite edge and has the same length. A game uses `ActiveMaps::walkable` and `clamp_to_union` for the player instead of one map rectangle (Long Way: `move_player`). Every system that used the map rectangle must read `ActiveMaps`. `CameraBounds` is an eased box and only fits systems that use it for the camera: a game with enemies that read it for their area should not use it with seamless maps yet. The `rebuild` hook runs after every load and unload and must rebuild from all entities. Not built: an exit from the second map back to the first (the walk back works while the first map is still loaded), enemies and projectiles across a seam, and a layout of three maps around one map. `dev-docs/extensions/map-transitions.md`.
-
-## adr-x33. An object can be an exit: `exit_to` names the map, the game makes the touch area (2026-11-07)
-
-**Decision.** A legend entry may have the parameter `exit_to=<map id>` (`"m": marker exit_to=2`). The kit reads it (`MapObject::exit_to`) and checks it when the maps are registered: the map must exist and have exactly one `player_start`. The game adds an `ExitTrigger { area, to }` component (with a `MapId`) to the entity of such an object. `detect_exit` tests the feet against the triggers of the current map as well as the exit areas, with the same `armed` rule. A touch sends `RequestMapChange` with `entry: None` and a scene transition. `entry: None` puts the player at the `player_start` of the target map and keeps their facing. A marker exit has no `transition` key and is never seamless. The kit also owns `start_feet(map, origin)` now (it was in Long Way). The script command `goto:<map>` uses the same arrival.
-
-**Rationale.** Some games want a door in the middle of a map, not a strip on its edge. The file knows where the object leads, and only the game knows how big the touch area is, so each side keeps its part and the kit stays free of game types (`adr-x13`). A seamless link needs an exit strip to place the next map, so an object cannot start one. Arrival at `player_start` needs no entry strip, which matches maps that have one way in. The shared `armed` flag stops an arrival next to an exit object from sending the player back at once.
-
-**How to apply.** Write `exit_to` on the legend entry, give the target map one `@`, and add `ExitTrigger` when the game spawns the object (Long Way: `markers.rs`). Do not put an exit object inside an exit area (rule 21 of `map-files.md`). `dev-docs/extensions/map-transitions.md`, `dev-docs/extensions/map-files.md`.
-
-## adr-x34. The window is split into screen regions, each with a camera and a UI root (2026-11-07)
-
-**Decision.** The kit owns a `ScreenLayout`: a set of named rectangles of the window (`Game`, `Hud`, `Full`), computed by a pure function from the window size, the layout mode and the bar size. Each region used by a layout has a `Camera2d` with a `viewport` and a UI root that targets that camera (`UiTargetCamera`). The kit marks the world camera `GameCamera`, the HUD camera `HudCamera`, and every kit query for the world camera uses `GameCamera`. Two layout modes: **bar** (the HUD has its own rectangle above or below the game rectangle) and **overlay** (the game rectangle is the whole window and the HUD is drawn over it). Only bar mode is built first. HUD content is one `bevy_ui` tree under one `Hud` root and does not depend on the mode. UI is written in art pixels and scaled by the global `UiScale` (window height of the region divided by the view height). The kit has generic widgets (label, icon, gauge). The game has the content and the values. The map-transition fade covers the game region only.
-
-**Rationale.** Bevy has no HUD concept, only `bevy_ui`, camera viewports and `UiTargetCamera`. `FixedVertical` maps the view height to the viewport height, so a camera in a smaller viewport keeps its art scale, and `follow_controlled` and `visible_rect` need no change. A second `Camera2d` would make `Single<.., With<Camera2d>>` match two entities, and Bevy skips such a system without a warning, so camera following would stop. The marker prevents that. A pure layout function is unit testable without a window. One scale rule and one font for all UI keeps the HUD, title screen, dialogs and info box alike. A fade that covers the HUD would hide values the player still needs.
-
-**How to apply.** Recompute the viewports on `WindowResized` and when the layout changes. Code that turns a window position into a world position must use the game viewport (`Camera::viewport_to_world_2d`), and `half_view` takes the region size, not the window size. `layers.rs` order stays: HUD below UI below fade. Approach considered and not chosen now: render the game into a UI node with `ViewportNode`. It would give one UI tree for every mode, but it is not tried on wasm. Roadmap item 13.
-
-## adr-x35. The kit knows the app flow states, and a game fills them in (2026-11-07)
-
-**Decision.** The kit defines the app states `Loading`, `Title`, `Playing` and `GameOver` as Bevy `States` (`AppState`) and `Running` and `Paused` as a sub state of `Playing` (`PlayState`), and no behaviour beyond them: the kit does not know what a title screen shows. A state chooses the screen layout (`Title` and `GameOver` use the `Full` region with their own background, `Playing` uses the layout of the game, `Paused` keeps it) and which UI roots exist (spawned `OnEnter`, removed `OnExit`). Gameplay systems run in `Playing` and not `Paused`. Pause freezes game time (`Time<Virtual>`); UI uses real time. While paused the HUD and the game stay visible, dimmed and not interactable, and a floating dialog is the only interactive part. A debug switch (`--skip-title`, the variable `GAME_KIT_SKIP_TITLE`, always set for scripted runs) skips the title once, so a developer does not walk through it.
-
-**Rationale.** Title, pause and game over change what is on screen, and the screen layout (`adr-x34`) must be a function of the state, or each new screen needs its own camera code. The kit has no states yet, so now is the cheapest time to set the names. One call that pauses virtual time freezes all movement that uses `time.delta_secs()`, which is all real-time movement (`adr-lw7`). A title screen on its own background needs no active game camera.
-
-**How to apply.** Add `AppFlowPlugin` after `ScreenPlugin`. A game builds a screen with `state_root` in `OnEnter`, fills the `PauseDialog` slot, and sends `LoadingFinished` when it has loaded. Map-transition timers and the camera glide use `Res<Time>`, so they freeze while paused. The scripted run tool uses real time. Long Way uses the plugin with `Playing` as its first state and no pause key. `dev-docs/extensions/screen-layout.md`.
-
-## adr-x36. A map file can describe its ground in a `background:` block, and the kit places the images (2026-11-08)
-
-**Decision.** The front matter has an optional `background:` block with `color` (hex), a mandatory `mode` (`random` or `pattern`), and for `random` the keys `fill` (a chance per cell), `tiles` (image names), `jitter` (pixels), `scale` (any number above 0) and `seed`. The parser keeps it in `Map::background` and checks the syntax. `map_background::place_tiles` in the kit decides, for each cell, whether it gets an image, which image and where. The game draws the colour as a rectangle of the map size and the images above it, and checks the image names. `mode: pattern` is reserved for a repeating fill and is rejected as not implemented.
-
-**Rationale.** The ground belongs to the map, so it is written in the map file, and a designer can tune it without code. A block leaves room for the pattern mode. `mode` has no default so that adding the pattern mode never changes how an old map reads. Each cell rolls its own dice from a hash of the map name, the `seed` and the cell, so the ground is the same on every load, F1 reload and platform, does not depend on the order of the cells, and keeps the images of old cells when a map grows. An exact count was rejected because the dice roll is simpler and a changing count does not matter for decoration. The hash is FNV-1a and SplitMix64 written in the kit, because `DefaultHasher` does not promise the same numbers on every platform, and a test fixes the result. The placement is in the kit at the developer's request. Only Long Way calls it today. The rectangle is a sprite per map and not `ClearColor`, because the kit can place several maps in one world (`adr-x30`, `adr-x32`). Each image has its own tiny z step (`layers.rs`), so overlapping images do not flicker.
-
-**How to apply.** Rule 25 of `dev-docs/extensions/map-files.md`. A game loads the block in its map load hook, calls `place_tiles` with the drawn size of one image (art size times `scale`), checks the tile names at start and draws the result. Values for Long Way: `games/long-way/docs/adr.md` `adr-lw26`.
-
-## adr-x37. Map legend characters follow a fixed convention (2026-11-08)
-
-**Decision.** In a map legend, the player is `@`, features are letters (upper and lower case separate variants of one family, for example `G` and `g`), enemies are special characters (`! # $ % & * +`) and pickups are digits. `.`, `|` and a space stay reserved. The parser does not enforce this. Long Way rocks moved from `0` and `1` to `O` and `o` so that digits are free for pickups.
-
-**Rationale.** A reader can tell the group of an object from its character alone, so a large map is easier to read. Pickups are the group that grows with the game design, and ten digits are enough for their kinds. Enforcing the groups in the parser would tie the kit to game concepts (`adr-x13`).
-
-**How to apply.** `dev-docs/extensions/map-files.md`, "Legend conventions". Use these characters when a new kind is added to any legend. R-Town keeps its legend until the user asks.
-
-## adr-x38. The kit has a touch trigger for collectable items, and the game keeps the inventory (2026-11-08)
-
-**Decision.** The kit owns `Collectable { area, kind }` (with a `MapId`), the `Collected { kind }` message and `CollectablePlugin`. When the feet of the `Controlled` entity touch the area of an item of the current map, the plugin sends `Collected` and despawns the item. The game owns the art, the item kinds, the touch area size and the player state (the inventory). The kit has no inventory type.
-
-**Rationale.** The touch test is the same for every game that has pickups, and it follows `ExitTrigger`. The shape of player state is not known yet: it will probably grow past counts (health, keys), so a kit inventory would be built on a guess. Kinds are strings from the legend, so the kit has no game types (`adr-x13`). Placed in the kit at the developer's request, before a second game needs it (`adr-x12`).
-
-**How to apply.** `dev-docs/extensions/collectables.md`. Long Way: `adr-lw27`.
-
-## adr-x39. The kit starts looping animations at a seeded random frame, and depends on `bevy_aseprite_ultra` (2026-11-08)
-
-**Decision.** `game_kit::animation` has `RandomStartFrame { seed }` and `AnimationHelpPlugin`. When the Aseprite file of an entity has loaded, the plugin sets `AnimationState` to a frame of the tag (or of the whole file) chosen from the seed, and removes the component. `RandomStartFrame::for_cell(map_name, cell)` builds the seed from the map name and the cell with the hash of `map_background`. The kit now depends on `bevy_aseprite_ultra` (the version is pinned once in the root `Cargo.toml`).
-
-**Rationale.** Copies of one animation that start together look uniform. A seed from the map and cell gives the same start on every load, F1 reload and platform, as the map backgrounds do (`adr-x36`). The kit takes the dependency at the developer's request (`adr-x12`): R-Town's animated water can use the same component. Both games already compile the crate, so no new crate reaches the web build, but the kit now cannot be used without it.
-
-**Also in the kit (same day).** The spawn helpers `tag_sprite`, `tag_animation`, `all_frames_sprite` and `all_frames_animation`, and `play_if_changed` (switch tag only when it differs, set the speed). `StaticFrame { relative }` shows one frame without playing, for icons (Long Way HUD). Both games used the spawn boilerplate in many places, and the tag switch came from Long Way `animate_player`, which no longer keeps its own `playing` field. R-Town's walk flip and bob stays in R-Town (one game uses it).
-
-**How to apply.** `dev-docs/extensions/pixel-art.md`, "Random start frame". Add `AnimationHelpPlugin` and put `RandomStartFrame::for_cell(..)` in the spawn bundle. Long Way: trees (`trees.rs`) and pickups (`pickups.rs`).
-
-## adr-x40. `Sentry` is one strategy that patrols until it sees the player, then pursues for good (2026-11-09)
-
-**Decision.** The kit has `strategies::Sentry { sight, .. }` and `can_see(from, to, range, edges)`. A sentry patrols like `RandomPatrol`, but within `radius` of its home (the feet in its first frame, so it keeps to a small area and does not drift), until the `Controlled` entity is within `sight` and no blocked edge of `CollisionWorld` crosses the straight line between the feet (`nav::segment_blocked`). It then walks to that entity and never goes back to patrolling. The legend parameters are `strategy=sentry radius=<px> sight=<px>`. Everything that blocks walking blocks sight.
-
-**Rationale.** Long Way's ghost needs a sight rule and R-Town's `Pursue` has none (`enemy-movement.md`). A second game wants it, so it belongs in the kit (`adr-x12`). One composite component keeps the one-way switch in one place. The alternative is a sight system that adds and removes `RandomPatrol` and `Pursue`: it spreads one behaviour over several components and systems, and the state would live in which components exist. Patrol logic is shared with `RandomPatrol` through one function, not copied. Giving up the chase is not a rule yet: the developer wants the chase to last.
-
-**Also in the kit (same day).** `strategies::Strategy` (`Patrol`, `Pursue`, `Sentry`) with `from_params` (reads `strategy=` and the parameters of the strategy it names, errors without the file name) and `insert` (adds the component). Both games parse the same legend entries, so R-Town's own copy was removed. The kit does not take enemy markers out of the map object list: a game that keeps all objects in `map.objects` (Long Way) picks its markers by kind, as it does for rocks and pickups.
-
-**How to apply.** `dev-docs/extensions/enemy-movement.md`. Add `StrategiesPlugin` (it needs `CollisionPlugin`), give the entity `Mover` and a `Strategy` from `Strategy::from_params(&object.params)` (or `Sentry::new(radius, sight)`). Read `Sentry::alerted()` for a cue.
-
-## adr-x41. The kit reports touches on the controlled entity and plays facing tags (2026-11-09)
-
-**Decision.** `game_kit::touch` has `Touchable` (on an entity with a `HitBox`), the message `ControlledTouched { by }` and `TouchPlugin`. The message is sent in every frame in which the hit box of the `Controlled` entity overlaps that of a touchable entity. A game reads it `.after(TouchSet)` and chooses the result. `game_kit::animation` has `FacingTags { down, side, up, speed }` for the sprite child of an entity with `MoveState`, and `view_of(facing)`: a sprite with the tags `Down`, `Left` (the side view, looking left) and `Up` plays the tag for the way the entity faces, flipped for the right. It plays all the time, and removing the component hands the animation back to the game.
-
-**Rationale.** R-Town killed the player on overlap and Long Way's ghost will cost HP on overlap: the test is the same, the result is not (`adr-x13`: no game types in the kit). Sending every frame keeps the kit free of state. A game that wants one hit removes `Touchable`. The facing rule matches the Long Way player (sideways wins a tie). R-Town's walk flip and bob stays in R-Town (`walk_animation.rs`): it is a different look, with no tags.
-
-**How to apply.** `dev-docs/extensions/enemy-movement.md`. R-Town uses the touch (`death.rs`). The ghost of Long Way uses both.
-
-## adr-x42. The kit turns a mouse click into a world position and sends it as a message (2026-11-09)
-
-**Decision.** `game_kit::pointer` has `PointerPlugin`, the message `WorldClick { position, button }` (world units) and `cursor_to_world`. A mouse button that goes down inside the game region of the window sends one message per button, converted through the `GameCamera`. A click on the HUD bar sends nothing. The system runs in `PointerSet` in `PreUpdate`, after `InputSystems`, so it uses the camera as it was drawn. The scripted run tool sends the same message with `click:<x>:<y>` (world units). The kit does not choose what a click does. This is the first step of roadmap item 8: there is still no `PlayerInput` resource, no key bindings and no touch.
-
-**Rationale.** A message in world units is the smallest thing every game that clicks needs, and the conversion through the pixel camera and the letterbox is the part that is easy to get wrong, so it is written once (`adr-x12`). Running in `PreUpdate` matters because the camera follows the player in `Update`: a conversion after it would use a camera that is one step ahead of the picture the player clicked on. The script sends the message and not a fake window cursor, because a script has no window position. The alternative, a `PlayerInput` resource that hides the device (`adr-x22`), needs the keyboard rework of R-Town as well, and Long Way has no keyboard movement left, so it waits.
-
-**How to apply.** `dev-docs/extensions/pointer.md`. Add `PointerPlugin`, read `MessageReader<WorldClick>` in `Update`.
-
-## adr-x43. Walking to a clicked place: `Mover::feet_offset`, `NavInset` and `NavGrid::nearest_reachable` (2026-11-09)
-
-**Decision.** (1) `Mover` has `feet_offset`, the distance of the feet below the `Transform` (as `DepthSort::feet_offset`), default 0, so an entity whose `Transform` is the middle of its sprite (the Long Way player) can use the mover. (2) `NavInset { min, max }` is an optional resource: the nav grid covers the map rectangle shrunk by it, so paths stay where the actor can stand. (3) `NavGrid::nearest_reachable(from, to)` gives `to` when a path exists, and otherwise the nearest grid point that `from` can walk to (a goal in a blocked area, outside the map, or enclosed). (4) `segment_blocked` now blocks a segment that starts exactly on the edge line at a convex end and heads on into the shape. The game keeps the walkable rule of its maps (`limit_player` applies `clamp_to_union` after the mover), and the kit mover keeps clamping to `CameraBounds` only.
-
-**Rationale.** (1) and (3) are small additions that the ghost and R-Town do not notice. (2): the player stands half a body width from the sides and a body height from the top, but the grid ran to the map edge, where a zero width gap beside a tree block let a path use ground the player cannot reach, and the player stopped under the tree. Shrinking the grid is simpler than teaching the mover about margins on each side. (4) was found in the real game: from a box corner the straight line through the box was judged free and the player walked into the box (this was the former roadmap item 11). The check looks 0.02 units along the segment, so a segment that leaves the corner along the outside, or away from the box, still passes, as `collision::resolve` allows. The click goes to the nearest reachable point because a click on a tree should still move the player, and one flood fill per click costs little. Keeping the map rule in the game follows `adr-x12`: a seam rule is a map rule, not a mover rule.
-
-**How to apply.** `dev-docs/extensions/nav.md` (`NavInset`, `nearest_reachable`) and `dev-docs/extensions/enemy-movement.md` (`feet_offset`). Roadmap item 3 covers a better answer for maps that join.
+## Index
+
+| ID | Decision | File |
+|---|---|---|
+| x2 | Draw order sorted by feet | EXTENSIONS-SCREEN.md |
+| x3 | Collision debug overlay | EXTENSIONS-DEBUG.md |
+| x4 | Forgiving collision: `allow_sliding` | EXTENSIONS-COLLISION.md |
+| x5 | Debug strategy: logging and scripted input | EXTENSIONS-DEBUG.md |
+| x6 | Reusable visual debug tools in `debug.rs` | EXTENSIONS-DEBUG.md |
+| x9 | Draw order layers | EXTENSIONS-SCREEN.md |
+| x10 | Sliding along merged outlines, into notches | EXTENSIONS-COLLISION.md |
+| x11 | Map file layout: Features and Map sections | EXTENSIONS-MAPS.md |
+| x12 | Shared code lives in one kit crate, `crates/game-kit` | EXTENSIONS.md |
+| x13 | Map object kinds are strings in the kit | EXTENSIONS-MAPS.md |
+| x14 | Kit holds default layers, games override | EXTENSIONS-SCREEN.md |
+| x15 | Scripted run tool is in the kit and extensible | EXTENSIONS-DEBUG.md |
+| x16 | Collision blockers are a kit component, slide values scale with the cell size | EXTENSIONS-COLLISION.md |
+| x17 | Camera follow in the kit, debug sizes scale with the cell size | EXTENSIONS-SCREEN.md |
+| x18 | Map files are one drawn grid in a text file | EXTENSIONS-MAPS.md |
+| x19 | Debug keys F2 info, F3 grid, F1 map reload | EXTENSIONS-DEBUG.md |
+| x20 | Neighbour groups in the kit | EXTENSIONS-COLLISION.md |
+| x21 | Projectiles are in the kit and collide as a ground point | EXTENSIONS-COLLISION.md |
+| x22 | Input starts in the game and moves to the kit later | EXTENSIONS-INPUT.md |
+| x23 | Path finding on a grid built from the collision edges | EXTENSIONS-COLLISION.md |
+| x24 | Strategies are components that write a goal | EXTENSIONS-GAMEPLAY.md |
+| x25 | Spawner settings are legend parameters | EXTENSIONS-GAMEPLAY.md |
+| x26 | A seedable random number generator in the kit | EXTENSIONS-GAMEPLAY.md |
+| x27 | Hit boxes, and projectiles hit at their flight height | EXTENSIONS-COLLISION.md |
+| x28 | F1 sends `ReloadMap` from the kit, and `--debug` turns the debug tools on | EXTENSIONS-DEBUG.md |
+| x29 | A corner contact between blocked areas is closed with a filler | EXTENSIONS-COLLISION.md |
+| x30 | Exits and entries are front matter blocks, and `player_start` marks a start | EXTENSIONS-MAPS.md |
+| x31 | A map transition is run by the kit through three game hooks | EXTENSIONS-MAPS.md |
+| x32 | A seamless exit joins the next map into the world, the player crosses a doorway | EXTENSIONS-MAPS.md |
+| x33 | An object can be an exit: `exit_to` names the map, the game makes the touch area | EXTENSIONS-MAPS.md |
+| x34 | The window is split into screen regions, each with a camera and a UI root | EXTENSIONS-SCREEN.md |
+| x35 | The kit knows the app flow states, and a game fills them in | EXTENSIONS-SCREEN.md |
+| x36 | A map file can describe its ground in a `background:` block, and the kit places the images | EXTENSIONS-MAPS.md |
+| x37 | Map legend characters follow a fixed convention | EXTENSIONS-MAPS.md |
+| x38 | The kit has a touch trigger for collectable items, and the game keeps the inventory | EXTENSIONS-GAMEPLAY.md |
+| x39 | The kit starts looping animations at a seeded random frame, and depends on `bevy_aseprite_ultra` | EXTENSIONS-SCREEN.md |
+| x40 | `Sentry` is one strategy that patrols until it sees the player, then pursues for good | EXTENSIONS-GAMEPLAY.md |
+| x41 | The kit reports touches on the controlled entity and plays facing tags | EXTENSIONS-GAMEPLAY.md |
+| x42 | The kit turns a mouse click into a world position and sends it as a message | EXTENSIONS-INPUT.md |
+| x43 | Walking to a clicked place: `Mover::feet_offset`, `NavInset` and `NavGrid::nearest_reachable` | EXTENSIONS-INPUT.md |

@@ -21,6 +21,8 @@ games/long-way/
     ├── inventory.rs    `Inventory` (energy counts), `InventoryPlugin`: fills it from `Collected`
     ├── hp.rs           `Hp` (the player's hit points), `DamagePlayer` message, `HpPlugin` (`adr-lw28`)
     ├── ghost.rs        `spawn_ghosts` (from `spawn_ghost` markers, called by the load hook), `GhostPlugin`: the touch (1 HP, then dies) and the removal after `Die` (`adr-lw29`)
+    ├── background.rs   `spawn_background`, `check_tiles`: draws the ground colour and the tile images of a map's `background:` block from `ground_tiles.aseprite` (`adr-x36`, `adr-lw26`)
+    ├── scenery.rs      `spawn_scenery`: the Zen Garden trees and shrubs of one map, blocking like `green_tree` (`adr-lw23`)
     ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`
 ```
@@ -40,7 +42,7 @@ games/long-way/
 | [Screen layout](../../../dev-docs/extensions/screen-layout.md) | `camera.rs`, `hud.rs`, `main.rs` (plus `screen.rs`, `hud.rs`, `app_state.rs` in `crates/game-kit`) |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
-Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`, `hp.rs`, `ghost.rs`.
+Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `scenery.rs`, `background.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`, `hp.rs`, `ghost.rs`.
 
 ## Long Way values for the pixel art extension
 

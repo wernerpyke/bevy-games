@@ -1,6 +1,6 @@
 # Map transitions
 
-How a game moves the player from one map to another. The format of the exits and entries is in [map-files.md](map-files.md). Research on other engines: `dev-docs/RESEARCH-map-transitions.md`.
+How a game moves the player from one map to another. The format of the exits and entries is in [map-files.md](map-files.md).
 
 ## Status
 
@@ -170,5 +170,5 @@ Nothing is decided. A map is rebuilt from its file on every load, so it comes ba
 
 ### Other
 
-- Research and the comparison with other engines: `dev-docs/RESEARCH-map-transitions.md`. The question of a Bevy asset loader for the maps is there too (roadmap item 3).
+- The research on other engines was deleted after the decision. It is in git history as `dev-docs/RESEARCH-map-transitions.md`. The question of a Bevy asset loader for the maps is `rm3`.
 - Seamless layout: a map can be reached by one seamless link only if the maps fit together without overlapping. A map that would overlap an active map is refused.

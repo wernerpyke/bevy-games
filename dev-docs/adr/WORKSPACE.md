@@ -2,7 +2,7 @@
 
 ## adr-w1. Folder layout and documentation structure (2026-10-30)
 
-**Decision.** Use `docs/` for human docs, `dev-docs/` for developer docs and `dev-scripts/` for dev tooling. Keep `ROADMAP.md`, plans and ADRs in `dev-docs/`. The rules are in `CLAUDE.md` under Conventions.
+**Decision.** Use `docs/` for human docs, `dev-docs/` for developer docs and `dev-scripts/` for dev tooling. Keep `ROADMAP.md`, `ROADMAP-completed.md`, plans and ADRs in `dev-docs/`. The rules are in `CLAUDE.md` under Conventions.
 
 **Rationale.** Keeping the three folders separate makes the audience of each file clear. `dev-docs/` is used instead of `notes/` so developer material stays out of any shipped web build. Decisions are one file per topic in `dev-docs/adr/` so they stay easy to find as they grow.
 
@@ -56,3 +56,11 @@
 **Rationale.** A rule tested in two places needs two updates. Tests of the map file break on every edit while the developer experiments with layouts. Kit code is the shared contract, so it carries the tests.
 
 **How to apply.** When a game rule moves into the kit, move its tests with it (ask first, as for any move to the kit). Game tests stay inline in a `#[cfg(test)] mod tests` at the bottom of the file they test. Applied to Long Way on 2026-11-06 (`adr-lw17`).
+
+## adr-w8. Roadmap items have stable IDs, and completed items move to their own file (2026-11-09)
+
+**Decision.** Each roadmap item has an ID `rm<n>` that is assigned once and never reused or renumbered. The priority is a separate number in the item heading, and the list is sorted by it. Other documents refer to an item by its ID. Completed items move to `dev-docs/ROADMAP-completed.md`, where they have no ID.
+
+**Rationale.** Priority changes often, so a number that means both position and identity broke every reference to it when items were re-ordered. About 25 documents cited items by number. A stable ID is the same idea as an ADR ID (`dev-docs/adr/README.md`). The completed items were 17 KB of history that every read of the roadmap paid for.
+
+**How to apply.** Add an item with the next free `rm<n>` and a priority. To re-prioritise, change the priority number and move the item, never the ID. When an item is done, move it to `ROADMAP-completed.md` with its date and remove its ID, and update documents that cite the ID. New IDs start at `rm15`.

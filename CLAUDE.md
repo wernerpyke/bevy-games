@@ -44,7 +44,7 @@ User context: knows common game engine architecture and mechanics, so do not exp
 
 ### Roadmap
 
-`dev-docs/ROADMAP.md` has two H2 headings. **Items for Future Implementation** is numbered sequentially (renumber and fix cross-references when re-ordering). **Completed Items** is not numbered (remove the number when moving an item). Each item has an H3 heading with paragraphs on goal, considerations and known issues or learnings.
+`dev-docs/ROADMAP.md` lists open items. Each has a stable ID `rm<n>` (never reused or renumbered, `adr-w8`) and a separate priority number in its heading; the list is sorted by priority. Refer to an item by its ID. Each item has an H3 heading with paragraphs on goal, considerations and known issues or learnings. When an item is done, move it to `dev-docs/ROADMAP-completed.md` (no ID) and update the documents that cite its ID.
 
 ## Games and workspace rules
 
@@ -67,12 +67,12 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - macOS (native) and Web (WebAssembly). Both must keep working. Do not add a dependency that breaks `wasm32-unknown-unknown` without telling the user first.
 - 2D only. Disable unused Bevy default features where practical.
 - Pixel art rendering: nearest-neighbour sampling, integer scaling, fixed low-resolution camera.
-- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (its `docs/SPEC.md`). Other games state their own timing model, so ask.
+- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (`games/r-town/docs/SPEC.md`). Other games state their own timing model, so ask.
 
 ## Working rules
 
 1. Ask before making an architectural decision (state layout, plugin boundaries, save format, crate choice). Give a recommendation with a short trade-off.
-2. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate before roadmap item 3 is decided.
+2. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate before `rm2` is decided.
 3. Bevy is pinned to 0.20.1 in the root `Cargo.toml`. Check every Bevy ecosystem crate for compatibility with that version before adding it.
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Bundles such as `SpriteBundle` are removed. Use required components.
 5. Bevy reference order: (a) `bevy-src/` (git-ignored shallow clone of tag `v0.20.1`; update it when the version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on dependency source; (c) docs.rs for the pinned version. Search for the exact API. Do not read whole files.
@@ -96,7 +96,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 
 Pipeline, palette rules and the list of copied files: `games/long-way/docs/art-pipeline.md`. Read it before any art work. Key rules:
 - `.aseprite` files are the source of truth. Exports in `assets/generated/` are never edited by hand.
-- **Animation speed is set as frame durations in the `.aseprite` file, not in code** (`adr-a6`). Do not use `Animation::with_speed` for a fixed animation. Read durations with `./dev-scripts/aseprite.sh check`, and change them with `set_durations` (dry run until `apply=1`; it overwrites the file, so look at `git status` first). Rules: `dev-docs/extensions/pixel-art.md`, "Animation speed".
+- **Animation speed is set as frame durations in the `.aseprite` file, not in code** (`adr-a6`). Do not use `Animation::with_speed` for a fixed animation. `set_durations` overwrites the file, so look at `git status` first. Rules: `dev-docs/extensions/pixel-art.md`, "Animation speed".
 - **Do NOT copy, import, convert or reference any file from `~/Dark/graveyard_shift/diodrama-assets/` until the user names that file.** Never modify or delete anything there.
 - Mark Claude-drawn placeholders with the `_placeholder` suffix.
 
@@ -106,8 +106,8 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 - Build, test: `./dev-scripts/rust.sh build|test [game]` (no game means all games)
 - Run: `./dev-scripts/rust.sh run <game>` (add `--debug` to start with the F2 info box and the F3 grid visible, and `--skip-title` to skip a title screen; the flags are not passed to cargo)
-- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>" [map-file]` (the optional map file starts the game in that map, for example `2.txt`), for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the F2 info box, the F3 grid and the collision and movement overlays are drawn. Without the flag they start hidden (F2 and F3 still toggle them). Add `screenshot:<name>` to save the window to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
-- Zoomed screenshot: `./dev-scripts/shot.sh <game> <name> "<commands>" cx=<x> cy=<y> w=<w> h=<h> scale=<n>` (world units, saves `target/screenshots/<name>_crop.png`). Aseprite checks: `./dev-scripts/aseprite.sh <check|frame_grid|sheet_analysis|crop> <file> key=value ...`. Details: `dev-docs/extensions/dev-scripts.md`. Allowlist: `Bash(./dev-scripts/shot.sh:*)`, `Bash(./dev-scripts/aseprite.sh:*)`.
+- Scripted run: `./dev-scripts/rust.sh script <game> "<commands>" [map-file]` (the optional map file, for example `2.txt`, starts the game in that map), for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the debug overlays are drawn. `screenshot:<name>` saves to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
+- Zoomed screenshot: `./dev-scripts/shot.sh <game> <name> "<commands>" cx= cy= w= h= scale=`. Aseprite checks: `./dev-scripts/aseprite.sh <script> <file> key=value ...`. Both are in `dev-docs/extensions/dev-scripts.md`. Allowlist: `Bash(./dev-scripts/shot.sh:*)`, `Bash(./dev-scripts/aseprite.sh:*)`.
 - Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)
@@ -116,13 +116,11 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 ## Disk use
 
-`target/` must stay under **8 GB**. A clean build of both games is 2.2 GB, and 3.2 GB with `lint`, `test` and `web` (`dev-docs/adr/ENGINE.md` adr-e8). Run this routine at the start of a session that builds Rust, and after any change to `Cargo.toml`.
+`target/` must stay under **8 GB** (`dev-docs/adr/ENGINE.md` adr-e8: sizes, why there is no debug info, and `rm90` for more savings). Run this routine at the start of a session that builds Rust, and after any change to `Cargo.toml`.
 
 1. Run `./dev-scripts/rust.sh size`.
 2. Over 8 GB: tell the user, then run `./dev-scripts/rust.sh prune`.
-3. Still over 8 GB after the prune: ask before `cargo clean`. A clean build takes about 10 minutes.
-4. After a Bevy version or feature change, run `cargo clean` once. The old outputs are never used again.
-5. Do not add `debug = true` or `bevy/dynamic_linking` as a default to a profile without asking. The user does not debug Rust by hand, so dependencies have no debug info and our crates have line tables only.
+3. Still over 8 GB after the prune: ask before `cargo clean` (about 10 minutes to rebuild).
+4. After a Bevy version or feature change, run `cargo clean` once.
+5. Do not add `debug = true` or `bevy/dynamic_linking` as a default to a profile without asking.
 6. Delete files in `target/screenshots/` when the check that needed them is done.
-
-`cargo-sweep` is optional and not installed. Other savings are roadmap item 90.

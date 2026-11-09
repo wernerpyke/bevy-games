@@ -42,7 +42,7 @@ Blocking items that touch form a group. A game gives an item that stands alone a
 ## Limits
 
 - Groups come from the grid cells, not from the drawn art.
-- The full-cell footprint is a first rule. Roadmap item "Re-assess the group footprint rule" covers a review by playing.
+- The full-cell footprint is a first rule. `rm7` covers a review by playing.
 
 ## Tests
 

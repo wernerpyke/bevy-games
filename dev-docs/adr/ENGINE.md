@@ -82,7 +82,7 @@ Updated 2026-11-05: the player is now the Hunter, a 128x128 canvas with a body a
 
 ## adr-e8. No debug info for dependencies, line tables for our crates (2026-11-05)
 
-**Decision.** `[profile.dev.package."*"]` sets `debug = false` and `[profile.dev]` sets `debug = "line-tables-only"` in the root `Cargo.toml`. `target/` is kept under 8 GB with a short routine (`CLAUDE.md`, "Disk use"): `rust.sh size`, then `rust.sh prune`, then ask before `cargo clean`. Further savings are roadmap item 90.
+**Decision.** `[profile.dev.package."*"]` sets `debug = false` and `[profile.dev]` sets `debug = "line-tables-only"` in the root `Cargo.toml`. `target/` is kept under 8 GB with a short routine (`CLAUDE.md`, "Disk use"): `rust.sh size`, then `rust.sh prune`, then ask before `cargo clean`. Further savings are `rm90`.
 
 **Rationale.** The developer does not review or debug Rust code by hand, and Claude does not use a debugger. Debug info was most of the size: `target/` was 25 GB, and 2.2 GB after a clean build without it (3.2 GB with `lint`, `test` and `web`). Panics still show file and line, because line tables stay. Only stepping through code in a debugger is lost. The limit of 8 GB is about twice the normal size, so it signals stale outputs.
 

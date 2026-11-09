@@ -15,14 +15,14 @@ Each ADR is an H2 heading with a date tag. The ID has the form `adr-<prefix><n>`
 | `ENGINE.md` | `e` |
 | `ART.md` | `a` |
 | `WORKSPACE.md` | `w` |
-| `EXTENSIONS.md` | `x` |
+| `EXTENSIONS.md` (index), `EXTENSIONS-COLLISION.md`, `-MAPS.md`, `-GAMEPLAY.md`, `-SCREEN.md`, `-INPUT.md`, `-DEBUG.md` | `x` |
 | `games/long-way/docs/adr.md` | `lw` |
 | `games/r-town/docs/adr.md` | `rt` |
 
 IDs are assigned once and never reused or renumbered. A new record gets the next free number in its file. Add a new prefix to this table when a new topic file is created.
 
 ```markdown
-## adr-e1. Decision title (YYYY-MM-DD)
+## adr-<prefix><n>. Decision title (YYYY-MM-DD)
 
 **Decision.** …
 
@@ -38,4 +38,4 @@ IDs are assigned once and never reused or renumbered. A new record gets the next
 
 ## Referencing other documents
 
-Reference only long-lived documents: `ROADMAP.md` and its items, other ADRs, `docs/`, and the source. Do not reference `PLAN-*.md` files or their phases. Plans are deleted when done.
+Reference only long-lived documents: `ROADMAP.md` and `ROADMAP-completed.md` and their items (by ID, `rm<n>`), other ADRs, `docs/`, and the source. Do not reference `PLAN-*.md` files or their phases. Plans are deleted when done.

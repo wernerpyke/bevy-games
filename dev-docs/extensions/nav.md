@@ -45,7 +45,7 @@ A grid of walk points covers the map. Two neighbouring points are linked when a 
 - A line that touches a convex corner of a blocked area and only leaves it along the outside passes it. This matches walking (`collision.md`). A leg that starts on a corner and heads into the shape is blocked (rule 3). Found in Long Way (64 px cells, step 4, so corners are on grid points).
 - The inset is one rectangle for the whole grid. It is right for one map. At a seamless doorway (not used by Long Way) the union of two maps would need per-map insets.
 - The grid is as fine as `step`. A gap narrower than the step may be missed.
-- Roadmap item 3 covers a larger design (many maps, dynamic obstacles).
+- `rm3` covers a larger design (many maps, dynamic obstacles).
 
 ## Tests
 

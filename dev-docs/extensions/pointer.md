@@ -6,7 +6,7 @@ The kit turns a mouse click into a world position and sends it as a message. A g
 
 ## Status
 
-`crates/game-kit/src/pointer.rs`, used by Long Way. Decision: `adr-x42`. Ready to share. Only the mouse is covered: no touch, no key bindings, no `PlayerInput` resource (roadmap item 8).
+`crates/game-kit/src/pointer.rs`, used by Long Way. Decision: `adr-x42`. Ready to share. Only the mouse is covered: no touch, no key bindings, no `PlayerInput` resource (`rm8`).
 
 ## Terms
 
