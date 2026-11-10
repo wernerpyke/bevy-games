@@ -45,7 +45,7 @@ const PULSE_SECS: f32 = 0.12;
 const FRONT: (&str, f32) = ("effects/ring_front.particle.ron", 2.1);
 const BURN: &str = "effects/ring_burn.particle.ron";
 const Z_BURN: f32 = 2.2;
-/// 4 square frames side by side: flames flicker, shards grow, over the life of a particle.
+/// Square frames side by side (fire 6, ice 4): flames flicker, shards grow, over the life of a particle.
 const FIRE_SPRITE: &str = "generated/wall_fire.png";
 const ICE_SPRITE: &str = "generated/wall_ice.png";
 
@@ -108,7 +108,7 @@ fn load_style(
         },
         fire: materials.add(SpriteParticle2dMaterial::new(
             server.load(FIRE_SPRITE),
-            4,
+            6,
             1,
         )),
         ice: materials.add(SpriteParticle2dMaterial::new(server.load(ICE_SPRITE), 4, 1)),
