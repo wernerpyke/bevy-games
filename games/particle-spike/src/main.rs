@@ -28,6 +28,12 @@ fn main() {
                     primary_window: Some(Window {
                         title: "particle-spike".into(),
                         resolution: WINDOW_SIZE.into(),
+                        // The benchmark (`SPIKE_BENCH`) needs the real frame time, not one capped by vsync.
+                        present_mode: if std::env::var("SPIKE_BENCH").is_ok() {
+                            bevy::window::PresentMode::AutoNoVsync
+                        } else {
+                            bevy::window::PresentMode::AutoVsync
+                        },
                         ..default()
                     }),
                     ..default()

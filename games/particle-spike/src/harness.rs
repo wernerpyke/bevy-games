@@ -396,7 +396,7 @@ mod native {
     const DIR: &str = "target/screenshots";
 
     pub fn add(app: &mut App) {
-        app.add_systems(Update, (screenshot_key, shot_script));
+        app.add_systems(Update, (screenshot_key, shot_script, bench_script));
     }
 
     pub fn save_screenshot(commands: &mut Commands, name: &str) {
@@ -458,6 +458,69 @@ mod native {
             exit.write(AppExit::Success);
             *stage = 3;
         }
+    }
+
+    /// `SPIKE_BENCH=<effects>:<seconds>`, for example `1,2,3,4:8`: fires those effects at 0.3 s (again every
+    /// `SPIKE_BENCH_EVERY` seconds when set), measures from 0.5 s to `seconds`, prints the frame times and particle
+    /// counts and quits. Vsync is off in this mode (see `main.rs`), so the frame time is the real cost.
+    fn bench_script(
+        time: Res<Time>,
+        stores: Query<&ParticleStore>,
+        mut state: Local<Bench>,
+        mut fire: MessageWriter<FireEffect>,
+        mut exit: MessageWriter<AppExit>,
+    ) {
+        let Some((effects, seconds)) = std::env::var("SPIKE_BENCH").ok().and_then(|v| {
+            let (list, secs) = v.split_once(':')?;
+            let effects: Vec<usize> = list.split(',').filter_map(|e| e.parse().ok()).collect();
+            Some((effects, secs.parse::<f32>().ok()?))
+        }) else {
+            return;
+        };
+        let every: Option<f32> = std::env::var("SPIKE_BENCH_EVERY")
+            .ok()
+            .and_then(|v| v.parse().ok());
+        let t = time.elapsed_secs();
+        let due = state.next_fire.unwrap_or(0.3);
+        if t >= due && t < seconds {
+            for effect in &effects {
+                fire.write(FireEffect {
+                    effect: *effect,
+                    from: PLAYER,
+                    aim: Vec2::new(410.0, 0.0),
+                });
+            }
+            state.next_fire = Some(every.map_or(f32::MAX, |e| due + e));
+        }
+        if t >= 0.5 && t < seconds {
+            state.frames.push(time.delta_secs() * 1000.0);
+            state
+                .particles
+                .push(stores.iter().map(ParticleStore::len).sum());
+        } else if t >= seconds && !state.frames.is_empty() {
+            let mut sorted = state.frames.clone();
+            sorted.sort_by(f32::total_cmp);
+            let mean = sorted.iter().sum::<f32>() / sorted.len() as f32;
+            let p95 = sorted[(sorted.len() as f32 * 0.95) as usize];
+            let particles = &state.particles;
+            let mean_particles = particles.iter().sum::<usize>() / particles.len();
+            info!(
+                "BENCH effects {effects:?} every {every:?}: {} frames, mean {mean:.2} ms ({:.0} fps), p95 {p95:.2} ms, max {:.2} ms, particles mean {mean_particles}, max {}",
+                sorted.len(),
+                1000.0 / mean,
+                sorted[sorted.len() - 1],
+                particles.iter().max().unwrap_or(&0),
+            );
+            exit.write(AppExit::Success);
+            state.frames.clear();
+        }
+    }
+
+    #[derive(Default)]
+    pub struct Bench {
+        next_fire: Option<f32>,
+        frames: Vec<f32>,
+        particles: Vec<usize>,
     }
 }
 

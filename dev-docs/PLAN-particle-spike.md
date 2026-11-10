@@ -38,6 +38,36 @@ Steps 1 to 7 are done on native: harness, fireball, ring of fire or ice, crystal
 - **Build cost.** The spike had its own copy of every Bevy build, because it enabled `file_watcher`, a Bevy feature that `long-way` does not use. Hot reload is now an opt-in feature, off by default. The default Bevy features are now identical to `long-way`'s (checked with `cargo tree`). Measured after the change: a default build of the spike compiles only the spike crate (10 s after the manifest change, 5.6 s after touching a file). Bevy is not rebuilt. The user said build time matters and disk use does not for now, so do NOT run `cargo clean` (it would cost about 10 minutes and the old duplicates only cost disk). `target/` is 11 GB, over the 8 GB limit of `adr-e8`. The user accepted this for now. Each switch between `--features hot-reload` and a normal build rebuilds Bevy (about 5 minutes), so use the feature only for a whole tuning session. The same holds for `--features bevy/dynamic_linking`.
 - **For step 10:** `ui_bevy_render` is needed for UI text (`ui_api` alone draws nothing). Add it to `dev-docs/bevy/notes.md`, with the Enoki facts under "Learned" below.
 
+### As-is performance, native, before 7c (2026-11-10)
+
+Measured with the new benchmark mode, so step 8 and 7c can compare like with like. **Run it:** `SPIKE_BENCH=<effects>:<seconds> ./dev-scripts/rust.sh run particle-spike`, for example `1,2,3,4:8`. It fires those effects at 0.3 s, measures from 0.5 s, prints one `BENCH` line (mean, p95 and max frame time, mean and max particles) and quits. `SPIKE_BENCH_EVERY=<s>` fires them again every so many seconds, so effects pile up. `SPIKE_GLOW=1` turns additive blending on. Vsync is off in this mode, so the numbers are the real cost, not 16.7 ms capped at 60 fps.
+
+Conditions: native, `dev` profile (crate at opt-level 1, Bevy at 3), window 1280x720, one machine. A release build is faster. Frame times are noisy: an empty scene (effect 0) gave 3.0 to 5.6 ms between runs, so treat differences under about 0.5 ms as noise.
+
+| Case (3 s, fired once) | Glow off: mean ms (particles mean / max) | Glow on: mean ms (particles mean / max) |
+|---|---|---|
+| Smoke test (20 particles) | 5.6 | 3.7 |
+| Fireball | 4.1 (60 / 313) | 3.7 (72 / 311) |
+| Ring | 3.7 (243 / 336) | 4.1 (255 / 348) |
+| Wall (fire) | 3.6 (39 / 60) | 3.8 (36 / 52) |
+| Whirlpool | 4.1 (377 / 438) | 4.0 (375 / 443) |
+| All four together | 4.4 (687 / 829) | 4.0 (690 / 825) |
+
+| Case (8 s, all four fired again every 0.7 s, two runs each) | Mean ms | p95 ms | Particles mean / max |
+|---|---|---|---|
+| Empty scene, glow off | 3.28, 3.20 | 7.0, 6.0 | 1 / 20 |
+| Empty scene, glow on | 3.03, 3.35 | 6.1, 6.9 | 2 / 20 |
+| Stress, glow off | 3.26, 3.32 | 5.7, 5.8 | about 3270 / about 4550 |
+| Stress, glow on | 4.08, 3.61 | 10.8, 6.6 | about 2950 to 3320 / about 4550 |
+
+What it says:
+- **Weapons at normal use cost almost nothing on native.** One of each, 690 particles, runs at 4 to 4.4 ms (about 230 to 250 fps uncapped). The 60 fps budget is 16.7 ms.
+- **Stress is about 5 times the normal particle count** (about 3300 particles, 4500 at the peak) and costs only 0 to 0.8 ms over an empty scene.
+- **Glow on vs off:** no difference in the single-fire runs (all within noise). In the stress runs glow on was 0.3 to 0.8 ms slower on average (4.08 and 3.61 against 3.26 and 3.32), and one run had a worse p95 (10.8 ms). This looks like a small real cost from overdraw, but two runs are not enough to be sure. Both stay far inside the budget on native.
+- **Single spikes** of 20 to 100 ms appear in the max column. They happen in the first second (asset loading, window start), not during steady play.
+- **Not measured:** the web (the target is at least 30 fps with all four, and wasm runs the particle simulation on one thread, so expect a much bigger cost), a release build, and moving emitters (the 7c option 1 test).
+- **For 7c:** to compare, run `SPIKE_BENCH=2:3` (ring alone) and `SPIKE_BENCH=1,2,3,4:3` before and after, glow off and on.
+
 ### Log
 
 - Step 1 done: `games/particle-spike/` builds natively (opens a window on Metal, no errors), passes lint, and compiles for wasm. It shows the default Enoki effect rising from a white square.
