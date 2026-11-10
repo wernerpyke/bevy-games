@@ -104,6 +104,11 @@ Enoki has no swirl motion, so the effect needs a workaround.
 - Seen on native in stills: fire and the fireball tail gain hot yellow spots where particles overlap, and low-alpha particles fade to nothing instead of a muddy brown. Water goes to pure white where droplets overlap, so the blue palette is lost. Flame shapes merge where they overlap.
 - Not checked: WebGL2, frame time (step 8), motion.
 
+## Easing of the ring expansion (spike step 7c, 2026-11-10)
+
+- Enoki cannot ease a particle to an exact radius: damping depends on the life fraction and the frame rate. Emitters moved along the curve can. The ring is now 40 emitters whose position is set each frame from a pure function (`rules::ring_radius`); the particles stay where they are born and fade, so the band behind the front is the trail. The hurt band uses the same function, one step back in time.
+- Native cost: not measurable (ring stress run 3.2 ms before, 3.1 to 3.9 ms after, about 14 % more particles). Web cost not measured yet.
+
 ## Decision still open
 
 Use Enoki for Long Way weapons, yes or no. The spike answers this. Record the result in `dev-docs/adr/ENGINE.md` (a new record, and a row in the adr-e4 table).

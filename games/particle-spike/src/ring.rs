@@ -1,23 +1,23 @@
 //! Ring of fire or ice: a ring that grows from the player to a maximum radius, stays there and burns for a while,
 //! then disappears. Step 5 of the spike.
 //!
-//! Gameplay is plain: the radius is `SPEED * time` up to `MAX_RADIUS`, then it stays. The ring is a band (`band`).
+//! Gameplay is plain: the radius is eased out (`rules::ring_radius`) up to `MAX_RADIUS` over `GROW_SECS`, then it stays. The ring is a band (`band`).
 //! A body that overlaps the band is hurt, and again every `HURT_INTERVAL` seconds while it stays in it, so a body that
 //! walks into the band later is hurt too (`rules::rect_overlaps_band`). After `BURN_SECS` the ring ends.
 //! The look is made of upward triangles: flames (`wall_fire`) or ice shards (`wall_ice`), the same sprites as the wall.
-//! - Growing: one point emitter at the player. Every particle is shot out at the speed the ring grows, so it stays on
-//!   the ring front by construction.
+//! - Growing: `FRONT_EMITTERS` emitters on the circle, moved outward every frame to the eased radius (`move_front`). Their
+//!   particles stay where they are born, so the band behind the front is the trail, and the front is exact whatever the
+//!   easing. The hurt band reaches back `TRAIL_SECS` in time.
 //! - Burning: when the ring is nearly at the maximum radius, `BURNERS` small emitters are placed on the circle.
 //!   They shimmer until the burn time is over. Particles cannot be held on a ring by Enoki itself (`Circle`
 //!   emission fills a disc, and damping depends on the life fraction), so the ring is made of emitters.
 //!
-//! Fire and ice use the same effect files and differ in the sprite sheet. I toggles the element (env `SPIKE_ICE` starts
-//! with ice, for scripted screenshots).
+//! Fire and ice use the same effect files and differ in the sprite sheet (effects 2 and 6).
 
 use crate::fireball::{FLASH_SECS, HitFlash};
 use crate::glow::{AdditiveSprite, Glow, SpriteLook};
 use crate::harness::{Body, EffectLibrary, Enemy, FireEffect};
-use crate::rules::rect_overlaps_band;
+use crate::rules::{rect_overlaps_band, ring_radius};
 use bevy::prelude::*;
 use bevy_enoki::prelude::*;
 use std::f32::consts::TAU;
@@ -26,9 +26,9 @@ use std::f32::consts::TAU;
 const FIRE_RING: usize = 2;
 const ICE_RING: usize = 6;
 
-/// Radius growth in art pixels per second. The front effect file has the same speed (`linear_speed`).
-const SPEED: f32 = 300.0;
-/// The ring stops growing here. The front effect file has `lifetime` = `MAX_RADIUS / SPEED`.
+/// The ring grows to `MAX_RADIUS` in this many seconds, eased out (`rules::ring_radius`): fast at the start, slowing to a stop.
+const GROW_SECS: f32 = 0.767;
+/// The ring stops growing here.
 /// 230 keeps the whole ring inside the view (half height 256), so the stand-ins at x = ±410 are out of reach.
 const MAX_RADIUS: f32 = 230.0;
 /// The ring burns for this long once it is at the maximum radius.
@@ -41,8 +41,11 @@ const BURNERS: usize = 40;
 const BAND_HALF: f32 = 24.0;
 /// A body that stays in the band is hurt again after this many seconds.
 const HURT_INTERVAL: f32 = 0.5;
-/// The growing emitters spawn for this long, which gives the front its thickness (`SPEED * PULSE_SECS` art pixels).
-const PULSE_SECS: f32 = 0.12;
+/// Number of emitters on the growing front. They move outward with the eased radius.
+const FRONT_EMITTERS: usize = 40;
+/// The damaging band while growing reaches back this far in time: from the radius now to the radius this long ago.
+/// It matches the trail the moving emitters leave (the front particle life is a little longer).
+const TRAIL_SECS: f32 = 0.12;
 
 const FRONT: (&str, f32) = ("effects/ring_front.particle.ron", 2.1);
 const BURN: &str = "effects/ring_burn.particle.ron";
@@ -74,9 +77,13 @@ struct Ring {
     element: Element,
 }
 
-/// A growing emitter. After `PULSE_SECS` it stops and removes itself once its last particle is gone.
+/// An emitter on the growing front, at `angle` on the circle. It follows the radius of its ring. When the ring has grown
+/// (or is gone) it stops and removes itself once its last particle is gone.
 #[derive(Component)]
-struct Pulse(Timer);
+struct Front {
+    owner: Entity,
+    angle: f32,
+}
 
 /// An emitter on the burning ring. When the ring is gone it stops and removes itself like a `Pulse`.
 #[derive(Component)]
@@ -88,7 +95,7 @@ impl Plugin for RingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_style).add_systems(
             Update,
-            (launch, grow_rings, end_pulses, end_burners).chain(),
+            (launch, grow_rings, move_front, end_burners).chain(),
         );
     }
 }
@@ -128,30 +135,40 @@ fn launch(
             ICE_RING => Element::Ice,
             _ => continue,
         };
-        commands.spawn(Ring {
-            centre: shot.from,
-            radius: 0.0,
-            age: 0.0,
-            hurt: Vec::new(),
-            burn: None,
-            element,
-        });
-        let mut front = commands.spawn((
-            ParticleEffectHandle(server.load(FRONT.0)),
-            Transform::from_translation(shot.from.extend(FRONT.1)),
-            Pulse(Timer::from_seconds(PULSE_SECS, TimerMode::Once)),
-        ));
-        look(&style, element).insert(&glow, &mut front);
+        let owner = commands
+            .spawn(Ring {
+                centre: shot.from,
+                radius: 0.0,
+                age: 0.0,
+                hurt: Vec::new(),
+                burn: None,
+                element,
+            })
+            .id();
+        for i in 0..FRONT_EMITTERS {
+            let mut front = commands.spawn((
+                ParticleEffectHandle(server.load(FRONT.0)),
+                Transform::from_translation(shot.from.extend(FRONT.1)),
+                Front {
+                    owner,
+                    angle: TAU * i as f32 / FRONT_EMITTERS as f32,
+                },
+            ));
+            look(&style, element).insert(&glow, &mut front);
+        }
     }
 }
 
-/// The band that hurts: inner and outer radius. While the front grows it is the thickness of the front, and while the ring
-/// burns it is the band of the burners.
-fn band(radius: f32) -> (f32, f32) {
+/// The band that hurts: inner and outer radius. While the front grows it reaches from the radius `TRAIL_SECS` ago to the
+/// radius now (the trail of the moving emitters), and while the ring burns it is the band of the burners.
+fn band(age: f32, radius: f32) -> (f32, f32) {
     if radius >= MAX_RADIUS - BURN_LEAD {
         (MAX_RADIUS - BAND_HALF, MAX_RADIUS + BAND_HALF)
     } else {
-        ((radius - SPEED * PULSE_SECS).max(0.0), radius + 4.0)
+        (
+            ring_radius(age - TRAIL_SECS, GROW_SECS, MAX_RADIUS),
+            radius + 4.0,
+        )
     }
 }
 
@@ -166,7 +183,7 @@ fn grow_rings(
 ) {
     for (entity, mut ring) in &mut rings {
         ring.age += time.delta_secs();
-        ring.radius = (ring.radius + SPEED * time.delta_secs()).min(MAX_RADIUS);
+        ring.radius = ring_radius(ring.age, GROW_SECS, MAX_RADIUS);
 
         if ring.burn.is_none() && ring.radius >= MAX_RADIUS - BURN_LEAD {
             ring.burn = Some(Timer::from_seconds(BURN_SECS, TimerMode::Once));
@@ -182,7 +199,7 @@ fn grow_rings(
             }
         }
 
-        let (inner, outer) = band(ring.radius);
+        let (inner, outer) = band(ring.age, ring.radius);
         for (body_entity, body, is_enemy) in &bodies {
             if !rect_overlaps_band(ring.centre, inner, outer, body.0) {
                 continue;
@@ -215,15 +232,24 @@ fn grow_rings(
     }
 }
 
-fn end_pulses(
-    time: Res<Time>,
-    mut emitters: Query<(Entity, &mut Pulse, &mut ParticleSpawnerState)>,
+fn move_front(
+    rings: Query<&Ring>,
+    mut emitters: Query<(Entity, &Front, &mut Transform, &mut ParticleSpawnerState)>,
     mut commands: Commands,
 ) {
-    for (entity, mut pulse, mut state) in &mut emitters {
-        if pulse.0.tick(time.delta()).is_finished() {
-            state.active = false;
-            commands.entity(entity).insert(OneShot::Despawn);
+    for (entity, front, mut transform, mut state) in &mut emitters {
+        match rings.get(front.owner) {
+            Ok(ring) if ring.age < GROW_SECS => {
+                let position = ring.centre + Vec2::from_angle(front.angle) * ring.radius;
+                transform.translation = position.extend(FRONT.1);
+            }
+            _ => {
+                state.active = false;
+                commands
+                    .entity(entity)
+                    .remove::<Front>()
+                    .insert(OneShot::Despawn);
+            }
         }
     }
 }

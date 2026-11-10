@@ -28,6 +28,18 @@ impl Rect2 {
     }
 }
 
+/// Ease-out: 0 at 0, 1 at 1, fast at the start and slowing to a stop (quadratic, so the start speed is twice the average).
+pub fn ease_out(u: f32) -> f32 {
+    let left = 1.0 - u.clamp(0.0, 1.0);
+    1.0 - left * left
+}
+
+/// Radius of a growing ring `age` seconds after it started: eased from 0 to `max` over `grow_secs`, then constant.
+/// A negative age (history before the start) gives 0.
+pub fn ring_radius(age: f32, grow_secs: f32, max: f32) -> f32 {
+    max * ease_out(age / grow_secs)
+}
+
 /// True when a circle touches or overlaps the rectangle.
 pub fn circle_hits_rect(centre: Vec2, radius: f32, rect: Rect2) -> bool {
     rect.closest_point(centre).distance_squared(centre) <= radius * radius
@@ -97,6 +109,49 @@ mod tests {
     use super::*;
 
     const RECT: Rect2 = Rect2::new(Vec2::new(10.0, 0.0), Vec2::new(8.0, 8.0));
+
+    #[test]
+    fn ease_out_runs_from_0_to_1_and_clamps() {
+        assert_eq!(ease_out(0.0), 0.0);
+        assert_eq!(ease_out(1.0), 1.0);
+        assert_eq!(ease_out(-1.0), 0.0);
+        assert_eq!(ease_out(2.0), 1.0);
+    }
+
+    #[test]
+    fn ease_out_is_fast_first_and_never_goes_back() {
+        assert!(ease_out(0.1) > 0.15);
+        let mut last = 0.0;
+        for i in 0..=100 {
+            let now = ease_out(i as f32 / 100.0);
+            assert!(now >= last);
+            last = now;
+        }
+        // The last tenth of the time covers only a sliver of the distance.
+        assert!(1.0 - ease_out(0.9) < 0.02);
+    }
+
+    #[test]
+    fn ring_radius_reaches_the_maximum_exactly_and_stays() {
+        assert_eq!(ring_radius(0.0, 0.8, 230.0), 0.0);
+        assert_eq!(ring_radius(0.8, 0.8, 230.0), 230.0);
+        assert_eq!(ring_radius(5.0, 0.8, 230.0), 230.0);
+        assert_eq!(ring_radius(-0.3, 0.8, 230.0), 0.0);
+    }
+
+    #[test]
+    fn the_trailing_band_leaves_no_gap_at_frame_rates_up_to_20_fps() {
+        // The band reaches back `trail` seconds. Consecutive frames must overlap, or a body could be skipped.
+        let (grow, max, trail) = (0.767, 230.0, 0.12);
+        let mut age = 0.0;
+        while age < grow {
+            let next = age + 0.05;
+            let inner_next = ring_radius(next - trail, grow, max);
+            let outer_now = ring_radius(age, grow, max);
+            assert!(inner_next <= outer_now);
+            age = next;
+        }
+    }
 
     #[test]
     fn circle_inside_hits() {
