@@ -1,6 +1,6 @@
 # Research: particles for player weapons
 
-Date: 2026-11-09. Status: assessment done, spike not started (see `PLAN-particle-spike.md`).
+Date: 2026-11-09. Status: spike done, verdict below (2026-11-10). Plan for the port: `PLAN-weapons.md`.
 
 ## Goal
 
@@ -109,9 +109,23 @@ Enoki has no swirl motion, so the effect needs a workaround.
 - Enoki cannot ease a particle to an exact radius: damping depends on the life fraction and the frame rate. Emitters moved along the curve can. The ring is now 40 emitters whose position is set each frame from a pure function (`rules::ring_radius`); the particles stay where they are born and fade, so the band behind the front is the trail. The hurt band uses the same function, one step back in time.
 - Native cost: not measurable (ring stress run 3.2 ms before, 3.1 to 3.9 ms after, about 14 % more particles). Web cost not measured yet.
 
-## Decision still open
+## Verdict (2026-11-10)
 
-Use Enoki for Long Way weapons, yes or no. The spike answers this. Record the result in `dev-docs/adr/ENGINE.md` (a new record, and a row in the adr-e4 table).
+**Use Enoki.** Recorded in `adr-e9` (`dev-docs/adr/ENGINE.md`) and in the adr-e4 table.
+
+| Check | Result |
+|---|---|
+| Web (WebGL2) renders | **Pass.** The user ran all four weapons in a browser through `wasm-server-runner`: no problem, no console errors (step 2). Browser name and version not recorded. |
+| Frame time, native | **Pass.** All four together, about 3400 particles (5 times normal use): about 3.4 ms mean (about 300 fps uncapped), `dev` profile. Normal use (690 particles): 4 to 4.4 ms with vsync off, noise about 0.5 ms. Glow on or off: no measurable difference. Moving emitters (the eased ring): no measurable cost. |
+| Frame time, web | **Not measured.** The user skipped it ("it works well"). The risk (one wasm thread) is untested in numbers. |
+| Pixel look | **Accepted by the user** for the fireball and the ring in motion. No sub-pixel shimmer measurement was made. |
+| Palette | **Partly.** Sprites carry the palette and colour curves stay near white. Particle colours from curves are not palette-exact. |
+| Runtime control | **Pass.** Ring radius (eased, 40 moving emitters), wall length and per-emitter attractors change while running (`ParticleEffectInstance`). |
+| Authoring | **Not timed.** Hot reload works natively, but only with `bevy/file_watcher`, which rebuilds Bevy (about 5 minutes per switch), so it is not carried into the games. |
+
+What Enoki is good for: trails, bursts, embers, flames. What it is not good for: a placed object with a fixed life and a place in the depth order. The ice wall is plain animated sprites. A swirl has no built-in motion: the whirlpool is variant B (attractors with a start speed above the circular speed, so droplets spiral outward). The pivot (A) and sprite ring (C) variants were built and dropped.
+
+Remaining risks: web frame time under stress, Enoki upgrades (the 10-line additive patch), palette-exact colour from curves, and the wall needing a dynamic blocker in the collision and nav code (`PLAN-weapons.md`, P1). Facts learned about the crate: `dev-docs/bevy/notes.md`, "bevy_enoki".
 
 ## Sources
 

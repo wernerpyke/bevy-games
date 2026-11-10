@@ -47,6 +47,7 @@ Accepted costs: breaking API changes every Bevy release, slow compiles, larger w
 | `bevy_asset_loader` | 0.28.1 | `bevy_app`/`bevy_ecs ^0.20.0` | Loading states |
 | `bevy_egui` | 0.43.1 | `bevy_app`/`bevy_ecs ^0.20.0` | Debug UI |
 | `bevy-inspector-egui` | 0.38.0 | `bevy_app`/`bevy_ecs ^0.20.0` | Entity inspector |
+| `bevy_enoki` | 0.8.0 | `^0.20` | Particle effects for weapons (accepted, `adr-e9`). Local patch for additive blending. |
 
 **Rationale.** Each crate moved to 0.20 within about five weeks of the Bevy release, so no plugin blocks Bevy 0.20.1.
 
@@ -87,3 +88,11 @@ Updated 2026-11-05: the player is now the Hunter, a 128x128 canvas with a body a
 **Rationale.** The developer does not review or debug Rust code by hand, and Claude does not use a debugger. Debug info was most of the size: `target/` was 25 GB, and 2.2 GB after a clean build without it (3.2 GB with `lint`, `test` and `web`). Panics still show file and line, because line tables stay. Only stepping through code in a debugger is lost. The limit of 8 GB is about twice the normal size, so it signals stale outputs.
 
 **How to apply.** Do not add `debug = true` or `bevy/dynamic_linking` as a default without asking. After a Bevy version or feature change, run `cargo clean` once: the old outputs are never used again. Run the routine at the start of a session that builds Rust, and after any `Cargo.toml` change.
+
+## adr-e9. Particle effects with `bevy_enoki`, with a local patch for additive blending (2026-11-10)
+
+**Decision.** Weapon effects that are many short-lived random bits (trails, bursts, embers, flames) use `bevy_enoki` 0.8.0, pinned `=0.8.0` in `[workspace.dependencies]`. A placed object with a fixed life and a place in the depth order (the ice wall) is built from plain animated sprites (`bevy_aseprite_ultra`), not particles. Additive blending ("glow") needs a patched copy of Enoki: one trait method `blend_state()` on `Particle2dMaterial` (default alpha blending) and two shader handles made public, about 10 lines. The patch stays for now (user, 2026-11-10) through the root `[patch.crates-io]`. The fallback is to drop glow, which removes the patch. The Enoki code lives in `crates/game-kit/src/fx.rs` as a plain dependency of the kit, with **no Cargo features** (user, 2026-11-10; the cost is that R-Town also compiles Enoki's 5 extra crates). Not carried into any game: `bevy/file_watcher` (hot reload), `bevy/dynamic_linking` and the Enoki `dev` feature.
+
+**Rationale.** `bevy_hanabi` needs compute shaders, so WebGPU only. `bevy_sprinkles` targets Bevy 0.19 and is 3D first. Enoki simulates on the CPU and runs on WebGL2: the user ran the spike in a browser with all four weapons, saw no console errors and no problem (the web frame time was not measured). On native, all four weapons together (about 3400 particles, 5 times normal use) cost about 3.4 ms a frame on the `dev` profile. Enoki adds 5 crates (Enoki, `wide`, `chacha20`, `getrandom` 0.3 and 0.4) and no Bevy feature, so the build stays small. A feature in the kit would build the kit twice (`--workspace` against `-p`), and `bevy/file_watcher` already doubled every Bevy build in the spike. Enoki hard-codes alpha blending, so glow needs the patch.
+
+**How to apply.** Gates after any change to a `Cargo.toml` are in `dev-docs/PLAN-weapons.md` (dependency tree, `Cargo.lock`, no Bevy crate recompiled, sizes). Re-apply the 10 lines when Enoki is upgraded. Facts about the crate: `dev-docs/bevy/notes.md`, "bevy_enoki". Measurements and the comparison: `dev-docs/RESEARCH-particles.md`.

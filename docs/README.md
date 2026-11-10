@@ -29,6 +29,16 @@ The first build takes several minutes.
 - Long Way: click with the left mouse button to walk to that place. The player goes around trees and rocks, and a click on a blocked place goes to the nearest place it can reach. A new click changes the goal. The arrow keys do nothing there.
 - R-Town: arrow keys walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug (they start hidden unless the game runs with `--debug`). Enemies (R-Town) kill the player on a touch: press F1 to start again.
 
+## Run in a browser (a crate that has no web release yet)
+
+Install the runner once: `cargo install wasm-server-runner`. The workspace `.cargo/config.toml` sets it as the runner for `wasm32-unknown-unknown`. Start it **from the crate folder**, because it serves `./assets` of the folder it runs in:
+
+```
+cd games/<crate> && cargo run -p <crate> --target wasm32-unknown-unknown
+```
+
+It prints a URL (`http://127.0.0.1:1334`). The first load is slow (the debug `.wasm` is over 100 MB). The real web release is `rm10`.
+
 ## Troubleshooting
 
 - Asset not found when running the binary directly: run it through `./dev-scripts/rust.sh run <game>`, or set `BEVY_ASSET_ROOT` to the game folder (for example `games/long-way`).

@@ -36,6 +36,7 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 8. Playback speed is set in the same branch (`ase.animation.speed`).
 9. A file with no tags plays all frames with `Animation::default()`.
 10. A tag may also name one frame, to pick a variant (a rock type) and not to animate.
+11. Tags must not overlap. A script that makes tags makes them after all frames exist, then `./dev-scripts/aseprite.sh check <file>` shows the frame ranges to read (`games/long-way/docs/art-pipeline.md`, rule 9).
 
 ### Animation speed
 

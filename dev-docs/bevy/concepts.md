@@ -285,6 +285,12 @@ Bevy app states switch groups of systems on and off and run code when a state is
 - `DespawnOnExit(state)` on an entity removes it when that state is left. A screen root uses it, so leaving the title removes the title.
 - `Time<Virtual>::pause()` stops the clock that `Res<Time>` reads in `Update`, so everything that uses `time.delta_secs()` freezes. `Time<Real>` keeps running.
 
+## Particle effects and custom particle materials
+
+A particle system draws many short-lived quads from one emitter. We use `bevy_enoki` (`adr-e9`). An effect is a RON file (speed, lifetime, size and colour over time). An emitter is an entity with a spawner component that points at the effect and at a material. Particles are only visuals: they do not collide and send no events, so a weapon is two parts. A gameplay entity owns the position, radius and hit test (plain Rust, moved with `delta_secs()`). An emitter follows it and only draws.
+
+A material tells the GPU how to colour a particle: a plain colour, or a sprite sheet played over the particle's life. A custom material is a struct with `AsBindGroup` and a `Particle2dMaterial` impl that names a fragment shader (and, in our patched Enoki, a blend state). Additive blending adds the particle colour to what is already on screen, so overlaps glow. Project code: `games/particle-spike/src/glow.rs`, later `crates/game-kit/src/fx.rs`.
+
 ## Cargo features and build profiles
 
 Bevy is split into many optional pieces called features. We turn off the defaults and keep only the 2D set:

@@ -101,3 +101,19 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - `bevy::picking::Pickable { should_block_lower: true, is_hoverable: false }` on a UI node stops picking below it.
 - A system with `Single<(&mut Camera, ..), With<A>>` and `Single<&mut Camera, With<B>>` needs `Without<B>` and `Without<A>` filters, or Bevy reports a query conflict. A long tuple in a `Single` trips clippy `type_complexity`: use a `type` alias.
 - Test without a window: `App::new().add_plugins(MinimalPlugins)`, `init_resource::<UiScale>()`, and spawn `(Window { resolution: (720, 1080).into(), ..default() }, PrimaryWindow)`. `Window::physical_size()` works without a backend.
+
+## bevy_enoki 0.8.0 (verified in the particle spike, 2026-11-10)
+
+- Spawners: `ParticleSpawner(material handle)` plus `ParticleEffectHandle` (shared asset) or `ParticleEffectInstance` (own copy, changeable at run time). `OneShot::Despawn` removes the spawner after the burst and its last particle. `spawn_rate: 0.001` with `spawn_amount: 1` gives exactly one particle.
+- `scale_curve` and `color_curve` set the absolute size and colour, not multipliers. With a sprite material the shader multiplies the sprite by the colour, so keep colour curves near white (a dark tint makes dark discs). A tint cannot change hue: a red sprite tinted blue goes black. Fire and ice need their own sprites.
+- A sprite sheet is played in order over the particle life: `frame = floor(life fraction x frames)`. A fast growth and a long hold need a sheet padded with repeated cells. For one fixed picture use a one-frame PNG. Cells must be square (the quad is square, `scale` is one number) and the art must fill its cell.
+- A particle starts with the rotation of the emitter entity. Its own direction does not matter, and `angular_speed` spins it from there. A full-circle `direction` spread (1.0) gives a radial burst. A burst of equal-speed particles from one point forms a ring front.
+- `EmissionShape::Circle(r)` fills a disc. It is not a ring outline.
+- Damping is `velocity *= 1 + life_fraction * (acceleration - damp) * dt`: it depends on the life fraction and the frame rate, so a particle cannot be stopped at an exact radius. For an exact curve, move small emitters along it each frame (40 moving emitters cost no visible frame time).
+- `Attractor.position` is an offset from the emitter, not a world point. Set it per emitter on `ParticleEffectInstance`. A reloaded effect file loses it, so set it again. An emitter turned by `Quat::from_rotation_z(angle)` shoots its particles along that angle (tangent launches).
+- Particles spawn at the emitter position once per frame, so a fast emitter leaves gaps unless the particles are large. A follower reads `GlobalTransform`, so it lags one frame.
+- Enoki refreshes running emitters only on a first load. After `AssetEvent::Modified`, copy the changed effect into the emitters yourself. `AssetServer::reload` only reloads files with a live handle, so keep every effect file loaded (an `EffectLibrary` resource).
+- Blending is fixed to alpha in 0.8.0. Additive needs the local patch (`blend_state()` on `Particle2dMaterial`, `adr-e9`) and a material with the same shader and bind group as the Enoki one.
+- Hot reload of effect files needs `bevy/file_watcher`, which gives Bevy a feature set Long Way does not use and rebuilds every Bevy crate. Do not enable it in a game. An atomic save (temp file and rename, as `sed -i` does) is not seen by the watcher.
+- `ui_bevy_render` is needed to draw UI text. `ui_api` alone draws nothing.
+- Web: `wasm-server-runner` serves `./assets` of the directory it runs in. Start it from the crate folder: `cd games/<crate> && cargo run -p <crate> --target wasm32-unknown-unknown`.
