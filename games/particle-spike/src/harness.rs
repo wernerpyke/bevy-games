@@ -1,7 +1,7 @@
 //! Test harness: pick an effect, fire it at the cursor, see particle count and frame time,
-//! save screenshots, reload effect files. Effects read `FireEffect` and draw themselves.
+//! save screenshots. Effects read `FireEffect` and draw themselves.
 //!
-//! Keys: 0-4 pick an effect, Space fire, H hide the text, R reload effect files, P screenshot (native).
+//! Keys: 0-6 pick an effect (5 and 6 are the ice versions of the wall and the ring), Space fire, H hide the text, P screenshot (native).
 //! Env `SPIKE_SHOT=<effect>:<seconds>` (native) picks and fires an effect, saves a screenshot and quits. `SPIKE_AIM=x,y` sets the aim of that shot.
 
 use crate::rules::{Rect2, move_rect};
@@ -10,13 +10,23 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_enoki::prelude::*;
 
-pub const EFFECTS: [&str; 5] = ["smoke test", "fireball", "ring", "wall", "whirlpool"];
-const SELECT_KEYS: [KeyCode; 5] = [
+pub const EFFECTS: [&str; 7] = [
+    "smoke test",
+    "fireball",
+    "fire ring",
+    "fire wall",
+    "whirlpool",
+    "ice wall",
+    "ice ring",
+];
+const SELECT_KEYS: [KeyCode; 7] = [
     KeyCode::Digit0,
     KeyCode::Digit1,
     KeyCode::Digit2,
     KeyCode::Digit3,
     KeyCode::Digit4,
+    KeyCode::Digit5,
+    KeyCode::Digit6,
 ];
 
 /// Where the stand-in player stands.
@@ -82,6 +92,12 @@ pub struct Body(pub Rect2);
 #[derive(Component)]
 struct HudText;
 
+/// Bottom right: whether B and G are on.
+#[derive(Component)]
+struct FlagsText;
+
+type HudParts = Or<(With<HudText>, With<FlagsText>)>;
+
 #[derive(Component)]
 struct Crosshair;
 
@@ -106,9 +122,9 @@ impl Plugin for HarnessPlugin {
                     move_enemy,
                     march_enemy,
                     move_player,
-                    reload_effects,
                     refresh_instances,
                     update_hud,
+                    update_flags,
                 ),
             );
 
@@ -153,6 +169,20 @@ fn setup(mut commands: Commands) {
             position_type: PositionType::Absolute,
             top: px(8),
             left: px(8),
+            ..default()
+        },
+    ));
+
+    commands.spawn((
+        FlagsText,
+        Text::new(""),
+        TextFont::from_font_size(14.0),
+        TextColor(Color::WHITE),
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.6)),
+        Node {
+            position_type: PositionType::Absolute,
+            bottom: px(8),
+            right: px(8),
             ..default()
         },
     ));
@@ -306,39 +336,34 @@ fn move_player(
     player.translation.y += delta.y;
 }
 
-fn toggle_hud(keys: Res<ButtonInput<KeyCode>>, mut hud: Single<&mut Visibility, With<HudText>>) {
+fn toggle_hud(keys: Res<ButtonInput<KeyCode>>, mut hud: Query<&mut Visibility, HudParts>) {
     if keys.just_pressed(KeyCode::KeyH) {
-        **hud = match **hud {
-            Visibility::Hidden => Visibility::Inherited,
-            _ => Visibility::Hidden,
-        };
+        for mut visibility in &mut hud {
+            *visibility = match *visibility {
+                Visibility::Hidden => Visibility::Inherited,
+                _ => Visibility::Hidden,
+            };
+        }
     }
 }
 
-/// Reloads every effect file (R). With the `hot-reload` feature on native, saving a file does the same. The web needs the key.
-fn reload_effects(
-    keys: Res<ButtonInput<KeyCode>>,
-    effects: Res<Assets<Particle2dEffect>>,
-    server: Res<AssetServer>,
+fn update_flags(
+    look: Res<crate::fireball::Look>,
+    glow: Res<crate::glow::Glow>,
+    mut text: Single<&mut Text, With<FlagsText>>,
 ) {
-    if !keys.just_pressed(KeyCode::KeyR) {
-        return;
-    }
-    let mut count = 0;
-    for id in effects.ids() {
-        if let Some(path) = server.get_path(id) {
-            server.reload(path.into_owned());
-            count += 1;
-        }
-    }
-    info!("reloaded {count} effect file(s)");
+    let state = |on: bool| if on { "on" } else { "off" };
+    text.0 = format!(
+        "B sprites {} | G glow {}",
+        state(look.sprites),
+        state(glow.on)
+    );
 }
 
 fn update_hud(
     selected: Res<Selected>,
     diagnostics: Res<DiagnosticsStore>,
     stores: Query<&ParticleStore>,
-    whirl: Res<crate::whirlpool::WhirlLook>,
     mut hud: Single<&mut Text, With<HudText>>,
 ) {
     let frame_ms = diagnostics
@@ -347,14 +372,9 @@ fn update_hud(
         .unwrap_or(0.0);
     let particles: usize = stores.iter().map(ParticleStore::len).sum();
     hud.0 = format!(
-        "{} {}{} | particles {particles} | {frame_ms:.1} ms ({:.0} fps)\n0-4 pick, Space fire, WASD move, I ice or fire, V water variant, B squares, arrows move red, R reload, H hide{}",
+        "{} {} | particles {particles} | {frame_ms:.1} ms ({:.0} fps)\n0-6 pick, Space fire, WASD move, B squares, G glow, arrows move red, H hide{}",
         selected.0,
         EFFECTS[selected.0],
-        if selected.0 == 4 {
-            format!(" [{}]", whirl.label())
-        } else {
-            String::new()
-        },
         if frame_ms > 0.0 {
             1000.0 / frame_ms
         } else {

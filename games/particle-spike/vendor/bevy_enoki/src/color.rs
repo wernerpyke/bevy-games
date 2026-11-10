@@ -1,0 +1,42 @@
+use bevy_asset::Asset;
+use bevy_color::LinearRgba;
+use bevy_math::Vec4;
+use bevy_reflect::TypePath;
+use bevy_render::render_resource::{AsBindGroup, ShaderType};
+use bevy_shader::ShaderRef;
+
+use super::{prelude::Particle2dMaterial, PARTICLE_COLOR_FRAG};
+
+/// simple color material that gets multiplied by
+/// any color, caluclated in the particle effect
+#[derive(AsBindGroup, Asset, TypePath, Clone)]
+pub struct ColorParticle2dMaterial {
+    #[uniform(0)]
+    color: LinearRgba,
+}
+
+#[derive(ShaderType, Asset, TypePath, Clone)]
+#[allow(dead_code)]
+pub struct ColorParticle2dUniform {
+    color: Vec4,
+}
+
+impl Default for ColorParticle2dMaterial {
+    fn default() -> Self {
+        Self {
+            color: LinearRgba::WHITE,
+        }
+    }
+}
+
+impl ColorParticle2dMaterial {
+    pub fn new(color: LinearRgba) -> Self {
+        Self { color }
+    }
+}
+
+impl Particle2dMaterial for ColorParticle2dMaterial {
+    fn fragment_shader() -> ShaderRef {
+        PARTICLE_COLOR_FRAG.into()
+    }
+}

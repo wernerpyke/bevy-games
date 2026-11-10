@@ -2,6 +2,7 @@
 //! Rules and results: dev-docs/RESEARCH-particles.md, dev-docs/PLAN-particle-spike.md.
 
 mod fireball;
+mod glow;
 mod harness;
 mod ring;
 mod rules;
@@ -35,6 +36,7 @@ fn main() {
         .add_plugins((
             AsepriteUltraPlugin,
             EnokiPlugin,
+            glow::GlowPlugin,
             harness::HarnessPlugin,
             fireball::FireballPlugin,
             ring::RingPlugin,

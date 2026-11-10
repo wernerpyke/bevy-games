@@ -13,16 +13,18 @@
 //! - Fire: a row of Enoki emitters that keep spawning flames (`wall_fire` sprites). When the wall is gone the emitters
 //!   stop and remove themselves after their last particle.
 
+use crate::glow::Glow;
 use crate::harness::{Blocker, Body, EffectLibrary, FireEffect, MarchTrigger};
-use crate::ring::{Element, RingStyle, material};
+use crate::ring::{Element, RingStyle, look};
 use crate::rules::Rect2;
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use bevy_aseprite_ultra::prelude::*;
 use bevy_enoki::prelude::*;
 
-/// Index of the effect in `harness::EFFECTS`.
-const EFFECT: usize = 3;
+/// Indexes of the effects in `harness::EFFECTS`.
+const FIRE_WALL: usize = 3;
+const ICE_WALL: usize = 5;
 
 /// Length of the wall along its line, and its thickness, in art pixels.
 const LENGTH: f32 = 220.0;
@@ -159,17 +161,23 @@ fn cubes(rect: Rect2) -> Vec<Cube> {
 fn launch(
     mut fired: MessageReader<FireEffect>,
     style: Res<RingStyle>,
+    glow: Res<Glow>,
     server: Res<AssetServer>,
     existing: Query<Entity, With<Wall>>,
     mut commands: Commands,
 ) {
-    for shot in fired.read().filter(|shot| shot.effect == EFFECT) {
+    for shot in fired.read() {
+        let element = match shot.effect {
+            FIRE_WALL => Element::Fire,
+            ICE_WALL => Element::Ice,
+            _ => continue,
+        };
         // One wall at a time: a new one replaces the old one.
         for old in &existing {
             commands.entity(old).despawn();
         }
         let rect = wall_rect(shot.from, shot.aim);
-        let pending = match style.element {
+        let pending = match element {
             Element::Ice => cubes(rect),
             Element::Fire => Vec::new(),
         };
@@ -184,14 +192,14 @@ fn launch(
                 MarchTrigger,
             ))
             .id();
-        if style.element == Element::Fire {
+        if element == Element::Fire {
             for point in line_points(rect, FLAME_SPACING) {
-                commands.spawn((
-                    ParticleSpawner(material(&style, Element::Fire)),
+                let mut flame = commands.spawn((
                     ParticleEffectHandle(server.load(FLAME)),
                     Transform::from_translation(point.extend(Z_WALL)),
                     WallEmitter(wall),
                 ));
+                look(&style, Element::Fire).insert(&glow, &mut flame);
             }
         }
     }

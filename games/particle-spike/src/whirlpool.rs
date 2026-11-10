@@ -5,7 +5,7 @@
 //! while it stays (`rules::rect_overlaps_band`). The shield also pushes the red block straight out of the circle
 //! (`PUSH_SPEED`, `rules::push_delta`), and blockers stop it. These are design values for you, not decisions.
 //!
-//! The look is chosen with V before firing (env `SPIKE_WHIRL=0..3` starts on one). WASD moves the player.
+//! The look is the attractor one (B) unless env `SPIKE_WHIRL=0..3` picks another. WASD moves the player.
 //! - A pivot: 12 emitters on two circles, one clockwise and one counter-clockwise. The droplets stay where they are
 //!   born, so each emitter leaves an arc behind it.
 //! - A spiral: 12 emitters turn clockwise while their radius shrinks, over and over. Each leaves a spiral thread.
@@ -18,6 +18,7 @@
 //! When the whirlpool is gone the emitters stop and remove themselves after their last particle.
 
 use crate::fireball::{FLASH_SECS, HitFlash};
+use crate::glow::Glow;
 use crate::harness::{Blocker, Body, EffectLibrary, Enemy, FireEffect, MarchTrigger, Player};
 use crate::rules::{Rect2, move_rect, push_delta, rect_overlaps_band};
 use bevy::prelude::*;
@@ -103,15 +104,9 @@ impl Variant {
     }
 }
 
-/// The variant the next whirlpool will use (V cycles).
+/// The variant the next whirlpool will use.
 #[derive(Resource)]
-pub struct WhirlLook(usize);
-
-impl WhirlLook {
-    pub fn label(&self) -> &'static str {
-        VARIANTS[self.0].label()
-    }
-}
+struct WhirlLook(usize);
 
 /// The whirlpool. `hurt` holds the age of the whirlpool at the last hit of each body.
 #[derive(Component)]
@@ -141,13 +136,12 @@ impl Plugin for WhirlpoolPlugin {
             .ok()
             .and_then(|v| v.parse::<usize>().ok())
             .filter(|i| *i < VARIANTS.len())
-            .unwrap_or(0);
+            .unwrap_or(2);
         app.insert_resource(WhirlLook(start))
             .add_systems(Startup, load_effects)
             .add_systems(
                 Update,
                 (
-                    switch_variant,
                     launch,
                     age_whirlpools,
                     push_enemy,
@@ -164,13 +158,6 @@ impl Plugin for WhirlpoolPlugin {
 fn load_effects(server: Res<AssetServer>, mut library: ResMut<EffectLibrary>) {
     for file in [DROP, ORBIT, SPRAY] {
         library.0.push(server.load(file));
-    }
-}
-
-fn switch_variant(keys: Res<ButtonInput<KeyCode>>, mut look: ResMut<WhirlLook>) {
-    if keys.just_pressed(KeyCode::KeyV) {
-        look.0 = (look.0 + 1) % VARIANTS.len();
-        info!("whirlpool variant: {}", look.label());
     }
 }
 
@@ -217,6 +204,7 @@ fn ring_alpha(age: f32) -> f32 {
 fn launch(
     mut fired: MessageReader<FireEffect>,
     look: Res<WhirlLook>,
+    glow: Res<Glow>,
     server: Res<AssetServer>,
     mut commands: Commands,
 ) {
@@ -236,12 +224,12 @@ fn launch(
         for slot in 0..variant.emitters() {
             let (radius, angle) = pose(variant, slot, 0.0);
             let position = shot.from + Vec2::from_angle(angle) * radius;
-            commands.spawn((
-                ParticleSpawner::default(),
+            let mut drop = commands.spawn((
                 ParticleEffectHandle(server.load(variant.effect())),
                 Transform::from_translation(position.extend(Z_DROPS)),
                 WhirlEmitter { owner, slot },
             ));
+            glow.insert_color(&mut drop);
         }
         if variant == Variant::Sprite {
             commands.spawn((

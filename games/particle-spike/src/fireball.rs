@@ -5,6 +5,7 @@
 //! and a hit spawns five one-shot emitters (flash, fire, sparks, smoke, shockwave).
 //! Effect files: `assets/effects/*.particle.ron`.
 
+use crate::glow::{AdditiveSprite, Glow, SpriteLook};
 use crate::harness::{Body, ENEMY_COLOR, EffectLibrary, Enemy, FireEffect};
 use crate::rules::{Rect2, first_hit};
 use bevy::prelude::*;
@@ -91,21 +92,20 @@ impl Plugin for FireballPlugin {
 
 /// Which particle look the next shots use: flat squares (Enoki default) or the sprites exported from `fireball_placeholder.aseprite`. B toggles.
 #[derive(Resource)]
-struct Look {
-    sprites: bool,
-    blob: Handle<SpriteParticle2dMaterial>,
+pub struct Look {
+    pub sprites: bool,
+    blob: SpriteLook,
 }
 
 fn load_look(
     server: Res<AssetServer>,
-    mut materials: ResMut<Assets<SpriteParticle2dMaterial>>,
+    mut normals: ResMut<Assets<SpriteParticle2dMaterial>>,
+    mut adds: ResMut<Assets<AdditiveSprite>>,
     mut commands: Commands,
 ) {
     commands.insert_resource(Look {
         sprites: true,
-        blob: materials.add(SpriteParticle2dMaterial::from_texture(
-            server.load(BLOB_FILE),
-        )),
+        blob: SpriteLook::new(&mut normals, &mut adds, server.load(BLOB_FILE), 1),
     });
 }
 
@@ -130,6 +130,7 @@ fn spawn_emitter(
     commands: &mut Commands,
     server: &AssetServer,
     look: &Look,
+    glow: &Glow,
     file: &'static str,
     translation: Vec3,
     rotation: Quat,
@@ -140,26 +141,25 @@ fn spawn_emitter(
         ..default()
     };
     let effect = ParticleEffectHandle(server.load(file));
+    let mut entity = commands.spawn((effect, transform));
     if look.sprites {
-        commands
-            .spawn((ParticleSpawner(look.blob.clone()), effect, transform))
-            .id()
+        look.blob.insert(glow, &mut entity);
     } else {
-        commands
-            .spawn((ParticleSpawner::default(), effect, transform))
-            .id()
+        glow.insert_color(&mut entity);
     }
+    entity.id()
 }
 
 fn spawn_one_shot(
     commands: &mut Commands,
     server: &AssetServer,
     look: &Look,
+    glow: &Glow,
     file: &'static str,
     translation: Vec3,
     rotation: Quat,
 ) {
-    let emitter = spawn_emitter(commands, server, look, file, translation, rotation);
+    let emitter = spawn_emitter(commands, server, look, glow, file, translation, rotation);
     commands.entity(emitter).insert(OneShot::Despawn);
 }
 
@@ -167,6 +167,7 @@ fn launch(
     mut fired: MessageReader<FireEffect>,
     server: Res<AssetServer>,
     look: Res<Look>,
+    glow: Res<Glow>,
     mut commands: Commands,
 ) {
     for shot in fired.read().filter(|shot| shot.effect == EFFECT) {
@@ -196,6 +197,7 @@ fn launch(
                 &mut commands,
                 &server,
                 &look,
+                &glow,
                 file,
                 start.extend(Z_HEAD + z),
                 backwards,
@@ -207,6 +209,7 @@ fn launch(
             &mut commands,
             &server,
             &look,
+            &glow,
             MUZZLE,
             start.extend(Z_HEAD),
             Quat::from_rotation_z(direction.to_angle()),
@@ -218,6 +221,7 @@ fn move_fireballs(
     time: Res<Time>,
     server: Res<AssetServer>,
     look: Res<Look>,
+    glow: Res<Glow>,
     mut balls: Query<(Entity, &mut Fireball, &mut Transform)>,
     bodies: Query<(Entity, &Body, Has<Enemy>)>,
     mut commands: Commands,
@@ -239,6 +243,7 @@ fn move_fireballs(
                     &mut commands,
                     &server,
                     &look,
+                    &glow,
                     file,
                     point.extend(z),
                     Quat::IDENTITY,

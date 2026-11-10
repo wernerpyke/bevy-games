@@ -885,8 +885,6 @@ dependencies = [
 [[package]]
 name = "bevy_enoki"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3224fad106bedf0f66dd89eea29a8b67b8a63f96bc49bad231cdcc2224d5c2b"
 dependencies = [
  "bevy_app",
  "bevy_asset",

@@ -97,6 +97,13 @@ Enoki has no swirl motion, so the effect needs a workaround.
 | Runtime control | We must change an effect while it runs (ring radius, wall length). `ParticleEffectInstance` should allow it. |
 | Blocking wall | Needs a dynamic blocker in the collision and nav code. Outside the spike. |
 
+## Additive blending (spike step 7b, 2026-11-10)
+
+- Enoki hard-codes `BlendState::ALPHA_BLENDING` in its pipeline (`material.rs`), and the material trait has no way to change it. Additive needs a patch: one trait method `blend_state()` (default alpha) and two public shader constants. The spike uses a vendored copy (`games/particle-spike/vendor/bevy_enoki`, root `[patch.crates-io]`). Worth an upstream PR. A custom material alone is not enough.
+- Two materials in `glow.rs` (sprite and colour) use `SrcAlpha, One, Add`. G toggles it for the next effects.
+- Seen on native in stills: fire and the fireball tail gain hot yellow spots where particles overlap, and low-alpha particles fade to nothing instead of a muddy brown. Water goes to pure white where droplets overlap, so the blue palette is lost. Flame shapes merge where they overlap.
+- Not checked: WebGL2, frame time (step 8), motion.
+
 ## Decision still open
 
 Use Enoki for Long Way weapons, yes or no. The spike answers this. Record the result in `dev-docs/adr/ENGINE.md` (a new record, and a row in the adr-e4 table).

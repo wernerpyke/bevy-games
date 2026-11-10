@@ -15,14 +15,16 @@
 //! with ice, for scripted screenshots).
 
 use crate::fireball::{FLASH_SECS, HitFlash};
+use crate::glow::{AdditiveSprite, Glow, SpriteLook};
 use crate::harness::{Body, EffectLibrary, Enemy, FireEffect};
 use crate::rules::rect_overlaps_band;
 use bevy::prelude::*;
 use bevy_enoki::prelude::*;
 use std::f32::consts::TAU;
 
-/// Index of the effect in `harness::EFFECTS`.
-const EFFECT: usize = 2;
+/// Indexes of the effects in `harness::EFFECTS`.
+const FIRE_RING: usize = 2;
+const ICE_RING: usize = 6;
 
 /// Radius growth in art pixels per second. The front effect file has the same speed (`linear_speed`).
 const SPEED: f32 = 300.0;
@@ -57,9 +59,8 @@ pub enum Element {
 
 #[derive(Resource)]
 pub struct RingStyle {
-    pub element: Element,
-    fire: Handle<SpriteParticle2dMaterial>,
-    ice: Handle<SpriteParticle2dMaterial>,
+    fire: SpriteLook,
+    ice: SpriteLook,
 }
 
 /// The ring. `hurt` holds the age of the ring at the last hit of each body. `burn` runs while the ring is at the maximum radius.
@@ -87,72 +88,60 @@ impl Plugin for RingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, load_style).add_systems(
             Update,
-            (toggle_element, launch, grow_rings, end_pulses, end_burners).chain(),
+            (launch, grow_rings, end_pulses, end_burners).chain(),
         );
     }
 }
 
 fn load_style(
     server: Res<AssetServer>,
-    mut materials: ResMut<Assets<SpriteParticle2dMaterial>>,
+    mut normals: ResMut<Assets<SpriteParticle2dMaterial>>,
+    mut adds: ResMut<Assets<AdditiveSprite>>,
     mut library: ResMut<EffectLibrary>,
     mut commands: Commands,
 ) {
     library.0.push(server.load(FRONT.0));
     library.0.push(server.load(BURN));
     commands.insert_resource(RingStyle {
-        element: if std::env::var("SPIKE_ICE").is_ok() {
-            Element::Ice
-        } else {
-            Element::Fire
-        },
-        fire: materials.add(SpriteParticle2dMaterial::new(
-            server.load(FIRE_SPRITE),
-            6,
-            1,
-        )),
-        ice: materials.add(SpriteParticle2dMaterial::new(server.load(ICE_SPRITE), 4, 1)),
+        fire: SpriteLook::new(&mut normals, &mut adds, server.load(FIRE_SPRITE), 6),
+        ice: SpriteLook::new(&mut normals, &mut adds, server.load(ICE_SPRITE), 4),
     });
 }
 
-fn toggle_element(keys: Res<ButtonInput<KeyCode>>, mut style: ResMut<RingStyle>) {
-    if keys.just_pressed(KeyCode::KeyI) {
-        style.element = match style.element {
-            Element::Fire => Element::Ice,
-            Element::Ice => Element::Fire,
-        };
-        info!("ring element: {:?}", style.element);
-    }
-}
-
-pub fn material(style: &RingStyle, element: Element) -> Handle<SpriteParticle2dMaterial> {
+pub fn look(style: &RingStyle, element: Element) -> &SpriteLook {
     match element {
-        Element::Fire => style.fire.clone(),
-        Element::Ice => style.ice.clone(),
+        Element::Fire => &style.fire,
+        Element::Ice => &style.ice,
     }
 }
 
 fn launch(
     mut fired: MessageReader<FireEffect>,
     style: Res<RingStyle>,
+    glow: Res<Glow>,
     server: Res<AssetServer>,
     mut commands: Commands,
 ) {
-    for shot in fired.read().filter(|shot| shot.effect == EFFECT) {
+    for shot in fired.read() {
+        let element = match shot.effect {
+            FIRE_RING => Element::Fire,
+            ICE_RING => Element::Ice,
+            _ => continue,
+        };
         commands.spawn(Ring {
             centre: shot.from,
             radius: 0.0,
             age: 0.0,
             hurt: Vec::new(),
             burn: None,
-            element: style.element,
+            element,
         });
-        commands.spawn((
-            ParticleSpawner(material(&style, style.element)),
+        let mut front = commands.spawn((
             ParticleEffectHandle(server.load(FRONT.0)),
             Transform::from_translation(shot.from.extend(FRONT.1)),
             Pulse(Timer::from_seconds(PULSE_SECS, TimerMode::Once)),
         ));
+        look(&style, element).insert(&glow, &mut front);
     }
 }
 
@@ -169,6 +158,7 @@ fn band(radius: f32) -> (f32, f32) {
 fn grow_rings(
     time: Res<Time>,
     style: Res<RingStyle>,
+    glow: Res<Glow>,
     server: Res<AssetServer>,
     mut rings: Query<(Entity, &mut Ring)>,
     bodies: Query<(Entity, &Body, Has<Enemy>)>,
@@ -183,12 +173,12 @@ fn grow_rings(
             for i in 0..BURNERS {
                 let angle = TAU * i as f32 / BURNERS as f32;
                 let position = ring.centre + Vec2::from_angle(angle) * MAX_RADIUS;
-                commands.spawn((
-                    ParticleSpawner(material(&style, ring.element)),
+                let mut burner = commands.spawn((
                     ParticleEffectHandle(server.load(BURN)),
                     Transform::from_translation(position.extend(Z_BURN)),
                     Burner(entity),
                 ));
+                look(&style, ring.element).insert(&glow, &mut burner);
             }
         }
 

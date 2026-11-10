@@ -27,6 +27,8 @@ D1 and D3 are confirmed. D2 is not blocking.
 
 ### Status for the next session (2026-11-10, end of day)
 
+**Update (later 2026-11-10):** step 7b is done (see the log). The harness was simplified: keys `0` to `6` pick an effect (`5` ice wall, `6` ice ring), the `I`, `V` and `R` keys are gone, and the bottom right shows whether `B` and `G` are on. Resume with 7c, the web asset-path fix, step 8, step 9, step 10. Step 10 must also delete `games/particle-spike/vendor/` and the `[patch.crates-io]` and `exclude` lines in the root `Cargo.toml`.
+
 Steps 1 to 7 are done on native: harness, fireball, ring of fire or ice, crystal wall (ice cubes as plain sprites, fire as Enoki flames) and the whirlpool (four looks, B chosen, with a push). Everything was seen in stills only. The user has tried the fireball and the ring in motion and is happy with both. Committed and pushed at the end of this session.
 
 - **Resume with:** step 7b (additive blending). Do it on all weapons together: fireball, ring, fire wall flames and the whirlpool droplets. Then 7c (easing of the ring expansion), the web asset-path fix, step 8 (measure, all four weapons at once), step 9 (verify), step 10 (migrate and delete). The whirlpool is not tuned further ("fine as it is").
@@ -88,6 +90,8 @@ Steps 1 to 7 are done on native: harness, fireball, ring of fire or ice, crystal
   - Following: seen with the player walking at 100 px/s. The spiral droplets stay in the world and leave a trail behind the player (looks right for water), the sprite ring and its spray stay centred on the player.
   - Leaning (the pick is yours): C for the body of the weapon, with the A spiral droplets as an optional trail or spray on top (the spiral is the best particle look). Not measured yet: frame time per variant (step 8), the web.
   - Learned: Enoki `Attractor.position` is an offset from the emitter, not a world point, so a ring of emitters needs one attractor offset each (set on `ParticleEffectInstance`; a reloaded file loses it, so set it again when `attractors` is `None`). An emitter turned by `Quat::from_rotation_z(angle)` shoots its particles along that angle, which gives tangent launches. Emitters that move along a circle leave arcs of stationary droplets behind them.
+
+- Step 7b built (2026-11-10): additive blending, key `G` (env `SPIKE_GLOW=1`), `src/glow.rs`. Enoki cannot do it unpatched (blend state is fixed), so `games/particle-spike/vendor/bevy_enoki` is a copy with `blend_state()` on the material trait, plus a root `[patch.crates-io]` and `exclude`. Delete both with the spike (step 10). Seen in stills on native, all four weapons, glow off and on: fire and the fireball tail get hot yellow overlaps and fade cleanly, water goes pure white (blue lost), flames merge. Lint and the wasm compile pass. Not seen: motion, WebGL2 run, frame time. The decision on whether to keep it is yours. Your feedback: glow on looks better; on some effects (the ice ring) the difference is small. Not decided: glow on by default, or per weapon.
 
 
 ## Steps
