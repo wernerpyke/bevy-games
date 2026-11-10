@@ -1,0 +1,14 @@
+[package]
+name = "particle-spike"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+bevy = { workspace = true, features = ["ui_bevy_render"] }
+bevy_aseprite_ultra.workspace = true
+bevy_enoki.workspace = true
+
+[features]
+# Off by default: it gives Bevy a feature set that long-way does not use, so every Bevy crate is built a second time.
+# Native only. Saving an effect file reloads it while the game runs.
+hot-reload = ["bevy/file_watcher"]

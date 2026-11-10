@@ -1,0 +1,19 @@
+#![enable(implicit_some)]
+// Ring front: upward triangles (flames or ice shards). Moves at
+// 300 px/s (ring.rs SPEED), no damping, lifetime 0.767 s = MAX_RADIUS / SPEED.
+// The sheet has 4 frames that play over the life: flames flicker, shards grow.
+(
+    spawn_rate: 0.04,
+    spawn_amount: 60,
+    emission_shape: Point,
+    lifetime: (0.767, 0.0),
+    linear_speed: (300.0, 0.0),
+    direction: ((1.0, 0.0), 1.0),
+    scale: (32.0, 0.0),
+    scale_curve: (points: [(30.0, 0.0, None), (34.0, 0.7, None), (30.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.8, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 0.0), 1.0, None),
+    ]),
+)

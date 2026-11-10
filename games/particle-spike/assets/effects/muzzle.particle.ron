@@ -1,0 +1,18 @@
+#![enable(implicit_some)]
+// Small burst at the player when the ball leaves. +X of the emitter points the way the ball flies.
+(
+    spawn_rate: 0.001,
+    spawn_amount: 10,
+    emission_shape: Circle(6.0),
+    lifetime: (0.3, 0.3),
+    linear_speed: (160.0, 0.5),
+    direction: ((1.0, 0.0), 0.35),
+    linear_damp: (3.0, 0.0),
+    scale: (10.0, 0.0),
+    scale_curve: (points: [(10.0, 0.0, None), (3.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 0.85, blue: 0.8, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 0.8), 0.5, None),
+        ((red: 0.9, green: 0.42, blue: 0.36, alpha: 0.0), 1.0, None),
+    ]),
+)

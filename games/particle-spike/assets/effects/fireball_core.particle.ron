@@ -1,0 +1,16 @@
+#![enable(implicit_some)]
+// Bright head glow. Short-lived blobs left in the world behind the ball.
+// Palette (linear): pale #fdcdbe (0.98, 0.61, 0.515), salmon #fc9c7e (0.97, 0.33, 0.21), orange #fc5842 (0.97, 0.098, 0.054).
+(
+    spawn_rate: 0.016,
+    spawn_amount: 2,
+    emission_shape: Circle(3.0),
+    lifetime: (0.3, 0.15),
+    scale: (20.0, 0.0),
+    scale_curve: (points: [(20.0, 0.0, None), (6.0, 0.5, None), (1.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 0.85, blue: 0.8, alpha: 0.7), 0.0, None),
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 0.8), 0.5, None),
+        ((red: 0.9, green: 0.42, blue: 0.36, alpha: 0.0), 1.0, None),
+    ]),
+)

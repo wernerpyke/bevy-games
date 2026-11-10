@@ -1,0 +1,18 @@
+#![enable(implicit_some)]
+// Ring front: many particles with the same speed from one point form an expanding circle.
+(
+    spawn_rate: 0.001,
+    spawn_amount: 60,
+    emission_shape: Point,
+    lifetime: (0.28, 0.0),
+    linear_speed: (340.0, 0.0),
+    direction: ((1.0, 0.0), 1.0),
+    linear_damp: (3.5, 0.0),
+    scale: (7.0, 0.0),
+    scale_curve: (points: [(7.0, 0.0, None), (2.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 0.85, blue: 0.8, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 0.8), 0.5, None),
+        ((red: 0.9, green: 0.42, blue: 0.36, alpha: 0.0), 1.0, None),
+    ]),
+)

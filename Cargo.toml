@@ -9,6 +9,7 @@ edition = "2024"
 [workspace.dependencies]
 bevy = { version = "=0.20.1", default-features = false, features = ["2d"] }
 bevy_aseprite_ultra = "=0.10.0"
+bevy_enoki = "=0.8.0"
 game-kit = { path = "crates/game-kit" }
 pathfinding = "=4.16.0"
 
