@@ -50,14 +50,14 @@ const FIRE_SPRITE: &str = "generated/wall_fire.png";
 const ICE_SPRITE: &str = "generated/wall_ice.png";
 
 #[derive(Clone, Copy, PartialEq, Debug)]
-enum Element {
+pub enum Element {
     Fire,
     Ice,
 }
 
 #[derive(Resource)]
-struct RingStyle {
-    element: Element,
+pub struct RingStyle {
+    pub element: Element,
     fire: Handle<SpriteParticle2dMaterial>,
     ice: Handle<SpriteParticle2dMaterial>,
 }
@@ -125,7 +125,7 @@ fn toggle_element(keys: Res<ButtonInput<KeyCode>>, mut style: ResMut<RingStyle>)
     }
 }
 
-fn material(style: &RingStyle, element: Element) -> Handle<SpriteParticle2dMaterial> {
+pub fn material(style: &RingStyle, element: Element) -> Handle<SpriteParticle2dMaterial> {
     match element {
         Element::Fire => style.fire.clone(),
         Element::Ice => style.ice.clone(),

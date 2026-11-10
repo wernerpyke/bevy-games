@@ -5,6 +5,8 @@ mod fireball;
 mod harness;
 mod ring;
 mod rules;
+mod wall;
+mod whirlpool;
 
 use bevy::camera::ScalingMode;
 use bevy::prelude::*;
@@ -36,6 +38,8 @@ fn main() {
             harness::HarnessPlugin,
             fireball::FireballPlugin,
             ring::RingPlugin,
+            wall::WallPlugin,
+            whirlpool::WhirlpoolPlugin,
         ))
         .insert_resource(ClearColor(BACKGROUND))
         .add_systems(Startup, setup)
@@ -56,6 +60,7 @@ fn setup(mut commands: Commands) {
 
     // The stand-in for the player.
     commands.spawn((
+        harness::Player,
         Sprite::from_color(Color::srgb(0.9, 0.9, 0.9), Vec2::new(32.0, 50.0)),
         Transform::from_translation(harness::PLAYER.extend(1.0)),
     ));

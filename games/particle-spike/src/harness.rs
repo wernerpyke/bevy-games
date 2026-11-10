@@ -2,9 +2,9 @@
 //! save screenshots, reload effect files. Effects read `FireEffect` and draw themselves.
 //!
 //! Keys: 0-4 pick an effect, Space fire, H hide the text, R reload effect files, P screenshot (native).
-//! Env `SPIKE_SHOT=<effect>:<seconds>` (native) picks and fires an effect, saves a screenshot and quits.
+//! Env `SPIKE_SHOT=<effect>:<seconds>` (native) picks and fires an effect, saves a screenshot and quits. `SPIKE_AIM=x,y` sets the aim of that shot.
 
-use crate::rules::Rect2;
+use crate::rules::{Rect2, move_rect};
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -21,6 +21,11 @@ const SELECT_KEYS: [KeyCode; 5] = [
 
 /// Where the stand-in player stands.
 pub const PLAYER: Vec2 = Vec2::ZERO;
+/// Speed of the player when WASD moves it.
+const PLAYER_SPEED: f32 = 160.0;
+/// Speed of the red block while it marches at the player, and how near it gets.
+const MARCH_SPEED: f32 = 60.0;
+const MARCH_STOP: f32 = 40.0;
 const ENEMY_START_X: f32 = 410.0;
 const ENEMY_SIZE: Vec2 = Vec2::new(40.0, 48.0);
 /// Speed of the red block when the arrow keys move it.
@@ -53,6 +58,14 @@ pub struct FireEffect {
     pub from: Vec2,
     pub aim: Vec2,
 }
+
+/// The stand-in player. WASD moves it, so effects that follow the player can be seen following.
+#[derive(Component)]
+pub struct Player;
+
+/// While an entity with this marker exists (a wall, a whirlpool), the red block marches at the player.
+#[derive(Component)]
+pub struct MarchTrigger;
 
 /// A stand-in enemy.
 #[derive(Component)]
@@ -91,6 +104,8 @@ impl Plugin for HarnessPlugin {
                     smoke_test.after(fire),
                     toggle_hud,
                     move_enemy,
+                    march_enemy,
+                    move_player,
                     reload_effects,
                     refresh_instances,
                     update_hud,
@@ -170,12 +185,13 @@ fn fire(
     keys: Res<ButtonInput<KeyCode>>,
     selected: Res<Selected>,
     aim: Res<Aim>,
+    player: Single<&Transform, With<Player>>,
     mut fire: MessageWriter<FireEffect>,
 ) {
     if keys.just_pressed(KeyCode::Space) {
         fire.write(FireEffect {
             effect: selected.0,
-            from: PLAYER,
+            from: player.translation.truncate(),
             aim: aim.0,
         });
     }
@@ -205,6 +221,7 @@ fn smoke_test(
 fn move_enemy(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    blockers: Query<&Body, (With<Blocker>, Without<Enemy>)>,
     mut enemy: Single<(&mut Body, &mut Transform), With<Enemy>>,
 ) {
     let mut step = Vec2::ZERO;
@@ -220,10 +237,73 @@ fn move_enemy(
     }
     if step != Vec2::ZERO {
         let (body, transform) = &mut *enemy;
-        body.0.centre += step.normalize() * ENEMY_SPEED * time.delta_secs();
+        let rects: Vec<Rect2> = blockers.iter().map(|b| b.0).collect();
+        body.0.centre = move_rect(
+            body.0,
+            step.normalize() * ENEMY_SPEED * time.delta_secs(),
+            &rects,
+        );
         transform.translation.x = body.0.centre.x;
         transform.translation.y = body.0.centre.y;
     }
+}
+
+type EnemyMut<'a> = (&'a mut Body, &'a mut Transform);
+
+/// While a `MarchTrigger` exists, the red block walks at the player and is stopped by every blocker.
+fn march_enemy(
+    time: Res<Time>,
+    triggers: Query<(), With<MarchTrigger>>,
+    blockers: Query<&Body, (With<Blocker>, Without<Enemy>)>,
+    player: Single<&Transform, (With<Player>, Without<Enemy>)>,
+    mut enemy: Single<EnemyMut, (With<Enemy>, Without<Player>)>,
+) {
+    if triggers.is_empty() {
+        return;
+    }
+    let (body, transform) = &mut *enemy;
+    let to_player = player.translation.truncate() - body.0.centre;
+    if to_player.length() <= MARCH_STOP {
+        return;
+    }
+    let rects: Vec<Rect2> = blockers.iter().map(|b| b.0).collect();
+    let step = to_player.normalize() * MARCH_SPEED * time.delta_secs();
+    body.0.centre = move_rect(body.0, step, &rects);
+    transform.translation.x = body.0.centre.x;
+    transform.translation.y = body.0.centre.y;
+}
+
+/// WASD moves the player. Env `SPIKE_WALK=dx,dy` (px/s) walks it from 0.3 s on, for scripted shots.
+fn move_player(
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    mut player: Single<&mut Transform, With<Player>>,
+    mut walk: Local<Option<Option<Vec2>>>,
+) {
+    let scripted = walk.get_or_insert_with(|| {
+        std::env::var("SPIKE_WALK").ok().and_then(|v| {
+            let (x, y) = v.split_once(',')?;
+            Some(Vec2::new(x.parse().ok()?, y.parse().ok()?))
+        })
+    });
+    let mut step = Vec2::ZERO;
+    for (key, direction) in [
+        (KeyCode::KeyA, Vec2::NEG_X),
+        (KeyCode::KeyD, Vec2::X),
+        (KeyCode::KeyW, Vec2::Y),
+        (KeyCode::KeyS, Vec2::NEG_Y),
+    ] {
+        if keys.pressed(key) {
+            step += direction;
+        }
+    }
+    let velocity = match *scripted {
+        Some(walk) if time.elapsed_secs() > 0.3 => walk,
+        _ => step.normalize_or_zero() * PLAYER_SPEED,
+    };
+    let delta = velocity * time.delta_secs();
+    player.translation.x += delta.x;
+    player.translation.y += delta.y;
 }
 
 fn toggle_hud(keys: Res<ButtonInput<KeyCode>>, mut hud: Single<&mut Visibility, With<HudText>>) {
@@ -258,6 +338,7 @@ fn update_hud(
     selected: Res<Selected>,
     diagnostics: Res<DiagnosticsStore>,
     stores: Query<&ParticleStore>,
+    whirl: Res<crate::whirlpool::WhirlLook>,
     mut hud: Single<&mut Text, With<HudText>>,
 ) {
     let frame_ms = diagnostics
@@ -266,9 +347,14 @@ fn update_hud(
         .unwrap_or(0.0);
     let particles: usize = stores.iter().map(ParticleStore::len).sum();
     hud.0 = format!(
-        "{} {} | particles {particles} | {frame_ms:.1} ms ({:.0} fps)\n0-4 pick, Space fire, I ice or fire ring, B squares, arrows move red, R reload, H hide{}",
+        "{} {}{} | particles {particles} | {frame_ms:.1} ms ({:.0} fps)\n0-4 pick, Space fire, WASD move, I ice or fire, V water variant, B squares, arrows move red, R reload, H hide{}",
         selected.0,
         EFFECTS[selected.0],
+        if selected.0 == 4 {
+            format!(" [{}]", whirl.label())
+        } else {
+            String::new()
+        },
         if frame_ms > 0.0 {
             1000.0 / frame_ms
         } else {
@@ -333,7 +419,12 @@ mod native {
         let t = time.elapsed_secs();
         if *stage == 0 && t >= 0.3 {
             selected.0 = effect;
-            aim.0 = Vec2::new(410.0, 0.0);
+            // `SPIKE_AIM=x,y` aims elsewhere, for example down for a horizontal wall.
+            aim.0 = std::env::var("SPIKE_AIM")
+                .ok()
+                .and_then(|v| v.split_once(',').map(|(x, y)| (x.to_owned(), y.to_owned())))
+                .and_then(|(x, y)| Some(Vec2::new(x.parse().ok()?, y.parse().ok()?)))
+                .unwrap_or(Vec2::new(410.0, 0.0));
             fire.write(FireEffect {
                 effect,
                 from: PLAYER,

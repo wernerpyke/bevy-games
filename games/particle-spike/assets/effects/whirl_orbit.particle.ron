@@ -1,0 +1,20 @@
+#![enable(implicit_some)]
+// Whirlpool variant B (attractor): droplets leave the emitter along the tangent of the ring (the emitter is turned that
+// way in code) and an attractor at the player (set in code, whirlpool.rs ORBIT_STRENGTH) bends them.
+// The start speed is above the circular speed, so the droplets spiral outwards, from the inner edge of the band to just past the outer edge (a shield that pushes away).
+(
+    spawn_rate: 0.03,
+    spawn_amount: 1,
+    emission_shape: Circle(3.0),
+    lifetime: (1.3, 0.2),
+    linear_speed: (185.0, 0.05),
+    direction: ((1.0, 0.0), 0.0),
+    scale: (7.0, 0.3),
+    scale_curve: (points: [(8.0, 0.0, None), (6.0, 0.5, None), (2.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 0.92, green: 0.97, blue: 1.0, alpha: 0.95), 0.0, None),
+        ((red: 0.6, green: 0.85, blue: 1.0, alpha: 0.9), 0.3, None),
+        ((red: 0.29, green: 0.63, blue: 0.91, alpha: 0.6), 0.7, None),
+        ((red: 0.17, green: 0.42, blue: 0.75, alpha: 0.0), 1.0, None),
+    ]),
+)

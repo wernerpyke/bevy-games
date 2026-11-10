@@ -1,0 +1,20 @@
+#![enable(implicit_some)]
+// Wall crystal: one upright shard (or flame) at a time around a point on the wall line. The sheet has 4 frames that
+// play over the life: shards grow, flames flicker. Long life and a high rate keep a few overlapping at each spot, so the
+// wall reads as standing there. The lifetime spread de-synchronises neighbours. Particles hardly move.
+(
+    spawn_rate: 0.32,
+    spawn_amount: 1,
+    emission_shape: Circle(9.0),
+    lifetime: (1.6, 0.4),
+    linear_speed: (2.0, 1.0),
+    direction: ((0.0, 1.0), 0.3),
+    scale: (44.0, 0.2),
+    scale_curve: (points: [(40.0, 0.0, None), (46.0, 0.5, None), (42.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 0.0), 0.0, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.12, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.8, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 0.0), 1.0, None),
+    ]),
+)

@@ -41,6 +41,38 @@ pub fn rect_overlaps_band(centre: Vec2, inner: f32, outer: f32, rect: Rect2) -> 
         && rect.farthest_corner_distance(centre) >= inner
 }
 
+/// True when two rectangles overlap (touching edges do not count).
+pub fn rects_overlap(a: Rect2, b: Rect2) -> bool {
+    let reach = (a.size + b.size) / 2.0;
+    let gap = (a.centre - b.centre).abs();
+    gap.x < reach.x && gap.y < reach.y
+}
+
+/// Moves `rect` by `step`, one axis at a time, so it slides along a blocker. An axis move is refused when it would
+/// put the rectangle into a blocker that it does not overlap yet (a body that starts inside can walk out).
+pub fn move_rect(rect: Rect2, step: Vec2, blockers: &[Rect2]) -> Vec2 {
+    let mut centre = rect.centre;
+    for axis in [Vec2::X, Vec2::Y] {
+        let next = Rect2::new(centre + step * axis, rect.size);
+        let blocked = blockers
+            .iter()
+            .any(|b| rects_overlap(next, *b) && !rects_overlap(Rect2::new(centre, rect.size), *b));
+        if !blocked {
+            centre = next.centre;
+        }
+    }
+    centre
+}
+
+/// How far a shield around `centre` pushes a body this frame: straight away from the centre at `speed`, while any part of the
+/// body is inside `radius`. Nothing once it is clear.
+pub fn push_delta(centre: Vec2, radius: f32, rect: Rect2, speed: f32, dt: f32) -> Vec2 {
+    if !circle_hits_rect(centre, radius, rect) {
+        return Vec2::ZERO;
+    }
+    (rect.centre - centre).try_normalize().unwrap_or(Vec2::X) * speed * dt
+}
+
 /// Moves a circle from `from` to `to` in small steps and returns the first share of the move (0 to 1) at which
 /// it touches the rectangle. The step is half the radius, so a fast circle cannot jump over a thin rectangle.
 pub fn sweep_circle(from: Vec2, to: Vec2, radius: f32, rect: Rect2) -> Option<f32> {
@@ -110,6 +142,57 @@ mod tests {
     fn a_rectangle_that_spans_the_whole_band_is_in_it() {
         let wide = Rect2::new(Vec2::ZERO, Vec2::new(200.0, 8.0));
         assert!(rect_overlaps_band(Vec2::ZERO, 20.0, 30.0, wide));
+    }
+
+    #[test]
+    fn touching_rectangles_do_not_overlap() {
+        let beside = Rect2::new(Vec2::new(18.0, 0.0), Vec2::new(8.0, 8.0));
+        assert!(!rects_overlap(RECT, beside));
+        assert!(rects_overlap(
+            RECT,
+            Rect2::new(Vec2::new(17.0, 0.0), Vec2::new(8.0, 8.0))
+        ));
+    }
+
+    #[test]
+    fn a_move_into_a_blocker_stops_and_slides() {
+        let wall = Rect2::new(Vec2::new(0.0, 20.0), Vec2::new(100.0, 10.0));
+        let body = Rect2::new(Vec2::new(0.0, 0.0), Vec2::new(10.0, 10.0));
+        // Moving up into the wall is refused, moving sideways along it is not.
+        let after = move_rect(body, Vec2::new(3.0, 12.0), &[wall]);
+        assert_eq!(after, Vec2::new(3.0, 0.0));
+    }
+
+    #[test]
+    fn a_body_inside_a_blocker_can_walk_out() {
+        let wall = Rect2::new(Vec2::ZERO, Vec2::new(100.0, 100.0));
+        let body = Rect2::new(Vec2::new(45.0, 0.0), Vec2::new(10.0, 10.0));
+        assert_eq!(
+            move_rect(body, Vec2::new(2.0, 0.0), &[wall]),
+            Vec2::new(47.0, 0.0)
+        );
+    }
+
+    #[test]
+    fn the_shield_pushes_a_body_straight_away_until_it_is_clear() {
+        let near = Rect2::new(Vec2::new(0.0, 100.0), Vec2::new(40.0, 48.0));
+        let push = push_delta(Vec2::ZERO, 110.0, near, 200.0, 0.1);
+        assert!(
+            push.x.abs() < 1e-4 && (push.y - 20.0).abs() < 1e-4,
+            "{push}"
+        );
+        // The nearest edge of this body is at y = 130, outside a radius of 110.
+        let clear = Rect2::new(Vec2::new(0.0, 154.0), Vec2::new(40.0, 48.0));
+        assert_eq!(push_delta(Vec2::ZERO, 110.0, clear, 200.0, 0.1), Vec2::ZERO);
+    }
+
+    #[test]
+    fn a_body_on_the_player_is_still_pushed_somewhere() {
+        let on_top = Rect2::new(Vec2::ZERO, Vec2::new(10.0, 10.0));
+        assert_ne!(
+            push_delta(Vec2::ZERO, 110.0, on_top, 200.0, 0.1),
+            Vec2::ZERO
+        );
     }
 
     #[test]
