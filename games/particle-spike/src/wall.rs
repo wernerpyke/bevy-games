@@ -10,7 +10,7 @@
 //!   The cubes start one after another from the middle outwards (`GROW_SPREAD`). Cubes in front (lower on screen) are
 //!   drawn over the ones behind. In the last `FADE_SECS` of the wall the sprites fade out with their alpha, and they are
 //!   removed with the wall.
-//! - Fire: a row of Enoki emitters that keep spawning flames (`wall_fire` sprites). When the wall is gone the emitters
+//! - Fire: a row of Enoki emitters that keep spawning flames (`fire_ring` sprites). When the wall is gone the emitters
 //!   stop and remove themselves after their last particle.
 
 use crate::glow::Glow;
@@ -199,7 +199,7 @@ fn launch(
                     Transform::from_translation(point.extend(Z_WALL)),
                     WallEmitter(wall),
                 ));
-                look(&style, Element::Fire).insert(&glow, &mut flame);
+                look(&style, Element::Fire, 0).insert(&glow, &mut flame);
             }
         }
     }

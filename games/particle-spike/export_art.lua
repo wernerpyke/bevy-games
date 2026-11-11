@@ -6,7 +6,7 @@
 --     --script-param out=games/particle-spike/assets/generated --script games/particle-spike/export_art.lua
 local spr = app.sprite
 local out = app.params["out"]
-local names = { blob = true, wall_fire = true, wall_ice = true }
+local names = { blob = true, fire_ring = true, ice_ring1 = true, ice_ring2 = true, ice_ring3 = true, ice_ring4 = true }
 
 for _, tag in ipairs(spr.tags) do
   if names[tag.name] then
@@ -23,7 +23,7 @@ for _, tag in ipairs(spr.tags) do
     -- Enoki draws every particle as a square quad, so a sheet with tall cells would be stretched. The wall sprites are
     -- tall, so their cells are made square, with the sprite centred in the cell.
     local cw, ch = w, h
-    if string.sub(tag.name, 1, 4) == "wall" then cw, ch = math.max(w, h), math.max(w, h) end
+    if string.sub(tag.name, 1, 9) == "fire_ring" or string.sub(tag.name, 1, 8) == "ice_ring" then cw, ch = math.max(w, h), math.max(w, h) end
     local function cell(img)
       local c = Image(cw, ch, ColorMode.RGB)
       c:drawImage(Image(img, bounds), Point((cw - w) // 2, (ch - h) // 2))

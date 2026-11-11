@@ -4,7 +4,7 @@
 //! Gameplay is plain: the radius is eased out (`rules::ring_radius`) up to `MAX_RADIUS` over `GROW_SECS`, then it stays. The ring is a band (`band`).
 //! A body that overlaps the band is hurt, and again every `HURT_INTERVAL` seconds while it stays in it, so a body that
 //! walks into the band later is hurt too (`rules::rect_overlaps_band`). After `BURN_SECS` the ring ends.
-//! The look is made of upward triangles: flames (`wall_fire`) or ice shards (`wall_ice`), the same sprites as the wall.
+//! The look is made of upward triangles: flames (`fire_ring`) or ice shards (`ice_ring1` to `ice_ring4`; each emitter picks one of the four at random).
 //! - Growing: `FRONT_EMITTERS` emitters on the circle, moved outward every frame to the eased radius (`move_front`). Their
 //!   particles stay where they are born, so the band behind the front is the trail, and the front is exact whatever the
 //!   easing. The hurt band reaches back `TRAIL_SECS` in time.
@@ -21,6 +21,7 @@ use crate::rules::{rect_overlaps_band, ring_radius};
 use bevy::prelude::*;
 use bevy_enoki::prelude::*;
 use std::f32::consts::TAU;
+use std::time::Duration;
 
 /// Indexes of the effects in `harness::EFFECTS`.
 const FIRE_RING: usize = 2;
@@ -49,10 +50,20 @@ const TRAIL_SECS: f32 = 0.12;
 
 const FRONT: (&str, f32) = ("effects/ring_front.particle.ron", 2.1);
 const BURN: &str = "effects/ring_burn.particle.ron";
+/// Ice has two emitters per position, each at half the spawn rate (`spawn_rate` in these files), so the shards of
+/// neighbouring emitters mix. The second one starts half a period late, so its shards fall between the first one's.
+const FRONT_ICE: (&str, f32) = ("effects/ring_front_ice.particle.ron", 0.06);
+const BURN_ICE: (&str, f32) = ("effects/ring_burn_ice.particle.ron", 0.2);
 const Z_BURN: f32 = 2.2;
 /// Square frames side by side (fire 6, ice 4): flames flicker, shards grow, over the life of a particle.
-const FIRE_SPRITE: &str = "generated/wall_fire.png";
-const ICE_SPRITE: &str = "generated/wall_ice.png";
+const FIRE_SPRITE: &str = "generated/fire_ring.png";
+/// Four hand-drawn shard sets (4 frames each). Every ice emitter picks one of them at random (`look`).
+const ICE_SPRITES: [&str; 4] = [
+    "generated/ice_ring1.png",
+    "generated/ice_ring2.png",
+    "generated/ice_ring3.png",
+    "generated/ice_ring4.png",
+];
 
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum Element {
@@ -63,7 +74,18 @@ pub enum Element {
 #[derive(Resource)]
 pub struct RingStyle {
     fire: SpriteLook,
-    ice: SpriteLook,
+    ice: [SpriteLook; 4],
+}
+
+/// A scrambled number for emitter `index` of `owner`. `salt` gives each use its own number. No random crate needed.
+fn roll(owner: Entity, index: usize, salt: u32) -> u32 {
+    let mut x = (owner.to_bits() as u32 ^ (index as u32 + 1).wrapping_mul(0x9E37_79B1))
+        .wrapping_add(salt.wrapping_mul(0x85EB_CA6B));
+    x ^= x >> 15;
+    x = x.wrapping_mul(0x2C1B_3C6D);
+    x ^= x >> 12;
+    x = x.wrapping_mul(0x297A_2D39);
+    x ^ (x >> 15)
 }
 
 /// The ring. `hurt` holds the age of the ring at the last hit of each body. `burn` runs while the ring is at the maximum radius.
@@ -109,17 +131,55 @@ fn load_style(
 ) {
     library.0.push(server.load(FRONT.0));
     library.0.push(server.load(BURN));
+    library.0.push(server.load(FRONT_ICE.0));
+    library.0.push(server.load(BURN_ICE.0));
     commands.insert_resource(RingStyle {
         fire: SpriteLook::new(&mut normals, &mut adds, server.load(FIRE_SPRITE), 6),
-        ice: SpriteLook::new(&mut normals, &mut adds, server.load(ICE_SPRITE), 4),
+        ice: ICE_SPRITES.map(|path| SpriteLook::new(&mut normals, &mut adds, server.load(path), 4)),
     });
 }
 
-pub fn look(style: &RingStyle, element: Element) -> &SpriteLook {
+/// The sprite look of an element. Fire has one sheet. Ice has two shard sets, and `roll` picks one.
+pub fn look(style: &RingStyle, element: Element, roll: u32) -> &SpriteLook {
     match element {
         Element::Fire => &style.fire,
-        Element::Ice => &style.ice,
+        Element::Ice => &style.ice[roll as usize % style.ice.len()],
     }
+}
+
+/// Emitters at one position on the ring, and the effect file and spawn rate each one uses.
+fn per_position(
+    element: Element,
+    fire: (&'static str, f32),
+    ice: (&'static str, f32),
+) -> (usize, &'static str, f32) {
+    match element {
+        Element::Fire => (1, fire.0, fire.1),
+        Element::Ice => (2, ice.0, ice.1),
+    }
+}
+
+/// The look of emitter `k` at position `index`. For ice the emitters at one position get different shard sets.
+fn pick(
+    style: &RingStyle,
+    element: Element,
+    owner: Entity,
+    index: usize,
+    salt: u32,
+    k: usize,
+) -> &SpriteLook {
+    let first = roll(owner, index, salt);
+    let step = 1 + roll(owner, index, salt + 10) % (ICE_SPRITES.len() as u32 - 1);
+    look(style, element, first + k as u32 * step)
+}
+
+/// Gives emitter `k` of a position a spawn timer that starts at its share of the period.
+fn stagger(k: usize, per_position: usize, rate: f32) -> ParticleSpawnerState {
+    let mut state = ParticleSpawnerState::default();
+    state.timer.set_elapsed(Duration::from_secs_f32(
+        rate * k as f32 / per_position as f32,
+    ));
+    state
 }
 
 fn launch(
@@ -145,16 +205,20 @@ fn launch(
                 element,
             })
             .id();
+        let (count, file, rate) = per_position(element, (FRONT.0, 0.03), FRONT_ICE);
         for i in 0..FRONT_EMITTERS {
-            let mut front = commands.spawn((
-                ParticleEffectHandle(server.load(FRONT.0)),
-                Transform::from_translation(shot.from.extend(FRONT.1)),
-                Front {
-                    owner,
-                    angle: TAU * i as f32 / FRONT_EMITTERS as f32,
-                },
-            ));
-            look(&style, element).insert(&glow, &mut front);
+            for k in 0..count {
+                let mut front = commands.spawn((
+                    ParticleEffectHandle(server.load(file)),
+                    Transform::from_translation(shot.from.extend(FRONT.1)),
+                    Front {
+                        owner,
+                        angle: TAU * i as f32 / FRONT_EMITTERS as f32,
+                    },
+                ));
+                pick(&style, element, owner, i, 1, k).insert(&glow, &mut front);
+                front.insert(stagger(k, count, rate));
+            }
         }
     }
 }
@@ -187,15 +251,19 @@ fn grow_rings(
 
         if ring.burn.is_none() && ring.radius >= MAX_RADIUS - BURN_LEAD {
             ring.burn = Some(Timer::from_seconds(BURN_SECS, TimerMode::Once));
+            let (count, file, rate) = per_position(ring.element, (BURN, 0.1), BURN_ICE);
             for i in 0..BURNERS {
                 let angle = TAU * i as f32 / BURNERS as f32;
                 let position = ring.centre + Vec2::from_angle(angle) * MAX_RADIUS;
-                let mut burner = commands.spawn((
-                    ParticleEffectHandle(server.load(BURN)),
-                    Transform::from_translation(position.extend(Z_BURN)),
-                    Burner(entity),
-                ));
-                look(&style, ring.element).insert(&glow, &mut burner);
+                for k in 0..count {
+                    let mut burner = commands.spawn((
+                        ParticleEffectHandle(server.load(file)),
+                        Transform::from_translation(position.extend(Z_BURN)),
+                        Burner(entity),
+                    ));
+                    pick(&style, ring.element, entity, i, 2, k).insert(&glow, &mut burner);
+                    burner.insert(stagger(k, count, rate));
+                }
             }
         }
 
