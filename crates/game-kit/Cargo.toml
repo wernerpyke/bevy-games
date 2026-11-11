@@ -3,6 +3,10 @@ name = "game-kit"
 version.workspace = true
 edition.workspace = true
 
+# The kit has no doc tests, so skip the empty rustdoc run on every `test` (about 3 s).
+[lib]
+doctest = false
+
 [dependencies]
 bevy = { workspace = true, features = ["ui_api"] }
 bevy_aseprite_ultra.workspace = true

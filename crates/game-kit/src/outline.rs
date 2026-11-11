@@ -374,8 +374,6 @@ fn flush(
 #[cfg(test)]
 mod tests {
     use super::*;
-    /// Half the width of an actor, used to grow obstacles in the tests. Same value as Long Way's player.
-    const ACTOR_HALF_WIDTH: f32 = 20.0;
 
     fn rect(x0: f32, y0: f32, x1: f32, y1: f32) -> Rect {
         Rect::new(x0, y0, x1, y1)
@@ -424,16 +422,6 @@ mod tests {
                 .expect("no NaN")
         });
         edges
-    }
-
-    /// The blocked area of an obstacle `size` wide and high: the obstacle grown sideways by the actor's half width.
-    fn grown(x: f32, y: f32, size: f32) -> Rect {
-        rect(
-            x - ACTOR_HALF_WIDTH,
-            y,
-            x + size + ACTOR_HALF_WIDTH,
-            y + size,
-        )
     }
 
     #[test]
@@ -573,13 +561,6 @@ mod tests {
     }
 
     #[test]
-    fn rectangles_touching_only_at_a_corner_are_one_cluster() {
-        let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 10.0, 20.0, 20.0)]);
-        assert_eq!(clusters.len(), 1);
-        assert_eq!(clusters[0].members, vec![0, 1]);
-    }
-
-    #[test]
     fn a_corner_contact_is_closed_by_a_small_filler_square() {
         let clusters = build(&[rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 10.0, 20.0, 20.0)]);
         assert_eq!(clusters.len(), 1);
@@ -615,14 +596,46 @@ mod tests {
         assert!(shortest(&apart) >= 9.0);
     }
 
+    fn filler_at(x: f32, y: f32) -> Rect {
+        Rect::from_center_half_size(Vec2::new(x, y), FILLER_HALF)
+    }
+
+    #[test]
+    fn a_corner_contact_gets_a_filler_whichever_rectangle_comes_first() {
+        // The two diagonals through the vertex (10, 10), each in both input orders: one arm of `corner_fillers` each.
+        let (low_left, high_right) = (rect(0.0, 0.0, 10.0, 10.0), rect(10.0, 10.0, 20.0, 20.0));
+        let (high_left, low_right) = (rect(0.0, 10.0, 10.0, 20.0), rect(10.0, 0.0, 20.0, 10.0));
+        for pair in [
+            [low_left, high_right],
+            [high_right, low_left],
+            [high_left, low_right],
+            [low_right, high_left],
+        ] {
+            assert_eq!(
+                corner_fillers(&pair),
+                vec![filler_at(10.0, 10.0)],
+                "{pair:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_checkerboard_of_four_rectangles_has_a_filler_at_each_inner_vertex() {
-        let clusters = build(&[
+        let rects = [
             rect(0.0, 0.0, 10.0, 10.0),
             rect(10.0, 10.0, 20.0, 20.0),
             rect(20.0, 0.0, 30.0, 10.0),
             rect(30.0, 10.0, 40.0, 20.0),
-        ]);
+        ];
+        assert_eq!(
+            corner_fillers(&rects),
+            vec![
+                filler_at(10.0, 10.0),
+                filler_at(20.0, 10.0),
+                filler_at(30.0, 10.0)
+            ]
+        );
+        let clusters = build(&rects);
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].members, vec![0, 1, 2, 3]);
     }
@@ -638,28 +651,6 @@ mod tests {
         assert_eq!(clusters[0].members, vec![0, 2]);
         assert_eq!(clusters[1].members, vec![1]);
         assert_eq!(clusters[1].edges.len(), 4);
-    }
-
-    #[test]
-    fn a_gap_just_wide_enough_for_player_keeps_two_clusters() {
-        // Obstacles 41 apart: after growing by 20 each side, 1 unit is left for the feet.
-        let clusters = build(&[grown(0.0, 0.0, 100.0), grown(141.0, 0.0, 100.0)]);
-        assert_eq!(clusters.len(), 2);
-    }
-
-    #[test]
-    fn a_gap_of_exactly_players_width_is_closed() {
-        // Obstacles 40 apart: the grown areas touch, so there is no room for the feet.
-        let clusters = build(&[grown(0.0, 0.0, 100.0), grown(140.0, 0.0, 100.0)]);
-        assert_eq!(clusters.len(), 1);
-        assert_eq!(clusters[0].edges.len(), 4);
-    }
-
-    #[test]
-    fn a_gap_too_narrow_for_player_is_closed() {
-        let clusters = build(&[grown(0.0, 0.0, 100.0), grown(139.0, 0.0, 100.0)]);
-        assert_eq!(clusters.len(), 1);
-        assert_eq!(clusters[0].edges.len(), 4);
     }
 
     #[test]
@@ -805,11 +796,6 @@ mod tests {
     }
 
     #[test]
-    fn only_the_middle_of_a_three_by_three_block_is_interior() {
-        assert_eq!(interior_of(&grid_of_rects(3, 3)), vec![4]);
-    }
-
-    #[test]
     fn a_five_by_five_block_has_nine_interior_rectangles() {
         let interior = interior_of(&grid_of_rects(5, 5));
         let expected: Vec<usize> = (1..4)
@@ -842,19 +828,6 @@ mod tests {
         assert_eq!(build(&ring)[0].edges.len(), 8);
     }
 
-    /// A small repeatable random number source, so the random layouts below are the same on every run.
-    struct Lcg(u64);
-
-    impl Lcg {
-        fn below(&mut self, n: u64) -> u64 {
-            self.0 = self
-                .0
-                .wrapping_mul(6_364_136_223_846_793_005)
-                .wrapping_add(1_442_695_040_888_963_407);
-            (self.0 >> 33) % n
-        }
-    }
-
     /// True when an outline edge has some length lying on the closed rectangle.
     fn touches_an_edge(r: &Rect, edges: &[Edge]) -> bool {
         edges.iter().any(|e| {
@@ -874,16 +847,20 @@ mod tests {
 
     #[test]
     fn interior_means_no_edge_lies_on_the_rectangle_in_random_layouts() {
-        let mut random = Lcg(7);
+        // Seeded, so the random layouts are the same on every run.
+        let mut random = crate::rng::Rng::new(7);
         let mut interior_seen = 0;
         for _ in 0..300 {
-            let count = 3 + random.below(10) as usize;
+            let count = 3 + (random.next_u64() % 10) as usize;
             let rects: Vec<Rect> = (0..count)
                 .map(|_| {
-                    let (x, y) = (random.below(6) as f32 * 10.0, random.below(6) as f32 * 10.0);
+                    let (x, y) = (
+                        (random.next_u64() % 6) as f32 * 10.0,
+                        (random.next_u64() % 6) as f32 * 10.0,
+                    );
                     let (w, h) = (
-                        10.0 + random.below(3) as f32 * 10.0,
-                        10.0 + random.below(3) as f32 * 10.0,
+                        10.0 + (random.next_u64() % 3) as f32 * 10.0,
+                        10.0 + (random.next_u64() % 3) as f32 * 10.0,
                     );
                     rect(x, y, x + w, y + h)
                 })

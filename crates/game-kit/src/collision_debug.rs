@@ -294,4 +294,132 @@ mod tests {
         assert!(boxes.contains(&(Vec2::new(0.0, 20.0), Vec2::new(LINE_THICKNESS, 20.0))));
         assert!(boxes.contains(&(Vec2::new(40.0, 20.0), Vec2::new(LINE_THICKNESS, 20.0))));
     }
+
+    const OUTLINE_Z: f32 = 1.0;
+    const INTERIOR_Z: f32 = 2.0;
+    const FEET_Z: f32 = 3.0;
+
+    fn overlay_app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<CollisionWorld>()
+            .insert_resource(DebugSettings {
+                cell_size: 64.0,
+                grid_color: Color::WHITE,
+                grid_origin: crate::debug::GridOrigin::Center,
+                target_name: "t",
+                grid_z: 0.0,
+                hud_z_index: 0,
+                rows_from_top: None,
+                show_grid: true,
+                show_info: true,
+            })
+            .add_plugins(CollisionDebugPlugin {
+                outline_z: OUTLINE_Z,
+                interior_z: INTERIOR_Z,
+                feet_z: FEET_Z,
+            });
+        app.update();
+        app
+    }
+
+    /// The colour and draw order of every outline sprite.
+    fn outline_sprites(app: &mut App) -> Vec<(Color, f32)> {
+        let world = app.world_mut();
+        world
+            .query_filtered::<(&Sprite, &Transform), With<OutlineSprite>>()
+            .iter(world)
+            .map(|(sprite, t)| (sprite.color, t.translation.z))
+            .collect()
+    }
+
+    fn markers(app: &mut App) -> Vec<Vec3> {
+        let world = app.world_mut();
+        world
+            .query_filtered::<&Transform, With<FeetMarker>>()
+            .iter(world)
+            .map(|t| t.translation)
+            .collect()
+    }
+
+    #[test]
+    fn the_outline_and_the_interior_areas_are_drawn_and_replaced_when_the_world_changes() {
+        let mut app = overlay_app();
+        // A block of 3 by 3 cells: the centre cell touches no empty space.
+        let cells: Vec<Rect> = (0..9)
+            .map(|i| {
+                let min = Vec2::new((i % 3) as f32, (i / 3) as f32) * 64.0;
+                Rect::from_corners(min, min + 64.0)
+            })
+            .collect();
+        let mut world = app.world_mut().resource_mut::<CollisionWorld>();
+        world.add_blocked(&cells);
+        let edges = world.edges().len();
+        assert_eq!(world.interior_areas().count(), 1);
+        app.update();
+        let sprites = outline_sprites(&mut app);
+        let outline = sprites
+            .iter()
+            .filter(|s| **s == (OUTLINE_COLOR, OUTLINE_Z))
+            .count();
+        let interior = sprites
+            .iter()
+            .filter(|s| **s == (INTERIOR_COLOR, INTERIOR_Z))
+            .count();
+        assert_eq!(
+            (outline, interior, sprites.len()),
+            (2 * edges, 4, 2 * edges + 4)
+        );
+
+        let mut world = app.world_mut().resource_mut::<CollisionWorld>();
+        world.clear();
+        world.add_blocked(&[Rect::new(0.0, 0.0, 64.0, 64.0)]);
+        app.update();
+        assert_eq!(
+            outline_sprites(&mut app),
+            vec![(OUTLINE_COLOR, OUTLINE_Z); 8]
+        );
+    }
+
+    #[test]
+    fn a_feet_marker_follows_the_feet_and_goes_with_its_entity() {
+        let mut app = overlay_app();
+        let target = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(30.0, 50.0, 0.0),
+                DepthSort { feet_offset: 10.0 },
+            ))
+            .id();
+        app.update();
+        assert_eq!(markers(&mut app), [Vec3::new(30.0, 40.0, FEET_Z)]);
+        app.world_mut()
+            .get_mut::<Transform>(target)
+            .unwrap()
+            .translation = Vec3::new(-20.0, 5.0, 0.0);
+        app.update();
+        assert_eq!(markers(&mut app), [Vec3::new(-20.0, -5.0, FEET_Z)]);
+        app.world_mut().despawn(target);
+        app.update();
+        assert_eq!(markers(&mut app), []);
+    }
+
+    #[test]
+    fn the_overlay_follows_the_grid_switch() {
+        let mut app = overlay_app();
+        let visibility = |app: &mut App| {
+            let world = app.world_mut();
+            *world
+                .query_filtered::<&Visibility, With<OverlayRoot>>()
+                .single(world)
+                .unwrap()
+        };
+        assert_eq!(visibility(&mut app), Visibility::Inherited);
+        app.world_mut().resource_mut::<DebugSettings>().show_grid = false;
+        app.update();
+        assert_eq!(visibility(&mut app), Visibility::Hidden);
+        app.world_mut().resource_mut::<DebugSettings>().show_grid = true;
+        app.update();
+        assert_eq!(visibility(&mut app), Visibility::Inherited);
+    }
 }

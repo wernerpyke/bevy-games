@@ -19,7 +19,7 @@
 #                                             # for example: script long-way "wait:0.5;screenshot:start;quit"
 #                                             # an optional map file after the commands starts the game in that map: script long-way "..." 2.txt
 #   ./dev-scripts/rust.sh size                # disk use of target/ and its biggest folders
-#   ./dev-scripts/rust.sh prune               # delete the incremental cache and stale binaries (see CLAUDE.md, "Disk use")
+#   ./dev-scripts/rust.sh prune               # delete the incremental cache, stale binaries and stale .o files (see CLAUDE.md, "Disk use")
 #   ./dev-scripts/rust.sh <other> [args...]   # passed straight to cargo
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -118,9 +118,20 @@ case "${1:-}" in
     du -sh target target/* target/debug/* 2>/dev/null | sort -rh | head -12
     ;;
   prune)
-    # Deletes what a build makes again on demand: the incremental cache and binaries of crates that no longer
-    # exist in games/. Then cargo-sweep (optional, if installed) removes outputs not used for 14 days.
+    # Deletes what a build makes again on demand: the incremental cache, binaries of crates that no longer exist in
+    # games/, and stale debug-info objects. Then cargo-sweep (optional, if installed) removes outputs not used for
+    # 14 days. Do not run it while a build runs.
     rm -rf target/debug/incremental target/release/incremental
+    # On macOS every dev build leaves its .o files in deps/ and a rebuild never removes the old ones (2026-11-11:
+    # 24,000 files, 3.7 GB). Older than 15 minutes means no build in progress still needs them.
+    stale_objects=0
+    for deps in target/debug/deps target/release/deps; do
+      [ -d "$deps" ] || continue
+      count=$(find "$deps" -maxdepth 1 -name '*.o' -mmin +15 | wc -l | tr -d ' ')
+      find "$deps" -maxdepth 1 -name '*.o' -mmin +15 -delete
+      stale_objects=$((stale_objects + count))
+    done
+    echo "removed $stale_objects stale object files"
     for file in target/debug/* target/release/*; do
       [ -f "$file" ] && [ -x "$file" ] || continue
       name="$(basename "$file")"

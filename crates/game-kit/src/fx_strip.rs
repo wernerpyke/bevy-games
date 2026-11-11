@@ -290,6 +290,94 @@ mod tests {
     }
 
     #[test]
+    fn a_frame_in_a_lower_row_of_the_atlas_is_read_from_its_row() {
+        // Two frames of 4x4 stacked in an atlas 4 wide and 8 high.
+        let mut layout = TextureAtlasLayout::new_empty(UVec2::new(4, 8));
+        layout.add_texture(URect::new(0, 0, 4, 4));
+        layout.add_texture(URect::new(0, 4, 4, 8));
+        let mut data = vec![0; 4 * 8 * BYTES];
+        paint(&mut data, 4, 1, 0, 10); // frame 0
+        paint(&mut data, 4, 2, 5, 20); // frame 1: pixel (2, 1)
+        let strip = strip_from_atlas(&data, 4, &layout, &[1], false).unwrap();
+        assert_eq!((strip.cell, strip.rgba[0]), (UVec2::new(1, 1), 20));
+    }
+
+    /// `build_looks` with one requested look, of tag "fly" in an `.aseprite` file that is not loaded yet.
+    fn looks_app() -> (App, Handle<Aseprite>) {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Aseprite>()
+            .init_asset::<TextureAtlasLayout>()
+            .init_asset::<Image>()
+            .init_asset::<SpriteParticle2dMaterial>()
+            .init_asset::<AdditiveSprite>()
+            .init_resource::<FxLooks>()
+            .add_systems(Update, build_looks);
+        let file = app.world().resource::<Assets<Aseprite>>().reserve_handle();
+        app.world_mut()
+            .resource_mut::<FxLooks>()
+            .pending
+            .push(Pending {
+                name: "spark".to_owned(),
+                aseprite: file.clone(),
+                tag: "fly".to_owned(),
+                square: false,
+            });
+        (app, file)
+    }
+
+    /// Loads an `.aseprite` file with no tags, and its atlas (the default handles of `Aseprite::default()`).
+    fn load(app: &mut App, file: &Handle<Aseprite>, with_atlas: bool) {
+        let world = app.world_mut();
+        world
+            .resource_mut::<Assets<Aseprite>>()
+            .insert(file, Aseprite::default())
+            .unwrap();
+        if with_atlas {
+            let (data, layout) = atlas(1);
+            world
+                .resource_mut::<Assets<TextureAtlasLayout>>()
+                .insert(&Handle::default(), layout)
+                .unwrap();
+            let image = Image::new(
+                Extent3d {
+                    width: 4,
+                    height: 4,
+                    depth_or_array_layers: 1,
+                },
+                TextureDimension::D2,
+                data,
+                TextureFormat::Rgba8UnormSrgb,
+                RenderAssetUsages::default(),
+            );
+            world
+                .resource_mut::<Assets<Image>>()
+                .insert(&Handle::default(), image)
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn a_look_waits_until_its_file_and_its_atlas_are_loaded() {
+        let (mut app, file) = looks_app();
+        app.update();
+        assert!(!app.world().resource::<FxLooks>().settled());
+        load(&mut app, &file, false);
+        app.update();
+        assert!(!app.world().resource::<FxLooks>().settled(), "no atlas yet");
+    }
+
+    #[test]
+    fn a_look_whose_tag_is_missing_is_dropped() {
+        let (mut app, file) = looks_app();
+        load(&mut app, &file, true);
+        app.update();
+        let looks = app.world().resource::<FxLooks>();
+        assert!(looks.settled());
+        assert!(looks.get("spark").is_none());
+    }
+
+    #[test]
     fn no_frames_or_a_missing_frame_or_an_empty_tag_gives_nothing() {
         let (data, layout) = atlas(1);
         assert_eq!(strip_from_atlas(&data, 4, &layout, &[], false), None);

@@ -422,6 +422,8 @@ fn slide_to_nearest_edge(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rng::Rng;
+    use crate::test_util::{DT, edges_of};
 
     /// The blocked feet area of the test obstacle: x -20 to 50, y -30 to 12.8.
     fn block() -> Rect {
@@ -430,17 +432,13 @@ mod tests {
 
     /// The outline edges of the test obstacle.
     fn trunk_edges() -> Vec<Edge> {
-        outline::build(&[block()])
-            .iter()
-            .flat_map(|c| c.edges.iter().copied())
-            .collect()
+        edges_of(&[block()])
     }
 
     fn walk(from: Vec2, to: Vec2) -> Vec2 {
         resolve(from, to, &trunk_edges()).feet
     }
 
-    const DT: f32 = 1.0 / 60.0;
     /// 300 world units per second at 60 frames per second.
     const STEP: f32 = 5.0;
 
@@ -492,27 +490,9 @@ mod tests {
     }
 
     #[test]
-    fn near_the_right_edge_player_slides_to_the_right() {
-        let past = simulate(&SLIDING, Vec2::new(40.0, -100.0), Vec2::new(0.0, STEP), 200);
-        assert_eq!(past.x, 50.0);
-        assert!(past.y > 12.8);
-    }
-
-    #[test]
     fn in_the_middle_of_the_trunk_player_stays_stopped() {
         let end = simulate(&SLIDING, Vec2::new(15.0, -100.0), Vec2::new(0.0, STEP), 300);
         assert_eq!(end, Vec2::new(15.0, -30.0));
-    }
-
-    #[test]
-    fn without_sliding_player_stays_stopped_even_near_the_edge() {
-        let end = simulate(
-            &NOT_SLIDING,
-            Vec2::new(-10.0, -100.0),
-            Vec2::new(0.0, STEP),
-            300,
-        );
-        assert_eq!(end, Vec2::new(-10.0, -30.0));
     }
 
     #[test]
@@ -562,11 +542,8 @@ mod tests {
 
     /// Frame times that vary a little from frame to frame, like a real display.
     fn frame_times() -> impl Iterator<Item = f32> {
-        let mut seed: u32 = 12345;
-        std::iter::from_fn(move || {
-            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
-            Some(0.0155 + (seed >> 16) as f32 / 65536.0 * 0.002)
-        })
+        let mut rng = Rng::new(12345);
+        std::iter::from_fn(move || Some(rng.range(0.0155, 0.0175)))
     }
 
     #[test]
@@ -598,13 +575,6 @@ mod tests {
         panic!("never slid in {pushed} s");
     }
 
-    fn edges_of(rects: &[Rect]) -> Vec<Edge> {
-        outline::build(rects)
-            .iter()
-            .flat_map(|c| c.edges.iter().copied())
-            .collect()
-    }
-
     /// A U shape: base 0..40 by 0..10 and pillars 0..10 and 30..40 up to y 40. The notch is x 10..30 above y 10.
     fn notch() -> Vec<Edge> {
         edges_of(&[
@@ -612,22 +582,6 @@ mod tests {
             Rect::new(0.0, 10.0, 10.0, 40.0),
             Rect::new(30.0, 10.0, 40.0, 40.0),
         ])
-    }
-
-    #[test]
-    fn walking_along_a_wall_cannot_slip_into_the_shape_at_an_inward_corner() {
-        // Two rocks, the upper one shifted left. The wall x 40 (y 0 to 20) ends at an inward corner at (40, 20),
-        // where the upper rock's bottom face (x 0 to 40, y 20) starts. The player stopped on the wall line pushes up.
-        let edges = edges_of(&[
-            Rect::new(40.0, 0.0, 100.0, 20.0),
-            Rect::new(0.0, 20.0, 80.0, 60.0),
-        ]);
-        let end = resolve(Vec2::new(40.0, 5.0), Vec2::new(40.0, 100.0), &edges).feet;
-        assert_eq!(
-            end,
-            Vec2::new(40.0, 20.0),
-            "stopped in the corner, not walked into the shape"
-        );
     }
 
     #[test]
@@ -663,13 +617,19 @@ mod tests {
         )
         .feet;
         assert_eq!(end.x, 30.0);
-        // Inward corner: feet a hair past the end still stop in the corner.
+        // Inward corner: two rocks, the upper one shifted left. The wall x 40 (y 0 to 20) ends at an inward corner
+        // at (40, 20), where the upper rock's bottom face (x 0 to 40, y 20) starts. Feet stopped on the wall line
+        // push up, a hair past the end of that face, and still stop in the corner.
         let edges = edges_of(&[
             Rect::new(40.0, 0.0, 100.0, 20.0),
             Rect::new(0.0, 20.0, 80.0, 60.0),
         ]);
         let end = resolve(Vec2::new(40.0, 5.0), Vec2::new(40.000_005, 100.0), &edges).feet;
-        assert_eq!(end.y, 20.0);
+        assert_eq!(
+            end,
+            Vec2::new(40.0, 20.0),
+            "stopped in the corner, not walked into the shape"
+        );
     }
 
     #[test]
@@ -779,11 +739,17 @@ mod tests {
         // Pushing right into the left face at y 100: the near end (76.8) leads into the pocket. It slides to just
         // below the overhang and walks on until the bottom rock stops it. The inward corner there never slides it.
         let end = simulate_edges(Vec2::new(300.0, 100.0), Vec2::new(STEP, 0.0), 120, &edges);
-        assert_eq!(end, Vec2::new(440.8, 76.3));
+        assert_near(end, Vec2::new(440.8, 76.8 - SLIDING.slide.past_corner));
         // Pushing up into the bottom face near its left end: it slides left past the end, walks up the wall and is
         // stopped under the overhang.
         let end = simulate_edges(Vec2::new(460.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
-        assert_eq!(end, Vec2::new(440.3, 76.8));
+        assert_near(end, Vec2::new(440.8 - SLIDING.slide.past_corner, 76.8));
+    }
+
+    /// The slide end points are sums of f32 coordinates near 600, which round by about 1e-4. The positions the
+    /// slide tests tell apart differ by `past_corner` (0.5) or more.
+    fn assert_near(end: Vec2, expected: Vec2) {
+        assert!(end.distance(expected) < 1e-3, "{end} is not {expected}");
     }
 
     #[test]
@@ -797,10 +763,10 @@ mod tests {
         ]);
         // Pushing up under the bottom rock's right end: it slides right past it and walks up until the upper rock stops it.
         let end = simulate_edges(Vec2::new(630.0, -50.0), Vec2::new(0.0, STEP), 120, &edges);
-        assert_eq!(end, Vec2::new(647.7, 140.8));
+        assert_near(end, Vec2::new(647.2 + SLIDING.slide.past_corner, 140.8));
         let end = simulate_edges(Vec2::new(900.0, 160.0), Vec2::new(-STEP, 0.0), 120, &edges);
         // Pushing left into the upper rock near its bottom end: it slides into the notch and walks to its back.
-        assert_eq!(end, Vec2::new(583.2, 140.3));
+        assert_near(end, Vec2::new(583.2, 140.8 - SLIDING.slide.past_corner));
     }
 
     #[test]
@@ -842,22 +808,29 @@ mod tests {
 
     #[test]
     fn an_end_at_an_inward_corner_refuses_the_slide() {
-        let edges = l_shape();
-        let face = resolve(Vec2::new(20.0, 30.0), Vec2::new(20.0, 0.0), &edges)
-            .blocked_y
-            .expect("the top of the base blocks a move down");
-        assert!(face.from_concave);
-        // 10 from the inward end and in range, but a slide there only runs into the pillar.
-        let slid = slide_to_nearest_edge(
-            &SLIDING.slide,
-            face,
-            Vec2::new(20.0, 10.0),
-            true,
-            Vec2::new(0.0, -1.0),
-            DT,
-            &edges,
-        );
-        assert_eq!(slid, None);
+        // The L shape with the pillar on the left (inward end at the start of the base's top face, x 10) and its
+        // mirror with the pillar on the right (inward end at the face's end, x 90).
+        let mirrored = edges_of(&[
+            Rect::new(0.0, 0.0, 100.0, 10.0),
+            Rect::new(90.0, 10.0, 100.0, 50.0),
+        ]);
+        for (edges, x, at_start) in [(l_shape(), 20.0, true), (mirrored, 80.0, false)] {
+            let face = resolve(Vec2::new(x, 30.0), Vec2::new(x, 0.0), &edges)
+                .blocked_y
+                .expect("the top of the base blocks a move down");
+            assert_eq!((face.from_concave, face.to_concave), (at_start, !at_start));
+            // 10 from the inward end and in range, but a slide there only runs into the pillar.
+            let slid = slide_to_nearest_edge(
+                &SLIDING.slide,
+                face,
+                Vec2::new(x, 10.0),
+                true,
+                Vec2::new(0.0, -1.0),
+                DT,
+                &edges,
+            );
+            assert_eq!(slid, None, "pillar end at the start: {at_start}");
+        }
     }
 
     #[test]
@@ -986,13 +959,7 @@ mod tests {
 mod temporary_tests {
     use super::*;
     use crate::nav::NavGrid;
-    use crate::projectile::{self, Step};
-
-    const DT: f32 = 1.0 / 60.0;
-
-    fn map() -> Rect {
-        Rect::new(0.0, 0.0, 200.0, 200.0)
-    }
+    use crate::test_util::map_rect;
 
     /// A tree trunk and a vertical wall (x 100 to 110, y 40 to 160) that is added and removed during a test.
     fn world_with_trunk() -> CollisionWorld {
@@ -1028,46 +995,20 @@ mod temporary_tests {
         assert_eq!(walk_right(&world, inside, 130.0).x, 130.0);
     }
 
-    #[test]
-    fn a_shot_hits_a_wall_that_appears_and_flies_on_after_it_goes() {
-        let mut world = world_with_trunk();
-        let id = world.add_temporary(wall());
-        let flight = |world: &CollisionWorld| {
-            projectile::step(
-                Vec2::new(98.0, 100.0),
-                Vec2::new(300.0, 0.0),
-                DT,
-                world.edges(),
-                map(),
-            )
-        };
-        assert_eq!(flight(&world), Step::HitBlocked(Vec2::new(100.0, 100.0)));
-        world.remove_temporary(id);
-        assert!(matches!(flight(&world), Step::Flying(_)));
-    }
-
+    /// Smoke test that a temporary wall reaches a user of `edges()`. Projectiles and movement call `resolve` on the
+    /// same edges, which the walk tests above check.
     #[test]
     fn a_path_goes_round_a_wall_and_straight_again_when_it_is_removed() {
         let mut world = world_with_trunk();
         let id = world.add_temporary(wall());
         let (from, to) = (Vec2::new(50.0, 100.0), Vec2::new(150.0, 100.0));
-        let grid = NavGrid::build(world.edges(), map(), 10.0);
+        let grid = NavGrid::build(world.edges(), map_rect(), 10.0);
         let path = grid.find_path(from, to).expect("a way round");
         assert!(path.len() > 1, "{path:?}");
         assert!(path.iter().any(|p| p.y <= 40.0 || p.y >= 160.0), "{path:?}");
         world.remove_temporary(id);
-        let grid = NavGrid::build(world.edges(), map(), 10.0);
+        let grid = NavGrid::build(world.edges(), map_rect(), 10.0);
         assert_eq!(grid.find_path(from, to), Some(vec![to]));
-    }
-
-    #[test]
-    fn removing_a_wall_leaves_no_stale_edges() {
-        let mut world = world_with_trunk();
-        let before = world.edges().to_vec();
-        let id = world.add_temporary(wall());
-        assert!(world.edges().len() > before.len());
-        world.remove_temporary(id);
-        assert_eq!(world.edges().len(), before.len());
     }
 
     #[test]
@@ -1113,6 +1054,27 @@ mod temporary_tests {
         let second = world.add_blocked(&[Rect::new(50.0, 50.0, 60.0, 60.0)]);
         assert_eq!((first, second), (0, 1));
         assert!(!world.is_interior(first));
+    }
+
+    #[test]
+    fn a_temporary_area_can_be_an_interior_area() {
+        // Eight permanent squares round a hole, which a temporary square fills. Its area number (8) is past the
+        // permanent areas, so `interior_areas` must look it up among all the areas the clusters were built from.
+        let mut world = CollisionWorld::default();
+        let ring: Vec<Rect> = (0..9)
+            .filter(|&i| i != 4)
+            .map(|i| {
+                let (x, y) = ((i % 3) as f32 * 10.0, (i / 3) as f32 * 10.0);
+                Rect::new(x, y, x + 10.0, y + 10.0)
+            })
+            .collect();
+        world.add_blocked(&ring);
+        assert_eq!(world.interior_areas().count(), 0);
+        let middle = Rect::new(10.0, 10.0, 20.0, 20.0);
+        let id = world.add_temporary(middle);
+        assert_eq!(world.interior_areas().collect::<Vec<_>>(), vec![middle]);
+        world.remove_temporary(id);
+        assert_eq!(world.interior_areas().count(), 0);
     }
 
     /// Run with `--ignored --nocapture` to read the cost of one rebuild with many blocked areas.

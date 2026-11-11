@@ -253,6 +253,21 @@ mod tests {
         assert_eq!(ui_scale(1440, 2.0, 512.0), 720.0 / 512.0);
         assert_eq!(ui_scale(720, 1.0, 512.0), 720.0 / 512.0);
         assert_eq!(ui_scale(720, 1.0, 0.0), 1.0);
+        assert_eq!(ui_scale(720, 0.0, 512.0), 1.0);
+        assert_eq!(ui_scale(720, -1.0, 512.0), 1.0);
+    }
+
+    #[test]
+    fn a_negative_ratio_gives_an_empty_bar() {
+        // -2 is the case that would otherwise give a bar of 2 window heights: -2 / (1 - 2).
+        for mode in [
+            ScreenMode::BarTop { ratio: -2.0 },
+            ScreenMode::BarBottom { ratio: -2.0 },
+        ] {
+            let screen = regions(WINDOW, mode);
+            assert_eq!(screen.hud.unwrap().height(), 0, "{mode:?}");
+            assert_eq!(screen.game, screen.full, "{mode:?}");
+        }
     }
 
     fn app_with_screen(mode: ScreenMode) -> App {
@@ -321,5 +336,84 @@ mod tests {
             game.viewport.as_ref().unwrap().physical_size,
             UVec2::new(720, 1080)
         );
+    }
+
+    fn rect_of(viewport: &Option<Viewport>) -> Option<URect> {
+        viewport.as_ref().map(|v| {
+            URect::from_corners(v.physical_position, v.physical_position + v.physical_size)
+        })
+    }
+
+    /// The game viewport, and the HUD viewport when the HUD camera is on.
+    fn viewports(app: &mut App) -> (Option<URect>, Option<URect>) {
+        let world = app.world_mut();
+        let game = world
+            .query_filtered::<&Camera, With<GameCamera>>()
+            .single(world)
+            .unwrap();
+        let game = rect_of(&game.viewport);
+        let hud = world
+            .query_filtered::<&Camera, With<HudCamera>>()
+            .single(world)
+            .unwrap();
+        let hud = hud.is_active.then(|| rect_of(&hud.viewport)).flatten();
+        (game, hud)
+    }
+
+    fn window_mut(app: &mut App) -> Mut<'_, Window> {
+        let world = app.world_mut();
+        world
+            .query_filtered::<&mut Window, With<PrimaryWindow>>()
+            .single_mut(world)
+            .unwrap()
+    }
+
+    #[test]
+    fn a_bar_below_and_an_overlay_reach_the_cameras() {
+        for (mode, game, hud) in [
+            (
+                ScreenMode::BarBottom { ratio: 0.5 },
+                URect::new(0, 0, 720, 720),
+                URect::new(0, 720, 720, 1080),
+            ),
+            (
+                ScreenMode::Overlay,
+                URect::new(0, 0, 720, 1080),
+                URect::new(0, 0, 720, 1080),
+            ),
+        ] {
+            let mut app = app_with_screen(mode);
+            app.update();
+            assert_eq!(viewports(&mut app), (Some(game), Some(hud)), "{mode:?}");
+        }
+    }
+
+    #[test]
+    fn a_window_of_zero_size_is_skipped_until_it_has_a_size() {
+        let mut app = app_with_screen(ScreenMode::BarTop { ratio: 0.5 });
+        window_mut(&mut app)
+            .resolution
+            .set_physical_resolution(0, 1080);
+        app.update();
+        assert_eq!(viewports(&mut app).0, None);
+        assert_eq!(
+            app.world().resource::<ScreenLayout>().regions,
+            regions(UVec2::ZERO, ScreenMode::BarTop { ratio: 0.5 })
+        );
+        window_mut(&mut app)
+            .resolution
+            .set_physical_resolution(720, 1080);
+        app.update();
+        assert_eq!(viewports(&mut app).0, Some(URect::new(0, 360, 720, 1080)));
+    }
+
+    #[test]
+    fn a_change_of_scale_factor_alone_sets_the_ui_scale_again() {
+        let mut app = app_with_screen(ScreenMode::BarTop { ratio: 0.5 });
+        app.update();
+        assert_eq!(app.world().resource::<UiScale>().0, 720.0 / 512.0);
+        window_mut(&mut app).resolution.set_scale_factor(2.0);
+        app.update();
+        assert_eq!(app.world().resource::<UiScale>().0, 720.0 / 1024.0);
     }
 }

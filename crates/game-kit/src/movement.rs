@@ -141,6 +141,15 @@ impl PathFollower {
         self.searched_for = None;
         self.stalled = 0.0;
     }
+
+    /// A follower with this path, for tests of other modules.
+    #[cfg(test)]
+    pub(crate) fn along(points: &[Vec2]) -> Self {
+        Self {
+            path: points.iter().copied().collect(),
+            ..default()
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
@@ -255,25 +264,10 @@ mod tests {
     use super::*;
     use crate::collision::SlideTuning;
     use crate::nav::NavPlugin;
-    use bevy::time::TimeUpdateStrategy;
-    use std::time::Duration;
+    use crate::test_util::{map_rect, movement_app};
 
     fn app_with(blocked: &[Rect]) -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
-                16,
-            )));
-        let mut world = CollisionWorld::default();
-        world.add_blocked(blocked);
-        app.insert_resource(world)
-            .insert_resource(CollisionSettings {
-                allow_sliding: true,
-                slide: SlideTuning::for_cell_size(16.0),
-            })
-            .insert_resource(CameraBounds(Rect::new(0.0, 0.0, 200.0, 200.0)))
-            .add_plugins((NavPlugin { step: 4.0 }, MovementPlugin::default()));
-        app
+        movement_app(blocked, map_rect())
     }
 
     fn spawn(app: &mut App, at: Vec2, goal: Option<Vec2>) -> Entity {
@@ -378,6 +372,91 @@ mod tests {
         let state = app.world().get::<MoveState>(entity).unwrap();
         assert!(state.walking);
         assert!((state.facing - Vec2::X).length() < 1e-4);
+    }
+
+    fn follower(app: &App, entity: Entity) -> &PathFollower {
+        app.world().get::<PathFollower>(entity).unwrap()
+    }
+
+    #[test]
+    fn no_more_searches_start_in_a_frame_than_the_budget_allows() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(CollisionWorld::default())
+            .insert_resource(CollisionSettings {
+                allow_sliding: true,
+                slide: SlideTuning::for_cell_size(16.0),
+            })
+            .insert_resource(CameraBounds(Rect::new(0.0, 0.0, 200.0, 200.0)))
+            .add_plugins((
+                NavPlugin { step: 4.0 },
+                MovementPlugin {
+                    searches_per_frame: 2,
+                },
+            ));
+        let movers: Vec<Entity> = (0..3)
+            .map(|i| {
+                let y = 40.0 + 40.0 * i as f32;
+                spawn(&mut app, Vec2::new(20.0, y), Some(Vec2::new(180.0, y)))
+            })
+            .collect();
+        let searched = |app: &App| {
+            movers
+                .iter()
+                .filter(|&&m| follower(app, m).searched_for.is_some())
+                .count()
+        };
+        app.update();
+        assert_eq!(searched(&app), 2);
+        app.update();
+        assert_eq!(searched(&app), 3);
+    }
+
+    #[test]
+    fn a_mover_that_stalls_searches_again() {
+        let mut app = app_with(&[]);
+        let goal = Vec2::new(150.0, 100.0);
+        let entity = spawn(&mut app, Vec2::new(195.0, 100.0), Some(goal));
+        app.update();
+        // A stale path that leads out of the map: the mover is held at the map edge (x 200).
+        let stale = Vec2::new(250.0, 100.0);
+        app.world_mut()
+            .get_mut::<PathFollower>(entity)
+            .unwrap()
+            .path = [stale].into();
+        // 0.4 s: stalled, but not for long enough.
+        for _ in 0..25 {
+            app.update();
+        }
+        assert_eq!(feet(&app, entity), Vec2::new(200.0, 100.0));
+        assert_eq!(follower(&app, entity).path.front(), Some(&stale));
+        for _ in 0..120 {
+            app.update();
+        }
+        assert!(
+            feet(&app, entity).distance(goal) <= 2.5,
+            "{:?}",
+            feet(&app, entity)
+        );
+    }
+
+    #[test]
+    fn an_unreachable_goal_is_searched_again_and_reached_when_the_way_opens() {
+        let block = Rect::new(80.0, 80.0, 120.0, 120.0);
+        let mut app = app_with(&[block]);
+        let goal = Vec2::new(100.0, 100.0);
+        let entity = spawn(&mut app, Vec2::new(20.0, 30.0), Some(goal));
+        for _ in 0..10 {
+            app.update();
+        }
+        assert!(app.world().get::<MoveState>(entity).unwrap().unreachable);
+        app.world_mut().resource_mut::<CollisionWorld>().clear();
+        for _ in 0..150 {
+            app.update();
+        }
+        let state = app.world().get::<MoveState>(entity).unwrap();
+        assert!(state.arrived && !state.unreachable, "{state:?}");
+        assert!(feet(&app, entity).distance(goal) <= 2.0);
     }
 
     #[test]

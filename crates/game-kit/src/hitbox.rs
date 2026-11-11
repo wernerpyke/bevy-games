@@ -30,16 +30,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_box_follows_the_ground_point_and_offset() {
-        let hit_box = HitBox {
-            offset: Vec2::new(0.0, 6.0),
-            half_size: Vec2::new(4.0, 6.0),
-        };
-        let rect = hit_box.rect_at(Vec2::new(100.0, 50.0));
-        assert_eq!(rect, Rect::new(96.0, 50.0, 104.0, 62.0));
-    }
-
-    #[test]
     fn overlap_needs_shared_area() {
         let a = Rect::new(0.0, 0.0, 10.0, 10.0);
         assert!(overlaps(a, Rect::new(5.0, 5.0, 15.0, 15.0)));

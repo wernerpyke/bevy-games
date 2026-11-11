@@ -453,22 +453,11 @@ fn rebuild_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outline;
     use crate::rng::Rng;
-
-    fn edges_of(rects: &[Rect]) -> Vec<Edge> {
-        outline::build(rects)
-            .iter()
-            .flat_map(|c| c.edges.iter().copied())
-            .collect()
-    }
-
-    fn map() -> Rect {
-        Rect::new(0.0, 0.0, 200.0, 200.0)
-    }
+    use crate::test_util::{edges_of, map_rect};
 
     fn grid(rects: &[Rect]) -> NavGrid {
-        NavGrid::build(&edges_of(rects), map(), 4.0)
+        NavGrid::build(&edges_of(rects), map_rect(), 4.0)
     }
 
     /// Every leg of the path, from `from`, crosses no edge.
@@ -644,7 +633,7 @@ mod tests {
             Rect::new(20.0, 150.0, 60.0, 154.0),
         ];
         let edges = edges_of(&rects);
-        let nav = NavGrid::build(&edges, map(), 4.0);
+        let nav = NavGrid::build(&edges, map_rect(), 4.0);
         let mut rng = Rng::new(5);
         let mut found = 0;
         for _ in 0..300 {

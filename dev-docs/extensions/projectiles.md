@@ -34,7 +34,7 @@ A projectile flies in a straight line over the ground and disappears when it rea
 4. On a hit the kit sends `ProjectileHit { position, cause }`, logs a `debug!` line and despawns the entity. The sprite child goes with it.
 5. The game spawns the entity with `Projectile::new(direction, speed)`, `DepthSort { feet_offset: 0.0 }`, a `Transform` at the ground point and `Visibility`. It adds the sprite as a child with `ProjectileSprite`. The projectile is in the world layer, so it passes behind trees like a character does (`draw-order.md`).
 6. The kit turns the `ProjectileSprite` child to point along the velocity. The art must point along +x. Only the child turns, so its lift above the ground does not change.
-7. A `ProjectileTarget` entity with a `HitBox` is hit when the path of the shot, lifted by `Projectile::height`, enters the box. The path is cut at the point where a blocked area stops the shot, so a target behind a tree is safe. The first target on the path is hit. The hit is `HitCause::Target(entity)` and the game removes the target (`adr-x27`).
+7. A `ProjectileTarget` entity with a `HitBox` is hit when the path of the shot, lifted by `Projectile::height`, enters the box. The path is cut at the point where a blocked area stops the shot, so a target behind a tree is safe. The first target on the path is hit. The hit is `HitCause::Target(entity)` and the game removes the target (`adr-x27`). A path that only touches an edge or a corner of the box (a graze) is not a hit, the same rule as `hitbox::overlaps`.
 8. Spawn the projectile at the shooter's feet, which are never inside a blocked area. A spawn point inside a blocked area is not a hit, because only crossing an edge counts.
 
 ## Usage
@@ -52,4 +52,4 @@ A projectile flies in a straight line over the ground and disappears when it rea
 
 ## Tests
 
-`crates/game-kit/src/projectile.rs` has unit tests for `step` (open ground, faces on both axes, diagonal, a step longer than a band, free paths, all four map sides, start on an edge, hit before map edge) and for the sprite rotation. Run `./dev-scripts/rust.sh test game-kit`. Checks in the running game: `./dev-scripts/rust.sh script r-town "teleport:340:882;hold:x:0.1;wait:1;quit"` fires at a lone tree.
+`crates/game-kit/src/projectile.rs` has unit tests for `step` (open ground, faces on both axes, diagonal, free paths, all four map sides, start on an edge, hit before map edge), for `target_hit` (each side, a long step, a graze, the nearest of several), for the system (a target behind a blocked area, the map edge, the hit height) and for the sprite rotation. A step longer than a band is tested on `collision::resolve`. Run `./dev-scripts/rust.sh test game-kit`. Checks in the running game: `./dev-scripts/rust.sh script r-town "teleport:340:882;hold:x:0.1;wait:1;quit"` fires at a lone tree.

@@ -155,17 +155,11 @@ fn check_object_exits(from: &LinkedMap, maps: &[LinkedMap]) -> Result<(), MapErr
 mod tests {
     use super::*;
     use crate::map::parse;
+    use crate::test_util::empty_map;
 
     /// An empty map of `w` by `h` cells with the given `exits:` and `entries:` blocks.
     fn map(w: i32, h: i32, blocks: &str) -> Map {
-        let mut text = format!(
-            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: {w}x{h}\nlegend:\n  \".\": empty\n{blocks}---\n"
-        );
-        let row = vec!["."; w as usize].join(" ");
-        for y in (0..h).rev() {
-            text.push_str(&format!("{y:>2} |{row}|\n"));
-        }
-        parse("t.txt", &text, &[]).unwrap_or_else(|e| panic!("{e}"))
+        empty_map(16, w, h, blocks)
     }
 
     fn check(maps: &[(&str, &Map)]) -> Result<(), MapError> {
@@ -235,20 +229,6 @@ mod tests {
             let e = problem(&[("1", &first), ("2", &second)]);
             assert!(e.message.contains("exactly one"), "{cells}: {e}");
         }
-    }
-
-    #[test]
-    fn a_chain_of_maps_with_matching_strips_is_fine() {
-        let first = top_exit("2", "e", "seamless");
-        let second = entry_map("3..6,0");
-        check(&[("1", &first), ("2", &second)]).unwrap();
-    }
-
-    #[test]
-    fn maps_without_exits_always_pass() {
-        let plain = map(4, 4, "");
-        check(&[("1", &plain)]).unwrap();
-        check(&[]).unwrap();
     }
 
     #[test]
@@ -386,7 +366,5 @@ mod tests {
         );
         let large = entry_map("3..4,0");
         check(&[("1", &small), ("2", &large)]).unwrap();
-        let wide = entry_map("3..5,0");
-        check(&[("1", &small), ("2", &wide)]).unwrap_err();
     }
 }

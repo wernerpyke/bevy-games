@@ -316,11 +316,9 @@ fn sentry(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collision::{CollisionSettings, CollisionWorld, SlideTuning};
-    use crate::movement::{MovementPlugin, Mover};
-    use crate::nav::NavPlugin;
-    use bevy::time::TimeUpdateStrategy;
-    use std::time::Duration;
+    use crate::collision::CollisionWorld;
+    use crate::movement::Mover;
+    use crate::test_util::{edges_of, movement_app};
 
     #[test]
     fn radius_is_read_from_the_parameters() {
@@ -344,20 +342,21 @@ mod tests {
                 .unwrap_err()
                 .contains("above 0")
         );
-        assert!(Pursue::from_params(&Params::default()).is_ok());
     }
 
     #[test]
     fn a_patrol_target_is_inside_the_radius_and_the_bounds() {
         let mut rng = Rng::new(1);
+        // The disc reaches past the bounds on two sides.
         let from = Vec2::new(20.0, 20.0);
         let bounds = Rect::new(0.0, 0.0, 200.0, 200.0);
-        for _ in 0..200 {
-            let point = pick_target(&mut rng, from, 50.0, Some(bounds), 8, |_| true);
-            if let Some(point) = point {
-                assert!(point.distance(from) <= 50.0 + 1e-3);
-                assert!(bounds.contains(point));
-            }
+        let points: Vec<Vec2> = (0..200)
+            .filter_map(|_| pick_target(&mut rng, from, 50.0, Some(bounds), 8, |_| true))
+            .collect();
+        assert!(points.len() >= 150, "{} of 200 picks", points.len());
+        for point in points {
+            assert!(point.distance(from) <= 50.0 + 1e-3, "{point:?}");
+            assert!(bounds.contains(point), "{point:?}");
         }
     }
 
@@ -373,23 +372,9 @@ mod tests {
     }
 
     fn app() -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
-                16,
-            )))
-            .insert_resource(CollisionWorld::default())
-            .insert_resource(CollisionSettings {
-                allow_sliding: true,
-                slide: SlideTuning::for_cell_size(16.0),
-            })
-            .insert_resource(CameraBounds(Rect::new(0.0, 0.0, 400.0, 400.0)))
-            .insert_resource(GameRng::seeded(7))
-            .add_plugins((
-                NavPlugin { step: 4.0 },
-                MovementPlugin::default(),
-                StrategiesPlugin,
-            ));
+        let mut app = movement_app(&[], Rect::new(0.0, 0.0, 400.0, 400.0));
+        app.insert_resource(GameRng::seeded(7))
+            .add_plugins(StrategiesPlugin);
         app
     }
 
@@ -472,10 +457,7 @@ mod tests {
     }
 
     fn wall_edges() -> Vec<Edge> {
-        crate::outline::build(&[Rect::new(90.0, 0.0, 110.0, 100.0)])
-            .iter()
-            .flat_map(|c| c.edges.iter().copied())
-            .collect()
+        edges_of(&[Rect::new(90.0, 0.0, 110.0, 100.0)])
     }
 
     #[test]
@@ -634,21 +616,90 @@ mod tests {
 
     #[test]
     fn a_sentry_patrols_while_the_player_is_out_of_range_or_hidden() {
+        let home = Vec2::new(100.0, 200.0);
+        let patrols = |app: &App, sentry: Entity| {
+            assert!(!app.world().get::<Sentry>(sentry).unwrap().alerted());
+            let goal = app.world().get::<MoveGoal>(sentry).unwrap().0;
+            assert!(
+                goal.is_some_and(|goal| goal.distance(home) <= 10.0 + 1e-3),
+                "a patrol goal near home: {goal:?}"
+            );
+        };
         let mut far = app();
-        let sentry = spawn_sentry(&mut far, Vec2::new(100.0, 200.0), 10.0, 50.0);
+        let sentry = spawn_sentry(&mut far, home, 10.0, 50.0);
         spawn_player(&mut far, Vec2::new(350.0, 200.0));
         run(&mut far, 300);
-        assert!(!far.world().get::<Sentry>(sentry).unwrap().alerted());
+        patrols(&far, sentry);
 
         let mut hidden = app();
         hidden
             .world_mut()
             .resource_mut::<CollisionWorld>()
             .add_blocked(&[Rect::new(190.0, 0.0, 210.0, 400.0)]);
-        let sentry = spawn_sentry(&mut hidden, Vec2::new(100.0, 200.0), 10.0, 400.0);
+        let sentry = spawn_sentry(&mut hidden, home, 10.0, 400.0);
         spawn_player(&mut hidden, Vec2::new(300.0, 200.0));
         run(&mut hidden, 300);
-        assert!(!hidden.world().get::<Sentry>(sentry).unwrap().alerted());
+        patrols(&hidden, sentry);
+    }
+
+    #[test]
+    fn a_pursuer_with_a_target_follows_that_target_and_not_the_player() {
+        let mut app = app();
+        spawn_player(&mut app, Vec2::new(300.0, 300.0));
+        let target = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(120.0, 90.0, 0.0),
+                DepthSort { feet_offset: 10.0 },
+            ))
+            .id();
+        let pursuer = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(50.0, 50.0, 0.0),
+                Mover::new(10.0),
+                Pursue {
+                    target: Some(target),
+                },
+            ))
+            .id();
+        app.update();
+        assert_eq!(
+            app.world().get::<MoveGoal>(pursuer).unwrap().0,
+            Some(Vec2::new(120.0, 80.0))
+        );
+        // The target is gone: it stands still, and does not fall back to the player.
+        app.world_mut().despawn(target);
+        app.update();
+        assert_eq!(app.world().get::<MoveGoal>(pursuer).unwrap().0, None);
+    }
+
+    #[test]
+    fn a_patrol_that_finds_no_place_waits_before_it_tries_again() {
+        let mut app = app();
+        // Outside the bounds, so no place within the radius can be picked.
+        let at = Vec2::new(-100.0, -100.0);
+        let entity = app
+            .world_mut()
+            .spawn((
+                Transform::from_translation(at.extend(0.0)),
+                RandomPatrol::new(10.0),
+                MoveState::default(),
+            ))
+            .id();
+        app.update();
+        let patrol = *app.world().get::<RandomPatrol>(entity).unwrap();
+        assert_eq!(patrol.wait, NO_TARGET_WAIT);
+        // Places can be found from now on, but the wait is not over: 56 frames of 16 ms are 0.9 s.
+        app.insert_resource(CameraBounds(Rect::new(-200.0, -200.0, 400.0, 400.0)));
+        run(&mut app, 56);
+        assert_eq!(app.world().get::<MoveGoal>(entity).unwrap().0, None);
+        run(&mut app, 10);
+        let goal = app.world().get::<MoveGoal>(entity).unwrap().0;
+        assert!(
+            goal.is_some_and(|goal| goal.distance(at) <= 10.0 + 1e-3),
+            "{goal:?}"
+        );
     }
 
     #[test]

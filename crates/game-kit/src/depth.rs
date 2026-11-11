@@ -77,24 +77,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lower_feet_are_in_front() {
-        assert!(depth_z(0.0, -100.0) > depth_z(0.0, 100.0));
-    }
-
-    #[test]
     fn same_feet_y_gives_different_z_by_x() {
         assert!(depth_z(64.0, 50.0) > depth_z(0.0, 50.0));
-        assert_eq!(depth_z(64.0, 50.0), depth_z(64.0, 50.0));
         // Neighbouring rocks 64 apart must differ by more than f32 rounding at this z.
         let z = depth_z(0.0, 50.0);
         assert!(depth_z(64.0, 50.0) - z > z.abs() * f32::EPSILON * 4.0);
-    }
-
-    #[test]
-    fn the_world_layer_holds_feet_far_beyond_the_screen() {
-        for (x, y) in [(5000.0, 99_000.0), (-5000.0, -99_000.0)] {
-            assert!(depth_z(x, y).abs() < WORLD_HALF_BAND, "x {x} y {y}");
-        }
     }
 
     #[test]

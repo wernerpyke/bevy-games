@@ -400,6 +400,7 @@ fn run_script(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::timed_app;
 
     #[test]
     fn commands_are_parsed_in_order() {
@@ -446,5 +447,184 @@ mod tests {
     #[test]
     fn empty_parts_are_ignored() {
         assert!(parse(";; ;").is_empty());
+    }
+
+    #[test]
+    fn every_key_name_gives_its_key() {
+        for (name, code) in [
+            ("up", KeyCode::ArrowUp),
+            ("down", KeyCode::ArrowDown),
+            ("left", KeyCode::ArrowLeft),
+            ("right", KeyCode::ArrowRight),
+            ("x", KeyCode::KeyX),
+            ("escape", KeyCode::Escape),
+            ("f1", KeyCode::F1),
+            ("f2", KeyCode::F2),
+            ("f3", KeyCode::F3),
+        ] {
+            assert_eq!(key(name), Some(code), "{name}");
+        }
+        assert_eq!(key("Up"), None);
+    }
+
+    /// Seconds per frame of the runner tests.
+    const FRAME: f32 = 0.1;
+
+    #[derive(Resource, Default)]
+    struct Seen {
+        pointer: Vec<(&'static str, Vec2)>,
+        changes: Vec<(String, Option<String>)>,
+    }
+
+    fn collect(
+        mut pointer: MessageReader<PointerInput>,
+        mut changes: MessageReader<RequestMapChange>,
+        mut seen: ResMut<Seen>,
+    ) {
+        for input in pointer.read() {
+            let action = match input.action {
+                PointerAction::Move { .. } => "move",
+                PointerAction::Press(PointerButton::Primary) => "press",
+                PointerAction::Release(PointerButton::Primary) => "release",
+                _ => "other",
+            };
+            seen.pointer.push((action, input.location.position));
+        }
+        for change in changes.read() {
+            seen.changes.push((change.to.clone(), change.entry.clone()));
+        }
+    }
+
+    /// The runner on `text`, with frames of `FRAME` seconds of real time and no start delay. The first update, which
+    /// has no time step, runs before the script is added.
+    fn runner(text: &str) -> App {
+        let mut app = timed_app(std::time::Duration::from_secs_f32(FRAME));
+        app.init_resource::<ButtonInput<KeyCode>>()
+            .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<Seen>()
+            .add_message::<RequestMapChange>()
+            .add_message::<WorldClick>()
+            .add_message::<PointerInput>();
+        app.update();
+        app.insert_resource(Script {
+            commands: parse(text),
+            elapsed: 0.0,
+            since_log: 0.0,
+            shot_requested: false,
+            ui_phase: 0,
+            shot_saved: false,
+            goto_sent: false,
+            goto_busy: false,
+            screenshot_dir_variable: "GAME_KIT_TEST_SCREENSHOT_DIR".to_string(),
+        })
+        .add_systems(Update, (run_script, collect).chain());
+        app
+    }
+
+    fn left(app: &App) -> usize {
+        app.world().resource::<Script>().commands.len()
+    }
+
+    fn held(app: &App, key: KeyCode) -> bool {
+        app.world().resource::<ButtonInput<KeyCode>>().pressed(key)
+    }
+
+    #[test]
+    fn a_hold_presses_its_keys_until_its_time_is_up() {
+        let mut app = runner("hold:up+left:0.25;wait:5");
+        for _ in 0..2 {
+            app.update();
+            assert!(held(&app, KeyCode::ArrowUp) && held(&app, KeyCode::ArrowLeft));
+            assert_eq!(left(&app), 2);
+        }
+        // 0.3 s: past the hold.
+        app.update();
+        assert!(!held(&app, KeyCode::ArrowUp) && !held(&app, KeyCode::ArrowLeft));
+        assert_eq!(left(&app), 1);
+    }
+
+    #[test]
+    fn a_wait_ends_when_its_time_is_up_and_quit_ends_the_app() {
+        let mut app = runner("wait:0.25;quit");
+        for _ in 0..2 {
+            app.update();
+            assert_eq!(left(&app), 2);
+        }
+        app.update();
+        assert_eq!(left(&app), 1);
+        assert_eq!(app.should_exit(), None);
+        app.update();
+        assert_eq!(app.should_exit(), Some(AppExit::Success));
+    }
+
+    #[test]
+    fn an_empty_script_ends_the_app() {
+        let mut app = runner("");
+        app.update();
+        assert_eq!(app.should_exit(), Some(AppExit::Success));
+    }
+
+    #[test]
+    fn a_teleport_puts_the_feet_at_the_position() {
+        let mut app = runner("teleport:30:40;wait:5");
+        let player = app
+            .world_mut()
+            .spawn((
+                Controlled,
+                Transform::from_xyz(-5.0, -5.0, 3.0),
+                DepthSort { feet_offset: 12.0 },
+            ))
+            .id();
+        app.update();
+        let at = app.world().get::<Transform>(player).unwrap().translation;
+        assert_eq!(at, Vec3::new(30.0, 52.0, 3.0));
+        assert_eq!(left(&app), 1);
+    }
+
+    #[test]
+    fn a_ui_click_moves_then_presses_then_releases_one_step_per_frame() {
+        let mut app = runner("ui_click:10:20;wait:5");
+        app.world_mut().spawn((Window::default(), PrimaryWindow));
+        app.insert_resource(UiScale(2.0));
+        let at = Vec2::new(20.0, 40.0);
+        let mouse = |app: &App| {
+            app.world()
+                .resource::<ButtonInput<MouseButton>>()
+                .pressed(MouseButton::Left)
+        };
+        let mut steps = Vec::new();
+        for _ in 0..3 {
+            app.update();
+            let seen = std::mem::take(&mut app.world_mut().resource_mut::<Seen>().pointer);
+            steps.push((seen, mouse(&app), left(&app)));
+        }
+        assert_eq!(
+            steps,
+            [
+                (vec![("move", at)], false, 2),
+                (vec![("move", at), ("press", at)], true, 2),
+                (vec![("move", at), ("release", at)], false, 1),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_goto_that_never_arrives_gives_up_after_5_seconds() {
+        let mut app = runner("goto:9;wait:5");
+        app.update();
+        assert_eq!(
+            app.world().resource::<Seen>().changes,
+            [("9".to_string(), None)]
+        );
+        // The limit is 5 s after the request. Steps of 0.1 s add up with a small error, so check a frame either side.
+        for _ in 0..48 {
+            app.update();
+        }
+        assert_eq!(left(&app), 2, "4.9 s");
+        for _ in 0..3 {
+            app.update();
+        }
+        assert_eq!(left(&app), 1, "5.2 s");
+        assert_eq!(app.world().resource::<Seen>().changes.len(), 1);
     }
 }

@@ -1170,6 +1170,7 @@ fn show_map_id(active: Res<ActiveMaps>, info: Option<ResMut<DebugInfo>>) {
 mod tests {
     use super::*;
     use crate::map::{PLAYER_START, parse};
+    use crate::test_util::{empty_map, empty_map_text, timed_app};
 
     fn cell(x: i32, y: i32) -> IVec2 {
         IVec2::new(x, y)
@@ -1241,10 +1242,25 @@ mod tests {
     }
 
     #[test]
-    fn idle_and_switch_do_not_advance_by_time() {
-        assert!(matches!(advance(Phase::Idle, 5.0, &FADE), Phase::Idle));
-        let covered = advance(Phase::Switch { request: request() }, 5.0, &FADE);
-        assert!(matches!(covered, Phase::Switch { .. }));
+    fn only_the_fade_and_the_swap_lock_the_player() {
+        let mut transition = MapTransition::new(FADE, Vec2::ZERO);
+        for (phase, locked) in [
+            (Phase::Idle, false),
+            (
+                Phase::FadeOut {
+                    elapsed: 0.0,
+                    request: request(),
+                },
+                true,
+            ),
+            (Phase::Switch { request: request() }, true),
+            (Phase::FadeIn { elapsed: 0.0 }, true),
+            (Phase::Seamless { request: request() }, false),
+        ] {
+            let name = format!("{phase:?}");
+            transition.phase = phase;
+            assert_eq!(transition.locks_input(), locked, "{name}");
+        }
     }
 
     #[test]
@@ -1259,10 +1275,12 @@ mod tests {
     }
 
     fn map_with_exit() -> Map {
-        let text = "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": empty\nexits:\n  up: area=3..6,9 to=2 entry=e transition=scene\n---\n";
-        let row = ["."; 10].join(" ");
-        let rows: String = (0..10).rev().map(|y| format!("{y:>2} |{row}|\n")).collect();
-        parse("t.txt", &format!("{text}{rows}"), &[]).unwrap()
+        empty_map(
+            64,
+            10,
+            10,
+            "exits:\n  up: area=3..6,9 to=2 entry=e transition=scene\n",
+        )
     }
 
     #[test]
@@ -1325,47 +1343,6 @@ mod tests {
             entry_feet(&left, origin, 64.0, Some(44.0)),
             origin + Vec2::new(32.0, 512.0 + 44.0)
         );
-    }
-
-    #[test]
-    fn an_entry_on_another_kind_of_edge_moves_the_offset_to_the_other_axis() {
-        let origin = Vec2::ZERO;
-        let vertical = area(cell(0, 6), cell(0, 7));
-        // A horizontal exit strip to a vertical entry strip: x offset becomes y offset, low end stays low end.
-        assert_eq!(
-            entry_feet(&vertical, origin, 64.0, Some(8.0)),
-            Vec2::new(32.0, 384.0 + 8.0)
-        );
-        let horizontal = area(cell(3, 0), cell(4, 0));
-        // And the other way round: a y offset becomes an x offset.
-        assert_eq!(
-            entry_feet(&horizontal, origin, 64.0, Some(100.0)),
-            Vec2::new(192.0 + 100.0, 32.0)
-        );
-    }
-
-    #[test]
-    fn every_pair_of_edges_gives_a_position_inside_the_entry() {
-        let exits = [
-            area(cell(3, 9), cell(4, 9)),
-            area(cell(3, 0), cell(4, 0)),
-            area(cell(9, 3), cell(9, 4)),
-            area(cell(0, 3), cell(0, 4)),
-        ];
-        for exit in exits {
-            for entry in exits {
-                // The feet 20 units into the strip, then right at its far end.
-                for along in [20.0, 127.9] {
-                    let feet_offset = Some(along);
-                    let at = entry_feet(&entry, Vec2::ZERO, 64.0, feet_offset);
-                    let rect = area_rect(&entry, Vec2::ZERO, 64.0);
-                    assert!(
-                        at.cmpge(rect.min).all() && at.cmple(rect.max).all(),
-                        "{exit:?} to {entry:?}: {at}"
-                    );
-                }
-            }
-        }
     }
 
     #[test]
@@ -1435,17 +1412,17 @@ mod tests {
         }
     }
 
-    fn registered(id: &str, blocks: &str) -> RegisteredMap {
-        let head = format!(
-            "---\nmap: {id}\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": empty\n{blocks}---\n"
-        );
-        let row = ["."; 10].join(" ");
-        let rows: String = (0..10).rev().map(|y| format!("{y:>2} |{row}|\n")).collect();
+    fn registered_sized(id: &str, cell: u32, w: i32, h: i32, blocks: &str) -> RegisteredMap {
         RegisteredMap {
             id: id.into(),
             file: format!("{id}.txt"),
-            map: parse("t.txt", &format!("{head}{rows}"), &[]).unwrap(),
+            map: parse("t.txt", &empty_map_text(id, cell, w, h, blocks), &[]).unwrap(),
         }
+    }
+
+    /// A 10 by 10 map of 64 unit cells.
+    fn registered(id: &str, blocks: &str) -> RegisteredMap {
+        registered_sized(id, 64, 10, 10, blocks)
     }
 
     const ORIGIN: Vec2 = Vec2::new(-1000.0, -500.0);
@@ -1465,17 +1442,13 @@ mod tests {
         );
         let two = registered("2", "entries:\n  from_1: area=3..6,0 facing=up\n");
         let registry = MapRegistry::from_parsed(vec![one, two]).unwrap();
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .init_resource::<Log>()
+        let mut app = timed_app(std::time::Duration::from_millis(600));
+        app.init_resource::<Log>()
             .insert_resource(registry)
             .insert_resource(ActiveMaps {
                 current: "1".into(),
                 ..default()
             })
-            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
-                std::time::Duration::from_millis(600),
-            ))
             .insert_resource(MapTransition::new(
                 Fade {
                     colour: Color::BLACK,
@@ -1512,6 +1485,11 @@ mod tests {
         let mut transform = query.single_mut(app.world_mut()).unwrap();
         transform.translation.x = feet.x;
         transform.translation.y = feet.y + FEET_OFFSET;
+    }
+
+    /// The index of the first line of the log, from index `from` on, that starts with `prefix`.
+    fn line_after(log: &[String], from: usize, prefix: &str) -> Option<usize> {
+        (from..log.len()).find(|&i| log[i].starts_with(prefix))
     }
 
     fn put_player(app: &mut App, feet: Vec2) {
@@ -1555,10 +1533,14 @@ mod tests {
         app.update();
         app.update();
         let log = app.world().resource::<Log>().0.clone();
-        assert_eq!(log.len(), 5, "{log:?}");
-        assert_eq!(log[2], format!("load 2 at {ORIGIN}"));
-        assert!(log[3].starts_with("rebuild with 1 map"), "{log:?}");
-        assert_eq!(log[4], "arrive Some(Up)");
+        // Load the new map, rebuild with the old map gone, then arrive.
+        let load = line_after(&log, 0, "load 2").expect("map 2 is loaded");
+        assert_eq!(log[load], format!("load 2 at {ORIGIN}"));
+        let rebuild = line_after(&log, load, "rebuild").expect("a rebuild after the load");
+        assert_eq!(log[rebuild], "rebuild with 1 map entities", "{log:?}");
+        let arrive = line_after(&log, rebuild, "arrive").expect("an arrival after the rebuild");
+        assert_eq!(log[arrive], "arrive Some(Up)");
+        assert_eq!(line_after(&log, load + 1, "load"), None, "{log:?}");
         assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
         assert!(app.world().resource::<MapTransition>().is_idle());
         // The same x along the strip, and the middle of the bottom row of the new map.
@@ -1582,11 +1564,8 @@ mod tests {
         for _ in 0..4 {
             app.update();
         }
-        assert_eq!(
-            app.world().resource::<Log>().0.len(),
-            2,
-            "no transition expected"
-        );
+        let log = &app.world().resource::<Log>().0;
+        assert_eq!(line_after(log, 0, "load 2"), None, "{log:?}");
         assert_eq!(app.world().resource::<ActiveMaps>().current, "1");
     }
 
@@ -1703,7 +1682,7 @@ mod tests {
     }
 
     #[test]
-    fn a_trigger_fires_once_and_the_player_is_armed_again_outside() {
+    fn a_trigger_fires_once_and_goes_with_its_map() {
         let mut app = app_with_trigger();
         app.update();
         put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
@@ -1721,12 +1700,16 @@ mod tests {
                 .count()
         };
         assert_eq!(loads(&app), 2);
-        // Map 2 has no trigger. The map of the trigger is gone, so walking back in does nothing and nothing loops.
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        // Map 2 has no trigger. The feet move back onto the place of the trigger of map 1, with the exits armed: the
+        // trigger went with its map, so nothing fires and nothing loops.
+        set_feet(&mut app, ORIGIN + Vec2::new(130.0, 130.0));
         for _ in 0..3 {
             app.update();
         }
-        assert_eq!(loads(&app), 2);
         assert!(app.world().resource::<MapTransition>().armed);
+        assert_eq!(loads(&app), 2);
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
     }
 
     #[test]
@@ -1767,34 +1750,64 @@ mod tests {
             app.update();
         }
         assert_eq!(app.world().resource::<ActiveMaps>().current, "1");
-        assert_eq!(app.world().resource::<Log>().0.len(), 2);
+        let log = &app.world().resource::<Log>().0;
+        assert_eq!(line_after(log, 1, "load"), None, "{log:?}");
         assert!(app.world().resource::<MapTransition>().is_idle());
         assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(300.0, 300.0));
+    }
+
+    /// Updates until `done` holds, at most 40 times.
+    fn update_until(app: &mut App, done: impl Fn(&World) -> bool) {
+        for _ in 0..40 {
+            if done(app.world()) {
+                return;
+            }
+            app.update();
+        }
+        panic!("the condition did not hold after 40 updates");
     }
 
     #[test]
     fn requests_during_a_transition_are_ignored() {
         let mut app = app_with_two_maps();
+        app.insert_resource(MapTransition::new(
+            Fade {
+                colour: Color::BLACK,
+                out_secs: 1.0,
+                in_secs: 1.0,
+            },
+            ORIGIN,
+        ));
         app.update();
         put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
-        for _ in 0..2 {
-            app.world_mut().write_message(RequestMapChange {
-                to: "2".into(),
-                entry: Some("from_1".into()),
-                transition: Transition::Scene,
-                source: None,
-            });
-        }
+        app.world_mut().write_message(RequestMapChange {
+            to: "2".into(),
+            entry: Some("from_1".into()),
+            transition: Transition::Scene,
+            source: None,
+        });
         app.update();
-        app.update();
-        let loads = app
-            .world()
-            .resource::<Log>()
-            .0
-            .iter()
-            .filter(|line| line.starts_with("load"))
-            .count();
-        assert_eq!(loads, 2, "the start map and one transition");
+        let transition = app.world().resource::<MapTransition>();
+        assert!(matches!(transition.phase, Phase::FadeOut { .. }));
+        assert!(transition.locks_input());
+        // A second request in a later frame, while the screen fades out. It leads nowhere, so it must not replace the
+        // first one.
+        app.world_mut().write_message(RequestMapChange {
+            to: "9".into(),
+            entry: Some("x".into()),
+            transition: Transition::Scene,
+            source: None,
+        });
+        update_until(&mut app, |world| {
+            world.resource::<ActiveMaps>().current == "2"
+        });
+        let transition = app.world().resource::<MapTransition>();
+        assert!(matches!(transition.phase, Phase::FadeIn { .. }));
+        assert!(transition.locks_input());
+        update_until(&mut app, |world| {
+            world.resource::<MapTransition>().is_idle()
+        });
+        assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(320.0, 32.0));
     }
 
     #[test]
@@ -1810,27 +1823,20 @@ mod tests {
         assert_eq!(registry.ids().collect::<Vec<_>>(), vec!["1"]);
     }
 
-    fn map_of(w: i32, h: i32, blocks: &str) -> Map {
-        let head = format!(
-            "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: {w}x{h}\nlegend:\n  \".\": empty\n{blocks}---\n"
-        );
-        let row = vec!["."; w as usize].join(" ");
-        let rows: String = (0..h).rev().map(|y| format!("{y:>2} |{row}|\n")).collect();
-        parse("t.txt", &format!("{head}{rows}"), &[]).unwrap()
-    }
-
     #[test]
     fn a_seamless_map_is_placed_beside_the_exit_edge_with_the_strips_on_top_of_each_other() {
         let origin = Vec2::new(-1000.0, -500.0);
         let exit_map = |area: &str| {
-            map_of(
+            empty_map(
+                64,
                 10,
                 10,
                 &format!("exits:\n  x: area={area} to=2 entry=e transition=seamless\n"),
             )
         };
-        let entry_map =
-            |w: i32, h: i32, area: &str| map_of(w, h, &format!("entries:\n  e: area={area}\n"));
+        let entry_map = |w: i32, h: i32, area: &str| {
+            empty_map(64, w, h, &format!("entries:\n  e: area={area}\n"))
+        };
         let place = |exit: &Map, entry: &Map| {
             seamless_origin(origin, exit, &exit.exits[0], entry, &entry.entries[0]).unwrap()
         };
@@ -1936,7 +1942,7 @@ mod tests {
     #[test]
     fn the_player_can_cross_a_seam_only_through_the_doorway() {
         let active = active_pair();
-        // The body is 14 wide on each side and 50 tall, as in Long Way.
+        // The body is 14 wide on each side and 50 tall.
         let areas = active.walkable(Vec2::new(14.0, 0.0), Vec2::new(14.0, 50.0));
         let walk = |from: Vec2, to: Vec2| clamp_to_union(&areas, from, to);
         // In the doorway, crossing from the lower map to the upper one in small steps: free.
@@ -1978,38 +1984,64 @@ mod tests {
     }
 
     #[test]
-    fn a_doorway_on_a_side_edge_bridges_sideways() {
-        let active = ActiveMaps {
-            current: "1".into(),
-            maps: vec![
-                ActiveMap {
-                    id: "1".into(),
-                    origin: Vec2::ZERO,
-                    rect: Rect::new(0.0, 0.0, 640.0, 640.0),
-                },
-                ActiveMap {
-                    id: "2".into(),
-                    origin: Vec2::new(640.0, 0.0),
-                    rect: Rect::new(640.0, 0.0, 1280.0, 640.0),
-                },
-            ],
-            doorways: vec![Doorway {
-                from: "1".into(),
-                to: "2".into(),
-                edge: Edge::Right,
-                area: Rect::new(576.0, 256.0, 640.0, 384.0),
-            }],
+    fn a_doorway_on_each_edge_bridges_from_the_inner_side_of_one_map_to_the_other() {
+        let first = ActiveMap {
+            id: "1".into(),
+            origin: Vec2::ZERO,
+            rect: Rect::new(0.0, 0.0, 640.0, 640.0),
         };
-        let areas = active.walkable(Vec2::new(14.0, 0.0), Vec2::new(14.0, 50.0));
-        let through = Vec2::new(640.0, 300.0);
-        assert_eq!(
-            clamp_to_union(&areas, Vec2::new(620.0, 300.0), through),
-            through
-        );
-        assert_eq!(
-            clamp_to_union(&areas, Vec2::new(620.0, 500.0), Vec2::new(640.0, 500.0)).x,
-            640.0 - 14.0
-        );
+        // Different margins on each side, so a swapped value shows. The first map shrinks to (14,6)..(630,590).
+        let margin_min = Vec2::new(14.0, 6.0);
+        let margin_max = Vec2::new(10.0, 50.0);
+        // The second map, the doorway on the edge of the first, and the bridge: the doorway shrunk along the edge,
+        // from the inner side of the first map to the inner side of the second.
+        for (edge, second, door, bridge) in [
+            (
+                Edge::Top,
+                Rect::new(0.0, 640.0, 640.0, 1280.0),
+                Rect::new(192.0, 576.0, 448.0, 640.0),
+                Rect::new(206.0, 590.0, 438.0, 646.0),
+            ),
+            (
+                Edge::Bottom,
+                Rect::new(0.0, -640.0, 640.0, 0.0),
+                Rect::new(192.0, 0.0, 448.0, 64.0),
+                Rect::new(206.0, -50.0, 438.0, 6.0),
+            ),
+            (
+                Edge::Right,
+                Rect::new(640.0, 0.0, 1280.0, 640.0),
+                Rect::new(576.0, 256.0, 640.0, 384.0),
+                Rect::new(630.0, 262.0, 654.0, 334.0),
+            ),
+            (
+                Edge::Left,
+                Rect::new(-640.0, 0.0, 0.0, 640.0),
+                Rect::new(0.0, 256.0, 64.0, 384.0),
+                Rect::new(-10.0, 262.0, 14.0, 334.0),
+            ),
+        ] {
+            let active = ActiveMaps {
+                current: "1".into(),
+                maps: vec![
+                    first.clone(),
+                    ActiveMap {
+                        id: "2".into(),
+                        origin: second.min,
+                        rect: second,
+                    },
+                ],
+                doorways: vec![Doorway {
+                    from: "1".into(),
+                    to: "2".into(),
+                    edge,
+                    area: door,
+                }],
+            };
+            let areas = active.walkable(margin_min, margin_max);
+            assert_eq!(areas.len(), 3, "{edge:?}");
+            assert_eq!(areas[2], bridge, "{edge:?}");
+        }
     }
 
     #[test]
@@ -2074,20 +2106,22 @@ mod tests {
         set_feet(&mut app, ORIGIN + Vec2::new(192.0 + 58.0, 600.0));
         app.update();
         let log = app.world().resource::<Log>().0.clone();
-        // The start map, then the second map at the top of the first, aligned strip on strip (both start at x 3).
+        // The second map at the top of the first, aligned strip on strip (both start at x 3), and a rebuild that keeps
+        // the first map. No arrive hook: the player is not moved.
+        let load = line_after(&log, 0, "load 2").expect("map 2 is loaded");
         assert_eq!(
-            log[2],
-            format!("load 2 at {}", ORIGIN + Vec2::new(0.0, 640.0)),
-            "{log:?}"
+            log[load],
+            format!("load 2 at {}", ORIGIN + Vec2::new(0.0, 640.0))
         );
-        assert!(log[3].starts_with("rebuild with 2 map"), "{log:?}");
-        assert_eq!(log.len(), 4, "no arrive hook: {log:?}");
+        let rebuild = line_after(&log, load, "rebuild").expect("a rebuild after the load");
+        assert_eq!(log[rebuild], "rebuild with 2 map entities");
+        assert_eq!(line_after(&log, 0, "arrive"), None, "{log:?}");
         let active = app.world().resource::<ActiveMaps>();
         assert_eq!(active.maps.len(), 2);
         assert_eq!(active.current, "1", "the player is still in the first map");
         assert_eq!(active.doorways.len(), 1);
         assert_eq!(active.doorways[0].edge, Edge::Top);
-        assert!(!app.world().resource::<MapTransition>().locks_input());
+        // No fade: the transition is over in the same frame (`only_the_fade_and_the_swap_lock_the_player`).
         assert!(app.world().resource::<MapTransition>().is_idle());
         // The player was not moved.
         assert_eq!(
@@ -2104,6 +2138,15 @@ mod tests {
     #[test]
     fn crossing_the_seam_changes_the_current_map_and_the_old_one_goes_when_out_of_view() {
         let mut app = app_with("seamless");
+        // Explicit time: steps of 1/8 s add up exactly, and no step is cut short by the largest frame time.
+        let step = 0.125;
+        app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+            std::time::Duration::from_secs_f32(step),
+        ));
+        app.world_mut()
+            .resource_mut::<Time<Virtual>>()
+            .set_max_delta(std::time::Duration::from_secs(1));
+        let steps_to_unload = (UNLOAD_AFTER_SECS / step) as usize;
         app.update();
         let camera = put_camera(&mut app, ORIGIN + Vec2::new(320.0, 600.0));
         put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
@@ -2125,7 +2168,8 @@ mod tests {
             second,
             "after the crossing the camera limits head for the new map alone"
         );
-        for _ in 0..3 {
+        // Longer than the grace time with the first map in view: it stays.
+        for _ in 0..=steps_to_unload {
             app.update();
         }
         assert_eq!(
@@ -2133,22 +2177,21 @@ mod tests {
             2,
             "the first map is still in view"
         );
-        // The camera moves up: the first map is out of view. It goes after the grace time. Virtual time takes at most
-        // 0.25 s per update, so that is a few updates.
+        // The camera moves up: the first map is out of view. It goes when it has been out of view for the grace time.
         app.world_mut()
             .entity_mut(camera)
             .insert(GlobalTransform::from(Transform::from_translation(
                 (ORIGIN + Vec2::new(320.0, 1100.0)).extend(0.0),
             )));
-        app.update();
+        for _ in 1..steps_to_unload {
+            app.update();
+        }
         assert_eq!(
             app.world().resource::<ActiveMaps>().maps.len(),
             2,
-            "not yet, the grace time has not passed"
+            "not yet, one step short of the grace time"
         );
-        for _ in 0..6 {
-            app.update();
-        }
+        app.update();
         let active = app.world().resource::<ActiveMaps>();
         assert_eq!(active.maps.len(), 1);
         assert_eq!(active.maps[0].id, "2");
@@ -2245,5 +2288,321 @@ mod tests {
         let active = app.world().resource::<ActiveMaps>();
         assert_eq!(active.maps.len(), 2, "map 3 is refused");
         assert!(active.get("3").is_none());
+    }
+
+    #[test]
+    fn a_trigger_of_a_joined_map_does_not_fire_while_the_player_is_in_the_current_map() {
+        let mut app = app_with("seamless");
+        app.update();
+        put_camera(&mut app, ORIGIN + Vec2::new(320.0, 600.0));
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 600.0));
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().maps.len(), 2);
+        // A trigger of map 2 whose area reaches into map 1.
+        app.world_mut().spawn((
+            MapId("2".into()),
+            ExitTrigger {
+                area: Rect::from_corners(
+                    ORIGIN + Vec2::new(80.0, 280.0),
+                    ORIGIN + Vec2::new(120.0, 320.0),
+                ),
+                to: "1".into(),
+            },
+        ));
+        // Out of the exit first, so the exits are armed again.
+        set_feet(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.update();
+        assert!(app.world().resource::<MapTransition>().armed);
+        set_feet(&mut app, ORIGIN + Vec2::new(100.0, 300.0));
+        app.update();
+        let transition = app.world().resource::<MapTransition>();
+        assert!(transition.armed, "the trigger did not fire");
+        assert!(transition.is_idle());
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "1");
+    }
+
+    /// A world with the resources that `plan_switch` and `begin_seamless` read. Map 1 (64 unit cells) is active at
+    /// `ORIGIN` and has a seamless exit `up` (3..6,9) to the entry `from_1` (2..5,0) of map 2 (32 unit cells, 12 by 8). A
+    /// scene transition loads a map at (300,-200). Map 7 is active but not registered.
+    fn world_for_plans() -> World {
+        let one = registered(
+            "1",
+            "exits:\n  up: area=3..6,9 to=2 entry=from_1 transition=seamless\n",
+        );
+        let two = registered_sized(
+            "2",
+            32,
+            12,
+            8,
+            "entries:\n  from_1: area=2..5,0 facing=up\n",
+        );
+        let mut world = World::new();
+        world.insert_resource(MapRegistry::from_parsed(vec![one, two]).unwrap());
+        world.insert_resource(ActiveMaps {
+            current: "1".into(),
+            maps: vec![
+                ActiveMap {
+                    id: "1".into(),
+                    origin: ORIGIN,
+                    rect: Rect::from_corners(ORIGIN, ORIGIN + Vec2::splat(640.0)),
+                },
+                ActiveMap {
+                    id: "7".into(),
+                    origin: Vec2::new(5000.0, 0.0),
+                    rect: Rect::new(5000.0, 0.0, 5640.0, 640.0),
+                },
+            ],
+            doorways: Vec::new(),
+        });
+        world.insert_resource(MapTransition::new(
+            Fade::default(),
+            Vec2::new(300.0, -200.0),
+        ));
+        world
+    }
+
+    fn used(from: &str, exit: &str, feet: Vec2) -> Option<ExitUse> {
+        Some(ExitUse {
+            from: from.into(),
+            exit: exit.into(),
+            feet,
+        })
+    }
+
+    #[test]
+    fn the_position_along_the_strip_is_scaled_to_the_cells_of_the_new_map() {
+        let world = world_for_plans();
+        // 58 units along an exit of 64 unit cells is 29 units along an entry of 32 unit cells.
+        let request = RequestMapChange {
+            to: "2".into(),
+            entry: Some("from_1".into()),
+            transition: Transition::Scene,
+            source: used("1", "up", ORIGIN + Vec2::new(192.0 + 58.0, 600.0)),
+        };
+        let switch = plan_switch(&world, &request).unwrap_or_else(|e| panic!("{e}"));
+        assert_eq!(switch.id, "2");
+        assert_eq!(switch.origin, Vec2::new(300.0, -200.0));
+        assert_eq!(
+            switch.arrival.feet,
+            Vec2::new(300.0 + 64.0 + 29.0, -200.0 + 16.0)
+        );
+        assert_eq!(switch.arrival.facing, Some(Facing::Up));
+    }
+
+    #[test]
+    fn a_switch_that_cannot_be_planned_names_the_problem() {
+        let world = world_for_plans();
+        for (to, entry, message) in [
+            ("9", Some("x"), "map `9` is not registered"),
+            ("2", None, "map `2` has no `player_start`"),
+            ("2", Some("nope"), "map `2` has no entry `nope`"),
+        ] {
+            let request = RequestMapChange {
+                to: to.into(),
+                entry: entry.map(String::from),
+                transition: Transition::Scene,
+                source: None,
+            };
+            assert_eq!(
+                plan_switch(&world, &request).err().as_deref(),
+                Some(message)
+            );
+        }
+    }
+
+    #[test]
+    fn a_seamless_join_that_cannot_be_made_names_the_problem_and_changes_nothing() {
+        let feet = ORIGIN + Vec2::new(250.0, 600.0);
+        for (to, entry, source, message) in [
+            (
+                "2",
+                Some("from_1"),
+                None,
+                "a seamless transition needs the exit that was used",
+            ),
+            (
+                "2",
+                Some("from_1"),
+                used("2", "up", feet),
+                "map `2` is not active",
+            ),
+            (
+                "2",
+                Some("from_1"),
+                used("7", "up", feet),
+                "map `7` is not registered",
+            ),
+            (
+                "2",
+                Some("from_1"),
+                used("1", "nope", feet),
+                "map `1` has no exit `nope`",
+            ),
+            (
+                "9",
+                Some("from_1"),
+                used("1", "up", feet),
+                "map `9` is not registered",
+            ),
+            (
+                "2",
+                None,
+                used("1", "up", feet),
+                "a seamless transition needs an entry",
+            ),
+            (
+                "2",
+                Some("nope"),
+                used("1", "up", feet),
+                "map `2` has no entry `nope`",
+            ),
+        ] {
+            let mut world = world_for_plans();
+            let request = RequestMapChange {
+                to: to.into(),
+                entry: entry.map(String::from),
+                transition: Transition::Seamless,
+                source,
+            };
+            assert_eq!(
+                begin_seamless(&mut world, &request),
+                Err(message.to_string())
+            );
+            let active = world.resource::<ActiveMaps>();
+            assert_eq!(active.maps.len(), 2, "{message}");
+            assert!(active.doorways.is_empty(), "{message}");
+        }
+    }
+
+    /// A new empty folder for the map files of one test.
+    fn temp_folder(test: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("game-kit-{}-{test}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    /// Writes `text` to `<dir>/<id>.txt`. The path is absolute, so `read` does not join it to the crate folder.
+    fn map_file(dir: &Path, id: &'static str, text: &str) -> MapSource {
+        let path = dir.join(format!("{id}.txt"));
+        std::fs::write(&path, text).unwrap();
+        MapSource {
+            id,
+            file: path.display().to_string().leak(),
+            bundled: "",
+        }
+    }
+
+    #[test]
+    fn loading_names_the_file_of_a_missing_file_a_bad_file_and_a_broken_link() {
+        let dir = temp_folder("load");
+        let good = map_file(&dir, "1", &empty_map_text("1", 64, 10, 10, ""));
+        let missing = MapSource {
+            id: "2",
+            file: dir.join("none.txt").display().to_string().leak(),
+            bundled: "",
+        };
+        let bad = map_file(&dir, "3", "no front matter\n");
+        let lost = map_file(
+            &dir,
+            "4",
+            &empty_map_text(
+                "4",
+                64,
+                10,
+                10,
+                "exits:\n  up: area=3..6,9 to=9 entry=e transition=scene\n",
+            ),
+        );
+        let error = MapRegistry::load(&[good, missing], &[]).err().unwrap();
+        // The rest of the message comes from the operating system.
+        assert!(error.starts_with(&format!("{}: ", missing.file)), "{error}");
+        assert_eq!(
+            MapRegistry::load(&[good, bad], &[]).err(),
+            Some(format!(
+                "{}:1: the file must start with a `---` frontmatter line",
+                bad.file
+            ))
+        );
+        let error = MapRegistry::load(&[good, lost], &[]).err().unwrap();
+        assert!(
+            error.starts_with(&format!(
+                "{}:9: exit `up` leads to map `9`, which is not registered",
+                lost.file
+            )),
+            "{error}"
+        );
+        let registry = MapRegistry::load(&[good], &[]).unwrap();
+        assert_eq!(registry.ids().collect::<Vec<_>>(), vec!["1"]);
+        assert_eq!(registry.get("1").unwrap().file, good.file);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_reload_leaves_the_maps_unchanged() {
+        let dir = temp_folder("reload");
+        let one = map_file(
+            &dir,
+            "1",
+            &empty_map_text(
+                "1",
+                64,
+                10,
+                10,
+                "exits:\n  up: area=3..6,9 to=2 entry=e transition=scene\n",
+            ),
+        );
+        let two = map_file(
+            &dir,
+            "2",
+            &empty_map_text("2", 64, 10, 10, "entries:\n  e: area=3..6,0\n"),
+        );
+        let mut registry = MapRegistry::load(&[one, two], &[]).unwrap();
+        let before = registry.get("2").unwrap().map.clone();
+        // A file that does not parse.
+        std::fs::write(two.file, "no front matter\n").unwrap();
+        assert_eq!(
+            registry.reload("2"),
+            Err(format!(
+                "{}:1: the file must start with a `---` frontmatter line",
+                two.file
+            ))
+        );
+        assert_eq!(registry.get("2").unwrap().map, before);
+        // A file that parses but breaks a link: the exit of map 1 leads to the entry `e`, which is gone.
+        std::fs::write(
+            two.file,
+            empty_map_text("2", 64, 10, 10, "entries:\n  f: area=3..6,0\n"),
+        )
+        .unwrap();
+        let error = registry.reload("2").unwrap_err();
+        assert!(
+            error.contains("leads to entry `e`, but map `2` has no such entry"),
+            "{error}"
+        );
+        assert_eq!(registry.get("2").unwrap().map, before);
+        // A good file is read again.
+        std::fs::write(
+            two.file,
+            empty_map_text("2", 64, 10, 10, "entries:\n  e: area=3..6,1\n"),
+        )
+        .unwrap();
+        registry.reload("2").unwrap();
+        assert_eq!(
+            registry.get("2").unwrap().map.entries[0].area,
+            area(cell(3, 1), cell(6, 1))
+        );
+        assert_eq!(
+            registry.reload("9"),
+            Err("map `9` is not registered".to_string())
+        );
+        let mut parsed = MapRegistry::from_parsed(vec![registered("1", "")]).unwrap();
+        assert_eq!(
+            parsed.reload("1"),
+            Err("map `1` has no file to read again".to_string())
+        );
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

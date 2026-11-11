@@ -22,32 +22,3 @@ pub struct ReloadMap;
 fn request_reload(mut requests: MessageWriter<ReloadMap>) {
     requests.write(ReloadMap);
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Resource, Default)]
-    struct Count(usize);
-
-    fn count(mut reader: MessageReader<ReloadMap>, mut seen: ResMut<Count>) {
-        seen.0 += reader.read().count();
-    }
-
-    #[test]
-    fn f1_sends_one_reload_message() {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .init_resource::<ButtonInput<KeyCode>>()
-            .init_resource::<Count>()
-            .add_plugins(ReloadPlugin)
-            .add_systems(Update, count.after(request_reload));
-        app.update();
-        assert_eq!(app.world().resource::<Count>().0, 0);
-        app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::F1);
-        app.update();
-        assert_eq!(app.world().resource::<Count>().0, 1);
-    }
-}

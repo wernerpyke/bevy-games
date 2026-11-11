@@ -529,12 +529,15 @@ mod tests {
         assert_eq!(map.entries[0].area, Area::new(cell(1, 0), cell(2, 0)));
         assert_eq!(map.entries[0].facing, Some(Facing::Up));
         assert_eq!(map.entries[1].facing, None);
-    }
-
-    #[test]
-    fn a_map_without_the_blocks_has_no_exits_or_entries() {
-        let map = parse_ok(&open(""));
-        assert!(map.exits.is_empty() && map.entries.is_empty());
+        for (text, facing) in [
+            ("up", Facing::Up),
+            ("down", Facing::Down),
+            ("left", Facing::Left),
+            ("right", Facing::Right),
+        ] {
+            let map = parse_ok(&open(&format!("entries:\n  e: area=0,1 facing={text}\n")));
+            assert_eq!(map.entries[0].facing, Some(facing), "{text}");
+        }
     }
 
     #[test]
@@ -546,11 +549,19 @@ mod tests {
 
     #[test]
     fn a_top_left_file_numbers_areas_like_its_row_labels() {
-        let text = "---\nmap: t\ncell: 16\norigin: top-left\nsize: 6x4\nlegend:\n  \".\": empty\nexits:\n  up: area=1..2,0 to=2 entry=a transition=scene\nentries:\n  low: area=4,3\n---\n   |0 1 2 3 4 5|\n 0 |. . . . . .|\n 1 |. . . . . .|\n 2 |. . . . . .|\n 3 |. . . . . .|\n";
+        let text = "---\nmap: t\ncell: 16\norigin: top-left\nsize: 6x4\nlegend:\n  \".\": empty\nexits:\n  up: area=1..2,0 to=2 entry=a transition=scene\nentries:\n  low: area=4,3\n  side: area=0,0..1\n---\n   |0 1 2 3 4 5|\n 0 |. . . . . .|\n 1 |. . . . . .|\n 2 |. . . . . .|\n 3 |. . . . . .|\n";
         let map = parse_ok(text);
         // Row 0 of this file is the top row, which is y = 3 from the bottom.
         assert_eq!(map.exits[0].area, Area::new(cell(1, 3), cell(2, 3)));
         assert_eq!(map.entries[0].area, Area::new(cell(4, 0), cell(4, 0)));
+        // A vertical strip turns over: rows 0..1 from the top are y 2..3, and the low end is still `min`.
+        assert_eq!(
+            map.entries[1].area,
+            Area {
+                min: cell(0, 2),
+                max: cell(0, 3)
+            }
+        );
     }
 
     #[test]

@@ -130,7 +130,7 @@ fn run_spawners(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy::time::TimeUpdateStrategy;
+    use crate::test_util::{Collected, collect, timed_app};
     use std::time::Duration;
 
     #[test]
@@ -178,22 +178,13 @@ mod tests {
         }
     }
 
-    #[derive(Resource, Default)]
-    struct Requests(Vec<SpawnRequest>);
-
-    fn collect(mut reader: MessageReader<SpawnRequest>, mut seen: ResMut<Requests>) {
-        seen.0.extend(reader.read().cloned());
-    }
+    type Requests = Collected<SpawnRequest>;
 
     fn app() -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_millis(
-                16,
-            )))
-            .init_resource::<Requests>()
+        let mut app = timed_app(Duration::from_millis(16));
+        app.init_resource::<Requests>()
             .add_plugins(SpawnerPlugin)
-            .add_systems(Update, collect.after(run_spawners));
+            .add_systems(Update, collect::<SpawnRequest>.after(run_spawners));
         app
     }
 
@@ -254,5 +245,30 @@ mod tests {
         app.update();
         app.update();
         assert_eq!(app.world().resource::<Requests>().0.len(), 1);
+    }
+
+    #[test]
+    fn the_entities_of_another_spawner_do_not_count_towards_the_limit() {
+        let mut app = app();
+        let spawn = |app: &mut App| {
+            app.world_mut()
+                .spawn((
+                    Transform::default(),
+                    Spawner::new(1.0, Some(1), Params::default()),
+                ))
+                .id()
+        };
+        let full = spawn(&mut app);
+        let empty = spawn(&mut app);
+        app.world_mut().spawn(SpawnedBy(full));
+        app.update();
+        let requests: Vec<Entity> = app
+            .world()
+            .resource::<Requests>()
+            .0
+            .iter()
+            .map(|r| r.spawner)
+            .collect();
+        assert_eq!(requests, [empty]);
     }
 }

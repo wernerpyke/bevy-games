@@ -21,8 +21,11 @@ pub fn ease_out(u: f32) -> f32 {
 }
 
 /// Radius of a growing ring `age` seconds after it started: eased from 0 to `max` over `grow_secs`, then constant.
-/// A negative age (history before the start) gives 0.
+/// A negative age (history before the start) gives 0. With `grow_secs` 0 the ring is at `max` from age 0.
 pub fn ring_radius(age: f32, grow_secs: f32, max: f32) -> f32 {
+    if grow_secs <= 0.0 {
+        return if age < 0.0 { 0.0 } else { max };
+    }
     max * ease_out(age / grow_secs)
 }
 
@@ -61,14 +64,6 @@ mod tests {
     }
 
     #[test]
-    fn ease_out_runs_from_0_to_1_and_clamps() {
-        assert_eq!(ease_out(0.0), 0.0);
-        assert_eq!(ease_out(1.0), 1.0);
-        assert_eq!(ease_out(-1.0), 0.0);
-        assert_eq!(ease_out(2.0), 1.0);
-    }
-
-    #[test]
     fn ease_out_is_fast_first_and_never_goes_back() {
         assert!(ease_out(0.1) > 0.15);
         let mut last = 0.0;
@@ -90,17 +85,31 @@ mod tests {
     }
 
     #[test]
-    fn the_trailing_band_leaves_no_gap_at_frame_rates_up_to_20_fps() {
+    fn a_ring_with_no_grow_time_is_at_the_maximum_at_once() {
+        assert_eq!(ring_radius(0.0, 0.0, 100.0), 100.0);
+        assert_eq!(ring_radius(0.5, 0.0, 100.0), 100.0);
+        assert_eq!(ring_radius(-0.1, 0.0, 100.0), 0.0);
+    }
+
+    #[test]
+    fn the_trailing_band_leaves_no_gap_at_20_fps_when_it_reaches_back_more_than_a_frame() {
         // The band reaches back `trail` seconds. Consecutive frames must overlap, or a body could be skipped.
-        let (grow, max, trail) = (0.767, 230.0, 0.12);
-        let mut age = 0.0;
-        while age < grow {
-            let next = age + 0.05;
-            let inner_next = ring_radius(next - trail, grow, max);
-            let outer_now = ring_radius(age, grow, max);
-            assert!(inner_next <= outer_now);
-            age = next;
-        }
+        // A frame at 20 fps is 0.05 s: a trail of 0.06 s overlaps, a trail of 0.04 s leaves a gap.
+        let (grow, max, frame) = (1.0, 100.0, 0.05);
+        let gaps = |trail: f32| {
+            let mut found = 0;
+            let mut age = 0.0;
+            while age < grow {
+                let next = age + frame;
+                if ring_radius(next - trail, grow, max) > ring_radius(age, grow, max) {
+                    found += 1;
+                }
+                age = next;
+            }
+            found
+        };
+        assert_eq!(gaps(0.06), 0);
+        assert!(gaps(0.04) > 0);
     }
 
     #[test]

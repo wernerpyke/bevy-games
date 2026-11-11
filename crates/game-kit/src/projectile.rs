@@ -161,7 +161,8 @@ fn move_projectiles(
 
 /// The first of the `targets` that the segment from `old` to `new` enters: its index and the entry point. A segment
 /// that starts inside a target hits it at `old`. The segment, not the end point, is tested, so a long step cannot
-/// jump over a thin target.
+/// jump over a thin target. A segment that only touches an edge or a corner (a graze) does not enter, as in
+/// `hitbox::overlaps`.
 pub fn target_hit(old: Vec2, new: Vec2, targets: &[Rect]) -> Option<(usize, Vec2)> {
     let delta = new - old;
     let mut best: Option<(usize, f32)> = None;
@@ -176,7 +177,8 @@ pub fn target_hit(old: Vec2, new: Vec2, targets: &[Rect]) -> Option<(usize, Vec2
     best.map(|(index, t)| (index, old + delta * t))
 }
 
-/// When (0 to 1) the segment `start + delta * t` is first inside `rect`. The slab method on each axis.
+/// When (0 to 1) the segment `start + delta * t` is first inside `rect`. The slab method on each axis. The edges
+/// are not inside, so a segment along an edge or through a corner only is no entry.
 fn entry_time(start: Vec2, delta: Vec2, rect: Rect) -> Option<f32> {
     let mut enter = 0.0f32;
     let mut leave = 1.0f32;
@@ -185,7 +187,7 @@ fn entry_time(start: Vec2, delta: Vec2, rect: Rect) -> Option<f32> {
         (start.y, delta.y, rect.min.y, rect.max.y),
     ] {
         if change == 0.0 {
-            if from < low || from > high {
+            if from <= low || from >= high {
                 return None;
             }
             continue;
@@ -194,7 +196,7 @@ fn entry_time(start: Vec2, delta: Vec2, rect: Rect) -> Option<f32> {
         enter = enter.max(a.min(b));
         leave = leave.min(a.max(b));
     }
-    (enter <= leave).then_some(enter)
+    (enter < leave).then_some(enter)
 }
 
 /// What one frame of flight did to a projectile.
@@ -225,37 +227,21 @@ pub fn step(old: Vec2, velocity: Vec2, dt: f32, edges: &[Edge], bounds: Rect) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::outline;
+    use crate::test_util::{Collected, DT, collect, edges_of, map_rect, timed_app};
 
-    const DT: f32 = 1.0 / 60.0;
     /// Twice a walk speed of 80 px/s.
     const SPEED: f32 = 160.0;
 
-    fn map() -> Rect {
-        Rect::new(0.0, 0.0, 200.0, 200.0)
-    }
-
     /// A blocked area, x 100 to 120, y 50 to 54: a 4 px band like the base of a lone tree.
     fn band_edges() -> Vec<Edge> {
-        edges_of(Rect::new(100.0, 50.0, 120.0, 54.0))
-    }
-
-    fn edges_of(area: Rect) -> Vec<Edge> {
-        outline::build(&[area])
-            .iter()
-            .flat_map(|c| c.edges.iter().copied())
-            .collect()
+        edges_of(&[Rect::new(100.0, 50.0, 120.0, 54.0)])
     }
 
     #[test]
-    fn the_sprite_turns_to_the_flight_direction() {
-        let turned = |velocity: Vec2| sprite_rotation(velocity).unwrap() * Vec3::X;
-        assert!((turned(Vec2::new(5.0, 0.0)) - Vec3::X).length() < 1e-5);
-        assert!((turned(Vec2::new(0.0, 5.0)) - Vec3::Y).length() < 1e-5);
-        assert!((turned(Vec2::new(-5.0, 0.0)) - Vec3::NEG_X).length() < 1e-5);
-        assert!((turned(Vec2::new(0.0, -5.0)) - Vec3::NEG_Y).length() < 1e-5);
-        let diagonal = turned(Vec2::new(3.0, 3.0));
-        assert!((diagonal - Vec3::new(1.0, 1.0, 0.0).normalize()).length() < 1e-5);
+    fn the_sprite_turns_from_plus_x_to_the_flight_direction_and_a_still_shot_keeps_its_turn() {
+        // Art drawn along +x points up for a shot that flies up. 1e-5 is rounding of a quarter turn in f32.
+        let up = sprite_rotation(Vec2::new(0.0, 5.0)).unwrap() * Vec3::X;
+        assert!((up - Vec3::Y).length() < 1e-5, "{up}");
         assert_eq!(sprite_rotation(Vec2::ZERO), None);
     }
 
@@ -263,24 +249,14 @@ mod tests {
         vec![Rect::new(100.0, 50.0, 110.0, 62.0)]
     }
 
-    #[derive(Resource, Default)]
-    struct Seen(Vec<ProjectileHit>);
-
-    fn collect(mut reader: MessageReader<ProjectileHit>, mut seen: ResMut<Seen>) {
-        seen.0.extend(reader.read().copied());
-    }
+    type Seen = Collected<ProjectileHit>;
 
     fn app() -> App {
-        use bevy::time::TimeUpdateStrategy;
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .insert_resource(TimeUpdateStrategy::ManualDuration(
-                std::time::Duration::from_millis(16),
-            ))
-            .init_resource::<CollisionWorld>()
+        let mut app = timed_app(std::time::Duration::from_millis(16));
+        app.init_resource::<CollisionWorld>()
             .init_resource::<Seen>()
             .add_plugins(ProjectilePlugin)
-            .add_systems(Update, collect.after(move_projectiles));
+            .add_systems(Update, collect::<ProjectileHit>.after(move_projectiles));
         app
     }
 
@@ -362,8 +338,34 @@ mod tests {
 
     #[test]
     fn a_diagonal_shot_hits_a_target() {
-        let hit = target_hit(Vec2::new(90.0, 40.0), Vec2::new(110.0, 60.0), &target());
-        assert!(hit.is_some());
+        // Enters through the corner (100, 50) and goes on inside.
+        let (index, point) =
+            target_hit(Vec2::new(90.0, 40.0), Vec2::new(110.0, 60.0), &target()).unwrap();
+        assert_eq!(index, 0);
+        assert!(point.distance(Vec2::new(100.0, 50.0)) < 1e-4, "{point:?}");
+    }
+
+    #[test]
+    fn a_shot_that_only_grazes_an_edge_or_a_corner_misses() {
+        // The target is x 100 to 110, y 50 to 62. Touching is not overlapping (`hitbox::overlaps`).
+        let cases = [
+            // Along the top edge, and along the left edge.
+            (Vec2::new(90.0, 62.0), Vec2::new(120.0, 62.0)),
+            (Vec2::new(100.0, 40.0), Vec2::new(100.0, 70.0)),
+            // Through the top left corner only.
+            (Vec2::new(90.0, 52.0), Vec2::new(110.0, 72.0)),
+            // Ends on the left face, and starts on it moving away.
+            (Vec2::new(90.0, 56.0), Vec2::new(100.0, 56.0)),
+            (Vec2::new(100.0, 56.0), Vec2::new(90.0, 56.0)),
+        ];
+        for (old, new) in cases {
+            assert_eq!(target_hit(old, new, &target()), None, "{old:?} to {new:?}");
+        }
+        // Just inside the top edge is a hit.
+        let (index, point) =
+            target_hit(Vec2::new(90.0, 61.9), Vec2::new(120.0, 61.9), &target()).unwrap();
+        assert_eq!(index, 0);
+        assert!(point.distance(Vec2::new(100.0, 61.9)) < 1e-4, "{point:?}");
     }
 
     #[test]
@@ -401,7 +403,13 @@ mod tests {
 
     #[test]
     fn open_ground_moves_by_velocity_times_dt() {
-        let result = step(Vec2::new(10.0, 10.0), Vec2::new(SPEED, 0.0), DT, &[], map());
+        let result = step(
+            Vec2::new(10.0, 10.0),
+            Vec2::new(SPEED, 0.0),
+            DT,
+            &[],
+            map_rect(),
+        );
         let Step::Flying(point) = result else {
             panic!("expected Flying, got {result:?}");
         };
@@ -417,7 +425,7 @@ mod tests {
             Vec2::new(SPEED, 0.0),
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
         assert_eq!(result, Step::HitBlocked(Vec2::new(100.0, 52.0)));
     }
@@ -429,7 +437,7 @@ mod tests {
             Vec2::new(0.0, SPEED),
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
         assert_eq!(result, Step::HitBlocked(Vec2::new(110.0, 50.0)));
     }
@@ -437,21 +445,22 @@ mod tests {
     #[test]
     fn diagonal_into_a_face_is_a_hit() {
         let velocity = Vec2::new(1.0, 1.0).normalize() * SPEED;
-        let result = step(Vec2::new(99.5, 51.0), velocity, DT, &band_edges(), map());
-        assert!(matches!(result, Step::HitBlocked(_)), "{result:?}");
-    }
-
-    #[test]
-    fn a_step_larger_than_the_band_is_still_a_hit() {
-        // One 100 px step from below the band to above it must not jump over the 4 px band.
         let result = step(
-            Vec2::new(110.0, 40.0),
-            Vec2::new(0.0, 6000.0),
+            Vec2::new(99.5, 51.0),
+            velocity,
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
-        assert_eq!(result, Step::HitBlocked(Vec2::new(110.0, 50.0)));
+        let Step::HitBlocked(point) = result else {
+            panic!("expected HitBlocked, got {result:?}");
+        };
+        // Stopped on the face at x 100, the y move goes on. 1e-4 is f32 rounding of the diagonal step.
+        assert_eq!(point.x, 100.0);
+        assert!(
+            (point.y - (51.0 + velocity.y * DT)).abs() < 1e-4,
+            "{point:?}"
+        );
     }
 
     #[test]
@@ -461,7 +470,7 @@ mod tests {
             Vec2::new(0.0, SPEED),
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
         assert!(matches!(result, Step::Flying(_)), "{result:?}");
     }
@@ -474,7 +483,7 @@ mod tests {
             Vec2::new(SPEED, 0.0),
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
         assert!(matches!(result, Step::Flying(_)), "{result:?}");
     }
@@ -504,7 +513,10 @@ mod tests {
             ),
         ];
         for (old, velocity, expected) in cases {
-            assert_eq!(step(old, velocity, DT, &[], map()), Step::LeftMap(expected));
+            assert_eq!(
+                step(old, velocity, DT, &[], map_rect()),
+                Step::LeftMap(expected)
+            );
         }
     }
 
@@ -515,43 +527,69 @@ mod tests {
             Vec2::new(-SPEED, 0.0),
             DT,
             &band_edges(),
-            map(),
+            map_rect(),
         );
         assert!(matches!(result, Step::Flying(_)), "{result:?}");
     }
 
     #[test]
     fn a_hit_wins_over_leaving_the_map() {
-        // The band touches the right edge of the map: the shot stops on its face, inside the map.
-        let edges = edges_of(Rect::new(198.0, 50.0, 220.0, 54.0));
+        // The band reaches past the right edge of the map. In one step the shot reaches the band at x 198 and would
+        // end at x 207, outside the map: it stops on the face.
+        let edges = edges_of(&[Rect::new(198.0, 50.0, 220.0, 54.0)]);
         let result = step(
             Vec2::new(197.0, 52.0),
-            Vec2::new(SPEED, 0.0),
-            DT,
+            Vec2::new(10.0, 0.0),
+            1.0,
             &edges,
-            map(),
+            map_rect(),
         );
         assert_eq!(result, Step::HitBlocked(Vec2::new(198.0, 52.0)));
     }
 
+    /// Fires a shot from `from` to the right at 6000 px/s, 96 px in one 16 ms frame. The map is `CameraBounds` and
+    /// the collision world holds the band x 100 to 120, y 50 to 54. Returns the hits seen after a few frames.
+    fn fire_right(from: Vec2, targets: &[(Vec2, HitBox)]) -> Vec<ProjectileHit> {
+        let mut app = app();
+        app.insert_resource(CameraBounds(map_rect()));
+        app.world_mut()
+            .resource_mut::<CollisionWorld>()
+            .add_blocked(&[Rect::new(100.0, 50.0, 120.0, 54.0)]);
+        for (at, hit_box) in targets {
+            app.world_mut().spawn((
+                Transform::from_xyz(at.x, at.y, 0.0),
+                *hit_box,
+                ProjectileTarget,
+            ));
+        }
+        app.world_mut().spawn((
+            Transform::from_xyz(from.x, from.y, 0.0),
+            Projectile::new(Vec2::X, 6000.0),
+        ));
+        for _ in 0..10 {
+            app.update();
+        }
+        app.world().resource::<Seen>().0.clone()
+    }
+
     #[test]
-    fn a_shot_through_a_corner_contact_is_a_hit() {
-        let edges: Vec<Edge> = outline::build(&[
-            Rect::new(0.0, 0.0, 10.0, 10.0),
-            Rect::new(10.0, 10.0, 20.0, 20.0),
-        ])
-        .iter()
-        .flat_map(|c| c.edges.iter().copied())
-        .collect();
-        let bounds = Rect::new(-50.0, -50.0, 50.0, 50.0);
-        // This line passes exactly through the vertex (10, 10).
-        let shot = step(
-            Vec2::new(14.0, 6.0),
-            Vec2::new(-8.0, 8.0),
-            1.0,
-            &edges,
-            bounds,
-        );
-        assert!(matches!(shot, Step::HitBlocked(_)), "{shot:?}");
+    fn a_target_behind_a_blocked_area_is_safe() {
+        // In one frame the shot reaches the band at x 100 and, without the band, the target at x 107 behind it.
+        let behind = HitBox {
+            offset: Vec2::ZERO,
+            half_size: Vec2::new(3.0, 10.0),
+        };
+        let seen = fire_right(Vec2::new(90.0, 52.0), &[(Vec2::new(110.0, 52.0), behind)]);
+        assert_eq!(seen.len(), 1, "{seen:?}");
+        assert_eq!(seen[0].cause, HitCause::Blocked);
+        assert_eq!(seen[0].position, Vec2::new(100.0, 52.0));
+    }
+
+    #[test]
+    fn a_shot_that_leaves_the_map_is_reported_on_the_map_edge() {
+        let seen = fire_right(Vec2::new(150.0, 100.0), &[]);
+        assert_eq!(seen.len(), 1, "{seen:?}");
+        assert_eq!(seen[0].cause, HitCause::MapEdge);
+        assert_eq!(seen[0].position, Vec2::new(200.0, 100.0));
     }
 }

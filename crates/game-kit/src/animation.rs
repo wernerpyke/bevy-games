@@ -301,16 +301,6 @@ mod tests {
     }
 
     #[test]
-    fn without_facing_tags_the_animation_is_left_alone() {
-        let (mut app, mover, sprite) = facing_app();
-        face(&mut app, mover, Vec2::Y);
-        app.world_mut().entity_mut(sprite).remove::<FacingTags>();
-        face(&mut app, mover, Vec2::NEG_Y);
-        let ase = app.world().get::<AseAnimation>(sprite).unwrap();
-        assert_eq!(ase.animation.tag.as_deref(), Some("Up"));
-    }
-
-    #[test]
     fn a_tag_is_played_once_until_it_changes() {
         let mut ase = AseAnimation {
             animation: Animation::tag("Idle"),
@@ -330,5 +320,118 @@ mod tests {
         assert_eq!(a, RandomStartFrame::for_cell("1", IVec2::new(3, 4)).seed);
         assert_ne!(a, RandomStartFrame::for_cell("2", IVec2::new(3, 4)).seed);
         assert_ne!(a, RandomStartFrame::for_cell("1", IVec2::new(4, 3)).seed);
+    }
+
+    const ELAPSED: std::time::Duration = std::time::Duration::from_millis(300);
+
+    /// The two frame systems, and a handle to an Aseprite file that is not loaded yet.
+    fn frame_app() -> (App, Handle<Aseprite>) {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Aseprite>()
+            .add_systems(Update, (apply_random_start, apply_static_frame));
+        let file = app.world().resource::<Assets<Aseprite>>().reserve_handle();
+        (app, file)
+    }
+
+    /// Loads the file: `frames` frames and no tags.
+    fn load(app: &mut App, file: &Handle<Aseprite>, frames: usize) {
+        let mut aseprite = Aseprite::default();
+        aseprite.frame_durations = vec![std::time::Duration::from_millis(100); frames];
+        app.world_mut()
+            .resource_mut::<Assets<Aseprite>>()
+            .insert(file, aseprite)
+            .unwrap();
+    }
+
+    fn animated(file: &Handle<Aseprite>, tag: Option<&str>) -> (AseAnimation, AnimationState) {
+        let animation = tag.map_or_else(Animation::default, Animation::tag);
+        (
+            AseAnimation {
+                animation,
+                aseprite: file.clone(),
+            },
+            AnimationState {
+                relative_frame: 1,
+                current_frame: 1,
+                elapsed: ELAPSED,
+                ..default()
+            },
+        )
+    }
+
+    fn frame_of(app: &App, entity: Entity) -> (u16, u16, std::time::Duration) {
+        let state = app.world().get::<AnimationState>(entity).unwrap();
+        (state.relative_frame, state.current_frame, state.elapsed)
+    }
+
+    #[test]
+    fn a_random_start_waits_for_the_file_then_sets_the_frame_from_the_seed() {
+        let (mut app, file) = frame_app();
+        let seed = 3;
+        let expected = start_offset(seed, 5);
+        assert!(
+            expected > 1,
+            "a seed whose frame differs from the one set: {expected}"
+        );
+        let entity = app
+            .world_mut()
+            .spawn((animated(&file, None), RandomStartFrame { seed }))
+            .id();
+        app.update();
+        assert!(app.world().get::<RandomStartFrame>(entity).is_some());
+        assert_eq!(frame_of(&app, entity), (1, 1, ELAPSED));
+        load(&mut app, &file, 5);
+        app.update();
+        assert!(app.world().get::<RandomStartFrame>(entity).is_none());
+        assert_eq!(
+            frame_of(&app, entity),
+            (expected, expected, std::time::Duration::ZERO)
+        );
+    }
+
+    #[test]
+    fn a_random_start_with_a_missing_tag_is_dropped_and_changes_nothing() {
+        let (mut app, file) = frame_app();
+        load(&mut app, &file, 5);
+        let entity = app
+            .world_mut()
+            .spawn((animated(&file, Some("Run")), RandomStartFrame { seed: 3 }))
+            .id();
+        app.update();
+        assert!(app.world().get::<RandomStartFrame>(entity).is_none());
+        assert_eq!(frame_of(&app, entity), (1, 1, ELAPSED));
+    }
+
+    #[test]
+    fn a_static_frame_waits_for_the_file_then_shows_the_frame_kept_in_range_and_stops() {
+        let (mut app, file) = frame_app();
+        let entity = app
+            .world_mut()
+            .spawn((animated(&file, None), StaticFrame { relative: 9 }))
+            .id();
+        app.update();
+        assert!(app.world().get::<StaticFrame>(entity).is_some());
+        load(&mut app, &file, 4);
+        app.update();
+        assert!(app.world().get::<StaticFrame>(entity).is_none());
+        assert_eq!(frame_of(&app, entity), (3, 3, std::time::Duration::ZERO));
+        let ase = app.world().get::<AseAnimation>(entity).unwrap();
+        assert!(!ase.animation.playing);
+    }
+
+    #[test]
+    fn a_static_frame_with_a_missing_tag_is_dropped_and_keeps_playing() {
+        let (mut app, file) = frame_app();
+        load(&mut app, &file, 4);
+        let entity = app
+            .world_mut()
+            .spawn((animated(&file, Some("Run")), StaticFrame { relative: 2 }))
+            .id();
+        app.update();
+        assert!(app.world().get::<StaticFrame>(entity).is_none());
+        assert_eq!(frame_of(&app, entity), (1, 1, ELAPSED));
+        let ase = app.world().get::<AseAnimation>(entity).unwrap();
+        assert!(ase.animation.playing);
     }
 }

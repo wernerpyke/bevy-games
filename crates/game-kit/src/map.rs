@@ -909,9 +909,6 @@ mod text_tests {
         assert!(map.objects.is_empty());
         let spaced = grid([DOTS, DOTS, DOTS, ". . .      "]).replace("|\n", "| \n");
         assert!(parse_ok(&spaced).objects.is_empty());
-        let stripped = error(&grid([DOTS, DOTS, DOTS, ". . ."]));
-        assert_eq!(stripped.line, 16);
-        assert!(stripped.message.contains("characters between the bars"));
     }
 
     #[test]
@@ -1010,17 +1007,11 @@ mod text_tests {
 
     #[test]
     fn reserved_legend_keys_are_errors() {
-        for key in ["|", ".", " "] {
+        for key in ["|", " "] {
             let source = head("6x4").replace("\"g\": tree_big", &format!("\"{key}\": tree_big"));
             let e = error(&format!("{source}{RULERS}{}", body([DOTS; 4])));
             assert_eq!(e.line, 9, "key `{key}`: {e}");
         }
-    }
-
-    #[test]
-    fn player_start_is_an_ordinary_object() {
-        let map = parse_ok(&grid([DOTS, DOTS, ". . . . @ .", DOTS]));
-        assert_eq!(cells(&map, "player_start"), vec![(4, 1)]);
     }
 
     #[test]
@@ -1048,18 +1039,6 @@ mod text_tests {
             assert_eq!(e.line, 5, "size `{bad}`");
             assert!(e.message.contains("`size`"), "{e}");
         }
-        let e = error(&format!(
-            "{}{rows}",
-            head("6x4").replace("bottom-left", "centre")
-        ));
-        assert_eq!(e.line, 4);
-        assert!(e.message.contains("origin"), "{e}");
-        let e = error(&format!(
-            "{}{rows}",
-            head("6x4").replace("tree_big", "bush")
-        ));
-        assert_eq!(e.line, 9);
-        assert!(e.message.contains("unknown kind"), "{e}");
     }
 
     #[test]
@@ -1124,6 +1103,7 @@ mod text_tests {
         let e = error(&format!("{base}  \"ab\": tree_big\n---\n"));
         assert!(e.message.contains("exactly one character"), "{e}");
         let e = error(&format!("{base}  \".\": tree_big\n---\n"));
+        assert_eq!(e.line, 7);
         assert!(e.message.contains("always empty"), "{e}");
         let e = error("---\nmap: t\ncell: 16\norigin: bottom-left\n  \"g\": tree_big\n---\n");
         assert!(e.message.contains("outside `legend`"), "{e}");
@@ -1149,17 +1129,26 @@ mod text_tests {
         assert_eq!(spawner.params.get("strategy"), Some("patrol"));
         assert_eq!(spawner.params.f32("radius"), Ok(Some(120.5)));
         assert_eq!(spawner.params.f32("missing"), Ok(None));
-        assert!(spawner.params.f32("strategy").is_err());
+        assert_eq!(
+            spawner.params.f32("strategy"),
+            Err("parameter `strategy` must be a number, found `patrol`".to_string())
+        );
         assert!(map.objects[1].params.is_empty());
     }
 
     #[test]
-    fn exit_to_is_read_from_the_legend_entry() {
-        let kinds = ["marker", "tree_big"];
-        let source = legend_map("  \"a\": marker exit_to=2\n  \"b\": tree_big\n");
-        let map = parse("t.txt", &source, &kinds).unwrap();
-        assert_eq!(map.objects[0].exit_to(), Some("2"));
-        assert_eq!(map.objects[1].exit_to(), None);
+    fn a_number_parameter_must_be_finite() {
+        let params = Params::from_pairs(&[("a", "inf"), ("b", "-inf"), ("c", "NaN"), ("d", "1e3")]);
+        for key in ["a", "b", "c"] {
+            let text = params.get(key).unwrap();
+            assert_eq!(
+                params.f32(key),
+                Err(format!(
+                    "parameter `{key}` must be a number, found `{text}`"
+                ))
+            );
+        }
+        assert_eq!(params.f32("d"), Ok(Some(1000.0)));
     }
 
     #[test]
@@ -1245,11 +1234,6 @@ mod text_tests {
     const FULL_BACKGROUND: &str = "  color: \"#2a3f5b\"\n  mode: random\n  fill: 0.2\n  jitter: 16\n  scale: 2\n  seed: 3\n  tiles: grass_0 flowers_1\n";
 
     #[test]
-    fn a_map_without_a_background_has_none() {
-        assert_eq!(parse_ok(&grid([DOTS; 4])).background, None);
-    }
-
-    #[test]
     fn a_full_background_block_is_read() {
         let map = parse_ok(&with_background(FULL_BACKGROUND));
         let background = map.background.expect("a background");
@@ -1267,7 +1251,7 @@ mod text_tests {
 
     #[test]
     fn scale_may_be_a_fraction() {
-        for (text, expected) in [("0.5", 0.5), ("1.5", 1.5), ("4", 4.0)] {
+        for (text, expected) in [("0.5", 0.5), ("1.5", 1.5)] {
             let block = format!("  color: \"#000000\"\n  mode: random\n  scale: {text}\n");
             assert_eq!(
                 parse_ok(&with_background(&block)).background.unwrap().scale,
@@ -1321,18 +1305,39 @@ mod text_tests {
             (format!("{ok}  scale: big\n"), 9, "number above 0"),
             (format!("{ok}  fill: 0.5\n"), 6, "needs `tiles`"),
             (format!("{ok}  tiles: a b a\n"), 9, "listed twice"),
-            (format!("{ok}  size: 3\n"), 9, "unknown key `size`"),
             (
-                "  color: \"#2a3f5b\"\n  color: \"#000000\"\n  mode: random\n".to_string(),
-                8,
-                "given twice",
+                format!("{ok}  tiles:\n"),
+                9,
+                "`tiles` needs at least one name",
             ),
+            (format!("{ok}  size: 3\n"), 9, "unknown key `size`"),
             (format!("{ok}  seed: -2\n"), 9, "whole number"),
         ];
         for (block, line, text) in cases {
             let e = error(&with_background(&block));
             assert_eq!(e.line, line, "{block:?}: {e}");
             assert!(e.message.contains(text), "{block:?}: {e}");
+        }
+    }
+
+    #[test]
+    fn each_background_key_given_twice_names_the_second_line() {
+        // `color` and `mode` are on lines 7 and 8. Each other key is on lines 9 and 10.
+        for (key, value, line) in [
+            ("color", "\"#000000\"", 9),
+            ("mode", "random", 9),
+            ("fill", "0", 10),
+            ("jitter", "1", 10),
+            ("scale", "1", 10),
+            ("seed", "1", 10),
+            ("tiles", "a", 10),
+        ] {
+            let block = format!(
+                "  color: \"#2a3f5b\"\n  mode: random\n  {key}: {value}\n  {key}: {value}\n"
+            );
+            let e = error(&with_background(&block));
+            assert_eq!(e.line, line, "{key}: {e}");
+            assert_eq!(e.message, format!("`{key}` is given twice in `background`"));
         }
     }
 

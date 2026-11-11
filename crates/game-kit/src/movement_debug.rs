@@ -93,11 +93,100 @@ fn draw(
 mod tests {
     use super::*;
 
+    use crate::map::Params;
+
+    fn debug_settings(show_grid: bool) -> DebugSettings {
+        DebugSettings {
+            cell_size: 64.0,
+            grid_color: Color::WHITE,
+            grid_origin: crate::debug::GridOrigin::Center,
+            target_name: "t",
+            grid_z: 0.0,
+            hud_z_index: 0,
+            rows_from_top: None,
+            show_grid,
+            show_info: true,
+        }
+    }
+
+    /// Colour, size, centre and angle of each sprite under the debug root.
+    fn sprites(app: &mut App) -> Vec<(Color, Vec2, Vec2, f32)> {
+        let world = app.world_mut();
+        world
+            .query_filtered::<(&Sprite, &Transform), With<ChildOf>>()
+            .iter(world)
+            .map(|(sprite, t)| {
+                let (_, angle) = t.rotation.to_axis_angle();
+                (
+                    sprite.color,
+                    sprite.custom_size.unwrap(),
+                    t.translation.truncate(),
+                    angle,
+                )
+            })
+            .collect()
+    }
+
     #[test]
-    fn a_line_sprite_covers_the_segment() {
-        let (centre, length, angle) = line_between(Vec2::new(0.0, 0.0), Vec2::new(0.0, 10.0));
-        assert_eq!(centre, Vec2::new(0.0, 5.0));
-        assert_eq!(length, 10.0);
-        assert!((angle - std::f32::consts::FRAC_PI_2).abs() < 1e-5);
+    fn each_path_is_drawn_from_the_feet_through_its_points_to_a_goal_square() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(debug_settings(true))
+            .add_plugins(MovementDebugPlugin);
+        // The feet are 10 below the transform, at (0, 0).
+        app.world_mut().spawn((
+            Transform::from_xyz(0.0, 10.0, 0.0),
+            Mover::new(10.0).with_feet_offset(10.0),
+            MoveGoal(Some(Vec2::new(30.0, 100.0))),
+            PathFollower::along(&[Vec2::new(30.0, 40.0), Vec2::new(30.0, 100.0)]),
+        ));
+        app.world_mut().spawn((
+            Transform::from_xyz(5.0, 6.0, 7.0),
+            Spawner::new(1.0, None, Params::default()),
+        ));
+        app.update();
+        let found = sprites(&mut app);
+        assert_eq!(found.len(), 4, "{found:?}");
+        let angle = |a: f32, b: f32| (a - b).abs() < 1e-5;
+        // From (0, 0) to (30, 40), then up to (30, 100).
+        let first = (40.0f32).atan2(30.0);
+        assert!(found.iter().any(|s| s.0 == PATH_COLOR
+            && s.1 == Vec2::new(50.0, LINE_THICKNESS)
+            && s.2 == Vec2::new(15.0, 20.0)
+            && angle(s.3, first)));
+        assert!(found.iter().any(|s| s.0 == PATH_COLOR
+            && s.1 == Vec2::new(60.0, LINE_THICKNESS)
+            && s.2 == Vec2::new(30.0, 70.0)
+            && angle(s.3, std::f32::consts::FRAC_PI_2)));
+        assert!(found.contains(&(
+            PATH_COLOR,
+            Vec2::splat(MARKER_SIZE),
+            Vec2::new(30.0, 100.0),
+            0.0
+        )));
+        assert!(found.contains(&(
+            SPAWNER_COLOR,
+            Vec2::splat(MARKER_SIZE * 1.5),
+            Vec2::new(5.0, 6.0),
+            0.0
+        )));
+        // Drawn again each frame, not added to.
+        app.update();
+        assert_eq!(sprites(&mut app).len(), 4);
+    }
+
+    #[test]
+    fn the_view_is_hidden_with_the_grid() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(debug_settings(false))
+            .add_plugins(MovementDebugPlugin);
+        app.update();
+        let world = app.world_mut();
+        let visibility = world
+            .query_filtered::<&Visibility, With<DebugRoot>>()
+            .single(world)
+            .unwrap();
+        assert_eq!(*visibility, Visibility::Hidden);
     }
 }

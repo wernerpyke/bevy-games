@@ -275,12 +275,122 @@ fn emitters_follow(
 mod tests {
     use super::*;
 
+    use bevy::ecs::system::RunSystemOnce;
+
+    const FILE: &str = "fx/test.ron";
+
+    /// What `Fx` needs, without Enoki's render plugins: the asset types, and the shared materials.
+    fn fx_app() -> (App, SpriteLook) {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Particle2dEffect>()
+            .init_asset::<SpriteParticle2dMaterial>()
+            .init_asset::<AdditiveSprite>()
+            .init_asset::<AdditiveColor>()
+            .add_systems(Startup, setup_materials);
+        app.update();
+        let world = app.world_mut();
+        let look = world.resource_scope(
+            |world, mut normals: Mut<Assets<SpriteParticle2dMaterial>>| {
+                let mut adds = world.resource_mut::<Assets<AdditiveSprite>>();
+                SpriteLook::new(&mut normals, &mut adds, Handle::default(), 4)
+            },
+        );
+        (app, look)
+    }
+
+    fn spawn_with(
+        app: &mut App,
+        mut spawn: impl FnMut(&mut Fx) -> Entity + Send + Sync + 'static,
+    ) -> Entity {
+        let entity = app
+            .world_mut()
+            .run_system_once(move |mut fx: Fx| spawn(&mut fx))
+            .unwrap();
+        app.world_mut().flush();
+        entity
+    }
+
     #[test]
-    fn the_blend_adds_to_what_is_already_drawn() {
-        let blend = additive();
-        assert_eq!(blend.color.dst_factor, BlendFactor::One);
-        assert_eq!(blend.color.src_factor, BlendFactor::SrcAlpha);
-        assert_eq!(blend.color.operation, BlendOperation::Add);
+    fn each_look_and_glow_gets_its_own_material() {
+        let (mut app, sprites) = fx_app();
+        let at = Transform::from_xyz(3.0, 4.0, 5.0);
+        let mut spawned = Vec::new();
+        for (look, glow) in [
+            (Look::Squares, true),
+            (Look::Squares, false),
+            (Look::Sprites(sprites.clone()), true),
+            (Look::Sprites(sprites.clone()), false),
+        ] {
+            spawned.push(spawn_with(&mut app, move |fx| {
+                fx.emitter(FILE, at, &look, glow)
+            }));
+        }
+        let world = app.world();
+        let glow_colour = world.resource::<FxMaterials>().additive_color.clone();
+        let [glow_squares, squares, glow_sprites, plain_sprites] = spawned[..] else {
+            unreachable!()
+        };
+        assert_eq!(
+            world
+                .get::<ParticleSpawner<AdditiveColor>>(glow_squares)
+                .unwrap()
+                .0,
+            glow_colour
+        );
+        assert_eq!(
+            world
+                .get::<ParticleSpawner<ColorParticle2dMaterial>>(squares)
+                .unwrap()
+                .0,
+            Handle::default()
+        );
+        assert_eq!(
+            world
+                .get::<ParticleSpawner<AdditiveSprite>>(glow_sprites)
+                .unwrap()
+                .0,
+            sprites.add
+        );
+        assert_eq!(
+            world
+                .get::<ParticleSpawner<SpriteParticle2dMaterial>>(plain_sprites)
+                .unwrap()
+                .0,
+            sprites.normal
+        );
+        for entity in spawned {
+            let effect = world.get::<ParticleEffectHandle>(entity).unwrap();
+            assert_eq!(
+                effect.0.path().map(|p| p.to_string()),
+                Some(FILE.to_string())
+            );
+            assert_eq!(*world.get::<Transform>(entity).unwrap(), at);
+            assert!(world.get::<OneShot>(entity).is_none());
+            assert!(world.get::<Follows>(entity).is_none());
+        }
+    }
+
+    #[test]
+    fn a_one_shot_despawns_itself_and_a_following_emitter_follows_its_owner() {
+        let (mut app, _) = fx_app();
+        let owner = app.world_mut().spawn(Transform::default()).id();
+        let once = spawn_with(&mut app, |fx| {
+            fx.one_shot(FILE, Transform::default(), &Look::Squares, false)
+        });
+        let follower = spawn_with(&mut app, move |fx| {
+            fx.following(owner, FILE, Transform::default(), &Look::Squares, true)
+        });
+        let world = app.world();
+        assert!(matches!(world.get::<OneShot>(once), Some(OneShot::Despawn)));
+        assert!(world.get::<Follows>(once).is_none());
+        assert_eq!(world.get::<Follows>(follower).unwrap().owner, owner);
+        assert!(world.get::<OneShot>(follower).is_none());
+        assert!(
+            world
+                .get::<ParticleSpawner<AdditiveColor>>(follower)
+                .is_some()
+        );
     }
 
     fn app() -> App {

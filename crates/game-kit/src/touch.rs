@@ -53,6 +53,7 @@ fn send_touches(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::{Collected, collect};
 
     fn body() -> HitBox {
         HitBox {
@@ -61,19 +62,14 @@ mod tests {
         }
     }
 
-    #[derive(Resource, Default)]
-    struct Seen(Vec<ControlledTouched>);
-
-    fn collect(mut messages: MessageReader<ControlledTouched>, mut seen: ResMut<Seen>) {
-        seen.0.extend(messages.read().copied());
-    }
+    type Seen = Collected<ControlledTouched>;
 
     fn app() -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .add_plugins(TouchPlugin)
             .init_resource::<Seen>()
-            .add_systems(Update, collect.after(TouchSet));
+            .add_systems(Update, collect::<ControlledTouched>.after(TouchSet));
         app
     }
 

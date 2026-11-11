@@ -122,6 +122,7 @@ fn send_clicks(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::{Collected, collect};
 
     #[test]
     fn the_cursor_must_be_inside_the_viewport() {
@@ -160,21 +161,101 @@ mod tests {
         assert!(is_blocked([world_node, button], parent_of, is_blocker));
     }
 
-    #[derive(Resource, Default)]
-    struct Seen(Vec<WorldClick>);
+    type Seen = Collected<WorldClick>;
 
-    fn collect(mut messages: MessageReader<WorldClick>, mut seen: ResMut<Seen>) {
-        seen.0.extend(messages.read().copied());
+    /// A game camera at (1000, 2000) that shows 800 by 600 world units in a viewport of 800 by 600 logical pixels,
+    /// 40 pixels below the top of a window 640 high (a HUD bar above it).
+    fn game_camera() -> (Camera, GlobalTransform) {
+        use bevy::camera::{CameraProjection, RenderTargetInfo, Viewport};
+        let mut projection = OrthographicProjection::default_2d();
+        projection.update(800.0, 600.0);
+        let mut camera = Camera {
+            viewport: Some(Viewport {
+                physical_position: UVec2::new(0, 40),
+                physical_size: UVec2::new(800, 600),
+                ..default()
+            }),
+            ..default()
+        };
+        camera.computed.clip_from_view = projection.get_clip_from_view();
+        camera.computed.target_info = Some(RenderTargetInfo {
+            physical_size: UVec2::new(800, 640),
+            scale_factor: 1.0,
+        });
+        (camera, GlobalTransform::from_xyz(1000.0, 2000.0, 0.0))
+    }
+
+    /// Close enough for a point that went through a matrix and its inverse.
+    fn near(a: Option<Vec2>, b: Vec2) -> bool {
+        a.is_some_and(|a| a.distance(b) < 1e-3)
     }
 
     #[test]
-    fn without_a_window_a_press_sends_nothing() {
+    fn a_cursor_in_the_viewport_is_converted_through_the_camera() {
+        let (camera, transform) = game_camera();
+        let world = |cursor| cursor_to_world(&camera, &transform, cursor);
+        assert!(near(
+            world(Vec2::new(400.0, 340.0)),
+            Vec2::new(1000.0, 2000.0)
+        ));
+        // The top left corner of the viewport is the top left of the view.
+        assert!(near(world(Vec2::new(0.0, 40.0)), Vec2::new(600.0, 2300.0)));
+        // On the HUD bar.
+        assert_eq!(world(Vec2::new(400.0, 20.0)), None);
+        // A camera that has not been given a render target yet.
+        let mut unready = camera.clone();
+        unready.computed.target_info = None;
+        assert_eq!(
+            cursor_to_world(&unready, &transform, Vec2::new(400.0, 340.0)),
+            None
+        );
+    }
+
+    fn pointer_app(cursor: Option<Vec2>) -> App {
         let mut app = App::new();
         app.add_plugins(MinimalPlugins)
             .add_plugins(PointerPlugin)
             .init_resource::<ButtonInput<MouseButton>>()
+            .init_resource::<bevy::picking::pointer::PointerMap>()
             .init_resource::<Seen>()
-            .add_systems(Update, collect);
+            .add_systems(Update, collect::<WorldClick>);
+        let (camera, transform) = game_camera();
+        app.world_mut().spawn((GameCamera, camera, transform));
+        let location = cursor.map(|position| bevy::picking::pointer::Location {
+            target: bevy::camera::NormalizedRenderTarget::None {
+                width: 800,
+                height: 640,
+            },
+            position,
+        });
+        app.world_mut()
+            .spawn((PointerId::Mouse, PointerLocation { location }));
+        app
+    }
+
+    #[test]
+    fn a_press_in_the_game_region_sends_a_click_for_each_button() {
+        let mut app = pointer_app(Some(Vec2::new(400.0, 340.0)));
+        let mut input = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        input.press(MouseButton::Left);
+        input.press(MouseButton::Right);
+        app.update();
+        let mut seen = app.world().resource::<Seen>().0.clone();
+        seen.sort_by_key(|click| click.button != MouseButton::Left);
+        assert_eq!(seen.len(), 2);
+        for (click, button) in seen.iter().zip([MouseButton::Left, MouseButton::Right]) {
+            assert_eq!(click.button, button);
+            assert!(
+                near(Some(click.position), Vec2::new(1000.0, 2000.0)),
+                "{click:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn without_a_window_a_press_sends_nothing() {
+        // The camera is there, but the mouse pointer has no place on a window.
+        let mut app = pointer_app(None);
         app.world_mut()
             .resource_mut::<ButtonInput<MouseButton>>()
             .press(MouseButton::Left);

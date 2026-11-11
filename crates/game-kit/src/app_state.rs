@@ -298,6 +298,17 @@ mod tests {
         world.query::<&C>().iter(world).count()
     }
 
+    /// The camera of each dim layer: `None` for the game camera, else its `UiTargetCamera`.
+    fn dim_layers(app: &mut App) -> Vec<Option<Entity>> {
+        let world = app.world_mut();
+        world
+            .query::<(&GlobalZIndex, Option<&UiTargetCamera>)>()
+            .iter(world)
+            .filter(|(z, _)| z.0 == DIM_Z_INDEX)
+            .map(|(_, target)| target.map(|t| t.entity()))
+            .collect()
+    }
+
     #[test]
     fn the_start_state_follows_the_skip_switch() {
         assert_eq!(initial_state(AppState::Title, true), AppState::Playing);
@@ -335,18 +346,32 @@ mod tests {
     }
 
     #[test]
-    fn a_skip_left_over_after_loading_skips_the_title_once() {
+    fn a_skip_used_by_loading_does_not_skip_a_later_title() {
         let mut app = flow(AppState::Loading, true);
         app.world_mut().write_message(LoadingFinished);
         app.update();
         app.update();
-        assert_eq!(state(&app), AppState::Playing);
         app.world_mut()
             .resource_mut::<NextState<AppState>>()
             .set(AppState::Title);
         app.update();
         app.update();
         assert_eq!(state(&app), AppState::Title);
+    }
+
+    // Kept on purpose: the skip was not used at the start, so it is used on the first title shown later.
+    #[test]
+    fn a_game_that_starts_playing_with_the_skip_skips_its_first_later_title() {
+        let mut app = flow(AppState::Playing, true);
+        assert_eq!(state(&app), AppState::Playing);
+        for expected in [AppState::Playing, AppState::Title] {
+            app.world_mut()
+                .resource_mut::<NextState<AppState>>()
+                .set(AppState::Title);
+            app.update();
+            app.update();
+            assert_eq!(state(&app), expected);
+        }
     }
 
     #[test]
@@ -396,29 +421,22 @@ mod tests {
         assert_eq!(play_state(&app), Some(PlayState::Paused));
         assert!(app.world().resource::<Time<Virtual>>().is_paused());
         assert_eq!(count::<PauseDialog>(&mut app), 1);
-        assert_eq!(
-            count::<GlobalZIndex>(&mut app),
-            2,
-            "one dim layer, one dialog"
-        );
+        assert_eq!(dim_layers(&mut app), vec![None]);
         press_escape(&mut app);
         assert_eq!(play_state(&app), Some(PlayState::Running));
         assert!(!app.world().resource::<Time<Virtual>>().is_paused());
         assert_eq!(count::<PauseDialog>(&mut app), 0);
-        assert_eq!(count::<GlobalZIndex>(&mut app), 0);
+        assert_eq!(dim_layers(&mut app), vec![]);
     }
 
     #[test]
     fn the_hud_is_dimmed_too_when_there_is_a_hud_camera() {
         let mut app = flow(AppState::Playing, false);
-        app.world_mut().spawn(HudCamera);
+        let hud = app.world_mut().spawn(HudCamera).id();
         press_escape(&mut app);
-        assert_eq!(
-            count::<GlobalZIndex>(&mut app),
-            3,
-            "two dim layers, one dialog"
-        );
-        assert_eq!(count::<UiTargetCamera>(&mut app), 1);
+        let mut layers = dim_layers(&mut app);
+        layers.sort();
+        assert_eq!(layers, vec![None, Some(hud)]);
     }
 
     #[test]
@@ -449,8 +467,10 @@ mod tests {
         app.add_plugins((MinimalPlugins, StatesPlugin))
             .init_resource::<ButtonInput<KeyCode>>()
             .add_plugins(AppFlowPlugin {
+                start: AppState::Playing,
+                skip_title: false,
                 pause_key: None,
-                ..AppFlowPlugin::new(AppState::Playing)
+                dim: Color::BLACK,
             });
         app.update();
         press_escape(&mut app);

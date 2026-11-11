@@ -181,6 +181,7 @@ pub fn follow_position(target: Vec2, half: Vec2, bounds: Option<Rect>) -> Vec2 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_util::timed_app;
 
     #[test]
     fn a_camera_offset_decays_without_stopping_and_ends() {
@@ -210,27 +211,78 @@ mod tests {
             Vec2::new(1200.0 * 16.0 / 9.0 / 2.0, 600.0)
         );
         assert_eq!(half_view(1000.0, 1000.0, 240.0), Vec2::new(120.0, 120.0));
+        assert_eq!(
+            half_view(640.0, 360.0, 1200.0),
+            half_view(1920.0, 1080.0, 1200.0),
+            "the window size does not change the view, only its shape does"
+        );
+    }
+
+    const DT: f32 = 0.1;
+    const TAU: f32 = 0.5;
+
+    /// A game camera with a view of 200 by 200 following a target at (500, 400), bounds and smoothing on.
+    fn smoothed_follow() -> (App, Entity) {
+        let mut app = timed_app(std::time::Duration::from_secs_f32(DT));
+        app.add_plugins(CameraFollowPlugin)
+            .insert_resource(CameraBounds(Rect::new(0.0, 0.0, 1000.0, 800.0)))
+            .insert_resource(CameraSmoothing {
+                tau: TAU,
+                snap: false,
+            });
+        let projection = Projection::Orthographic(OrthographicProjection {
+            area: Rect::new(-100.0, -100.0, 100.0, 100.0),
+            ..OrthographicProjection::default_2d()
+        });
+        let camera = app
+            .world_mut()
+            .spawn((GameCamera, projection, Transform::default()))
+            .id();
+        app.world_mut()
+            .spawn((Controlled, Transform::from_xyz(500.0, 400.0, 0.0)));
+        app.update();
+        app.update();
+        (app, camera)
+    }
+
+    fn camera_at(app: &App, camera: Entity) -> Vec2 {
+        app.world()
+            .get::<Transform>(camera)
+            .unwrap()
+            .translation
+            .truncate()
     }
 
     #[test]
-    fn the_plugin_spawns_one_camera_with_a_fixed_view_height() {
-        let mut app = App::new();
-        app.add_plugins(PixelCameraPlugin {
-            view_height: 240.0,
-            clear_color: Color::BLACK,
-        });
+    fn a_change_of_bounds_glides_the_camera_from_where_it_was() {
+        let (mut app, camera) = smoothed_follow();
+        assert_eq!(camera_at(&app, camera), Vec2::new(500.0, 400.0));
+        // The new bounds put the camera at x 200, 300 units to the left.
+        app.insert_resource(CameraBounds(Rect::new(0.0, 0.0, 300.0, 800.0)));
         app.update();
-        let mut query = app.world_mut().query::<(&Camera2d, &Projection)>();
-        let cameras: Vec<_> = query.iter(app.world()).collect();
-        assert_eq!(cameras.len(), 1);
-        let Projection::Orthographic(projection) = cameras[0].1 else {
-            panic!("the camera is not orthographic");
-        };
-        assert!(matches!(
-            projection.scaling_mode,
-            ScalingMode::FixedVertical { viewport_height } if viewport_height == 240.0
-        ));
-        assert_eq!(app.world().resource::<ClearColor>().0, Color::BLACK);
+        let expected =
+            (Vec2::new(200.0, 400.0) + smooth_offset(Vec2::new(300.0, 0.0), DT, TAU)).round();
+        assert_eq!(camera_at(&app, camera), expected);
+        assert!(expected.x > 200.0 && expected.x < 500.0);
+        for _ in 0..50 {
+            app.update();
+        }
+        assert_eq!(camera_at(&app, camera), Vec2::new(200.0, 400.0));
+    }
+
+    #[test]
+    fn a_snap_makes_the_next_change_of_bounds_jump_once() {
+        let (mut app, camera) = smoothed_follow();
+        app.insert_resource(CameraBounds(Rect::new(0.0, 0.0, 300.0, 800.0)));
+        app.world_mut().resource_mut::<CameraSmoothing>().snap = true;
+        app.update();
+        assert_eq!(camera_at(&app, camera), Vec2::new(200.0, 400.0));
+        assert!(!app.world().resource::<CameraSmoothing>().snap);
+        app.insert_resource(CameraBounds(Rect::new(0.0, 0.0, 1000.0, 800.0)));
+        app.update();
+        let glide =
+            (Vec2::new(500.0, 400.0) + smooth_offset(Vec2::new(-300.0, 0.0), DT, TAU)).round();
+        assert_eq!(camera_at(&app, camera), glide, "the next change glides");
     }
 
     #[test]
@@ -264,6 +316,23 @@ mod tests {
             visible_rect(&camera, &projection),
             Some(Rect::new(-70.0, -70.0, 130.0, 30.0))
         );
+    }
+
+    #[test]
+    fn a_camera_with_no_area_or_no_orthographic_view_has_no_visible_rect() {
+        let camera = GlobalTransform::from_xyz(30.0, -20.0, 0.0);
+        let perspective = Projection::Perspective(PerspectiveProjection::default());
+        assert_eq!(visible_rect(&camera, &perspective), None);
+        for area in [
+            Rect::new(-100.0, 0.0, 100.0, 0.0),
+            Rect::new(0.0, -50.0, 0.0, 50.0),
+        ] {
+            let flat = Projection::Orthographic(OrthographicProjection {
+                area,
+                ..OrthographicProjection::default_2d()
+            });
+            assert_eq!(visible_rect(&camera, &flat), None, "{area:?}");
+        }
     }
 
     const BOUNDS: Rect = Rect {
@@ -307,11 +376,5 @@ mod tests {
             follow_position(Vec2::new(-5000.4, 12.6), HALF, None),
             Vec2::new(-5000.0, 13.0)
         );
-    }
-
-    #[test]
-    fn the_height_does_not_depend_on_the_window_size() {
-        assert_eq!(half_view(640.0, 360.0, 1200.0).y, 600.0);
-        assert_eq!(half_view(3840.0, 2160.0, 1200.0).y, 600.0);
     }
 }

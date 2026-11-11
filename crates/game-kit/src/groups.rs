@@ -193,47 +193,26 @@ mod tests {
         );
     }
 
-    // The R-Town test map layouts (file cells, rows from the top).
     #[test]
-    fn a_solid_group_of_trees_is_one_group() {
-        let trees = [
-            (10, 1),
-            (11, 1),
-            (12, 1),
-            (13, 1),
-            (14, 1),
-            (12, 2),
-            (13, 2),
-            (14, 2),
-            (15, 2),
-            (13, 3),
-            (14, 3),
-            (15, 3),
-            (14, 4),
-            (15, 4),
-            (16, 4),
+    fn a_solid_block_with_ragged_rows_is_one_group() {
+        let block = [
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (1, 1),
+            (2, 1),
+            (3, 1),
+            (2, 2),
+            (3, 2),
         ];
-        assert_eq!(sizes(&trees, ALL), vec![15; 15]);
+        assert_eq!(sizes(&block, ALL), vec![8; 8]);
     }
 
     #[test]
-    fn two_lone_trees_stay_single() {
-        assert_eq!(sizes(&[(21, 1), (24, 4)], ALL), vec![1, 1]);
-    }
-
-    #[test]
-    fn a_mixture_with_notches_is_one_group_only_through_corners() {
-        // (33,3) touches the rest only at the corner of (34,2).
-        let mixed = [
-            (33, 1),
-            (34, 1),
-            (35, 1),
-            (34, 2),
-            (33, 3),
-            (35, 3),
-            (36, 3),
-        ];
-        assert_eq!(sizes(&mixed, ALL), vec![7; 7]);
-        assert_eq!(sizes(&mixed, Adjacency::Edges), vec![4, 4, 4, 4, 1, 2, 2]);
+    fn a_shape_joined_only_through_a_corner_is_one_group_only_with_corner_adjacency() {
+        // (2,2) touches (1,1) only at a corner.
+        let joined = [(0, 0), (1, 0), (1, 1), (2, 2), (3, 2)];
+        assert_eq!(sizes(&joined, ALL), vec![5; 5]);
+        assert_eq!(sizes(&joined, Adjacency::Edges), vec![3, 3, 3, 2, 2]);
     }
 }

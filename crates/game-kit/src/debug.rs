@@ -19,6 +19,7 @@ use crate::Controlled;
 use crate::camera::{GameCamera, visible_rect};
 use crate::depth::DepthSort;
 use crate::layers::{GRID_DEBUG_Z, HUD_Z_INDEX};
+use crate::map_transition::rects_overlap;
 
 // Sizes in world units, tuned for a cell size of 64 (`DebugSettings::scale` scales them to the game's cell size, so they
 // look the same on screen at any art scale).
@@ -215,10 +216,6 @@ pub struct DebugGrids(pub Vec<GridRegion>);
 struct GridPart {
     origin: Vec2,
     clip: Option<Rect>,
-}
-
-fn rects_overlap(a: Rect, b: Rect) -> bool {
-    a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y
 }
 
 /// The grids to draw for the visible area: one per region that is in view, or the global grid.
@@ -517,20 +514,6 @@ mod tests {
         assert_eq!(line_range(0.0, 1000.0, 1400.0, 64.0), 16..=21);
     }
 
-    #[test]
-    fn bottom_left_origin_is_the_bottom_left_of_the_visible_area() {
-        let visible = Rect::new(-960.0, -600.0, 960.0, 600.0);
-        assert_eq!(
-            GridOrigin::BottomLeft.resolve(visible),
-            Vec2::new(-960.0, -600.0)
-        );
-        assert_eq!(GridOrigin::Center.resolve(visible), Vec2::ZERO);
-        assert_eq!(
-            GridOrigin::World(Vec2::new(5.0, 6.0)).resolve(visible),
-            Vec2::new(5.0, 6.0)
-        );
-    }
-
     fn settings_for_parts() -> DebugSettings {
         DebugSettings {
             cell_size: 64.0,
@@ -611,5 +594,201 @@ mod tests {
         assert_eq!(settings.row_number(0), 59);
         assert_eq!(settings.row_number(59), 0);
         assert_eq!(settings.row_number(30), 29);
+    }
+
+    /// The debug tools with cell 64, the grid origin at the world origin, and a camera that shows x and y from -100 to
+    /// 100.
+    fn debug_app(start_visible: bool) -> (App, Entity) {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .init_resource::<ButtonInput<KeyCode>>()
+            .add_plugins(DebugPlugin {
+                cell_size: 64.0,
+                grid_color: Color::WHITE,
+                grid_origin: GridOrigin::Center,
+                target_name: "t",
+                grid_z: 0.0,
+                hud_z_index: 0,
+                start_visible,
+            });
+        let projection = Projection::Orthographic(OrthographicProjection {
+            area: Rect::new(-100.0, -100.0, 100.0, 100.0),
+            ..OrthographicProjection::default_2d()
+        });
+        let camera = app
+            .world_mut()
+            .spawn((GameCamera, projection, GlobalTransform::default()))
+            .id();
+        app.update();
+        (app, camera)
+    }
+
+    fn move_camera(app: &mut App, camera: Entity, to: Vec2) {
+        app.world_mut()
+            .entity_mut(camera)
+            .insert(GlobalTransform::from_translation(to.extend(0.0)));
+        app.update();
+    }
+
+    fn settings(app: &mut App) -> Mut<'_, DebugSettings> {
+        app.world_mut().resource_mut::<DebugSettings>()
+    }
+
+    /// Each column label: entity, text and position, from left to right.
+    fn columns(app: &mut App) -> Vec<(Entity, String, Vec2)> {
+        labels::<ColumnLabel>(app, |p| p.x)
+    }
+
+    /// Each row label: entity, text and position, from bottom to top.
+    fn rows(app: &mut App) -> Vec<(Entity, String, Vec2)> {
+        labels::<RowLabel>(app, |p| p.y)
+    }
+
+    fn labels<L: Component>(app: &mut App, key: fn(Vec2) -> f32) -> Vec<(Entity, String, Vec2)> {
+        let world = app.world_mut();
+        let mut found: Vec<_> = world
+            .query_filtered::<(Entity, &Text2d, &Transform), With<L>>()
+            .iter(world)
+            .map(|(e, text, t)| (e, text.0.clone(), t.translation.truncate()))
+            .collect();
+        found.sort_by(|a, b| key(a.2).total_cmp(&key(b.2)));
+        found
+    }
+
+    fn texts(labels: &[(Entity, String, Vec2)]) -> Vec<&str> {
+        labels.iter().map(|(_, text, _)| text.as_str()).collect()
+    }
+
+    fn visibility<C: Component>(app: &mut App) -> Visibility {
+        let world = app.world_mut();
+        *world
+            .query_filtered::<&Visibility, With<C>>()
+            .single(world)
+            .unwrap()
+    }
+
+    fn press(app: &mut App, key: KeyCode) {
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(key);
+        app.update();
+        let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        keys.release(key);
+        keys.clear();
+    }
+
+    #[test]
+    fn f2_toggles_the_info_box_and_f3_the_grid() {
+        let (mut app, _) = debug_app(false);
+        assert_eq!(visibility::<GridRoot>(&mut app), Visibility::Hidden);
+        assert_eq!(visibility::<InfoBox>(&mut app), Visibility::Hidden);
+        press(&mut app, KeyCode::F3);
+        assert_eq!(visibility::<GridRoot>(&mut app), Visibility::Inherited);
+        assert_eq!(visibility::<InfoBox>(&mut app), Visibility::Hidden);
+        press(&mut app, KeyCode::F2);
+        assert_eq!(visibility::<InfoBox>(&mut app), Visibility::Inherited);
+        press(&mut app, KeyCode::F3);
+        assert_eq!(visibility::<GridRoot>(&mut app), Visibility::Hidden);
+        assert_eq!(visibility::<InfoBox>(&mut app), Visibility::Inherited);
+    }
+
+    #[test]
+    fn the_grid_is_rebuilt_only_when_the_lines_in_view_or_the_row_numbers_change() {
+        let (mut app, camera) = debug_app(true);
+        let entities = |labels: &[(Entity, String, Vec2)]| -> Vec<Entity> {
+            labels.iter().map(|(e, _, _)| *e).collect()
+        };
+        let first = columns(&mut app);
+        assert_eq!(texts(&first), ["-1", "0", "1"]);
+        // x from -80 to 120: still lines -1 to 1, so the same labels.
+        move_camera(&mut app, camera, Vec2::new(20.0, 0.0));
+        assert_eq!(entities(&columns(&mut app)), entities(&first));
+        // x from -60 to 140: lines 0 to 2.
+        move_camera(&mut app, camera, Vec2::new(40.0, 0.0));
+        let moved = columns(&mut app);
+        assert_eq!(texts(&moved), ["0", "1", "2"]);
+        assert!(moved.iter().all(|(e, _, _)| !entities(&first).contains(e)));
+        assert_eq!(texts(&rows(&mut app)), ["-1", "0", "1"]);
+        settings(&mut app).rows_from_top = Some(10);
+        app.update();
+        assert_eq!(texts(&rows(&mut app)), ["10", "9", "8"]);
+    }
+
+    #[test]
+    fn labels_stay_on_the_view_edges_but_inside_their_map_while_the_camera_moves() {
+        let (mut app, camera) = debug_app(true);
+        // A map whose left edge (-90) and top edge (105) are near the view edges.
+        app.world_mut().resource_mut::<DebugGrids>().0 = vec![GridRegion {
+            origin: Vec2::ZERO,
+            rect: Rect::new(-90.0, -1000.0, 1000.0, 105.0),
+        }];
+        app.update();
+        let margin = LABEL_MARGIN;
+        let before = (columns(&mut app), rows(&mut app));
+        assert!(before.0.iter().all(|(_, _, p)| p.y == 100.0 - margin));
+        assert!(before.1.iter().all(|(_, _, p)| p.x == -90.0 + margin));
+        // View x from -105 to 95 and y from -90 to 110: the same lines, so only the labels move.
+        move_camera(&mut app, camera, Vec2::new(-5.0, 10.0));
+        let after = (columns(&mut app), rows(&mut app));
+        assert_eq!(texts(&after.0), texts(&before.0));
+        assert_eq!(after.0[0].0, before.0[0].0, "not rebuilt");
+        assert!(
+            after.0.iter().all(|(_, _, p)| p.y == 105.0 - margin),
+            "{after:?}"
+        );
+        assert!(
+            after.1.iter().all(|(_, _, p)| p.x == -90.0 + margin),
+            "{after:?}"
+        );
+        // A move that is not held back by the map edges.
+        move_camera(&mut app, camera, Vec2::new(15.0, -10.0));
+        let free = (columns(&mut app), rows(&mut app));
+        assert_eq!(free.0[0].0, before.0[0].0, "not rebuilt");
+        assert!(
+            free.0.iter().all(|(_, _, p)| p.y == 90.0 - margin),
+            "{free:?}"
+        );
+        assert!(
+            free.1.iter().all(|(_, _, p)| p.x == -85.0 + margin),
+            "{free:?}"
+        );
+    }
+
+    #[test]
+    fn the_target_is_reported_at_its_feet_counted_from_the_map_that_holds_them() {
+        let (mut app, _) = debug_app(true);
+        settings(&mut app).grid_origin = GridOrigin::World(Vec2::new(5.0, 6.0));
+        // Centre (100, 50), feet (100, 40). The map holds the feet but not the centre.
+        app.world_mut().spawn((
+            Controlled,
+            Transform::from_xyz(100.0, 50.0, 0.0),
+            DepthSort { feet_offset: 10.0 },
+        ));
+        let map = GridRegion {
+            origin: Vec2::new(20.0, -30.0),
+            rect: Rect::new(0.0, -100.0, 200.0, 45.0),
+        };
+        for (grids, rows_from_top, expected) in [
+            (
+                vec![],
+                None,
+                "t x/y: 95, 34\nt cell: 1, 0\nt world: 100, 40",
+            ),
+            (
+                vec![map],
+                None,
+                "t x/y: 80, 70\nt cell: 1, 1\nt world: 100, 40",
+            ),
+            (
+                vec![map],
+                Some(10),
+                "t x/y: 80, 570\nt cell: 1, 8\nt world: 100, 40",
+            ),
+        ] {
+            app.world_mut().resource_mut::<DebugGrids>().0 = grids;
+            settings(&mut app).rows_from_top = rows_from_top;
+            app.update();
+            assert_eq!(app.world().resource::<DebugInfo>().text(), expected);
+        }
     }
 }

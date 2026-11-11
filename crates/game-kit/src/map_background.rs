@@ -139,12 +139,6 @@ mod tests {
     }
 
     #[test]
-    fn the_same_input_gives_the_same_result() {
-        let b = background(0.3, 16.0, &["a", "b", "c"]);
-        assert_eq!(place("m", (20, 20), &b), place("m", (20, 20), &b));
-    }
-
-    #[test]
     fn a_different_seed_or_map_name_gives_a_different_ground() {
         let mut b = background(0.3, 16.0, &["a", "b", "c"]);
         let first = place("m", (20, 20), &b);

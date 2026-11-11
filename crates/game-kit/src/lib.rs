@@ -32,6 +32,8 @@ pub mod screen;
 pub mod script;
 pub mod spawner;
 pub mod strategies;
+#[cfg(test)]
+pub(crate) mod test_util;
 pub mod touch;
 
 use bevy::prelude::Component;
