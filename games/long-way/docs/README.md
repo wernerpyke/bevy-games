@@ -8,6 +8,7 @@ Documentation for this game only. General rules that other games may reuse are e
 | [collision.md](collision.md) | The player's size, tree and rock rules, rock geometry, slide values, known issues |
 | [maps.md](maps.md) | How to write a map file for Long Way |
 | [art-tags.md](art-tags.md) | Aseprite tags and map kinds |
+| [weapons.md](weapons.md) | How weapons work, their values, aim rules and tuning |
 | [adr.md](adr.md) | Decisions that apply to Long Way only |
 | [testing.md](testing.md) | Where the tests are and how to run them |
 

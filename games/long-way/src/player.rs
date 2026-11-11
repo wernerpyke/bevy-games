@@ -165,7 +165,7 @@ fn facing_of(direction: Vec2) -> Facing {
     }
 }
 
-fn feet_of(transform: &Transform) -> Vec2 {
+pub fn feet_of(transform: &Transform) -> Vec2 {
     transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET)
 }
 

@@ -1,6 +1,6 @@
 //! The weapon drawer: a click on an energy icon in the HUD slides a drawer up over the game area, with one button for
 //! each weapon of that energy. A click on a button sends `WeaponChosen` and the drawer slides away. The game does
-//! not pause. Nothing reads `WeaponChosen` yet but a log line (`adr-lw31`, `PLAN-weapons.md`).
+//! not pause. `weapons/mod.rs` turns `WeaponChosen` into `CastWeapon` (`adr-lw31`, `PLAN-weapons.md`).
 //!
 //! The drawer is its own UI root on the game camera (a child of `Hud` would be clipped to the HUD region). It is
 //! `BlocksWorldClick`, so a click on it does not walk the player (`adr-x44`). Times use real time, so they would
@@ -114,7 +114,7 @@ pub fn weapons_for(energy: Energy) -> &'static [WeaponKind] {
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EnergyIconClicked(pub Energy);
 
-/// The player chose a weapon in the drawer. Nothing uses it yet: `PLAN-weapons.md` reads it.
+/// The player chose a weapon in the drawer. `weapons/mod.rs` reads it.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WeaponChosen(pub WeaponKind);
 
@@ -152,7 +152,6 @@ impl Plugin for WeaponMenuPlugin {
                     close_on_world_click,
                     rebuild_buttons,
                     slide_drawer,
-                    log_choice,
                 )
                     .chain(),
             );
@@ -347,12 +346,6 @@ fn slide_drawer(
         Display::None
     };
     drawer.bottom = px(-DRAWER_HEIGHT * (1.0 - slide_value(slide)));
-}
-
-fn log_choice(mut chosen: MessageReader<WeaponChosen>) {
-    for choice in chosen.read() {
-        info!("weapon chosen: {}", choice.0.label());
-    }
 }
 
 #[cfg(test)]

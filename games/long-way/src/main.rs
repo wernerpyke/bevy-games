@@ -1,6 +1,7 @@
 mod background;
 mod camera;
 mod collision;
+mod enemy_hp;
 mod ghost;
 mod hp;
 mod hud;
@@ -13,6 +14,7 @@ mod rocks;
 mod scenery;
 mod trees;
 mod weapon_menu;
+mod weapons;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -37,6 +39,7 @@ fn main() {
             game_kit::fx::FxPlugin,
             inventory::InventoryPlugin,
             hp::HpPlugin,
+            enemy_hp::EnemyHpPlugin,
             ghost::GhostPlugin,
         ))
         .add_plugins((
@@ -57,6 +60,7 @@ fn main() {
             },
             hud::HudPlugin,
             weapon_menu::WeaponMenuPlugin,
+            weapons::WeaponPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

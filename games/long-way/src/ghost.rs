@@ -5,7 +5,8 @@
 //! art, `characters/ghost.aseprite` (tags `Down`, `Left`, `Up`, `Attack` and `Die`, durations set in the file).
 //!
 //! When a ghost touches the player it stops and plays `Attack` once. When that ends the player loses 1 HP (`hp.rs`)
-//! and the ghost dies: it plays `Die` once and is removed when that ends.
+//! and the ghost dies: it plays `Die` once and is removed when that ends. A ghost also has hit points
+//! (`enemy_hp.rs`): when weapons take the last one it dies the same way, without hurting the player.
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
@@ -18,6 +19,7 @@ use game_kit::movement::Mover;
 use game_kit::strategies::{Pursue, RandomPatrol, Sentry, Strategy};
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
 
+use crate::enemy_hp::{EnemyDied, EnemyHp};
 use crate::hp::DamagePlayer;
 use crate::map::Kind;
 use crate::player::WALK_SPEED;
@@ -40,12 +42,21 @@ const HIT_BOX: HitBox = HitBox {
 };
 /// Damage to the player on touch.
 const DAMAGE: u32 = 1;
+/// Hit points of a ghost. A placeholder until the weapons are tuned (`PLAN-weapons.md`).
+const HIT_POINTS: f32 = 100.0;
 
 pub struct GhostPlugin;
 
 impl Plugin for GhostPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (start_attack.after(TouchSet), finish_animations));
+        app.add_systems(
+            Update,
+            (
+                start_attack.after(TouchSet),
+                die_when_killed,
+                finish_animations,
+            ),
+        );
     }
 }
 
@@ -81,6 +92,7 @@ pub fn spawn_ghosts(commands: &mut Commands, server: &AssetServer, map: &Map, lo
             MapId(load.id.clone()),
             Mover::new(WALK_SPEED * SPEED_SHARE).with_edge_margin(EDGE_MARGIN),
             HIT_BOX,
+            EnemyHp::full(HIT_POINTS),
             Touchable,
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(feet.extend(0.0)),
@@ -124,6 +136,33 @@ fn start_attack(
     }
 }
 
+/// A ghost whose hit points reached 0 stops, cannot be hit or touch again, and plays `Die`. It does not hurt the player.
+fn die_when_killed(
+    mut commands: Commands,
+    mut died: MessageReader<EnemyDied>,
+    ghosts: Query<&Children, With<Ghost>>,
+    mut animations: Query<&mut AseAnimation>,
+) {
+    for EnemyDied(entity) in died.read() {
+        let Ok(children) = ghosts.get(*entity) else {
+            continue;
+        };
+        commands
+            .entity(*entity)
+            .remove::<(Touchable, Mover, RandomPatrol, Pursue, Sentry, HitBox)>();
+        for child in children {
+            commands
+                .entity(*child)
+                .remove::<(FacingTags, Attacking)>()
+                .insert(Dying);
+            if let Ok(mut ase) = animations.get_mut(*child) {
+                ase.animation.play("Die", AnimationRepeat::Count(0));
+            }
+        }
+        debug!("ghost: {entity:?} was killed");
+    }
+}
+
 /// When `Attack` has played the player loses HP and the ghost plays `Die`. When `Die` has played the ghost is removed.
 fn finish_animations(
     mut commands: Commands,
@@ -141,6 +180,9 @@ fn finish_animations(
         if attacking {
             damage.write(DamagePlayer { amount: DAMAGE });
             commands.entity(*entity).remove::<Attacking>().insert(Dying);
+            commands
+                .entity(parent.parent())
+                .remove::<(HitBox, EnemyHp)>();
             ase.animation.play("Die", AnimationRepeat::Count(0));
         } else if dying {
             commands.entity(parent.parent()).despawn();
@@ -157,7 +199,11 @@ mod tests {
         app.add_message::<ControlledTouched>()
             .add_message::<DamagePlayer>()
             .add_message::<AnimationEvents>()
-            .add_systems(Update, (start_attack, finish_animations).chain());
+            .add_message::<EnemyDied>()
+            .add_systems(
+                Update,
+                (start_attack, die_when_killed, finish_animations).chain(),
+            );
         app
     }
 
@@ -245,5 +291,69 @@ mod tests {
             .write_message(AnimationEvents::Finished(sprite));
         app.update();
         assert!(app.world().get_entity(ghost).is_err());
+    }
+
+    #[test]
+    fn a_killed_ghost_plays_die_without_hurting_the_player_and_is_removed() {
+        let mut app = app();
+        let (ghost, sprite) = spawn_ghost(&mut app);
+        app.world_mut()
+            .entity_mut(ghost)
+            .insert((HIT_BOX, EnemyHp::full(10.0)));
+        app.world_mut().write_message(EnemyDied(ghost));
+        app.update();
+        let world = app.world();
+        assert!(world.get::<Touchable>(ghost).is_none());
+        assert!(world.get::<Mover>(ghost).is_none());
+        assert!(world.get::<HitBox>(ghost).is_none());
+        assert!(world.get::<Dying>(sprite).is_some());
+        assert_eq!(
+            world
+                .get::<AseAnimation>(sprite)
+                .unwrap()
+                .animation
+                .tag
+                .as_deref(),
+            Some("Die")
+        );
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(sprite));
+        app.update();
+        assert_eq!(damage_messages(&app), 0);
+        assert!(app.world().get_entity(ghost).is_err());
+    }
+
+    #[test]
+    fn a_ghost_that_dies_while_attacking_never_lands_its_hit() {
+        let mut app = app();
+        let (ghost, sprite) = spawn_ghost(&mut app);
+        app.world_mut()
+            .write_message(ControlledTouched { by: ghost });
+        app.update();
+        app.world_mut().write_message(EnemyDied(ghost));
+        app.update();
+        assert!(app.world().get::<Attacking>(sprite).is_none());
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(sprite));
+        app.update();
+        assert_eq!(damage_messages(&app), 0);
+    }
+
+    #[test]
+    fn a_ghost_that_has_attacked_cannot_be_hurt_while_it_dies() {
+        let mut app = app();
+        let (ghost, sprite) = spawn_ghost(&mut app);
+        app.world_mut()
+            .entity_mut(ghost)
+            .insert((HIT_BOX, EnemyHp::full(10.0)));
+        app.world_mut()
+            .write_message(ControlledTouched { by: ghost });
+        app.update();
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(sprite));
+        app.update();
+        let world = app.world();
+        assert!(world.get::<EnemyHp>(ghost).is_none());
+        assert!(world.get::<HitBox>(ghost).is_none());
     }
 }

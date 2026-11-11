@@ -79,7 +79,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 
 ### Aim rules (D11)
 
-`CastWeapon { weapon, origin, aim }` is built from the player's state at the moment of the click. `aim` is a rule, not a cursor point.
+`CastWeapon { weapon, origin, facing }` is built from the player's state at the moment of the click: the player's feet and the direction the player last moved in. The aim is a rule per weapon, not a cursor point. The fireball's nearest-enemy search is done by the fireball itself (W6).
 
 | Weapon | Anchor | Aim |
 |---|---|---|
@@ -149,14 +149,14 @@ games/long-way/src/weapons/
 ├── wall.rs       WallPlugin (fire and ice)
 ├── whirlpool.rs  WhirlpoolPlugin (variant B)
 └── fireball.rs   FireballPlugin
-games/long-way/src/enemy_hp.rs   EnemyHp, EnemyDied (P4)
+games/long-way/src/enemy_hp.rs   EnemyHp, DamageEnemy, EnemyDied, the hurt flash (P4)
 ```
 
 Each weapon file is added in its own step. Do not create empty files for later weapons.
 
 - **Weapon kinds:** reuse `WeaponKind` from `weapon_menu.rs` (fire ring, ice ring, fire wall, ice wall, whirlpool, fireball). Do not make a second enum.
 - **Messages:**
-  - `CastWeapon { weapon, origin, aim }`: asks for a weapon. Built from `WeaponChosen` for the player.
+  - `CastWeapon { weapon, origin, facing }`: asks for a weapon. Built from `WeaponChosen` for the player.
   - `WeaponHit { target, weapon, amount, push }`: a damage tick, an impact, or a push on one target. `amount` is already `dps * tick` or the impact damage. `damage.rs` turns it into HP loss and movement.
 - **Gameplay and visuals are separate systems.** Gameplay owns the state (ring radius, wall rectangle and timer, whirlpool band) and sends `WeaponHit`. Visuals read that state and spawn emitters and sprites. The gameplay half runs and is tested with no particles.
 - **Values in one place.** `values.rs` holds, per weapon: `damage` (`PerSecond(f32)` or `Impact(f32)`), `pushback` (`None`, `Pixels(f32)`, `ToEdge`), `tick` (seconds between hits on one target, 0.5 s in the spike), size, duration, speed, `glow: bool`. Each number names its source (spike default or tuned).
@@ -165,7 +165,9 @@ Each weapon file is added in its own step. Do not create empty files for later w
 - Draw order: `DepthSort` on every emitter and sprite. No bare z numbers (`adr-x9`).
 - Weapons do not touch `Inventory`, the HUD or the player's movement. Energy cost and cooldown come in a later plan (D12).
 
-### P4. Base: enemy HP, damage, pushback, drawer link
+### P4. Base: enemy HP, damage, pushback, drawer link (done, 2026-11-11)
+
+**Result:** `enemy_hp.rs` (`EnemyHp` f32, `DamageEnemy`, `EnemyDied`, flash `#993D41` for 0.12 s on the child sprites), `weapons/` (`mod.rs`, `values.rs` with placeholder rows for all six weapons, `damage.rs` with `Contact` (damage ticks and the pixel budget) and the push through `collision::resolve` inside the map), the ghost has 100 HP and dies through `Die` when killed, `log_choice` is replaced by the `CastWeapon` log. Not seen on screen: the flash and a weapon-kill death in the running game (no weapon exists yet, they are unit tested); the scripted run shows one `weapons: cast ...` line per drawer click.
 
 D11 to D13 are decided. Then:
 
