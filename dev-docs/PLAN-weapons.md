@@ -97,6 +97,20 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 - Record how long a rebuild takes after touching `games/long-way/src/main.rs`, and the `.wasm` size of `long-way` with `wasm-release`.
 - Note the Cargo.lock state (`git status` must be clean; `weapon_icons.aseprite` is modified now, so ask about it first).
 
+**Baseline (2026-11-11, before P2; the Cargo tree is the P2 reference):**
+
+| Gate | Value |
+|---|---|
+| Unique crates, `cargo tree -p long-way` / `r-town` / `game-kit`, native | 492 / 492 / 490 lines |
+| Same, wasm | 463 / 463 / 461 lines |
+| Bevy features (`cargo tree -e features -i bevy -p long-way`) | 126 lines, saved in the scratchpad |
+| `Cargo.lock` | clean |
+| Rebuild after touching `games/long-way/src/main.rs` | 5.7 s, only `long-way` compiled |
+| `lint`, second run | compiles nothing |
+| `target/` before the wasm-release build | 5.3 GB (the 11 GB in the text above is out of date) |
+| `target/` after it | 7.7 GB |
+| `long-way.wasm`, `wasm-release`, no `wasm-opt` | 24,989,746 bytes (13 min 52 s clean build). Built while the P1 kit code was being added, so it holds the unused `area.rs` and blocker code (small). |
+
 ### P1. Kit geometry and the wall blocker (no Enoki)
 
 - `crates/game-kit/src/area.rs`: port the five functions on Bevy `Rect`. Tests moved from the spike (`ease_out`, ring radius, band overlap including the "consecutive frames overlap, so no body is skipped" test, push). Export in `lib.rs`.

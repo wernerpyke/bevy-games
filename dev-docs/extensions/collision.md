@@ -89,6 +89,12 @@ app.add_plugins(CollisionPlugin { allow_sliding: true });
 - Call `assist.reset()` on frames where the entity does not try to move.
 - Read the setting from `Res<CollisionSettings>`. See [plugin-configuration.md](plugin-configuration.md).
 
+## Temporary blocked areas
+
+A blocked area that exists for a while (a wall made by a spell) is added with `CollisionWorld::add_temporary(Rect)`, which returns a `TemporaryBlocker`, and removed with `remove_temporary(id)`. Each call rebuilds the clusters and edges once, so `resolve`, `move_feet`, projectiles and `nav.rs` see the change in the next frame (`nav` rebuilds its grid when the world changes). Permanent area numbers do not change. `clear()` also drops temporary areas, and `remove_temporary` of an unknown id does nothing. A body that stands inside the area when it appears is not trapped, because a move that starts inside is allowed to walk out. The game owns the timer and calls `remove_temporary`.
+
+Cost of one add or remove with 1000 blocked areas on a 1600 by 1000 map, measured on 2026-11-11 with the `cost_of_one_wall_with_many_areas` test (`--ignored --nocapture`): outline 1.7 ms, nav grid at a 16 unit step 6.5 ms. A wall is made once per cast, not every frame. A moving blocker (rebuilt every frame) needs a new measurement.
+
 ## Groups
 
 A game may give an item a thin blocked area when it stands alone and a full footprint when it touches other items. The merge into one outline is the one described here. How groups are found is in `groups.md`.
@@ -100,7 +106,7 @@ A game may give an item a thin blocked area when it stands alone and a full foot
 
 ## Limits
 
-- The outline is built once per call to `add_blocked`. Doors or destroyed objects need a rebuild of one cluster (`rm3`).
+- The outline is built once per call to `add_blocked`, `add_temporary` or `remove_temporary`, over all areas. Doors or destroyed objects need a rebuild of one cluster (`rm3`).
 - `outline::build` makes one grid over all rectangles, so large maps need chunking (`rm3`).
 - Every moving entity tests every edge. A spatial hash is the later fix.
 - A character placed inside a shape (for example by teleport) can walk freely inside it.

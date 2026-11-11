@@ -65,14 +65,26 @@ impl Plugin for CollisionPlugin {
 #[derive(Resource, Default)]
 pub struct CollisionWorld {
     areas: Vec<Rect>,
+    /// Blocked areas that exist for a while, such as a wall made by a spell (`add_temporary`).
+    temporary: Vec<(TemporaryBlocker, Rect)>,
+    next_temporary: u32,
+    /// `areas` then `temporary`, the list the clusters were built from. Area numbers index into it.
+    built: Vec<Rect>,
     clusters: Vec<Cluster>,
     edges: Vec<Edge>,
 }
 
+/// Names one temporary blocked area, so it can be removed again (`CollisionWorld::remove_temporary`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TemporaryBlocker(u32);
+
 impl CollisionWorld {
-    /// Removes every blocked area, for a game that reloads its map. Add the new areas with `add_blocked`.
+    /// Removes every blocked area, temporary ones too, for a game that reloads its map. Add the new areas with
+    /// `add_blocked`.
     pub fn clear(&mut self) {
         self.areas.clear();
+        self.temporary.clear();
+        self.built.clear();
         self.clusters.clear();
         self.edges.clear();
     }
@@ -82,20 +94,51 @@ impl CollisionWorld {
     pub fn add_blocked(&mut self, areas: &[Rect]) -> usize {
         let first = self.areas.len();
         self.areas.extend_from_slice(areas);
-        self.clusters = outline::build(&self.areas);
+        self.rebuild();
+        first
+    }
+
+    /// Adds a blocked area that is meant to go away again, and rebuilds every cluster and edge. Permanent area
+    /// numbers do not change, because temporary areas come after them. A body that stands inside the area when
+    /// it appears is not trapped: `resolve` lets a move that starts inside walk out.
+    pub fn add_temporary(&mut self, area: Rect) -> TemporaryBlocker {
+        let id = TemporaryBlocker(self.next_temporary);
+        self.next_temporary += 1;
+        self.temporary.push((id, area));
+        self.rebuild();
+        id
+    }
+
+    /// Removes a temporary area and rebuilds. Returns false when it is not there (already removed, or the world was
+    /// cleared by a map reload), and then changes nothing.
+    pub fn remove_temporary(&mut self, id: TemporaryBlocker) -> bool {
+        let before = self.temporary.len();
+        self.temporary.retain(|(other, _)| *other != id);
+        let removed = self.temporary.len() != before;
+        if removed {
+            self.rebuild();
+        }
+        removed
+    }
+
+    fn rebuild(&mut self) {
+        self.built.clear();
+        self.built.extend_from_slice(&self.areas);
+        self.built
+            .extend(self.temporary.iter().map(|(_, area)| *area));
+        self.clusters = outline::build(&self.built);
         self.edges = self
             .clusters
             .iter()
             .flat_map(|c| c.edges.iter().copied())
             .collect();
-        first
     }
 
     /// The areas that touch no empty space, for the debug overlay.
     pub fn interior_areas(&self) -> impl Iterator<Item = Rect> + '_ {
         self.clusters
             .iter()
-            .flat_map(|c| c.interior.iter().map(|&i| self.areas[i]))
+            .flat_map(|c| c.interior.iter().map(|&i| self.built[i]))
     }
 
     pub fn clusters(&self) -> &[Cluster] {
@@ -936,5 +979,167 @@ mod tests {
         assert_eq!(world.clusters().len(), 1);
         assert_eq!(world.edges().len(), 6, "an L shape has six edges");
         assert!(!world.is_interior(0));
+    }
+}
+
+#[cfg(test)]
+mod temporary_tests {
+    use super::*;
+    use crate::nav::NavGrid;
+    use crate::projectile::{self, Step};
+
+    const DT: f32 = 1.0 / 60.0;
+
+    fn map() -> Rect {
+        Rect::new(0.0, 0.0, 200.0, 200.0)
+    }
+
+    /// A tree trunk and a vertical wall (x 100 to 110, y 40 to 160) that is added and removed during a test.
+    fn world_with_trunk() -> CollisionWorld {
+        let mut world = CollisionWorld::default();
+        world.add_blocked(&[Rect::new(20.0, 20.0, 30.0, 24.0)]);
+        world
+    }
+
+    fn wall() -> Rect {
+        Rect::new(100.0, 40.0, 110.0, 160.0)
+    }
+
+    fn walk_right(world: &CollisionWorld, from: Vec2, to_x: f32) -> Vec2 {
+        resolve(from, Vec2::new(to_x, from.y), world.edges()).feet
+    }
+
+    #[test]
+    fn a_body_stops_at_a_wall_that_appears_and_walks_on_when_it_is_removed() {
+        let mut world = world_with_trunk();
+        let from = Vec2::new(80.0, 100.0);
+        assert_eq!(walk_right(&world, from, 140.0).x, 140.0);
+        let id = world.add_temporary(wall());
+        assert_eq!(walk_right(&world, from, 140.0).x, 100.0);
+        assert!(world.remove_temporary(id));
+        assert_eq!(walk_right(&world, from, 140.0).x, 140.0);
+    }
+
+    #[test]
+    fn a_body_inside_a_new_wall_can_walk_out() {
+        let mut world = world_with_trunk();
+        world.add_temporary(wall());
+        let inside = Vec2::new(105.0, 100.0);
+        assert_eq!(walk_right(&world, inside, 130.0).x, 130.0);
+    }
+
+    #[test]
+    fn a_shot_hits_a_wall_that_appears_and_flies_on_after_it_goes() {
+        let mut world = world_with_trunk();
+        let id = world.add_temporary(wall());
+        let flight = |world: &CollisionWorld| {
+            projectile::step(
+                Vec2::new(98.0, 100.0),
+                Vec2::new(300.0, 0.0),
+                DT,
+                world.edges(),
+                map(),
+            )
+        };
+        assert_eq!(flight(&world), Step::HitBlocked(Vec2::new(100.0, 100.0)));
+        world.remove_temporary(id);
+        assert!(matches!(flight(&world), Step::Flying(_)));
+    }
+
+    #[test]
+    fn a_path_goes_round_a_wall_and_straight_again_when_it_is_removed() {
+        let mut world = world_with_trunk();
+        let id = world.add_temporary(wall());
+        let (from, to) = (Vec2::new(50.0, 100.0), Vec2::new(150.0, 100.0));
+        let grid = NavGrid::build(world.edges(), map(), 10.0);
+        let path = grid.find_path(from, to).expect("a way round");
+        assert!(path.len() > 1, "{path:?}");
+        assert!(path.iter().any(|p| p.y <= 40.0 || p.y >= 160.0), "{path:?}");
+        world.remove_temporary(id);
+        let grid = NavGrid::build(world.edges(), map(), 10.0);
+        assert_eq!(grid.find_path(from, to), Some(vec![to]));
+    }
+
+    #[test]
+    fn removing_a_wall_leaves_no_stale_edges() {
+        let mut world = world_with_trunk();
+        let before = world.edges().to_vec();
+        let id = world.add_temporary(wall());
+        assert!(world.edges().len() > before.len());
+        world.remove_temporary(id);
+        assert_eq!(world.edges().len(), before.len());
+    }
+
+    #[test]
+    fn a_wall_that_touches_a_trunk_joins_its_cluster_and_leaves_it_again() {
+        let mut world = world_with_trunk();
+        let clusters = world.clusters().len();
+        let id = world.add_temporary(Rect::new(30.0, 20.0, 40.0, 60.0));
+        assert_eq!(world.clusters().len(), clusters);
+        world.remove_temporary(id);
+        assert_eq!(world.clusters().len(), clusters);
+        assert_eq!(world.edges().len(), 4);
+    }
+
+    #[test]
+    fn removing_twice_or_after_a_clear_does_nothing() {
+        let mut world = world_with_trunk();
+        let id = world.add_temporary(wall());
+        assert!(world.remove_temporary(id));
+        assert!(!world.remove_temporary(id));
+        let id = world.add_temporary(wall());
+        world.clear();
+        assert!(!world.remove_temporary(id));
+        assert!(world.edges().is_empty());
+    }
+
+    #[test]
+    fn two_walls_are_removed_one_at_a_time() {
+        let mut world = world_with_trunk();
+        let a = world.add_temporary(wall());
+        let b = world.add_temporary(Rect::new(140.0, 40.0, 150.0, 160.0));
+        world.remove_temporary(a);
+        assert_eq!(walk_right(&world, Vec2::new(80.0, 100.0), 135.0).x, 135.0);
+        assert_eq!(walk_right(&world, Vec2::new(120.0, 100.0), 160.0).x, 140.0);
+        world.remove_temporary(b);
+        assert_eq!(world.edges().len(), 4);
+    }
+
+    #[test]
+    fn permanent_area_numbers_stay_when_a_wall_is_added_after_them() {
+        let mut world = CollisionWorld::default();
+        let first = world.add_blocked(&[Rect::new(0.0, 0.0, 10.0, 10.0)]);
+        world.add_temporary(wall());
+        let second = world.add_blocked(&[Rect::new(50.0, 50.0, 60.0, 60.0)]);
+        assert_eq!((first, second), (0, 1));
+        assert!(!world.is_interior(first));
+    }
+
+    /// Run with `--ignored --nocapture` to read the cost of one rebuild with many blocked areas.
+    #[test]
+    #[ignore]
+    fn cost_of_one_wall_with_many_areas() {
+        let mut world = CollisionWorld::default();
+        let areas: Vec<Rect> = (0..40)
+            .flat_map(|x| {
+                (0..25).map(move |y| {
+                    let (x, y) = (x as f32 * 40.0, y as f32 * 40.0);
+                    Rect::new(x, y, x + 12.0, y + 6.0)
+                })
+            })
+            .collect();
+        world.add_blocked(&areas);
+        let bounds = Rect::new(0.0, 0.0, 1600.0, 1000.0);
+        let started = std::time::Instant::now();
+        let id = world.add_temporary(Rect::new(500.0, 300.0, 510.0, 420.0));
+        let outline = started.elapsed();
+        let started = std::time::Instant::now();
+        let _ = NavGrid::build(world.edges(), bounds, 16.0);
+        let nav = started.elapsed();
+        world.remove_temporary(id);
+        println!(
+            "{} areas: outline rebuild {outline:?}, nav grid {nav:?}",
+            areas.len()
+        );
     }
 }

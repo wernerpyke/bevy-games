@@ -2,6 +2,7 @@
 
 pub mod animation;
 pub mod app_state;
+pub mod area;
 pub mod camera;
 pub mod collectable;
 pub mod collision;
