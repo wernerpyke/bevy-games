@@ -88,9 +88,19 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Use Bevy `States` for app flow (loading, menu, playing, game over) and a sub-state or resource for play mode.
 - Use events or messages between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
-- Tests (`adr-w7`): code in `game-kit` is tested in `game-kit`. A game adds unit tests only for mechanics that are not in the kit, inline in the file they test. Do not test kit behaviour (collision, map parser, depth sort) or the bundled map file in a game, so maps can change freely. When a game rule moves to the kit, move its tests too.
 - Draw order comes from `crates/game-kit/src/layers.rs` and a game's own overrides (adr-x9, adr-x14). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos.
 - Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
+
+## Tests
+
+Read `dev-docs/testing.md` before you write or change a test, in any crate. Key rules:
+
+- **Where tests go (`adr-w7`):** code in `game-kit` is tested in `game-kit`. A game adds unit tests only for mechanics that are not in the kit, inline in the file they test. Do not test kit behaviour (collision, map parser, depth sort) or the bundled map file in a game, so maps can change freely. When a game rule moves to the kit, move its tests too.
+- **Prove that each test can fail.** Break the line the test targets (remove the guard, swap the checks, change `<` to `<=`). Run the test, see it fail, then undo the change with Edit (not `git checkout`). A test that still passes is wrong.
+- **Make the input cross the boundary that the name describes.** For "X wins over Y", X and Y must happen in the same step. For "ignored while Z", send the input while Z is active, in a later frame.
+- **Assert exact values.** Do not put asserts inside an `if let` or `match` arm that may not run. Do not stop at `is_some()`, `is_ok()` or `matches!(x, Variant(_))`.
+- **Vary the fixtures, and test every arm.** Use different cell sizes, origins and scales. Test each direction, input order and error message.
+- **Do not add duplicates.** Read the module's tests first and make an existing test stronger instead of adding a looser copy. Do not test Rust, glam or Bevy behaviour. Use neutral values in kit tests, never game values.
 
 ## Art
 
