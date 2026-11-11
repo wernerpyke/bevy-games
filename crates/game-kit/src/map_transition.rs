@@ -519,6 +519,9 @@ fn install_systems(app: &mut App) {
 fn spawn_fade_overlay(mut commands: Commands, transition: Res<MapTransition>) {
     commands.spawn((
         FadeOverlay,
+        // The overlay covers the whole game region and is transparent most of the time: it must not take picking
+        // (UI clicks, hover) from the nodes below it.
+        Pickable::IGNORE,
         GlobalZIndex(FADE_Z_INDEX),
         BackgroundColor(transition.fade.colour.with_alpha(0.0)),
         Node {

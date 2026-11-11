@@ -57,3 +57,4 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x41 | The kit reports touches on the controlled entity and plays facing tags | EXTENSIONS-GAMEPLAY.md |
 | x42 | The kit turns a mouse click into a world position and sends it as a message | EXTENSIONS-INPUT.md |
 | x43 | Walking to a clicked place: `Mover::feet_offset`, `NavInset` and `NavGrid::nearest_reachable` | EXTENSIONS-INPUT.md |
+| x44 | A click on a UI panel over the game region is not a world click: `BlocksWorldClick` | EXTENSIONS-INPUT.md |

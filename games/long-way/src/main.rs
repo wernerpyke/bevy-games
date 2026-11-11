@@ -12,6 +12,7 @@ mod player;
 mod rocks;
 mod scenery;
 mod trees;
+mod weapon_menu;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -44,7 +45,7 @@ fn main() {
             },
             game_kit::camera::CameraFollowPlugin,
             game_kit::screen::ScreenPlugin {
-                mode: game_kit::screen::ScreenMode::BarTop {
+                mode: game_kit::screen::ScreenMode::BarBottom {
                     ratio: camera::HUD_BAR_RATIO,
                 },
             },
@@ -54,6 +55,7 @@ fn main() {
                 ..game_kit::app_state::AppFlowPlugin::new(game_kit::app_state::AppState::Playing)
             },
             hud::HudPlugin,
+            weapon_menu::WeaponMenuPlugin,
             game_kit::collision::CollisionPlugin {
                 allow_sliding: true,
                 cell_size: camera::CELL_SIZE,

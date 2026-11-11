@@ -6,6 +6,7 @@ use crate::camera::{HUD_FONT_SIZE, HUD_TEXT};
 use crate::hp::Hp;
 use crate::inventory::{Energy, Inventory};
 use crate::pickups::DRAWN_SIZE;
+use crate::weapon_menu::EnergyIconClicked;
 
 /// The content of the HUD bar: the `backgrounds/hud.aseprite` picture (512 by 160 art pixels, the size of the bar), one
 /// text label, the energy counts and the row of HP icons (`adr-lw24`, `adr-lw25`, `adr-lw27`, `adr-lw28`).
@@ -33,11 +34,16 @@ struct HpRow;
 const ENERGY_FONT_SIZE: f32 = 24.0;
 /// The frame of the pickup pulse shown as the icon, counted from the first frame of the tag: a full flame.
 const ICON_FRAME: u16 = 3;
-/// Position of the energy row in the HUD bar, from its top left corner, and the gaps in it, in art pixels.
+/// Position of the energy row in the HUD bar, from its top left corner, and the gaps in it, in art pixels. Each entry
+/// (icon and count) has `CLICK_PAD` of space around it that takes the click, so the row and its gap are made smaller by
+/// the same amount and the icons stay where they were.
 const ENERGY_LEFT: f32 = 8.0;
 const ENERGY_TOP: f32 = 64.0;
 const ENERGY_GAP: f32 = 16.0;
 const ICON_COUNT_GAP: f32 = 4.0;
+const CLICK_PAD: f32 = 4.0;
+/// Colour behind an energy entry while the pointer is over it.
+const ENTRY_HOVER: Color = Color::srgba(1.0, 1.0, 1.0, 0.12);
 
 /// The count text next to the icon of one energy.
 #[derive(Component)]
@@ -79,19 +85,46 @@ fn spawn_hud_content(
         ));
         hud.spawn(Node {
             position_type: PositionType::Absolute,
-            left: px(ENERGY_LEFT),
-            top: px(ENERGY_TOP),
+            left: px(ENERGY_LEFT - CLICK_PAD),
+            top: px(ENERGY_TOP - CLICK_PAD),
             align_items: AlignItems::Center,
-            column_gap: px(ENERGY_GAP),
+            column_gap: px(ENERGY_GAP - 2.0 * CLICK_PAD),
             ..default()
         })
         .with_children(|row| {
             for energy in Energy::ALL {
-                row.spawn(Node {
-                    align_items: AlignItems::Center,
-                    column_gap: px(ICON_COUNT_GAP),
-                    ..default()
-                })
+                // A click on the entry opens the weapon drawer of this energy (`weapon_menu.rs`).
+                row.spawn((
+                    Node {
+                        align_items: AlignItems::Center,
+                        column_gap: px(ICON_COUNT_GAP),
+                        padding: UiRect::all(px(CLICK_PAD)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::NONE),
+                ))
+                .observe(
+                    |event: On<PointerEnter>, mut colours: Query<&mut BackgroundColor>| {
+                        if let Ok(mut colour) = colours.get_mut(event.event_target()) {
+                            colour.0 = ENTRY_HOVER;
+                        }
+                    },
+                )
+                .observe(
+                    |event: On<PointerLeave>, mut colours: Query<&mut BackgroundColor>| {
+                        if let Ok(mut colour) = colours.get_mut(event.event_target()) {
+                            colour.0 = Color::NONE;
+                        }
+                    },
+                )
+                .observe(
+                    move |click: On<PointerClick>,
+                          mut clicked: MessageWriter<EnergyIconClicked>| {
+                        if click.button == PointerButton::Primary {
+                            clicked.write(EnergyIconClicked(energy));
+                        }
+                    },
+                )
                 .with_children(|entry| {
                     // A still frame of the pickup art at the size the pickup is drawn in the world.
                     entry.spawn((

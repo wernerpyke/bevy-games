@@ -3,7 +3,7 @@ use bevy::prelude::*;
 /// Height of the game view in art pixels: 8 cells. The game region of the window is square, so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so about one 10th of the screen height. The camera follows the player and stops at the map edge.
 pub const VIEW_HEIGHT: f32 = 512.0;
 
-/// Size of the game window in logical pixels. The game region is the lower 576 by 576 (the view scale is 576 / `VIEW_HEIGHT` = 1.125), the HUD bar above it is 576 by 180 (`adr-lw24`).
+/// Size of the game window in logical pixels. The game region is the upper 576 by 576 (the view scale is 576 / `VIEW_HEIGHT` = 1.125), the HUD bar below it is 576 by 180 (`adr-lw24`).
 pub const WINDOW_WIDTH: u32 = 576;
 pub const WINDOW_HEIGHT: u32 = 756;
 

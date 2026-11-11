@@ -7,6 +7,9 @@
 //! - `hold:<keys>:<seconds>`        hold arrow keys, `x` or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`. A
 //!   short hold of `x` (`hold:x:0.1`) is one key press
 //! - `click:<world_x>:<world_y>`    a left mouse click at a world position (`pointer::WorldClick`)
+//! - `ui_click:<x>:<y>`            a left click on the UI at a window position in art pixels from the top left (the
+//!   same units as the UI, `UiScale` makes them logical pixels). It moves the picking pointer, presses and releases, so
+//!   the node under it gets the click as with a real mouse, and a `BlocksWorldClick` panel blocks the world click
 //! - `wait:<seconds>`
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
 //!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
@@ -21,16 +24,20 @@
 
 use std::collections::VecDeque;
 
+use bevy::camera::RenderTarget;
 use bevy::ecs::system::SystemParam;
 use bevy::input::InputSystems;
+use bevy::picking::PickingSystems;
+use bevy::picking::pointer::{Location, PointerAction, PointerButton, PointerId, PointerInput};
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
+use bevy::window::{PrimaryWindow, WindowRef};
 
 use crate::Controlled;
 use crate::depth::DepthSort;
 use crate::map::Transition;
 use crate::map_transition::{ActiveMaps, MapTransition, RequestMapChange};
-use crate::pointer::WorldClick;
+use crate::pointer::{PointerSet, WorldClick};
 
 /// Seconds to wait after start before the script runs, so the window and world are up.
 const START_DELAY: f32 = 1.0;
@@ -52,17 +59,25 @@ impl Plugin for ScriptPlugin {
         info!("script: {} commands loaded", commands.len());
         app.add_message::<RequestMapChange>()
             .add_message::<WorldClick>()
+            .add_message::<PointerInput>()
             .insert_resource(Script {
                 commands,
                 elapsed: -START_DELAY,
                 since_log: 0.0,
                 shot_requested: false,
+                ui_phase: 0,
                 shot_saved: false,
                 goto_sent: false,
                 goto_busy: false,
                 screenshot_dir_variable: format!("{}_SCREENSHOT_DIR", self.env_prefix),
             })
-            .add_systems(PreUpdate, run_script.after(InputSystems));
+            .add_systems(
+                PreUpdate,
+                run_script
+                    .after(InputSystems)
+                    .before(PickingSystems::ProcessInput)
+                    .before(PointerSet),
+            );
     }
 }
 
@@ -72,6 +87,7 @@ enum Command {
     Hold(Vec<KeyCode>, f32),
     Wait(f32),
     Click(Vec2),
+    UiClick(Vec2),
     Screenshot(String),
     Goto(String, Option<String>),
     Quit,
@@ -85,6 +101,8 @@ struct Script {
     since_log: f32,
     /// State of the current `screenshot` command.
     shot_requested: bool,
+    /// Step of the current `ui_click`: 0 moves the pointer, 1 presses, 2 releases (one step per frame).
+    ui_phase: u8,
     shot_saved: bool,
     /// State of the current `goto` command: the request was sent, and the transition has been seen running.
     goto_sent: bool,
@@ -109,6 +127,7 @@ fn parse(text: &str) -> VecDeque<Command> {
                 }
                 ["wait", seconds] => Command::Wait(seconds.parse().ok()?),
                 ["click", x, y] => Command::Click(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
+                ["ui_click", x, y] => Command::UiClick(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
                 ["screenshot", name]
                     if !name.is_empty()
                         && name
@@ -163,11 +182,67 @@ fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
 
 /// What a `goto` command needs from the map lifecycle.
 #[derive(SystemParam)]
-struct MapLink<'w> {
+struct MapLink<'w, 's> {
+    pointer: UiPointer<'w, 's>,
     changes: MessageWriter<'w, RequestMapChange>,
     clicks: MessageWriter<'w, WorldClick>,
     transition: Option<Res<'w, MapTransition>>,
     maps: Option<Res<'w, ActiveMaps>>,
+}
+
+/// What a `ui_click` command needs: the picking input, the mouse buttons and the window.
+#[derive(SystemParam)]
+struct UiPointer<'w, 's> {
+    input: MessageWriter<'w, PointerInput>,
+    mouse: ResMut<'w, ButtonInput<MouseButton>>,
+    window: Query<'w, 's, Entity, With<PrimaryWindow>>,
+    scale: Option<Res<'w, UiScale>>,
+}
+
+impl UiPointer<'_, '_> {
+    /// One step of a `ui_click` at `art` (art pixels from the window top left). Returns true after the last step.
+    fn step(&mut self, phase: u8, art: Vec2) -> bool {
+        let Ok(window) = self.window.single() else {
+            warn!("script: ui_click skipped, there is no primary window");
+            return true;
+        };
+        let target = RenderTarget::Window(WindowRef::Primary).normalize(Some(window));
+        let Some(target) = target else {
+            return true;
+        };
+        let scale = self.scale.as_ref().map_or(1.0, |scale| scale.0);
+        let location = Location {
+            target,
+            position: art * scale,
+        };
+        // The move is sent in every step, after the real mouse events of the frame, so a real cursor over the window
+        // cannot take the pointer away between the steps.
+        self.input.write(PointerInput::new(
+            PointerId::Mouse,
+            location.clone(),
+            PointerAction::Move { delta: Vec2::ZERO },
+        ));
+        match phase {
+            0 => {}
+            1 => {
+                self.mouse.press(MouseButton::Left);
+                self.input.write(PointerInput::new(
+                    PointerId::Mouse,
+                    location,
+                    PointerAction::Press(PointerButton::Primary),
+                ));
+            }
+            _ => {
+                self.mouse.release(MouseButton::Left);
+                self.input.write(PointerInput::new(
+                    PointerId::Mouse,
+                    location,
+                    PointerAction::Release(PointerButton::Primary),
+                ));
+            }
+        }
+        phase >= 2
+    }
 }
 
 fn run_script(
@@ -225,6 +300,14 @@ fn run_script(
                 button: MouseButton::Left,
             });
             true
+        }
+        Command::UiClick(position) => {
+            let done = link.pointer.step(script.ui_phase, *position);
+            script.ui_phase += 1;
+            if done {
+                info!("script: ui click at {position:?}");
+            }
+            done
         }
         Command::Screenshot(name) => {
             if !script.shot_requested {
@@ -308,6 +391,7 @@ fn run_script(
         script.commands.pop_front();
         script.elapsed = 0.0;
         script.shot_requested = false;
+        script.ui_phase = 0;
         script.goto_sent = false;
         script.goto_busy = false;
     }
@@ -333,6 +417,13 @@ mod tests {
         let commands = parse("click:100:-20.5;click:1;click:a:b");
         assert_eq!(commands.len(), 1);
         assert!(matches!(commands[0], Command::Click(p) if p == Vec2::new(100.0, -20.5)));
+    }
+
+    #[test]
+    fn ui_click_takes_a_window_position() {
+        let commands = parse("ui_click:60:-20.5;ui_click:1;ui_click:a:b");
+        assert_eq!(commands.len(), 1);
+        assert!(matches!(commands[0], Command::UiClick(p) if p == Vec2::new(60.0, -20.5)));
     }
 
     #[test]
