@@ -67,6 +67,8 @@ pub const RING: RingShape = RingShape {
 };
 
 const _: () = assert!(RING.burn_lead < RING.max_radius && RING.band_half < RING.max_radius);
+// The ring is 6 cells across (the user, 2026-11-11).
+const _: () = assert!(RING.max_radius * 2.0 == 6.0 * CELL_SIZE);
 
 /// The values of a weapon. Placeholders (P4): damage and pushback are guesses to be tuned.
 pub fn values(weapon: WeaponKind) -> WeaponValues {
@@ -126,11 +128,6 @@ mod tests {
                 assert!(n > 0.0, "{weapon:?}");
             }
         }
-    }
-
-    #[test]
-    fn the_ring_is_six_cells_across() {
-        assert_eq!(RING.max_radius * 2.0, 6.0 * CELL_SIZE);
     }
 
     #[test]

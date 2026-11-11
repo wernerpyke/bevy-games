@@ -24,7 +24,9 @@ pub struct Contact {
 impl Contact {
     /// Call every frame that the target is in the effect. Returns the damage to deal now, or `None` between ticks.
     /// The first call hits at once, then one tick every `values.tick` seconds, each of `dps * tick`, so the damage
-    /// averages `dps`. `Damage::Impact` weapons deal their damage themselves, so they get `None` here.
+    /// averages `dps`. A frame longer than the tick deals one tick and the rhythm starts again from it: missed ticks
+    /// are not dealt later (`PLAN-weapons.md` D14). `Damage::Impact` weapons deal their damage themselves, so they get
+    /// `None` here.
     pub fn damage(&mut self, values: &WeaponValues, dt: f32) -> Option<f32> {
         let Damage::PerSecond(dps) = values.damage else {
             return None;
@@ -33,7 +35,11 @@ impl Contact {
         if self.wait > 0.0 {
             return None;
         }
-        self.wait += values.tick;
+        if dt > values.tick {
+            self.wait = values.tick;
+        } else {
+            self.wait += values.tick;
+        }
         self.ticks += 1;
         Some(dps * values.tick)
     }
@@ -146,12 +152,29 @@ mod tests {
     }
 
     #[test]
-    fn a_long_frame_still_deals_one_tick_and_keeps_the_rhythm() {
+    fn a_frame_no_longer_than_the_tick_keeps_the_rhythm() {
+        // Ticks at 0, then due at 0.5 and 1.0. The frame that passes 0.5 ends at 0.75, so the next tick is 0.25 later.
         let v = values(Damage::PerSecond(10.0), Pushback::None);
         let mut contact = Contact::default();
-        assert!(contact.damage(&v, 0.0).is_some());
-        assert!(contact.damage(&v, 0.4).is_none());
-        assert!(contact.damage(&v, 0.2).is_some());
+        assert_eq!(contact.damage(&v, 0.0), Some(5.0));
+        assert_eq!(contact.damage(&v, 0.375), None);
+        assert_eq!(contact.damage(&v, 0.375), Some(5.0));
+        assert_eq!(contact.damage(&v, 0.125), None);
+        assert_eq!(contact.damage(&v, 0.125), Some(5.0));
+    }
+
+    #[test]
+    fn a_long_frame_deals_one_tick_and_the_rhythm_starts_again_from_it() {
+        // D14: no burst of missed ticks. Just over the tick and far over it give the same.
+        let v = values(Damage::PerSecond(10.0), Pushback::None);
+        for long in [0.625, 2.0] {
+            let mut contact = Contact::default();
+            assert_eq!(contact.damage(&v, 0.0), Some(5.0));
+            assert_eq!(contact.damage(&v, long), Some(5.0), "{long}");
+            assert_eq!(contact.damage(&v, 0.375), None, "{long}");
+            assert_eq!(contact.damage(&v, 0.125), Some(5.0), "{long}");
+            assert_eq!(contact.ticks(), 3);
+        }
     }
 
     #[test]
@@ -224,11 +247,7 @@ mod tests {
     }
 
     fn damage_messages(app: &App) -> Vec<DamageEnemy> {
-        app.world()
-            .resource::<Messages<DamageEnemy>>()
-            .iter_current_update_messages()
-            .copied()
-            .collect()
+        crate::test_util::messages(app)
     }
 
     #[test]

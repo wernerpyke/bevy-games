@@ -110,12 +110,7 @@ mod tests {
         app.world_mut()
             .write_message(WeaponChosen(WeaponKind::IceRing));
         app.update();
-        let sent: Vec<CastWeapon> = app
-            .world()
-            .resource::<Messages<CastWeapon>>()
-            .iter_current_update_messages()
-            .copied()
-            .collect();
+        let sent: Vec<CastWeapon> = crate::test_util::messages(&app);
         assert_eq!(sent.len(), 1);
         assert_eq!(sent[0].weapon, WeaponKind::IceRing);
         assert_eq!(

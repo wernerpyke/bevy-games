@@ -100,3 +100,26 @@ fn spawn_marker(
         });
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_lantern_blocks_the_middle_of_its_width_and_the_bottom_half_on_whole_pixels() {
+        // 80% of 28 is 22.4, so 22 wide. Centred in a cell of 48 from x 100.3: 113.3, so 113. Half of 35 is 17.5, so 18.
+        assert_eq!(
+            blocked_area(Vec2::new(100.3, 30.0), 48.0),
+            Rect::new(113.0, 30.0, 135.0, 48.0)
+        );
+    }
+
+    #[test]
+    fn the_touch_area_is_the_blocked_area_plus_the_margin_twice_as_large_around_its_centre() {
+        // With the margin: x 111..137, y 28..50, so the centre is (124, 39) and the size 26 by 22.
+        assert_eq!(
+            touch_area(Rect::new(113.0, 30.0, 135.0, 48.0)),
+            Rect::new(98.0, 17.0, 150.0, 61.0)
+        );
+    }
+}

@@ -16,6 +16,9 @@ mod trees;
 mod weapon_menu;
 mod weapons;
 
+#[cfg(test)]
+mod test_util;
+
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
 

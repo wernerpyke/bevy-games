@@ -280,10 +280,16 @@ mod tests {
     }
 
     fn damage_messages(app: &App) -> usize {
+        crate::test_util::messages::<DamagePlayer>(app).len()
+    }
+
+    fn tag(app: &App, sprite: Entity) -> Option<&str> {
         app.world()
-            .resource::<Messages<DamagePlayer>>()
-            .iter_current_update_messages()
-            .count()
+            .get::<AseAnimation>(sprite)
+            .unwrap()
+            .animation
+            .tag
+            .as_deref()
     }
 
     #[test]
@@ -306,18 +312,34 @@ mod tests {
     }
 
     #[test]
-    fn a_ghost_that_is_already_attacking_is_not_touched_again() {
+    fn a_ghost_that_has_attacked_is_not_touched_again_while_it_dies() {
+        // Without the guard a touch after the attack would start `Attack` again over `Die`, and hurt the player twice.
         let mut app = app();
         let (ghost, sprite) = spawn_ghost(&mut app);
+        let mut damage = 0;
         for _ in 0..2 {
             app.world_mut()
                 .write_message(ControlledTouched { by: ghost });
             app.update();
+            damage += damage_messages(&app);
         }
         app.world_mut()
             .write_message(AnimationEvents::Finished(sprite));
         app.update();
-        assert_eq!(damage_messages(&app), 1, "one touch, one damage");
+        damage += damage_messages(&app);
+        assert_eq!(tag(&app, sprite), Some("Die"));
+        app.world_mut()
+            .write_message(ControlledTouched { by: ghost });
+        app.update();
+        damage += damage_messages(&app);
+        assert_eq!(tag(&app, sprite), Some("Die"));
+        assert!(app.world().get::<Attacking>(sprite).is_none());
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(sprite));
+        app.update();
+        damage += damage_messages(&app);
+        assert_eq!(damage, 1, "one attack, one damage");
+        assert!(app.world().get_entity(ghost).is_err());
     }
 
     #[test]
@@ -435,40 +457,46 @@ mod tests {
         assert_eq!(damage_messages(&app), 0);
     }
 
+    /// Starts an attack (`touched`) or a death (`killed`) of the ghost in this update.
+    fn start(app: &mut App, ghost: Entity, what: &str) {
+        if what == "touched" {
+            app.world_mut()
+                .write_message(ControlledTouched { by: ghost });
+        } else {
+            app.world_mut().write_message(EnemyDied(ghost));
+        }
+        app.update();
+    }
+
     #[test]
     fn a_ghost_that_is_attacking_or_dying_does_not_play_hurt() {
-        let mut app = app();
-        let (ghost, sprite) = spawn_ghost(&mut app);
-        app.world_mut()
-            .write_message(ControlledTouched { by: ghost });
-        app.update();
-        app.world_mut().write_message(EnemyHurt(ghost));
-        app.update();
-        let world = app.world();
-        assert!(world.get::<Hurting>(sprite).is_none());
-        assert_eq!(
-            world
-                .get::<AseAnimation>(sprite)
-                .unwrap()
-                .animation
-                .tag
-                .as_deref(),
-            Some("Attack")
-        );
+        for (what, playing) in [("touched", "Attack"), ("killed", "Die")] {
+            let mut app = app();
+            let (ghost, sprite) = spawn_ghost(&mut app);
+            start(&mut app, ghost, what);
+            app.world_mut().write_message(EnemyHurt(ghost));
+            app.update();
+            assert!(app.world().get::<Hurting>(sprite).is_none(), "{what}");
+            assert_eq!(tag(&app, sprite), Some(playing), "{what}");
+        }
     }
 
     #[test]
     fn starting_an_attack_or_dying_while_hurt_takes_over() {
-        let mut app = app();
-        let (ghost, sprite) = spawn_ghost(&mut app);
-        app.world_mut().write_message(EnemyHurt(ghost));
-        app.update();
-        app.world_mut().write_message(EnemyDied(ghost));
-        app.update();
-        let world = app.world();
-        assert!(world.get::<Hurting>(sprite).is_none());
-        assert!(world.get::<Dying>(sprite).is_some());
-        assert!(world.get::<FacingTags>(sprite).is_none());
+        for (what, playing) in [("touched", "Attack"), ("killed", "Die")] {
+            let mut app = app();
+            let (ghost, sprite) = spawn_ghost(&mut app);
+            app.world_mut().write_message(EnemyHurt(ghost));
+            app.update();
+            start(&mut app, ghost, what);
+            let world = app.world();
+            assert!(world.get::<Hurting>(sprite).is_none(), "{what}");
+            assert!(world.get::<FacingTags>(sprite).is_none(), "{what}");
+            assert_eq!(tag(&app, sprite), Some(playing), "{what}");
+            let attacking = world.get::<Attacking>(sprite).is_some();
+            let dying = world.get::<Dying>(sprite).is_some();
+            assert_eq!((attacking, dying), (what == "touched", what == "killed"));
+        }
     }
 
     /// The kit's `animate_facing` sets the walking tag of every sprite that still has `FacingTags`. A ghost that
@@ -510,15 +538,6 @@ mod tests {
         (ghost, sprite)
     }
 
-    fn tag_of(app: &App, sprite: Entity) -> Option<String> {
-        app.world()
-            .get::<AseAnimation>(sprite)
-            .unwrap()
-            .animation
-            .tag
-            .clone()
-    }
-
     #[test]
     fn dying_hurt_and_attacking_are_not_overwritten_by_the_walking_tags_in_the_same_frame() {
         for round in 0..20 {
@@ -540,12 +559,44 @@ mod tests {
                 }
                 app.update();
                 app.update();
-                assert_eq!(
-                    tag_of(&app, sprite).as_deref(),
-                    Some(expected),
-                    "{name}, round {round}"
-                );
+                assert_eq!(tag(&app, sprite), Some(expected), "{name}, round {round}");
             }
         }
+    }
+
+    #[test]
+    fn a_marker_puts_a_ghost_with_its_feet_at_the_cell_centre_and_one_with_a_bad_strategy_is_skipped()
+     {
+        use crate::test_util::{asset_app, map, object, spawn_with};
+        let mut app = asset_app(16);
+        let map = map(
+            48.0,
+            vec![
+                object("spawn_ghost", 2, 3, &[("strategy", "pursue")]),
+                object("spawn_ghost", 5, 1, &[("strategy", "dance")]),
+                object("rock_0", 0, 0, &[]),
+            ],
+        );
+        let load = MapLoad {
+            id: "m".to_string(),
+            origin: Vec2::new(10.0, 20.0),
+        };
+        spawn_with(&mut app, move |commands, server| {
+            spawn_ghosts(commands, server, &map, &load);
+        });
+        let ghosts: Vec<(Vec2, String, bool)> = app
+            .world_mut()
+            .query_filtered::<(&Transform, &MapId, Has<Pursue>), With<Ghost>>()
+            .iter(app.world())
+            .map(|(transform, id, pursue)| (transform.translation.truncate(), id.0.clone(), pursue))
+            .collect();
+        assert_eq!(
+            ghosts,
+            vec![(
+                Vec2::new(10.0 + 2.5 * 48.0, 20.0 + 3.5 * 48.0),
+                "m".to_string(),
+                true
+            )]
+        );
     }
 }

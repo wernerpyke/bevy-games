@@ -83,12 +83,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_player_starts_with_three_full_points() {
-        let hp = Hp::default();
-        assert_eq!((hp.current, hp.max), (3, 3));
-    }
-
-    #[test]
     fn points_cannot_go_below_zero() {
         let mut hp = Hp::full(3);
         hp.lose(1);
@@ -101,18 +95,21 @@ mod tests {
 
     fn app() -> (App, Entity) {
         let mut app = App::new();
-        app.add_plugins(MinimalPlugins).add_plugins(HpPlugin);
+        app.add_plugins(HpPlugin);
         let player = app.world_mut().spawn((Controlled, Hp::default())).id();
         (app, player)
     }
 
     #[test]
-    fn a_damage_message_takes_points_and_stops_at_zero() {
+    fn a_damage_message_takes_points_and_at_zero_the_player_is_hurt_no_more() {
         let (mut app, player) = app();
+        let mut hurts = Vec::new();
         for _ in 0..5 {
             app.world_mut().write_message(DamagePlayer { amount: 1 });
             app.update();
+            hurts.push(crate::test_util::messages::<PlayerHurt>(&app).len());
         }
         assert_eq!(app.world().get::<Hp>(player).unwrap().current, 0);
+        assert_eq!(hurts, [1, 1, 1, 0, 0]);
     }
 }

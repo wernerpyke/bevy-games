@@ -76,4 +76,4 @@ Example: pushing up into the bottom face of the test cluster from world x 463, t
 
 ## Tests
 
-Trunk tests are in `collision.rs`. The engine tests (`collision.rs`, `outline.rs`) are in `crates/game-kit`. Rock tests are in rock tests in `rocks.rs` (placement, blocked area, sort line). See [testing.md](testing.md).
+The trunk band is tested through `trees.rs` and `scenery.rs`. Rock tests are in `rocks.rs` (placement, blocked area, sort line, jitter), lantern and marker tests in `markers.rs`. The engine tests (`collision.rs`, `outline.rs`) are in `crates/game-kit`. See [testing.md](testing.md).

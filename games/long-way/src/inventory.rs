@@ -117,4 +117,20 @@ mod tests {
         assert_eq!(Energy::from_kind("energy_black"), Some(Energy::Black));
         assert_eq!(Energy::from_kind("rock_0"), None);
     }
+
+    #[test]
+    fn a_collected_energy_is_counted_and_an_unknown_kind_is_not() {
+        let mut app = App::new();
+        app.add_message::<Collected>().add_plugins(InventoryPlugin);
+        for kind in ["energy_red", "moss", "energy_red"] {
+            app.world_mut().write_message(Collected {
+                kind: kind.to_string(),
+            });
+        }
+        app.update();
+        assert_eq!(
+            app.world().resource::<Inventory>().summary(),
+            "B 0  R 2  V 0  K 0"
+        );
+    }
 }

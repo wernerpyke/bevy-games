@@ -80,6 +80,8 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | D11 | Aim from a drawer button (the cursor is on the button) | **Decided: no cursor aim. Each weapon has its own aim rule**, taken from the player (facing, position) or the world (nearest enemy). See the table below. |
 | D12 | Energy cost and cooldown per cast (`Inventory`, `adr-lw27`) | **Decided: out of scope.** A separate plan will build them later. Weapons in this plan cost nothing and have no cooldown. |
 | D13 | What a ghost does when its HP reaches 0 | **Decided: it dies.** The ghost is removed (despawned) when `EnemyDied` fires. No drop. A death animation or effect is not part of this plan unless the user asks. |
+| D14 | Damage ticks after a long frame | **Decided (user, 2026-11-11): no burst.** A frame longer than the tick deals one tick, and the rhythm restarts from that tick. Missed ticks are not dealt in the next frames. Same rule as the kit's spawner. |
+| D15 | Dead enemies and weapons | **Decided (user, 2026-11-11): every weapon skips an enemy whose `EnemyHp` is 0 (dead)**, in its own target query or filter. It neither hurts nor pushes it, even while the enemy plays `Die` and still has its `HitBox`. A weapon must not rely on the enemy's plugin removing the `HitBox`. Each weapon step (W1 to W6) has a test for it. |
 
 ### Aim rules (D11)
 

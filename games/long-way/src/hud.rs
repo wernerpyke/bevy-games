@@ -194,6 +194,7 @@ fn update_hp_row(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bevy_aseprite_ultra::prelude::AseAnimation;
 
     #[test]
     fn lost_points_show_the_empty_icon() {
@@ -202,5 +203,62 @@ mod tests {
         assert_eq!(tags, ["Full", "Full", "Empty"]);
         let none = Hp { current: 0, max: 3 };
         assert!((0..3).all(|i| hp_icon_tag(i, &none) == "Empty"));
+    }
+
+    fn app() -> App {
+        let mut app = crate::test_util::asset_app(16);
+        app.init_resource::<Inventory>()
+            .add_systems(Update, (update_energy_counts, update_hp_row));
+        app.world_mut().spawn(HpRow);
+        app
+    }
+
+    #[test]
+    fn each_energy_count_shows_its_own_number_after_a_change() {
+        let mut app = app();
+        let red = app
+            .world_mut()
+            .spawn((EnergyCount(Energy::Red), Text::new("0")))
+            .id();
+        let blue = app
+            .world_mut()
+            .spawn((EnergyCount(Energy::Blue), Text::new("0")))
+            .id();
+        app.update();
+        let mut inventory = app.world_mut().resource_mut::<Inventory>();
+        inventory.add(Energy::Red);
+        inventory.add(Energy::Red);
+        app.update();
+        let text = |entity| app.world().get::<Text>(entity).unwrap().0.clone();
+        assert_eq!((text(red), text(blue)), ("2".to_string(), "0".to_string()));
+    }
+
+    fn hp_row_tags(app: &mut App) -> Vec<String> {
+        let world = app.world_mut();
+        let icons = world
+            .query_filtered::<&Children, With<HpRow>>()
+            .single(world)
+            .unwrap()
+            .to_vec();
+        icons
+            .iter()
+            .map(|icon| {
+                world
+                    .get::<AseAnimation>(*icon)
+                    .and_then(|ase| ase.animation.tag.clone())
+                    .unwrap_or_default()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_hp_row_is_filled_again_when_the_points_change() {
+        let mut app = app();
+        let player = app.world_mut().spawn(Hp { current: 4, max: 4 }).id();
+        app.update();
+        assert_eq!(hp_row_tags(&mut app), ["Full", "Full", "Full", "Full"]);
+        app.world_mut().get_mut::<Hp>(player).unwrap().current = 1;
+        app.update();
+        assert_eq!(hp_row_tags(&mut app), ["Full", "Empty", "Empty", "Empty"]);
     }
 }

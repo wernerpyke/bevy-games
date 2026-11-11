@@ -205,3 +205,110 @@ pub fn rebuild_collision(
     }
     info!("rocks: {} of {} rocks are interior", interior, rocks.len());
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::{map, object};
+
+    /// Cell 40, so the 2x2 footprint (80) is not the drawn size, and cell (0, 0) at (10, 20).
+    const CELL: f32 = 40.0;
+    const ORIGIN: Vec2 = Vec2::new(10.0, 20.0);
+
+    fn rock_map(draw: Option<f32>) -> (Map, MapObject) {
+        let rock = object("rock_0", 2, 1, &[]);
+        let mut map = map(CELL, vec![rock.clone()]);
+        map.draw_size = draw;
+        (map, rock)
+    }
+
+    #[test]
+    fn a_rock_is_drawn_at_a_whole_scale_with_its_visible_bottom_on_the_footprint() {
+        // The footprint corner is (10 + 2 * 40, 20 + 1 * 40) = (90, 60). The canvas centre is 3/8 of the drawn size
+        // above it, and the sort line 1 pixel above the bottom of the footprint.
+        for (draw, scale) in [
+            (Some(100.0), 3.0),
+            (Some(112.0), 4.0),
+            (Some(10.0), 1.0),
+            (None, 4.0),
+        ] {
+            let (map, rock) = rock_map(draw);
+            let above = 0.375 * scale * ART_PIXELS;
+            assert_eq!(
+                placement(&rock, &map, ORIGIN),
+                Placement {
+                    centre: Vec2::new(90.0 + 40.0, 60.0 + above),
+                    scale,
+                    feet_offset: above - SORT_BIAS,
+                },
+                "{draw:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_rock_in_a_group_blocks_its_inset_footprint_and_reaches_the_rock_above_with_an_open_top() {
+        // Inset 8 (a tenth of 80) on the left, right and top, then widened by the player's half width.
+        let (map, rock) = rock_map(None);
+        let (left, right) = (
+            90.0 + 8.0 - PLAYER_HALF_WIDTH,
+            170.0 - 8.0 + PLAYER_HALF_WIDTH,
+        );
+        let in_group = |neighbour_above| Group {
+            size: 2,
+            neighbour_above,
+        };
+        assert_eq!(
+            blocked_area(&rock, &map, ORIGIN, in_group(false)),
+            Rect::new(left, 60.0, right, 140.0 - 8.0)
+        );
+        assert_eq!(
+            blocked_area(&rock, &map, ORIGIN, in_group(true)),
+            Rect::new(left, 60.0, right, 140.0)
+        );
+    }
+
+    #[test]
+    fn a_rock_that_stands_alone_blocks_only_a_band_at_its_bottom() {
+        let (map, rock) = rock_map(None);
+        let alone = Group {
+            size: 1,
+            neighbour_above: false,
+        };
+        let area = blocked_area(&rock, &map, ORIGIN, alone);
+        assert_eq!(
+            area,
+            Rect::new(
+                90.0 + 8.0 - PLAYER_HALF_WIDTH,
+                60.0,
+                170.0 - 8.0 + PLAYER_HALF_WIDTH,
+                60.0 + 8.0
+            )
+        );
+    }
+
+    #[test]
+    fn the_jitter_stays_in_its_range_and_differs_between_neighbour_cells() {
+        let jitter = 6.0;
+        let offset = |x, y| jitter_offset(&object("rock_0", x, y, &[]), jitter);
+        let mut seen = Vec::new();
+        for x in -3..12 {
+            for y in -3..12 {
+                let at = offset(x, y);
+                assert!(at.abs().max_element() <= jitter, "({x}, {y}): {at}");
+                seen.push(at);
+            }
+        }
+        // Both signs on both axes, so the range is used on each side of 0.
+        assert!(
+            seen.iter().any(|at| at.x < -jitter / 2.0) && seen.iter().any(|at| at.x > jitter / 2.0)
+        );
+        assert!(
+            seen.iter().any(|at| at.y < -jitter / 2.0) && seen.iter().any(|at| at.y > jitter / 2.0)
+        );
+        assert_ne!(offset(3, 5), offset(4, 5));
+        assert_ne!(offset(3, 5), offset(3, 6));
+        assert_ne!(offset(3, 5).x, offset(3, 5).y);
+        assert_eq!(jitter_offset(&object("rock_0", 3, 5, &[]), 0.0), Vec2::ZERO);
+    }
+}

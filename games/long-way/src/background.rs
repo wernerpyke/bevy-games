@@ -114,4 +114,78 @@ mod tests {
         assert_eq!(unknown_tile(&map_with_tiles("grass_0 flowers_1")), None);
         assert_eq!(unknown_tile(&map_with_tiles("grass_0 moss")), Some("moss"));
     }
+
+    /// A map of 3 by 2 cells of 48, every cell with an image at scale 2.
+    fn map_3x2(tiles: &str) -> Map {
+        let source = format!(
+            "---\nmap: t\ncell: 48\norigin: bottom-left\nsize: 3x2\nbackground:\n  color: \"#336699\"\n  mode: random\n  fill: 1\n  scale: 2\n  tiles: {tiles}\nlegend:\n  \".\": empty\n---\n   |0 1 2|\n 1 |. . .|\n 0 |. . .|\n"
+        );
+        parse("t.txt", &source, &[]).unwrap_or_else(|e| panic!("{e}"))
+    }
+
+    /// The colour rectangles (size, position) and the images (tag, position, scale) that the map spawns, the images
+    /// in drawing order.
+    #[allow(clippy::type_complexity)]
+    fn spawn(map: Map) -> (Vec<(Option<Vec2>, Vec3)>, Vec<(String, Vec3, Vec3)>) {
+        let mut app = crate::test_util::asset_app(16);
+        let load = MapLoad {
+            id: "m".to_string(),
+            origin: Vec2::new(10.0, 20.0),
+        };
+        crate::test_util::spawn_with(&mut app, move |commands, server| {
+            spawn_background(commands, server, &map, &load);
+        });
+        let world = app.world_mut();
+        let colours = world
+            .query_filtered::<(&Sprite, &Transform), (With<MapId>, Without<AseAnimation>)>()
+            .iter(world)
+            .map(|(sprite, transform)| (sprite.custom_size, transform.translation))
+            .collect();
+        let mut images: Vec<(String, Vec3, Vec3)> = world
+            .query_filtered::<(&AseAnimation, &Transform), With<MapId>>()
+            .iter(world)
+            .map(|(ase, transform)| {
+                let tag = ase.animation.tag.clone().unwrap_or_default();
+                (tag, transform.translation, transform.scale)
+            })
+            .collect();
+        images.sort_by(|a, b| a.1.z.total_cmp(&b.1.z));
+        (colours, images)
+    }
+
+    #[test]
+    fn the_ground_is_a_colour_the_size_of_the_map_with_the_placed_images_over_it() {
+        let map = map_3x2("grass_0 flowers_1");
+        let background = map.background.clone().unwrap();
+        let placed = place_tiles("t", map.size, 48.0, &background, Vec2::splat(64.0));
+        assert_eq!(placed.len(), 6);
+        let (colours, images) = spawn(map);
+        assert_eq!(
+            colours,
+            vec![(
+                Some(Vec2::new(144.0, 96.0)),
+                Vec3::new(82.0, 68.0, BACKGROUND_Z)
+            )]
+        );
+        let expected: Vec<(String, Vec3, Vec3)> = placed
+            .iter()
+            .enumerate()
+            .map(|(index, tile)| {
+                let z = BACKGROUND_TILES_Z + index as f32 * BACKGROUND_TILE_Z_STEP;
+                (
+                    background.tiles[tile.tile].clone(),
+                    (Vec2::new(10.0, 20.0) + tile.centre).extend(z),
+                    Vec3::new(2.0, 2.0, 1.0),
+                )
+            })
+            .collect();
+        assert_eq!(images, expected);
+    }
+
+    #[test]
+    fn a_map_with_an_unknown_tile_gets_its_colour_and_no_images() {
+        let (colours, images) = spawn(map_3x2("grass_0 moss"));
+        assert_eq!(colours.len(), 1);
+        assert_eq!(images, vec![]);
+    }
 }

@@ -19,6 +19,7 @@ use crate::inventory::Energy;
 const DRAWER_RATIO: f32 = 0.6;
 /// Height of the drawer in art pixels: 60% of the bar (160), so 96.
 const DRAWER_HEIGHT: f32 = VIEW_HEIGHT * HUD_BAR_RATIO * DRAWER_RATIO;
+const _: () = assert!(DRAWER_HEIGHT > 95.999 && DRAWER_HEIGHT < 96.001);
 /// Seconds the drawer takes to slide fully up, and fully down.
 const OPEN_SECS: f32 = 0.2;
 const CLOSE_SECS: f32 = 0.15;
@@ -29,9 +30,16 @@ const DRAWER_ART: &str = "art/ui/weapon_drawer.aseprite";
 const ICON_ART: &str = "art/ui/weapon_icons.aseprite";
 const FONT: &str = "fonts/CourierPrime-Regular.ttf";
 
-/// Size of a weapon button, of its icon, and the text size, in art pixels. Four buttons and their gaps fit in 512.
+/// Width of the drawer picture in art pixels.
+const DRAWER_ART_WIDTH: f32 = 512.0;
+/// Size of a weapon button, of its icon, and the text size, in art pixels. Four buttons and their gaps fit in the
+/// drawer picture.
 const BUTTON_SIZE: Vec2 = Vec2::new(112.0, 72.0);
 const BUTTON_GAP: f32 = 8.0;
+const MAX_BUTTONS: usize = 4;
+const _: () = assert!(
+    MAX_BUTTONS as f32 * BUTTON_SIZE.x + (MAX_BUTTONS - 1) as f32 * BUTTON_GAP <= DRAWER_ART_WIDTH
+);
 const ICON_SIZE: f32 = 32.0;
 const LABEL_SIZE: f32 = 16.0;
 /// Space between the icon and the label of a button.
@@ -384,11 +392,6 @@ mod tests {
     }
 
     #[test]
-    fn the_drawer_is_60_percent_of_the_bar() {
-        assert!((DRAWER_HEIGHT - 96.0).abs() < 1e-3);
-    }
-
-    #[test]
     fn every_weapon_is_in_exactly_one_drawer_and_fits_a_button() {
         for weapon in WeaponKind::ALL {
             let drawers = Energy::ALL
@@ -403,14 +406,154 @@ mod tests {
     }
 
     #[test]
-    fn a_row_of_buttons_fits_the_view() {
-        let most = Energy::ALL
+    fn no_drawer_has_more_buttons_than_fit_its_picture() {
+        // The row of `MAX_BUTTONS` fits the picture: a compile-time assert beside the constants.
+        for energy in Energy::ALL {
+            assert!(weapons_for(energy).len() <= MAX_BUTTONS, "{energy:?}");
+        }
+    }
+
+    fn app() -> App {
+        let mut app = crate::test_util::asset_app(50);
+        app.add_message::<WorldClick>()
+            .add_plugins(WeaponMenuPlugin);
+        app.update();
+        app
+    }
+
+    fn open(app: &App) -> Option<Energy> {
+        app.world().resource::<DrawerState>().open
+    }
+
+    fn click_icon(app: &mut App, energy: Energy) {
+        app.world_mut().write_message(EnergyIconClicked(energy));
+        app.update();
+    }
+
+    #[test]
+    fn an_icon_opens_its_drawer_and_the_same_icon_or_a_click_in_the_world_closes_it() {
+        let mut app = app();
+        click_icon(&mut app, Energy::Red);
+        assert_eq!(open(&app), Some(Energy::Red));
+        click_icon(&mut app, Energy::Red);
+        assert_eq!(open(&app), None);
+        click_icon(&mut app, Energy::Blue);
+        assert_eq!(open(&app), Some(Energy::Blue));
+        app.world_mut().write_message(WorldClick {
+            position: Vec2::new(30.0, 40.0),
+            button: MouseButton::Left,
+        });
+        app.update();
+        assert_eq!(open(&app), None);
+    }
+
+    /// The weapons of the buttons in the row, and the texts that are direct children of the row.
+    fn row(app: &mut App) -> (Vec<WeaponKind>, Vec<String>) {
+        let world = app.world_mut();
+        let row = world
+            .query_filtered::<&Children, With<ButtonRow>>()
+            .single(world)
+            .map(|children| children.to_vec())
+            .unwrap_or_default();
+        let buttons = row
             .iter()
-            .map(|energy| weapons_for(*energy).len())
-            .max()
+            .filter_map(|child| world.get::<WeaponButton>(*child).map(|button| button.0))
+            .collect();
+        let texts = row
+            .iter()
+            .filter_map(|child| world.get::<Text>(*child).map(|text| text.0.clone()))
+            .collect();
+        (buttons, texts)
+    }
+
+    #[test]
+    fn an_energy_with_no_weapons_shows_a_text_and_one_with_weapons_a_button_each() {
+        let mut app = app();
+        click_icon(&mut app, Energy::Violet);
+        assert_eq!(row(&mut app), (vec![], vec!["No weapons yet".to_string()]));
+        click_icon(&mut app, Energy::Red);
+        assert_eq!(
+            row(&mut app),
+            (
+                vec![
+                    WeaponKind::Fireball,
+                    WeaponKind::FireRing,
+                    WeaponKind::FireWall
+                ],
+                vec![]
+            )
+        );
+    }
+
+    fn click(app: &mut App, entity: Entity, button: PointerButton) {
+        let location = bevy::picking::pointer::Location {
+            target: bevy::camera::NormalizedRenderTarget::None {
+                width: 1,
+                height: 1,
+            },
+            position: Vec2::ZERO,
+        };
+        app.world_mut().trigger(PointerClick {
+            entity,
+            pointer: bevy::picking::events::Pointer::new(
+                bevy::picking::pointer::PointerId::Mouse,
+                location,
+            ),
+            button,
+            hit: bevy::picking::backend::HitData::new(Entity::PLACEHOLDER, 0.0, None, None),
+            duration: std::time::Duration::ZERO,
+            count: 1,
+        });
+    }
+
+    #[test]
+    fn only_a_primary_click_on_a_button_chooses_its_weapon_and_closes_the_drawer() {
+        let mut app = app();
+        click_icon(&mut app, Energy::Red);
+        let ring = app
+            .world_mut()
+            .query::<(Entity, &WeaponButton)>()
+            .iter(app.world())
+            .find(|(_, button)| button.0 == WeaponKind::FireRing)
+            .map(|(entity, _)| entity)
             .unwrap();
-        assert!(most <= 4);
-        let width = most as f32 * BUTTON_SIZE.x + (most as f32 - 1.0) * BUTTON_GAP;
-        assert!(width <= VIEW_HEIGHT);
+        for other in [PointerButton::Secondary, PointerButton::Middle] {
+            click(&mut app, ring, other);
+            assert_eq!(crate::test_util::messages::<WeaponChosen>(&app), vec![]);
+            assert_eq!(open(&app), Some(Energy::Red), "{other:?}");
+        }
+        click(&mut app, ring, PointerButton::Primary);
+        assert_eq!(
+            crate::test_util::messages::<WeaponChosen>(&app),
+            vec![WeaponChosen(WeaponKind::FireRing)]
+        );
+        assert_eq!(open(&app), None);
+    }
+
+    #[test]
+    fn the_drawer_is_drawn_while_the_slide_is_above_zero_and_hidden_at_zero() {
+        let mut app = app();
+        let display = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<&Node, With<Drawer>>()
+                .single(app.world())
+                .unwrap()
+                .display
+        };
+        assert_eq!(display(&mut app), Display::None);
+        click_icon(&mut app, Energy::Red);
+        assert_eq!(display(&mut app), Display::Flex);
+        while app.world().resource::<DrawerState>().slide < 1.0 {
+            app.update();
+        }
+        click_icon(&mut app, Energy::Red);
+        let mut frames = 0;
+        while app.world().resource::<DrawerState>().slide > 0.0 {
+            assert_eq!(display(&mut app), Display::Flex);
+            app.update();
+            frames += 1;
+            assert!(frames < 100, "the drawer never closed");
+        }
+        assert_eq!(display(&mut app), Display::None);
     }
 }

@@ -49,7 +49,7 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Facing {
     Up,
     Down,
@@ -194,30 +194,51 @@ fn limit_player(
     let walkable = walkable_areas(&active);
     let locked = transition.locks_input();
     for (mut transform, mut player, mut goal, state, mut assist) in &mut query {
-        if locked {
-            goal.0 = None;
-            assist.reset();
-            player.walking = false;
-            continue;
-        }
-        player.walking = state.walking;
-        if !state.walking {
-            continue;
-        }
-        let feet = feet_of(&transform);
-        let limited = clamp_to_union(&walkable, feet, feet);
-        transform.translation.x = limited.x;
-        transform.translation.y = limited.y + PLAYER_FEET_OFFSET;
+        limit_one(
+            locked,
+            &walkable,
+            &mut transform,
+            &mut player,
+            &mut goal,
+            state,
+            &mut assist,
+        );
+    }
+}
 
-        player.facing = facing_of(state.facing);
-        if player.facing == Facing::Side {
-            let faces_right = state.facing.x > 0.0;
-            transform.scale.x = if faces_right == WALK_ART_FACES_RIGHT {
-                1.0
-            } else {
-                -1.0
-            };
-        }
+/// `limit_player` for one player.
+fn limit_one(
+    locked: bool,
+    walkable: &[Rect],
+    transform: &mut Transform,
+    player: &mut Player,
+    goal: &mut MoveGoal,
+    state: &MoveState,
+    assist: &mut SlideAssist,
+) {
+    if locked {
+        goal.0 = None;
+        assist.reset();
+        player.walking = false;
+        return;
+    }
+    player.walking = state.walking;
+    if !state.walking {
+        return;
+    }
+    let feet = feet_of(transform);
+    let limited = clamp_to_union(walkable, feet, feet);
+    transform.translation.x = limited.x;
+    transform.translation.y = limited.y + PLAYER_FEET_OFFSET;
+
+    player.facing = facing_of(state.facing);
+    if player.facing == Facing::Side {
+        let faces_right = state.facing.x > 0.0;
+        transform.scale.x = if faces_right == WALK_ART_FACES_RIGHT {
+            1.0
+        } else {
+            -1.0
+        };
     }
 }
 
@@ -338,14 +359,164 @@ mod tests {
 
     #[test]
     fn the_facing_follows_the_direction_of_walking() {
-        assert!(facing_of(Vec2::new(1.0, 0.2)) == Facing::Side);
-        assert!(facing_of(Vec2::new(-0.7, 0.7)) == Facing::Side);
-        assert!(facing_of(Vec2::new(0.2, 1.0)) == Facing::Up);
-        assert!(facing_of(Vec2::new(0.2, -1.0)) == Facing::Down);
+        assert_eq!(facing_of(Vec2::new(1.0, 0.2)), Facing::Side);
+        assert_eq!(facing_of(Vec2::new(-0.7, 0.7)), Facing::Side);
+        assert_eq!(facing_of(Vec2::new(0.2, 1.0)), Facing::Up);
+        assert_eq!(facing_of(Vec2::new(0.2, -1.0)), Facing::Down);
+    }
+
+    /// The scale x of the sprite when the player looks right, and left.
+    fn right_and_left() -> (f32, f32) {
+        let right = if WALK_ART_FACES_RIGHT { 1.0 } else { -1.0 };
+        (right, -right)
+    }
+
+    /// A player whose feet are at `feet`, looking down, with a scale x that no rule sets, so a change shows.
+    fn player_at(feet: Vec2) -> (Transform, Player) {
+        let transform = Transform::from_xyz(feet.x, feet.y + PLAYER_FEET_OFFSET, 0.0)
+            .with_scale(Vec3::new(0.5, 1.0, 1.0));
+        let player = Player {
+            facing: Facing::Down,
+            walking: false,
+            hurt: false,
+        };
+        (transform, player)
+    }
+
+    const WALKABLE: [Rect; 1] = [Rect {
+        min: Vec2::new(10.0, 20.0),
+        max: Vec2::new(300.0, 200.0),
+    }];
+
+    #[test]
+    fn a_walking_player_is_kept_in_the_walkable_area_and_faces_the_way_it_walks() {
+        let (right, left) = right_and_left();
+        for (direction, facing, scale) in [
+            (Vec2::X, Facing::Side, right),
+            (Vec2::NEG_X, Facing::Side, left),
+            (Vec2::Y, Facing::Up, 0.5),
+            (Vec2::NEG_Y, Facing::Down, 0.5),
+        ] {
+            let (mut transform, mut player) = player_at(Vec2::new(350.0, 100.0));
+            let state = MoveState {
+                walking: true,
+                facing: direction,
+                ..default()
+            };
+            limit_one(
+                false,
+                &WALKABLE,
+                &mut transform,
+                &mut player,
+                &mut MoveGoal(None),
+                &state,
+                &mut SlideAssist::default(),
+            );
+            assert_eq!(
+                transform.translation.truncate(),
+                Vec2::new(300.0, 100.0 + PLAYER_FEET_OFFSET),
+                "{direction}"
+            );
+            assert_eq!(
+                (player.walking, player.facing, transform.scale.x),
+                (true, facing, scale),
+                "{direction}"
+            );
+        }
     }
 
     #[test]
-    fn a_hit_plays_hurt_once_and_idle_comes_back_when_it_ends() {
+    fn a_player_that_does_not_walk_or_is_locked_by_a_transition_stands_as_it_is() {
+        for locked in [false, true] {
+            let (mut transform, mut player) = player_at(Vec2::new(350.0, 100.0));
+            player.walking = true;
+            let before = transform;
+            let mut goal = MoveGoal(Some(Vec2::new(50.0, 50.0)));
+            // While locked the mover's state says walking, and it is ignored.
+            let state = MoveState {
+                walking: locked,
+                facing: Vec2::NEG_X,
+                ..default()
+            };
+            limit_one(
+                locked,
+                &WALKABLE,
+                &mut transform,
+                &mut player,
+                &mut goal,
+                &state,
+                &mut SlideAssist::default(),
+            );
+            assert_eq!(transform, before, "locked {locked}");
+            assert_eq!((player.walking, player.facing), (false, Facing::Down));
+            let kept = if locked {
+                None
+            } else {
+                Some(Vec2::new(50.0, 50.0))
+            };
+            assert_eq!(goal.0, kept, "locked {locked}");
+        }
+    }
+
+    #[test]
+    fn an_arrival_puts_the_feet_in_the_walkable_area_and_turns_the_player_the_way_of_the_entry() {
+        use bevy::ecs::system::RunSystemOnce;
+        let (right, left) = right_and_left();
+        for (entry, facing, scale) in [
+            (None, Facing::Down, 0.5),
+            (Some(EntryFacing::Up), Facing::Up, 0.5),
+            (Some(EntryFacing::Down), Facing::Down, 0.5),
+            (Some(EntryFacing::Left), Facing::Side, left),
+            (Some(EntryFacing::Right), Facing::Side, right),
+        ] {
+            let mut app = App::new();
+            app.insert_resource(ActiveMaps {
+                current: "1".to_string(),
+                maps: vec![game_kit::map_transition::ActiveMap {
+                    id: "1".to_string(),
+                    origin: Vec2::new(40.0, 0.0),
+                    rect: Rect::new(40.0, 0.0, 520.0, 400.0),
+                }],
+                doorways: Vec::new(),
+            });
+            let (transform, mut player) = player_at(Vec2::new(200.0, 100.0));
+            player.walking = true;
+            let entity = app
+                .world_mut()
+                .spawn((
+                    transform,
+                    player,
+                    SlideAssist::default(),
+                    MoveGoal(Some(Vec2::ONE)),
+                ))
+                .id();
+            // The feet arrive left of the map: they are moved in by half a body width.
+            let arrival = Arrival {
+                feet: Vec2::new(30.0, 150.0),
+                facing: entry,
+            };
+            app.world_mut()
+                .run_system_once_with(arrive_player, arrival)
+                .unwrap();
+            let world = app.world();
+            let transform = world.get::<Transform>(entity).unwrap();
+            let player = world.get::<Player>(entity).unwrap();
+            assert_eq!(
+                transform.translation.truncate(),
+                Vec2::new(40.0 + PLAYER_HALF_WIDTH, 150.0 + PLAYER_FEET_OFFSET),
+                "{entry:?}"
+            );
+            assert_eq!(
+                (player.walking, player.facing, transform.scale.x),
+                (false, facing, scale),
+                "{entry:?}"
+            );
+            assert_eq!(world.get::<MoveGoal>(entity).unwrap().0, None);
+        }
+    }
+
+    #[test]
+    fn a_hit_plays_hurt_once_and_the_walking_tag_comes_back_when_it_ends() {
         let (mut app, player) = app();
         app.update();
         assert_eq!(tag(&app, player).as_deref(), Some("Idle"));

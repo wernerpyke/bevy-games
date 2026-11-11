@@ -80,3 +80,28 @@ fn spawn_pickup(
         Transform::from_translation(centre.extend(0.0)),
     ));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::inventory::Energy;
+    use crate::test_util::object;
+
+    #[test]
+    fn each_pickup_kind_has_the_art_and_the_name_of_its_own_energy() {
+        // The name is what `Collected` carries, so it must be the legend name of the same kind and give the energy
+        // whose HUD icon uses the same tag.
+        for (name, energy) in [
+            ("energy_blue", Energy::Blue),
+            ("energy_red", Energy::Red),
+            ("energy_violet", Energy::Violet),
+            ("energy_black", Energy::Black),
+        ] {
+            let kind = Kind::of(&object(name, 0, 0, &[]));
+            assert_eq!(art(kind), Some((energy.pickup_tag(), name)), "{name}");
+            assert_eq!(Energy::from_kind(name), Some(energy));
+        }
+        assert_eq!(art(Kind::Rock0), None);
+        assert_eq!(art(Kind::SpawnGhost), None);
+    }
+}

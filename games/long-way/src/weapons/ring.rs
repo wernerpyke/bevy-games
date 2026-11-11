@@ -116,11 +116,12 @@ fn cast_rings(mut cast: MessageReader<CastWeapon>, mut commands: Commands) {
     }
 }
 
-/// Grows the ring, hurts and pushes the enemies in its band, and ends it when the burn is over.
+/// Grows the ring, hurts and pushes the enemies in its band, and ends it when the burn is over. A dead enemy is
+/// skipped, even while it still has its `HitBox` (`PLAN-weapons.md` D15).
 fn update_rings(
     time: Res<Time>,
     mut rings: Query<(Entity, &mut Ring)>,
-    enemies: Query<(Entity, &Transform, &HitBox), With<EnemyHp>>,
+    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp)>,
     mut hits: MessageWriter<WeaponHit>,
     mut commands: Commands,
 ) {
@@ -138,7 +139,10 @@ fn update_rings(
 
         let (inner, outer) = band(&RING, ring.age, ring.radius);
         let (centre, values, weapon) = (ring.centre, ring.values, ring.weapon);
-        for (target, transform, hit_box) in &enemies {
+        for (target, transform, hit_box, hp) in &enemies {
+            if hp.is_dead() {
+                continue;
+            }
             let rect = hit_box.rect_at(transform.translation.truncate());
             if !rect_overlaps_band(centre, inner, outer, rect) {
                 continue;
@@ -285,7 +289,6 @@ fn end_burners(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[derive(Resource, Default)]
     struct Log(Vec<(f32, WeaponHit)>);
@@ -297,12 +300,8 @@ mod tests {
     }
 
     fn app(dt_ms: u64) -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins)
-            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
-                Duration::from_millis(dt_ms),
-            ))
-            .add_message::<CastWeapon>()
+        let mut app = crate::test_util::timed_app(dt_ms);
+        app.add_message::<CastWeapon>()
             .add_message::<WeaponHit>()
             .init_resource::<Log>()
             .add_systems(Update, (cast_rings, update_rings, collect).chain());
@@ -396,14 +395,21 @@ mod tests {
         let mut app = app(16);
         let burning = enemy(&mut app, RING.max_radius);
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
-        run(&mut app, 5.0, 16);
+        // The burn time starts when the ring is full, so the ring is still there just before grow plus burn, and
+        // gone just after.
+        let end = RING.grow_secs + RING.burn_secs;
+        run(&mut app, end - 0.05, 16);
+        assert_eq!(rings(&mut app), 1);
+        run(&mut app, 0.1, 16);
+        assert_eq!(rings(&mut app), 0);
+        run(&mut app, 2.0, 16);
         let times = damage_hits(&hits_on(&app, burning));
-        assert!(times.len() >= 4, "{times:?}");
+        // The first hit is at 0.43 s, when the band reaches the body. The ring ends after grow 0.77 s plus burn 2 s,
+        // so ticks 0.5 s apart fit 5 times. A tick lands in the first 16 ms frame at or after its time.
+        assert_eq!(times.len(), 5, "{times:?}");
         for pair in times.windows(2) {
-            assert!(pair[1] - pair[0] >= 0.49, "{times:?}");
+            assert!((pair[1] - pair[0] - 0.5).abs() <= 0.016, "{times:?}");
         }
-        // The ring ended: nothing after its burn (grow 0.77 s plus burn 2 s).
-        assert!(*times.last().unwrap() < 3.0, "{times:?}");
         assert_eq!(rings(&mut app), 0);
     }
 
@@ -442,58 +448,90 @@ mod tests {
         assert!(pushes.iter().all(|p| p.x >= 0.0));
     }
 
+    /// A living enemy where the front passes, so a test of a body that is not hit shows that the ring did reach it.
+    fn living_beside(app: &mut App) -> Entity {
+        app.world_mut()
+            .spawn((
+                EnemyHp::full(100.0),
+                Transform::from_xyz(0.0, 100.0, 0.0),
+                HitBox {
+                    offset: Vec2::ZERO,
+                    half_size: Vec2::splat(5.0),
+                },
+            ))
+            .id()
+    }
+
     #[test]
-    fn a_body_that_is_already_dead_or_has_no_hit_box_is_not_hit() {
+    fn a_body_with_a_hit_box_but_no_hp_is_not_hit() {
         let mut app = app(16);
-        let plain = app
+        let living = living_beside(&mut app);
+        let body = app
             .world_mut()
-            .spawn(Transform::from_xyz(100.0, 0.0, 0.0))
+            .spawn((
+                Transform::from_xyz(100.0, 0.0, 0.0),
+                HitBox {
+                    offset: Vec2::ZERO,
+                    half_size: Vec2::splat(5.0),
+                },
+            ))
             .id();
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
         run(&mut app, 4.0, 16);
-        assert!(hits_on(&app, plain).is_empty());
+        assert_eq!(damage_hits(&hits_on(&app, living)).len(), 1);
+        assert!(hits_on(&app, body).is_empty());
+    }
+
+    #[test]
+    fn a_dead_enemy_that_still_has_its_hit_box_is_not_hit() {
+        // D15: the ring does not rely on the enemy's plugin removing the `HitBox` while it plays `Die`.
+        let mut app = app(16);
+        let living = living_beside(&mut app);
+        let dead = enemy(&mut app, 100.0);
+        app.world_mut().get_mut::<EnemyHp>(dead).unwrap().current = 0.0;
+        cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
+        run(&mut app, 4.0, 16);
+        assert_eq!(damage_hits(&hits_on(&app, living)).len(), 1);
+        assert!(hits_on(&app, dead).is_empty());
     }
 
     #[test]
     fn the_ring_starts_to_burn_at_the_lead_radius_and_not_before() {
         let mut app = app(16);
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
-        app.update();
-        app.update();
-        assert!(
-            app.world_mut()
-                .query::<&Burning>()
-                .iter(app.world())
-                .count()
-                == 0
-        );
-        run(&mut app, 1.0, 16);
-        assert!(
-            app.world_mut()
-                .query::<&Burning>()
-                .iter(app.world())
-                .count()
-                == 1
-        );
+        let lead = RING.max_radius - RING.burn_lead;
+        let mut before = 0.0;
+        for _ in 0..100 {
+            app.update();
+            let (radius, burning) = app
+                .world_mut()
+                .query::<(&Ring, Has<Burning>)>()
+                .single(app.world())
+                .map(|(ring, burning)| (ring.radius, burning))
+                .unwrap();
+            if burning {
+                assert!(before < lead, "{before} was already at {lead}");
+                assert!(radius >= lead, "{radius} is below {lead}");
+                return;
+            }
+            before = radius;
+        }
+        panic!("the ring never started to burn");
     }
 
     #[test]
     fn the_damaging_band_matches_the_trail_while_growing_and_the_burners_when_full() {
-        let growing = band(
-            &RING,
-            0.3,
-            ring_radius(0.3, RING.grow_secs, RING.max_radius),
+        let trail = ring_radius(0.3 - RING.trail_secs, RING.grow_secs, RING.max_radius);
+        let radius = ring_radius(0.3, RING.grow_secs, RING.max_radius);
+        assert_eq!(band(&RING, 0.3, radius), (trail, radius + 4.0));
+        // The band changes at the lead radius: just below it is the trail, at it the band of the burners.
+        let lead = RING.max_radius - RING.burn_lead;
+        let full = (
+            RING.max_radius - RING.band_half,
+            RING.max_radius + RING.band_half,
         );
-        assert!(
-            growing.0 < growing.1 && growing.1 < RING.max_radius - RING.burn_lead + 4.0 + 100.0
-        );
-        let full = band(&RING, 1.0, RING.max_radius);
-        assert_eq!(
-            full,
-            (
-                RING.max_radius - RING.band_half,
-                RING.max_radius + RING.band_half
-            )
-        );
+        assert_eq!(band(&RING, 0.3, lead - 0.5), (trail, lead - 0.5 + 4.0));
+        assert_eq!(band(&RING, 0.3, lead), full);
+        assert_eq!(band(&RING, 1.0, RING.max_radius), full);
     }
 }

@@ -136,7 +136,6 @@ fn flash_hurt(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn points_go_down_and_stop_at_zero() {
@@ -170,13 +169,10 @@ mod tests {
     }
 
     fn app() -> App {
-        let mut app = App::new();
-        app.add_plugins(MinimalPlugins).add_plugins(EnemyHpPlugin);
-        app.insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
-            Duration::from_millis(50),
-        ))
-        .init_resource::<Deaths>()
-        .add_systems(Update, count_deaths.after(apply_damage));
+        let mut app = crate::test_util::timed_app(50);
+        app.add_plugins(EnemyHpPlugin)
+            .init_resource::<Deaths>()
+            .add_systems(Update, count_deaths.after(apply_damage));
         app
     }
 
@@ -299,14 +295,20 @@ mod tests {
     }
 
     #[test]
-    fn a_target_without_hp_is_ignored() {
+    fn a_target_without_hp_is_not_tinted_and_gets_no_hurt() {
         let mut app = app();
-        let other = app.world_mut().spawn_empty().id();
+        let sprite = app.world_mut().spawn(Sprite::default()).id();
+        let other = app.world_mut().spawn_empty().add_child(sprite).id();
         app.world_mut().write_message(DamageEnemy {
             target: other,
             amount: 5.0,
         });
         app.update();
-        assert_eq!(died_messages(&app), 0);
+        assert!(app.world().get::<HitFlash>(other).is_none());
+        assert_eq!(
+            app.world().get::<Sprite>(sprite).unwrap().color,
+            Color::WHITE
+        );
+        assert_eq!((hurt_messages(&app), died_messages(&app)), (0, 0));
     }
 }

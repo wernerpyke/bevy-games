@@ -90,3 +90,47 @@ fn spawn_tree(
         Transform::from_translation(centre.extend(0.0)),
     ));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::collision::PLAYER_HALF_WIDTH;
+
+    const CORNER: Vec2 = Vec2::new(100.0, 30.0);
+
+    fn group(size: usize) -> Group {
+        Group {
+            size,
+            neighbour_above: false,
+        }
+    }
+
+    #[test]
+    fn a_tree_canvas_is_centred_on_its_footprint() {
+        assert_eq!(placement(CORNER).0, Vec2::new(164.0, 94.0));
+    }
+
+    #[test]
+    fn a_tree_that_stands_alone_blocks_the_bottom_band_around_its_trunk() {
+        let (_, trunk) = placement(CORNER);
+        assert_eq!(
+            tree_blocker(&trunk, CORNER, 48.0, group(1)).0,
+            Rect::new(
+                100.0 + 76.0 - PLAYER_HALF_WIDTH,
+                30.0,
+                100.0 + 104.0 + PLAYER_HALF_WIDTH,
+                30.0 + 12.8
+            )
+        );
+    }
+
+    #[test]
+    fn a_tree_in_a_group_blocks_the_bottom_right_cell_of_its_footprint() {
+        // Cell 48, so the cell is not the trunk or the canvas size.
+        let (_, trunk) = placement(CORNER);
+        assert_eq!(
+            tree_blocker(&trunk, CORNER, 48.0, group(2)).0,
+            Rect::new(148.0, 30.0, 196.0, 78.0)
+        );
+    }
+}

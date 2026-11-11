@@ -334,13 +334,17 @@ mod tests {
         parse("test.txt", &text, KIND_NAMES).unwrap()
     }
 
-    fn size_at(map: &Map, groups: &[Group], x: i32, y: i32) -> usize {
+    fn group_at(map: &Map, groups: &[Group], x: i32, y: i32) -> Group {
         let i = map
             .objects
             .iter()
             .position(|o| o.cell == IVec2::new(x, y))
             .unwrap();
-        groups[i].size
+        groups[i]
+    }
+
+    fn size_at(map: &Map, groups: &[Group], x: i32, y: i32) -> usize {
+        group_at(map, groups, x, y).size
     }
 
     use game_kit::map::parse;
@@ -373,6 +377,39 @@ mod tests {
         assert_eq!(size_at(&map, &groups, 0, 0), 3);
         assert_eq!(size_at(&map, &groups, 3, 3), 3);
         assert_eq!(size_at(&map, &groups, 6, 0), 1);
+    }
+
+    #[test]
+    fn every_legend_name_has_its_own_kind_and_the_energy_names_give_every_energy() {
+        // `Kind::of` panics on a name the parser accepts and `from_name` does not know.
+        use crate::inventory::Energy;
+        let mut kinds = Vec::new();
+        let mut energies = Vec::new();
+        for &name in KIND_NAMES {
+            let kind = Kind::from_name(name).unwrap_or_else(|| panic!("`{name}` has no kind"));
+            assert!(!kinds.contains(&kind), "`{name}` repeats {kind:?}");
+            kinds.push(kind);
+            let energy = Energy::from_kind(name);
+            assert_eq!(energy.is_some(), kind.is_pickup(), "{name}");
+            energies.extend(energy);
+        }
+        assert_eq!(energies, Energy::ALL);
+    }
+
+    #[test]
+    fn a_blocking_object_knows_when_another_stands_on_its_top() {
+        // The rock at (2, 2) touches the top of the rock at (1, 0), not the other way round. The tree at (6, 0) is
+        // alone.
+        let map = map_with(&[('R', 1, 0), ('R', 2, 2), ('G', 6, 0)]);
+        let groups = blocking_groups(&map);
+        let at = |x, y| group_at(&map, &groups, x, y);
+        let group = |size, neighbour_above| Group {
+            size,
+            neighbour_above,
+        };
+        assert_eq!(at(1, 0), group(2, true));
+        assert_eq!(at(2, 2), group(2, false));
+        assert_eq!(at(6, 0), group(1, false));
     }
 
     #[test]
