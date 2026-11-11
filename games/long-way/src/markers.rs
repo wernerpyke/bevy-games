@@ -37,6 +37,8 @@ fn tag(kind: Kind) -> Option<&'static str> {
 
 /// The area the player's feet may not enter for a lantern whose cell corner is `corner`: the middle 80% of the lantern's width
 /// and the bottom half of its height, both rounded to whole pixels. It is not widened by the player, so the drawn box is what blocks.
+/// The bottom is `corner.y` as it is, while `spawn_marker` draws the sprite from `corner.y.round()`. With map jitter the
+/// blocked bottom can be up to 0.5 px off the drawn bottom. Known and left: too small to see or feel.
 fn blocked_area(corner: Vec2, cell: f32) -> Rect {
     let width = (BLOCKED_WIDTH_FRACTION * MARKER_WIDTH).round();
     let left = (corner.x + (cell - width) / 2.0).round();

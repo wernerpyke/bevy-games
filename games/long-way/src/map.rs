@@ -197,12 +197,15 @@ pub fn blocking_groups(map: &Map) -> Vec<Group> {
         };
         map.objects.len()
     ];
-    for ((&index, &(anchor, size)), group_size) in blocking.iter().zip(&boxes).zip(sizes) {
+    for (i, ((&index, &(anchor, size)), group_size)) in
+        blocking.iter().zip(&boxes).zip(sizes).enumerate()
+    {
         groups[index] = Group {
             size: group_size,
-            neighbour_above: boxes
-                .iter()
-                .any(|&(other, other_size)| touches_top(anchor, size, other, other_size)),
+            // Not the object itself: a 1x1 footprint would touch its own top row.
+            neighbour_above: boxes.iter().enumerate().any(|(j, &(other, other_size))| {
+                j != i && touches_top(anchor, size, other, other_size)
+            }),
         };
     }
     groups
@@ -410,6 +413,15 @@ mod tests {
         assert_eq!(at(1, 0), group(2, true));
         assert_eq!(at(2, 2), group(2, false));
         assert_eq!(at(6, 0), group(1, false));
+    }
+
+    #[test]
+    fn a_one_cell_object_is_not_its_own_neighbour_above() {
+        let map = map_with(&[('s', 0, 0), ('s', 4, 0), ('s', 4, 1)]);
+        let groups = blocking_groups(&map);
+        assert!(!group_at(&map, &groups, 0, 0).neighbour_above);
+        assert!(group_at(&map, &groups, 4, 0).neighbour_above);
+        assert!(!group_at(&map, &groups, 4, 1).neighbour_above);
     }
 
     #[test]

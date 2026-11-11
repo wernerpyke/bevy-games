@@ -10,7 +10,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 | adr-lw12 | Long Way draw order layers |
 | adr-lw13 | Rock blocked area and sort line |
 | adr-lw14 | A lone item blocks a band, a group blocks its footprint (trees: see adr-lw18) |
-| adr-lw17 | The view is a square of 8 by 8 cells, no game tests for collision |
+| adr-lw17 | The view is a square of 8 by 8 cells, no game tests for collision or the bundled maps |
 | adr-lw18 | A tree in a cluster blocks one map cell, the trunk cell |
 | adr-lw19 | The player starts at the `player_start` marker |
 | adr-lw21 | Long Way leaves a map by touching a marker |
@@ -100,11 +100,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **How to apply.** Change `VIEW_HEIGHT` to zoom. Keep 576 divisible by the cell size so the view holds whole cells. Update `adr-e7` if the number changes again. A map smaller than the view is centred.
 
-## adr-lw17. The view is a square of 8 by 8 cells, and the game has no collision tests (2026-11-06)
+## adr-lw17. The view is a square of 8 by 8 cells, and the game does not test collision or its bundled maps (2026-11-06, tests updated 2026-11-11)
 
-**Decision.** The game region of the window is square and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells (the window was square, 720, until the HUD bar of `adr-lw24`). This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map (changed by `adr-lw19`). Long Way has no unit tests for collision, placement or the bundled map. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics).
+**Decision.** The game region of the window is square and `VIEW_HEIGHT` is 512, so the camera shows 8 by 8 cells (the window was square, 720, until the HUD bar of `adr-lw24`). This replaces the 576 of `adr-lw16`. The player starts at the bottom middle of the map (changed by `adr-lw19`). Long Way has no unit tests for collision rules or the bundled map files. Collision rules are tested in `game-kit` (`adr-w7`: games test only their own mechanics). Long Way does test its own placement: where its rocks, trees, scenery and markers stand and which area each blocks, from small maps built inside the test (updated 2026-11-11; until then the game had no placement tests either).
 
-**Rationale.** The developer is experimenting with map sizes. A test that fixes the size and object cells of the bundled map fails on every edit. The collision rules are general and the kit tests them (`adr-x4`).
+**Rationale.** The developer is experimenting with map sizes. A test that fixes the size and object cells of the bundled map fails on every edit. The collision rules are general and the kit tests them (`adr-x4`). Placement is Long Way's own geometry (art sizes, footprints, blocked bands), so it belongs in the game's tests, and a test map built inside the test does not change when the bundled maps do.
 
 **How to apply.** Edit the map file and its `size:` freely. Resizing the window shows more of the world along its longer side, because the view height is fixed. The map file is still checked at start, and a mistake stops the game with the file and line.
 
