@@ -70,7 +70,7 @@ The script run keeps log lines that match `script:|collision:|WARN|ERROR|panicke
 
 ## Limits
 
-- Keys: the arrow keys, `x`, `escape` and `f1` to `f3`. `click:<x>:<y>` sends a left click as a world position (`pointer.md`), so a game that moves by clicking can be scripted. It does not move a real cursor, so the window to world conversion is not tested by a script.
+- Keys: the arrow keys, `x`, `escape` and `f1` to `f3`. `click:<x>:<y>` sends a left click as a world position (`pointer.md`), so a game that moves by clicking can be scripted. It does not move a real cursor, so the window to world conversion is not tested by a script. `ui_click:<x>:<y>` clicks the UI at a window position in art pixels from the top left (for example `ui_click:66:588` is the red energy icon in Long Way): it moves the picking pointer, presses and releases, through the same path as a mouse, so buttons, hover and `BlocksWorldClick` work. It sends no `WorldClick` unless the node under it lets the click through. A real cursor over the window cannot disturb it. The wrapper `rust.sh script` prints only lines that match `script:|collision:|WARN|ERROR|panicked`: set `LOG_FILTER="<pattern>"` to see other log lines.
 - It teleports the entity marked `Controlled`, which also needs a `DepthSort`. A game specific command needs a registration API in the kit (adr-x15).
 - Screenshots work on native builds only.
 - Unit tests do not cover frame timing, drawing or input.

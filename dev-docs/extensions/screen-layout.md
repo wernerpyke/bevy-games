@@ -14,7 +14,7 @@ How the window is shared between the game and a HUD, and how the app flow (loadi
 | Part | Code today | Shared? |
 |---|---|---|
 | `GameCamera`, `PixelCameraPlugin` | `crates/game-kit/src/camera.rs` | Shared. |
-| `ScreenMode`, `regions`, `ui_scale`, `ScreenPlugin`, `ScreenLayout` | `crates/game-kit/src/screen.rs` | Shared. Long Way uses a bar above the game. |
+| `ScreenMode`, `regions`, `ui_scale`, `ScreenPlugin`, `ScreenLayout` | `crates/game-kit/src/screen.rs` | Shared. Long Way uses a bar below the game. |
 | `Hud`, `HudCamera`, `label` | `crates/game-kit/src/hud.rs` | Shared. |
 | `AppState`, `PlayState`, `AppFlowPlugin`, `state_root`, `PauseDialog` | `crates/game-kit/src/app_state.rs` | Shared. Long Way starts in `Playing` and has no other screens. R-Town does not use it yet. |
 
@@ -31,7 +31,7 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 | Parameter | Where | Long Way |
 |---|---|---|
 | View height in art pixels | `PixelCameraPlugin::view_height` | `VIEW_HEIGHT` 512 |
-| Layout while playing | `ScreenPlugin::mode` | `BarTop { ratio: HUD_BAR_RATIO }`, ratio 0.3125 (bar 160 art pixels, 576 by 180 on screen) |
+| Layout while playing | `ScreenPlugin::mode` | `BarBottom { ratio: HUD_BAR_RATIO }`, ratio 0.3125 (bar 160 art pixels, 576 by 180 on screen) |
 | Window size | the game's `WindowPlugin` | `WINDOW_WIDTH` 576, `WINDOW_HEIGHT` 756 (`camera.rs`) |
 | HUD content | children of the `Hud` entity | one `label`, `Long Way` |
 | First state, pause key, dim colour | `AppFlowPlugin` | `Playing`, no pause key, default dim |
@@ -51,6 +51,7 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 
 7. The `Hud` root fills the HUD region and draws no background. A game puts its own background (a picture or a colour) inside it or on it.
 8. A game adds its content as children of the `Hud` entity, for example in a `PostStartup` system with `Single<Entity, With<Hud>>`. The kit has generic widgets only (`label`). Icons and gauges are added when a game needs them.
+   - A panel that must be drawn over the game region (a drawer, a dialog) cannot be a child of `Hud`: the HUD camera clips it to the HUD region. Spawn it as its own UI root with no `UiTargetCamera`, so it is on the game camera, and put `GlobalZIndex` from `layers.rs` on it. Add `BlocksWorldClick` to its root so a click on it does not become a `WorldClick` (`pointer.md`, `adr-x44`). A full-screen transparent root (the map fade) must carry `Pickable::IGNORE`, or it takes the clicks from the panels below it. Long Way: `weapon_menu.rs`, `adr-lw31`.
 
 ### App states
 

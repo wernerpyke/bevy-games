@@ -1,6 +1,6 @@
 //! The weapon drawer: a click on an energy icon in the HUD slides a drawer up over the game area, with one button for
 //! each weapon of that energy. A click on a button sends `WeaponChosen` and the drawer slides away. The game does
-//! not pause. Nothing reads `WeaponChosen` yet but a log line (`dev-docs/PLAN-weapon-drawer.md`).
+//! not pause. Nothing reads `WeaponChosen` yet but a log line (`adr-lw31`, `PLAN-weapons.md`).
 //!
 //! The drawer is its own UI root on the game camera (a child of `Hud` would be clipped to the HUD region). It is
 //! `BlocksWorldClick`, so a click on it does not walk the player (`adr-x44`). Times use real time, so they would

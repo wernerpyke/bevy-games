@@ -12,7 +12,8 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
-    ├── hud.rs          HudPlugin: the content of the HUD bar (the title, one icon with a count for each energy, and the row of HP icons). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── hud.rs          HudPlugin: the content of the HUD bar (the title, one clickable icon with a count for each energy, and the row of HP icons). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── weapon_menu.rs  WeaponMenuPlugin: the weapon drawer that slides up over the game area from an energy icon, `WeaponKind`, `weapons_for` (energy to weapons), the messages `EnergyIconClicked` and `WeaponChosen` (`adr-lw31`)
     ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
@@ -46,6 +47,6 @@ Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `scenery.rs
 
 ## Long Way values for the pixel art extension
 
-- `VIEW_HEIGHT` is 512 world units (8 cells) and the game region of the window is square (the window is 576 by 756 with the HUD bar above, `adr-lw24`), so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so it is about one 10th of the screen height. The camera follows the player and stops at the map edge (`adr-lw16`, `adr-lw17`). The player starts at the `player_start` marker (`adr-lw19`).
+- `VIEW_HEIGHT` is 512 world units (8 cells) and the game region of the window is square (the window is 576 by 756 with the HUD bar below, `adr-lw24`, `adr-lw31`), so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so it is about one 10th of the screen height. The camera follows the player and stops at the map edge (`adr-lw16`, `adr-lw17`). The player starts at the `player_start` marker (`adr-lw19`).
 - The player is the Hunter. Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
 - The player's tags (`Hunter.aseprite`): `Idle`, `Run`, `Up`, `Down`. `Up` and `Down` are placeholders. See [art-tags.md](art-tags.md).
