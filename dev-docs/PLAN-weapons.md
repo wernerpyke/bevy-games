@@ -2,6 +2,10 @@
 
 Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-particles.md`. The spike (`games/particle-spike/`) stays in place until the last step. It is the porting source.
 
+## Status (2026-11-11, end of session): resume here
+
+Done and committed: P0 to P4, W1 (fire ring, built, **values not tuned yet**), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). Next: tune W1 with the user's numbers, then **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen yet: a ghost pinned against a tree by a push, a cast near the map edge.
+
 ## Goal
 
 1. **Part 1, migrate.** Move what is reusable into `game-kit` (geometry, the wall blocker, **and all Enoki code**). Move the rest into `long-way`. Add `bevy_enoki` to `game-kit` without making the main build slower or `target/` bigger than it must be.
@@ -17,22 +21,22 @@ Energy cost, cooldown and a disabled drawer button at 0 energy (D12: a separate 
 
 Rule (`CLAUDE.md`, `adr-x12`): code goes into the kit only when R-Town could use it with no Long Way value in it **and** it adds no new dependency to R-Town. **Exception, decided by the user (D3): the Enoki code goes into the kit even though R-Town then compiles the extra crates.** Everything else stays in the game.
 
-| Spike piece | Goes to | Why |
-|---|---|---|
-| `rules.rs`: `ease_out`, `ring_radius`, `circle_hits_rect`, `rect_overlaps_band`, `push_delta` | **Kit**, new `area.rs` (Bevy `Rect`, no new dependency) | Plain geometry with no game value. Tests move with it (`adr-w7`). |
-| `rules.rs`: `Rect2`, `rects_overlap` | **Dropped** | The kit has `Rect` and `hitbox::overlaps`. |
-| `rules.rs`: `move_rect`, `sweep_circle`, `first_hit` | **Dropped** | The kit has `collision::move_feet` and `projectile`. |
-| Fireball flight and hits | **Kit, already there**: `projectile.rs` | Needs no change. The range limit is a Long Way system that despawns the shot. |
-| Wall as a blocker | **Kit**, `collision.rs`: add and remove a temporary blocked area at run time | `CollisionWorld` is only rebuilt on map load today (`rocks.rs` `rebuild_collision`). See D4 and P1. |
-| Draw order | **Kit `layers.rs` only if needed** | Every effect uses `DepthSort` in the world layer. Add a named layer only if a ring or the whirlpool must draw below the player. |
-| Enoki integration: `EnokiPlugin`, effect library, one-shot and follow-the-owner helpers, additive materials (`glow.rs`) | **Kit**, new `fx.rs` (D3) | Generic: no weapon values, no assets. **Cost accepted by the user:** the kit depends on Enoki, so R-Town also compiles the 5 extra crates. `FxPlugin` is opt-in, so R-Town runs no Enoki code. If the cost grows, split a `game-fx` crate (`adr-x12` allows it). Record this in the ADR. |
-| `fireball.rs`, `ring.rs`, `wall.rs`, `whirlpool.rs` | **Long Way**, `src/weapons/` | Weapons, values and art are game content. |
-| `harness.rs`, `main.rs`, `SPIKE_*` env, benchmark mode | **Dropped** | Spike tooling. Long Way has the script runner. |
-| Whirlpool variants A and C | **Dropped** | Variant B is the pick (D6). |
-| Effect files (16 `.particle.ron`) | **Long Way**, `assets/effects/` | Copied **in the step of the weapon that uses them**. |
-| Art: `fireball_placeholder`, `ice_wall_placeholder`, ring sheets | **Long Way**, `assets/art/weapons/` | Copied in the step of the weapon that uses them. Keep `_placeholder` until replaced. |
-| `export_art.lua` | **Dropped** | Replaced by run-time strips in the kit (`fx_strip.rs`, D2). No export step. |
-| `draw_*.lua` | **Dropped** | They only made the placeholders. |
+| Spike piece                                                                                                             | Goes to                                                                      | Why                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rules.rs`: `ease_out`, `ring_radius`, `circle_hits_rect`, `rect_overlaps_band`, `push_delta`                           | **Kit**, new `area.rs` (Bevy `Rect`, no new dependency)                      | Plain geometry with no game value. Tests move with it (`adr-w7`).                                                                                                                                                                                                                        |
+| `rules.rs`: `Rect2`, `rects_overlap`                                                                                    | **Dropped**                                                                  | The kit has `Rect` and `hitbox::overlaps`.                                                                                                                                                                                                                                               |
+| `rules.rs`: `move_rect`, `sweep_circle`, `first_hit`                                                                    | **Dropped**                                                                  | The kit has `collision::move_feet` and `projectile`.                                                                                                                                                                                                                                     |
+| Fireball flight and hits                                                                                                | **Kit, already there**: `projectile.rs`                                      | Needs no change. The range limit is a Long Way system that despawns the shot.                                                                                                                                                                                                            |
+| Wall as a blocker                                                                                                       | **Kit**, `collision.rs`: add and remove a temporary blocked area at run time | `CollisionWorld` is only rebuilt on map load today (`rocks.rs` `rebuild_collision`). See D4 and P1.                                                                                                                                                                                      |
+| Draw order                                                                                                              | **Kit `layers.rs` only if needed**                                           | Every effect uses `DepthSort` in the world layer. Add a named layer only if a ring or the whirlpool must draw below the player.                                                                                                                                                          |
+| Enoki integration: `EnokiPlugin`, effect library, one-shot and follow-the-owner helpers, additive materials (`glow.rs`) | **Kit**, new `fx.rs` (D3)                                                    | Generic: no weapon values, no assets. **Cost accepted by the user:** the kit depends on Enoki, so R-Town also compiles the 5 extra crates. `FxPlugin` is opt-in, so R-Town runs no Enoki code. If the cost grows, split a `game-fx` crate (`adr-x12` allows it). Record this in the ADR. |
+| `fireball.rs`, `ring.rs`, `wall.rs`, `whirlpool.rs`                                                                     | **Long Way**, `src/weapons/`                                                 | Weapons, values and art are game content.                                                                                                                                                                                                                                                |
+| `harness.rs`, `main.rs`, `SPIKE_*` env, benchmark mode                                                                  | **Dropped**                                                                  | Spike tooling. Long Way has the script runner.                                                                                                                                                                                                                                           |
+| Whirlpool variants A and C                                                                                              | **Dropped**                                                                  | Variant B is the pick (D6).                                                                                                                                                                                                                                                              |
+| Effect files (16 `.particle.ron`)                                                                                       | **Long Way**, `assets/effects/`                                              | Copied **in the step of the weapon that uses them**.                                                                                                                                                                                                                                     |
+| Art: `fireball_placeholder` (now `fireball_and_rings`), `ice_wall_placeholder` (now `ice_wall`), ring sheets                                                        | **Long Way**, `assets/art/weapons/`                                          | Copied in the step of the weapon that uses them. The `_placeholder` suffix is dropped from the Long Way copies (user, 2026-11-11).                                                                                                                                                                                                     |
+| `export_art.lua`                                                                                                        | **Dropped**                                                                  | Replaced by run-time strips in the kit (`fx_strip.rs`, D2). No export step.                                                                                                                                                                                                              |
+| `draw_*.lua`                                                                                                            | **Dropped**                                                                  | They only made the placeholders.                                                                                                                                                                                                                                                         |
 
 ## Dependency and build guard
 
@@ -134,7 +138,7 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 
 - Result of the D2 check: not directly (see D2). `crates/game-kit/src/fx_strip.rs` builds the strips at run time (`strip_from_atlas`, `FxLooks`). Unit tests on plain pixel buffers. Checked on the real art: `blob`, `fire_ring` and `ice_ring1` to `ice_ring4` of `fireball_placeholder.aseprite` give the same cell sizes as the spike's exported PNGs (4×32, 6×64, 4×59, 4×60, 4×59, 4×60). Pixel by pixel equality was not compared.
 - Art rule from the spike: after a script makes tags, run `./dev-scripts/aseprite.sh check <file>` and read the frame ranges. Tags must not overlap.
-- `fireball_placeholder.aseprite` is copied to `games/long-way/assets/art/weapons/` (it holds the ring, blob and fireball head tags). `art-pipeline.md` and `art-tags.md` are updated. The other art and the effect files are copied
+- `fireball_placeholder.aseprite` is copied as `fireball_and_rings.aseprite` to `games/long-way/assets/art/weapons/` (it holds the ring, blob and fireball head tags). `art-pipeline.md` and `art-tags.md` are updated. The other art and the effect files are copied
 
 ## Part 2: Weapons
 
@@ -167,7 +171,7 @@ Each weapon file is added in its own step. Do not create empty files for later w
 
 ### P4. Base: enemy HP, damage, pushback, drawer link (done, 2026-11-11)
 
-**Result:** `enemy_hp.rs` (`EnemyHp` f32, `DamageEnemy`, `EnemyDied`, flash `#993D41` for 0.12 s on the child sprites), `weapons/` (`mod.rs`, `values.rs` with placeholder rows for all six weapons, `damage.rs` with `Contact` (damage ticks and the pixel budget) and the push through `collision::resolve` inside the map), the ghost has 100 HP and dies through `Die` when killed, `log_choice` is replaced by the `CastWeapon` log. Not seen on screen: the flash and a weapon-kill death in the running game (no weapon exists yet, they are unit tested); the scripted run shows one `weapons: cast ...` line per drawer click.
+**Result:** `enemy_hp.rs` (`EnemyHp` f32, `DamageEnemy`, `EnemyDied`, flash `#993D41` for 0.12 s on the child sprites; the ghost has `Hurt` frames since 2026-11-11 and plays them instead, via `HurtFrames` and `EnemyHurt`), `weapons/` (`mod.rs`, `values.rs` with placeholder rows for all six weapons, `damage.rs` with `Contact` (damage ticks and the pixel budget) and the push through `collision::resolve` inside the map), the ghost has 100 HP and dies through `Die` when killed, `log_choice` is replaced by the `CastWeapon` log. Not seen on screen: the flash and a weapon-kill death in the running game (no weapon exists yet, they are unit tested); the scripted run shows one `weapons: cast ...` line per drawer click.
 
 D11 to D13 are decided. Then:
 
@@ -195,7 +199,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 9. **Gates and docs:** `lint`, `test` (changed crates). Update `weapons.md`, `source-layout.md`. Delete files in `target/screenshots/`.
 10. **Ask before committing** (one commit per weapon).
 
-#### W1. Fire ring
+#### W1. Fire ring (built 2026-11-11, values not tuned yet)
 
 - **Design questions:**
   - Pushback: `Pixels(n)`. How many pixels (start from the spike feel, tune)?

@@ -17,6 +17,8 @@ pub struct Contact {
     wait: f32,
     /// Pixels pushed so far.
     pushed: f32,
+    /// Damage ticks dealt so far.
+    ticks: u32,
 }
 
 impl Contact {
@@ -32,7 +34,18 @@ impl Contact {
             return None;
         }
         self.wait += values.tick;
+        self.ticks += 1;
         Some(dps * values.tick)
+    }
+
+    /// Pixels pushed so far, for the log.
+    pub fn pushed(&self) -> f32 {
+        self.pushed
+    }
+
+    /// Damage ticks dealt so far, for the log.
+    pub fn ticks(&self) -> u32 {
+        self.ticks
     }
 
     /// The part of `wanted` (a move away from the centre) that the weapon's pushback allows. `Pixels(n)` allows

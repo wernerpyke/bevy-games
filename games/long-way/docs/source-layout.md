@@ -22,7 +22,7 @@ games/long-way/
     ├── inventory.rs    `Inventory` (energy counts), `InventoryPlugin`: fills it from `Collected`
     ├── hp.rs           `Hp` (the player's hit points), `DamagePlayer` message, `HpPlugin` (`adr-lw28`)
     ├── enemy_hp.rs     `EnemyHp`, the `DamageEnemy` and `EnemyDied` messages, `EnemyHpPlugin`: damage, the hurt flash (`adr-lw32`)
-    ├── weapons/        `WeaponPlugin`: `CastWeapon` (from `WeaponChosen`) and `WeaponHit` messages, `values.rs` (every weapon number), `damage.rs` (hit points and push) (`adr-lw32`)
+    ├── weapons/        `WeaponPlugin`: `CastWeapon` (from `WeaponChosen`) and `WeaponHit` messages, `values.rs` (every weapon number), `damage.rs` (hit points and push), `ring.rs` (the fire ring, `adr-lw33`) (`adr-lw32`)
     ├── ghost.rs        `spawn_ghosts` (from `spawn_ghost` markers, called by the load hook), `GhostPlugin`: the touch (1 HP, then dies) and the removal after `Die` (`adr-lw29`)
     ├── background.rs   `spawn_background`, `check_tiles`: draws the ground colour and the tile images of a map's `background:` block from `ground_tiles.aseprite` (`adr-x36`, `adr-lw26`)
     ├── scenery.rs      `spawn_scenery`: the Zen Garden trees and shrubs of one map, blocking like `green_tree` (`adr-lw23`)

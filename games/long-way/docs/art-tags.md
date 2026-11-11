@@ -5,7 +5,7 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 | File | Tags |
 |---|---|
 | `characters/Hunter.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `HUNTER-sprites.md`. The player (`player.rs`) plays `Hurt` once when it loses HP (`PlayerHurt` message of `hp.rs`, `adr-lw28`). |
-| `characters/ghost.aseprite` | `Down`, `Left`, `Up` (4 frames, 200 ms), `Attack` (2 frames, 200 ms, played once on touch), `Die` (8 frames, 100 ms, played once). `Left` also serves `Right` as a flip. One layer, `Body`. The ghost (`ghost.rs`) uses `Down`, `Left`, `Up`, `Attack` and `Die`. |
+| `characters/ghost.aseprite` | `Down`, `Left`, `Up` (4 frames, 200 ms), `Attack` (2 frames, 200 ms, played once on touch), `Hurt` (4 frames, 100 ms, played once when a weapon hits it and it survives; the frames alternate a solid red ghost and the normal one), `Die` (8 frames, 100 ms, played once). `Left` also serves `Right` as a flip. One layer, `Body`. The ghost (`ghost.rs`) uses `Down`, `Left`, `Up`, `Attack`, `Hurt` and `Die`. |
 | `features/Green tree.aseprite` | none (all 8 frames loop) |
 | `features/Red tree.aseprite` | none (all 8 frames loop) |
 | `features/Rocks.aseprite` | `rock_0` (frame 1), `rock_1` (frame 2). Each tag is one frame and is a rock variant, not an animation. |
@@ -13,7 +13,7 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 | `pickups/pickups.aseprite` | `pickup_blue` (frames 1-8), `pickup_red` (frames 9-16), `pickup_violet` (frames 17-24), `pickup_black` (frames 25-32). Each tag is an 8 frame pulse loop (100 ms per frame, set in the file). One layer, `Pickup`. |
 | `ui/hp.aseprite` | `Full` (frame 1), `Empty` (frame 2). One frame each, a state not an animation. One layer, `Icon`. The HUD shows one icon per point of max HP. |
 | `ui/weapon_icons.aseprite` | `fireball`, `fire_ring`, `ice_ring`, `fire_wall`, `ice_wall`, `whirlpool` (frames 1 to 6, one frame each, a weapon icon not an animation). One layer, `Icon`. The tag name is `WeaponKind::icon_tag` in `weapon_menu.rs` (`adr-lw31`). |
-| `weapons/fireball_placeholder.aseprite` | `head` (frames 1-8, loop), `blob` (9-12), `fire_ring` (13-18), `ice_ring1` (19-22), `ice_ring2` (23-26), `ice_ring3` (27-30), `ice_ring4` (31-34). `head` is played as an animation. The others are particle sprites: `fx_strip.rs` cuts each tag into a strip of cells (one cell per frame, cropped to the tag's visible pixels, square for the rings), so the frame order inside a tag is the particle's life order. Placeholder art. |
+| `weapons/fireball_and_rings.aseprite` | `head` (frames 1-8, loop), `blob` (9-12), `fire_ring` (13-18), `ice_ring1` (19-22), `ice_ring2` (23-26), `ice_ring3` (27-30), `ice_ring4` (31-34). `head` is played as an animation. The others are particle sprites: `fx_strip.rs` cuts each tag into a strip of cells (one cell per frame, cropped to the tag's visible pixels, square for the rings), so the frame order inside a tag is the particle's life order. Placeholder art. |
 | `ui/weapon_drawer.aseprite` | none (one frame, the picture of the weapon drawer). One layer, `Background`. |
 
 ## Map kinds
@@ -32,7 +32,7 @@ Kinds are the names a map legend uses (`maps.md`). Each is defined in code (`map
 | `energy_red` | `pickups/pickups.aseprite` | `pickup_red` |
 | `energy_violet` | `pickups/pickups.aseprite` | `pickup_violet` |
 | `energy_black` | `pickups/pickups.aseprite` | `pickup_black` |
-| `spawn_ghost` | `characters/ghost.aseprite` | `Down`, `Left`, `Up`, `Attack`, `Die` |
+| `spawn_ghost` | `characters/ghost.aseprite` | `Down`, `Left`, `Up`, `Attack`, `Hurt`, `Die` |
 | `green_tree` | `features/Green tree.aseprite` | none, all frames loop |
 | `red_tree` | `features/Red tree.aseprite` | none, all frames loop |
 | `green_tree_medium` | `features/green_tree_medium.aseprite` | none, one frame |

@@ -1,6 +1,7 @@
 //! Every number that tunes a weapon, in one place. Each row names its source. All of them are placeholders until the
 //! weapon's step in `PLAN-weapons.md` has been tuned with the user: the spike gave the looks and sizes, not damage.
 
+use crate::camera::CELL_SIZE;
 use crate::weapon_menu::WeaponKind;
 
 /// How a weapon takes hit points.
@@ -32,6 +33,40 @@ pub struct WeaponValues {
     /// Particles are drawn with additive blending (the spike result: fire and the fireball on, water off).
     pub glow: bool,
 }
+
+/// The shape and timing of a ring (`weapons/ring.rs`). Spike defaults, except `max_radius`: 3 cells, so the ring is
+/// 6 cells across (the user, 2026-11-11).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct RingShape {
+    /// The ring grows to this radius, in pixels.
+    pub max_radius: f32,
+    /// Seconds to grow to `max_radius`, eased out: fast at the start, slowing to a stop.
+    pub grow_secs: f32,
+    /// Seconds the ring burns once it is at `max_radius`.
+    pub burn_secs: f32,
+    /// The burners start this many pixels before `max_radius`, so the growing front hands over to them.
+    pub burn_lead: f32,
+    /// Emitters on the growing front, and burners on the full ring.
+    pub front_emitters: usize,
+    pub burners: usize,
+    /// While the ring burns, the damaging band is this wide on each side of `max_radius`.
+    pub band_half: f32,
+    /// While the ring grows, the damaging band reaches back this far in time (the trail of the moving emitters).
+    pub trail_secs: f32,
+}
+
+pub const RING: RingShape = RingShape {
+    max_radius: 3.0 * CELL_SIZE,
+    grow_secs: 0.767,
+    burn_secs: 2.0,
+    burn_lead: 40.0,
+    front_emitters: 40,
+    burners: 40,
+    band_half: 24.0,
+    trail_secs: 0.12,
+};
+
+const _: () = assert!(RING.burn_lead < RING.max_radius && RING.band_half < RING.max_radius);
 
 /// The values of a weapon. Placeholders (P4): damage and pushback are guesses to be tuned.
 pub fn values(weapon: WeaponKind) -> WeaponValues {
@@ -91,6 +126,11 @@ mod tests {
                 assert!(n > 0.0, "{weapon:?}");
             }
         }
+    }
+
+    #[test]
+    fn the_ring_is_six_cells_across() {
+        assert_eq!(RING.max_radius * 2.0, 6.0 * CELL_SIZE);
     }
 
     #[test]

@@ -30,6 +30,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 ### Logging
 
 4. `debug!` for game logic transitions (blocked, sliding started, no longer pushing). `info!` for script progress.
+4b. **Exception for manual testing (user, 2026-11-11):** the life of a weapon and of an enemy logs at `info!`, one line per event and never per frame: a cast, a ring start and end, each hit with the enemy's position, hurt, killed, died, removed, a touch and its attack. A default run (`RUST_LOG` unset) then shows enough to report a problem that a scripted run did not reproduce.
 5. The module path is the filter: `RUST_LOG=long_way=debug`. Use `RUST_LOG=info,wgpu=error,naga=warn` to quiet Bevy.
 6. State used only to log once (such as `SlideAssist.phase`) is kept next to the logic.
 7. Check the log volume before adding any `info!` that runs every frame.

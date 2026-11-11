@@ -1,0 +1,20 @@
+#![enable(implicit_some)]
+// Ring front: one of 40 emitters that ring.rs moves outward along the eased radius. Each drops short-lived upward
+// triangles (flames or ice shards) that stay where they are born, so the band behind the emitter is the trail.
+// The trail is TRAIL_SECS (0.12 s) of ring history in ring.rs, the life here is about the same (0.14 s), so the visible trail matches the band.
+// The sheet plays over the life: flames flicker, shards grow.
+(
+    spawn_rate: 0.03,
+    spawn_amount: 1,
+    emission_shape: Circle(6.0),
+    lifetime: (0.14, 0.03),
+    linear_speed: (0.0, 0.0),
+    direction: ((0.0, 1.0), 0.3),
+    scale: (32.0, 0.0),
+    scale_curve: (points: [(30.0, 0.0, None), (34.0, 0.5, None), (30.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.6, None),
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 0.0), 1.0, None),
+    ]),
+)

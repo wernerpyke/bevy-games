@@ -2,9 +2,9 @@
 //! touch `EnemyHp` themselves, like `hp.rs` does for the player. At 0 the enemy sends `EnemyDied` once and the
 //! enemy's own plugin removes it (the ghost plays `Die`, `ghost.rs`).
 //!
-//! An enemy that is hurt flashes `HURT_COLOUR` for `HURT_FLASH_SECS`: the colour is set on the `Sprite` of each child
-//! of the enemy. An enemy with its own hurt frames (a `Hurt` tag) should play those instead; none has them yet, so
-//! the flash is the only hurt look.
+//! A hurt enemy shows it in one of two ways. An enemy that has its own hurt frames carries `HurtFrames` and gets an
+//! `EnemyHurt` message, which its own plugin turns into its `Hurt` animation (the ghost, `ghost.rs`). Any other enemy
+//! flashes `HURT_COLOUR` for `HURT_FLASH_SECS`: the colour is set on the `Sprite` of each child of the enemy.
 
 use bevy::prelude::*;
 
@@ -18,6 +18,7 @@ pub struct EnemyHpPlugin;
 impl Plugin for EnemyHpPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<DamageEnemy>()
+            .add_message::<EnemyHurt>()
             .add_message::<EnemyDied>()
             .add_systems(Update, (apply_damage, flash_hurt).chain());
     }
@@ -57,6 +58,14 @@ pub struct DamageEnemy {
     pub amount: f32,
 }
 
+/// Sent for every hit that an enemy survives, so an enemy with `HurtFrames` can play its hurt animation.
+#[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EnemyHurt(pub Entity);
+
+/// Marks an enemy that has its own hurt frames. It plays them on `EnemyHurt` and does not get the colour flash.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct HurtFrames;
+
 /// Sent once when an enemy's hit points reach 0.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EnemyDied(pub Entity);
@@ -67,30 +76,37 @@ struct HitFlash(Timer);
 
 fn apply_damage(
     mut damage: MessageReader<DamageEnemy>,
-    mut enemies: Query<&mut EnemyHp>,
+    mut enemies: Query<(&mut EnemyHp, Has<HurtFrames>, Option<&Transform>)>,
+    mut hurt: MessageWriter<EnemyHurt>,
     mut died: MessageWriter<EnemyDied>,
     mut commands: Commands,
 ) {
     for hit in damage.read() {
-        let Ok(mut hp) = enemies.get_mut(hit.target) else {
+        let Ok((mut hp, has_hurt_frames, transform)) = enemies.get_mut(hit.target) else {
             continue;
         };
         if hp.is_dead() {
             continue;
         }
         let killed = hp.lose(hit.amount);
+        let at = transform.map_or(Vec2::ZERO, |t| t.translation.truncate());
         info!(
-            "enemy: {:?} lost {:.1}, {:.1} of {:.1} left",
-            hit.target, hit.amount, hp.current, hp.max
+            "enemy: {:?} lost {:.1}, {:.1} of {:.1} left, at ({:.0}, {:.0})",
+            hit.target, hit.amount, hp.current, hp.max, at.x, at.y
         );
-        commands
-            .entity(hit.target)
-            .insert(HitFlash(Timer::from_seconds(
-                HURT_FLASH_SECS,
-                TimerMode::Once,
-            )));
+        if !has_hurt_frames {
+            commands
+                .entity(hit.target)
+                .insert(HitFlash(Timer::from_seconds(
+                    HURT_FLASH_SECS,
+                    TimerMode::Once,
+                )));
+        }
         if killed {
+            info!("enemy: {:?} died", hit.target);
             died.write(EnemyDied(hit.target));
+        } else {
+            hurt.write(EnemyHurt(hit.target));
         }
     }
 }
@@ -176,10 +192,19 @@ mod tests {
 
     /// Every `EnemyDied` seen so far, counted by a reader that runs after the plugin's systems.
     #[derive(Resource, Default)]
-    struct Deaths(usize);
+    struct Deaths(usize, usize);
 
-    fn count_deaths(mut died: MessageReader<EnemyDied>, mut deaths: ResMut<Deaths>) {
+    fn count_deaths(
+        mut died: MessageReader<EnemyDied>,
+        mut hurt: MessageReader<EnemyHurt>,
+        mut deaths: ResMut<Deaths>,
+    ) {
         deaths.0 += died.read().count();
+        deaths.1 += hurt.read().count();
+    }
+
+    fn hurt_messages(app: &App) -> usize {
+        app.world().resource::<Deaths>().1
     }
 
     fn died_messages(app: &App) -> usize {
@@ -227,6 +252,50 @@ mod tests {
         });
         app.update();
         assert_eq!(died_messages(&app), 1, "still only the first death");
+    }
+
+    #[test]
+    fn an_enemy_with_hurt_frames_gets_a_message_and_no_flash() {
+        let mut app = app();
+        let (root, sprite) = enemy(&mut app, 100.0);
+        app.world_mut().entity_mut(root).insert(HurtFrames);
+        app.update();
+        app.world_mut().write_message(DamageEnemy {
+            target: root,
+            amount: 10.0,
+        });
+        app.update();
+        assert_eq!(hurt_messages(&app), 1);
+        assert_eq!(
+            app.world().get::<Sprite>(sprite).unwrap().color,
+            Color::WHITE
+        );
+        assert!(app.world().get::<HitFlash>(root).is_none());
+    }
+
+    #[test]
+    fn an_enemy_without_hurt_frames_flashes_and_a_killing_blow_is_not_a_hurt() {
+        let mut app = app();
+        let (root, _) = enemy(&mut app, 10.0);
+        app.update();
+        app.world_mut().write_message(DamageEnemy {
+            target: root,
+            amount: 4.0,
+        });
+        app.update();
+        assert_eq!(hurt_messages(&app), 1);
+        assert!(app.world().get::<HitFlash>(root).is_some());
+        app.world_mut().write_message(DamageEnemy {
+            target: root,
+            amount: 40.0,
+        });
+        app.update();
+        assert_eq!(
+            hurt_messages(&app),
+            1,
+            "the killing blow is a death, not a hurt"
+        );
+        assert_eq!(died_messages(&app), 1);
     }
 
     #[test]
