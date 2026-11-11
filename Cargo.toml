@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = ["games/*", "crates/*"]
-# Patched copy of bevy_enoki, used only by the particle spike (see [patch.crates-io] below)
-exclude = ["games/particle-spike/vendor"]
+# Patched copy of bevy_enoki (see [patch.crates-io] below). It lies inside the workspace folder, so it must be excluded,
+# or cargo makes it a member.
+exclude = ["vendor"]
 
 [workspace.package]
 version = "0.1.0"
@@ -15,9 +16,9 @@ bevy_enoki = "=0.8.0"
 game-kit = { path = "crates/game-kit" }
 pathfinding = "=4.16.0"
 
-# Spike only: Enoki with a per-material blend state (for additive blending). Remove with the spike.
+# Enoki with a per-material blend state (for additive blending, `game-kit` `fx.rs`). About 10 lines changed from 0.8.0.
 [patch.crates-io]
-bevy_enoki = { path = "games/particle-spike/vendor/bevy_enoki" }
+bevy_enoki = { path = "vendor/bevy_enoki" }
 
 # Compile dependencies (Bevy) with optimisation even in dev builds. Game code stays fast to rebuild.
 # No debug info for dependencies, and only line tables for our own crates: nobody uses a debugger, and debug info
