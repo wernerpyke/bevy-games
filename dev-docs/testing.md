@@ -1,6 +1,6 @@
 # Writing unit tests
 
-Rules for every crate in the workspace: `game-kit` and each game. They come from the assessment of the kit tests (`ASSESS-KIT-unit-tests.md`, 2026-11-11). That assessment found tests that passed without checking what their names said, repeated tests, and branches no test reached. Each example below is a real case from that assessment.
+Rules for every crate in the workspace: `game-kit` and each game. They come from the assessments of the kit and Long Way tests (2026-11-11, deleted when their fixes were done; see git history). Those assessments found tests that passed without checking what their names said, repeated tests, and branches no test reached. Each example below is a real case from them.
 
 Where tests live and which crate tests what: `adr/WORKSPACE.md` adr-w7 and `CLAUDE.md`, "Tests".
 
