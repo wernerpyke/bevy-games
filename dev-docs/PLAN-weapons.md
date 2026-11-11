@@ -9,6 +9,8 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Out of scope
 
+**WASM.** This plan does not build, check or measure the web target: no `rust.sh web`, no `wasm-release`, no `.wasm` size, no web run. The spike showed that Enoki runs on the web. A later plan does the WASM compatibility check (this overrides `CLAUDE.md` working rule 8 for this plan, by the user's decision on 2026-11-11). `target/wasm32-unknown-unknown` was deleted.
+
 Energy cost, cooldown and a disabled drawer button at 0 energy (D12: a separate plan later), sound, new HUD elements (the drawer exists, `adr-lw31`), the game over screen and restart flow (`rm9` keeps them), and R-Town. Final numbers are set by tuning in each weapon step (the spike values are only the first defaults).
 
 ## Assessment: what goes where
@@ -34,7 +36,7 @@ Rule (`CLAUDE.md`, `adr-x12`): code goes into the kit only when R-Town could use
 
 ## Dependency and build guard
 
-Measured on 2026-11-10 with `cargo tree` on the wasm target: the spike and Long Way trees differ by **5 crates** only (`bevy_enoki`, `wide`, `chacha20`, `getrandom` 0.3.4 and 0.4.3). Same Bevy features. The main build does not spiral as long as these rules hold:
+Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by **5 crates** only (`bevy_enoki`, `wide`, `chacha20`, `getrandom` 0.3.4 and 0.4.3). Same Bevy features. The main build does not spiral as long as these rules hold:
 
 | # | Rule |
 |---|---|
@@ -46,14 +48,13 @@ Measured on 2026-11-10 with `cargo tree` on the wasm target: the spike and Long 
 
 | Gate | Pass when |
 |---|---|
-| `cargo tree -p long-way`, native and wasm | Only the 5 crates above are new |
+| `cargo tree -p long-way` | Only the 5 crates above are new |
 | `cargo tree -p r-town` and `-p game-kit` | Only the same 5 crates are new. Nothing else. |
 | `cargo tree -e features -i bevy -p long-way` | Identical to the baseline |
 | `git diff Cargo.lock` | Only added packages. No existing crate changes version. |
 | `./dev-scripts/rust.sh build long-way` | The "Compiling" lines name no Bevy crate |
 | `./dev-scripts/rust.sh lint`, run twice | The second run compiles nothing |
 | `./dev-scripts/rust.sh size` | Report the change in `target/`. Over 8 GB: say so (`adr-e8`). |
-| Web release size (`--profile wasm-release`) | Report the change in the `.wasm`. Grows by more than 1 MB: ask the user. |
 | Time to rebuild after touching one Long Way file | Report before and after. Not worse by more than noise. |
 
 `target/` was 11 GB at the time of writing (over the 8 GB limit, accepted for now). Ask before `cargo clean` (about 10 minutes).
@@ -94,7 +95,7 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 ### P0. Baseline (before any change)
 
 - Run every gate in the table above on the current tree. Write the numbers into a "Baseline" table in this file.
-- Record how long a rebuild takes after touching `games/long-way/src/main.rs`, and the `.wasm` size of `long-way` with `wasm-release`.
+- Record how long a rebuild takes after touching `games/long-way/src/main.rs`.
 - Note the Cargo.lock state (`git status` must be clean; `weapon_icons.aseprite` is modified now, so ask about it first).
 
 **Baseline (2026-11-11, before P2; the Cargo tree is the P2 reference):**
@@ -102,14 +103,11 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 | Gate | Value |
 |---|---|
 | Unique crates, `cargo tree -p long-way` / `r-town` / `game-kit`, native | 492 / 492 / 490 lines |
-| Same, wasm | 463 / 463 / 461 lines |
 | Bevy features (`cargo tree -e features -i bevy -p long-way`) | 126 lines, saved in the scratchpad |
 | `Cargo.lock` | clean |
 | Rebuild after touching `games/long-way/src/main.rs` | 5.7 s, only `long-way` compiled |
 | `lint`, second run | compiles nothing |
-| `target/` before the wasm-release build | 5.3 GB (the 11 GB in the text above is out of date) |
-| `target/` after it | 7.7 GB |
-| `long-way.wasm`, `wasm-release`, no `wasm-opt` | 24,989,746 bytes (13 min 52 s clean build). Built while the P1 kit code was being added, so it holds the unused `area.rs` and blocker code (small). |
+| `target/` | 5.3 GB (the 11 GB in the text above is out of date) |
 
 ### P1. Kit geometry and the wall blocker (no Enoki)
 
@@ -117,7 +115,7 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 - `crates/game-kit/src/collision.rs`: a temporary blocker. Needs: add at run time, remove on expiry, no stale edges, cost of one outline rebuild per change (measure), and `nav.rs` picking it up. Unit tests in the kit (a shot, a body and a path against a wall that appears and expires). Built here, used in W3.
 - `layers.rs`: change only if a weapon step shows a need.
 - Docs: `dev-docs/extensions/area-effects.md` (new), updates to `collision.md` and `projectiles.md` (no range limit: the game despawns). Add to `dev-docs/extensions/README.md`.
-- Check: `./dev-scripts/rust.sh test game-kit`, `lint`, `web`, `build r-town`. No `Cargo.toml` change, so the tree must not move.
+- Check: `./dev-scripts/rust.sh test game-kit`, `lint`, `build r-town`. No `Cargo.toml` change, so the tree must not move.
 
 ### P2. Enoki into `game-kit` (no weapons)
 
@@ -128,6 +126,9 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 - Long Way must look and run the same: run a scripted shot before and after (`script long-way "wait:0.5;screenshot:start;quit" --debug`) and compare.
 - Run all gates. Read the "Compiling" lines for `build long-way` and `build r-town`: Enoki's 5 crates appear, no Bevy crate. Stop and report if any gate fails.
 - Ask before committing (commit 1: kit geometry and blocker, commit 2: Enoki in the kit).
+
+**P2 result (2026-11-11):** tree diff is the 5 crates only (`bevy_enoki`, `wide`, `chacha20`, `getrandom` 0.4.3 and, on other targets, 0.3.4) for `long-way`, `r-town` and `game-kit`. Bevy features identical. `Cargo.lock` gains one line (`game-kit` depends on `bevy_enoki`). `build long-way` compiled no Bevy crate. Rebuild after touching `main.rs`: 4.8 s (baseline 5.7 s). Second `lint` compiles nothing. `target/` 7.9 GB after `prune`. A screenshot before and after matched except the line order of the debug info box.
+
 
 ### P3. Shared asset pipeline (D2)
 
@@ -175,7 +176,7 @@ D11 to D13 are decided. Then:
 - **A debug line per hit** (target, weapon, amount, HP left) at `info!` level, so tuning can read it from the script log.
 - **Scripted check:** `ui_click` on the red icon and then on a weapon button sends one `CastWeapon` (log line). No weapon exists yet, so nothing else happens.
 - Docs: `games/long-way/docs/weapons.md` (new: values table, files, the tuning loop), `adr.md` entries for enemy HP and the damage and pushback model.
-- Check: `lint`, `test long-way`, `test game-kit`, `web long-way`. Ask before committing.
+- Check: `lint`, `test long-way`, `test game-kit`. Ask before committing.
 
 ### Steps W1 to W6: one weapon at a time
 
@@ -186,10 +187,10 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 3. **Gameplay:** the weapon's state machine, hit test, `WeaponHit` messages with the values from `values.rs`. Unit tests in plain Rust for the mechanic (the spike tests move or are rewritten here).
 4. **Visuals:** the emitters and sprites, reading the gameplay state. `DepthSort` on all of them.
 5. **Wire into the drawer:** the button for this weapon (already in `weapon_menu.rs`) now produces a working cast through `CastWeapon`. Check the button after a cast (no double cast from one click) and that closing the drawer does not cancel the weapon.
-6. **Scripted test:** `rust.sh script long-way "...;ui_click:...;ui_click:...;wait:...;screenshot:...;quit" --debug` with ghosts placed at set distances (a ghost inside, on the edge and outside the effect). Read the log for the per-hit lines. Say what was not seen on screen (motion, timing, feel; the web run).
+6. **Scripted test:** `rust.sh script long-way "...;ui_click:...;ui_click:...;wait:...;screenshot:...;quit" --debug` with ghosts placed at set distances (a ghost inside, on the edge and outside the effect). Read the log for the per-hit lines. Say what was not seen on screen (motion, timing, feel).
 7. **Tune with the user:** the user plays it. The values to tune are `dps`, `pushback`, size, duration, and `glow`. Change `values.rs`, rerun, repeat until the user accepts. Record the accepted values in `weapons.md`. A tuning note per weapon says which numbers moved and why.
-8. **Performance check:** frame time and particle count with the weapon cast every 0.7 s (spike reference: about 3.4 ms native at about 3400 particles). The web is not measured; say so.
-9. **Gates and docs:** `lint`, `test` (changed crates), `web long-way`. Update `weapons.md`, `source-layout.md`. Delete files in `target/screenshots/`.
+8. **Performance check:** frame time and particle count with the weapon cast every 0.7 s (spike reference: about 3.4 ms native at about 3400 particles).
+9. **Gates and docs:** `lint`, `test` (changed crates). Update `weapons.md`, `source-layout.md`. Delete files in `target/screenshots/`.
 10. **Ask before committing** (one commit per weapon).
 
 #### W1. Fire ring
@@ -263,9 +264,9 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 ### P5. Verify all (after W6)
 
-- `./dev-scripts/rust.sh lint`, `test` (all crates), `web long-way`, `build r-town`.
-- All six weapons through the drawer in one scripted run, then a stress run (each cast again every 0.7 s). Compare the frame time with the spike figures. Report the final `target/` size and `.wasm` size. Run all gates once more.
-- Screenshots for each weapon with `--debug`. State what was not seen on screen: motion, timing, the web run.
+- `./dev-scripts/rust.sh lint`, `test` (all crates), `build r-town`.
+- All six weapons through the drawer in one scripted run, then a stress run (each cast again every 0.7 s). Compare the frame time with the spike figures. Report the final `target/` size. Run all gates once more.
+- Screenshots for each weapon with `--debug`. State what was not seen on screen: motion, timing.
 - Delete files in `target/screenshots/`.
 
 ### P6. Migrate and delete
@@ -274,7 +275,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
   - `ENGINE.md`: Enoki accepted, the patch decision (D1), G1 to G4 as rules (the spike plan step 10 may already have done part of it: check first).
   - `EXTENSIONS-GAMEPLAY.md`: area geometry and the temporary blocker in the kit; Enoki in the kit (D3: why, the 5-crate cost to R-Town, no Cargo features, split to `game-fx` if the cost grows).
   - `games/long-way/docs/adr.md`: enemy HP, the damage and pushback model (D7 to D9), the ring and feature rule (D10), weapons built behind `CastWeapon` and `WeaponHit`, gameplay and visuals separate.
-- Docs: `games/long-way/docs/weapons.md` (final: accepted values per weapon, files, tuning loop), `source-layout.md` (the `weapons/` folder, `enemy_hp.rs`, the extension table), `dev-docs/extensions/area-effects.md` (final), `dev-docs/README.md` map, `docs/README.md` (the web run instructions from the spike plan, and the effect export step if D2 needs it). Check `CLAUDE.md` for lines to change (commands table, game table).
+- Docs: `games/long-way/docs/weapons.md` (final: accepted values per weapon, files, tuning loop), `source-layout.md` (the `weapons/` folder, `enemy_hp.rs`, the extension table), `dev-docs/extensions/area-effects.md` (final), `dev-docs/README.md` map, `docs/README.md` (the effect export step if D2 needs it). Check `CLAUDE.md` for lines to change (commands table, game table).
 - Update `rm9` in `dev-docs/ROADMAP.md`: weapons and enemy HP are done and live; what stays open is the death screen, the restart flow, enemy attacks, sound and the impact sound. Move finished parts to `ROADMAP-completed.md`.
 - Delete `games/particle-spike/`, the root `[patch.crates-io]` and `exclude` lines if no longer needed (the patch stays if the kit still uses the vendored Enoki, D1), and `PLAN-particle-spike.md`. Then delete this plan. Git history keeps both.
 - Run `./dev-scripts/rust.sh prune`. Ask before `cargo clean`.
@@ -286,9 +287,8 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 |---|---|
 | The patched Enoki breaks on an upgrade | The patch is 10 lines. The ADR lists them. Upstream issue. D1 fallback removes the risk. |
 | The wall blocker costs too much (outline and nav rebuild per change) | Measured in P1. A wall appears once per cast, not every frame. |
-| Enoki adds more to the `.wasm` than expected | Gate G5, measured in P2. Ask at more than 1 MB. |
 | Enoki in the kit slows R-Town builds | Accepted (D3). Measured in P2. Split `game-fx` if it grows. |
-| The fresh-clone and web builds miss the generated sheets | D2, with a start-up check. |
+| A fresh clone misses the generated sheets | D2, with a start-up check. |
 | Spike values are mistaken for design | `values.rs` names the source of each number and each weapon step ends with the user's tuning. |
 | Pushback and damage ticks double-apply when two weapons overlap | Per-target timers are per weapon cast. Tested in P4. |
 | Pushing a ghost through a feature or out of the map | Push uses `move_feet`, so blocked areas stop it. Tested in P4 and W1. |

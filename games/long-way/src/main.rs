@@ -34,6 +34,7 @@ fn main() {
         .add_plugins((
             game_kit::animation::AnimationHelpPlugin,
             game_kit::collectable::CollectablePlugin,
+            game_kit::fx::FxPlugin,
             inventory::InventoryPlugin,
             hp::HpPlugin,
             ghost::GhostPlugin,

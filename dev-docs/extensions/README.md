@@ -26,6 +26,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [projectiles.md](projectiles.md) | Straight-flying projectiles that stop at blocked areas and the map edge | `game-kit` `projectile.rs` | x21, rt11 |
 | [nav.md](nav.md) | Grid path finding built from the collision outlines, nearest reachable point | `game-kit` `nav.rs` | x23, x43, rt12 |
 | [area-effects.md](area-effects.md) | Ring, band and push geometry for area effects, temporary blocked areas | `game-kit` `area.rs`, `collision.rs` | none yet |
+| [particles.md](particles.md) | Enoki particle effects: plugin, glow materials, one-shot and follow-the-owner emitters | `game-kit` `fx.rs`, `vendor/bevy_enoki` | none yet |
 | [pointer.md](pointer.md) | Mouse clicks as a world position message | `game-kit` `pointer.rs` | x42, lw30 |
 | [enemy-movement.md](enemy-movement.md) | Goals, patrol, pursue and sentry strategies, touch messages, facing tags, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, x40, x41, x43, rt12 |
 | [spawners.md](spawners.md) | Spawners with settings in the map legend | `game-kit` `spawner.rs`, `map.rs` | x25, rt12 |
