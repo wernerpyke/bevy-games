@@ -31,7 +31,7 @@ Rule (`CLAUDE.md`, `adr-x12`): code goes into the kit only when R-Town could use
 | Whirlpool variants A and C | **Dropped** | Variant B is the pick (D6). |
 | Effect files (16 `.particle.ron`) | **Long Way**, `assets/effects/` | Copied **in the step of the weapon that uses them**. |
 | Art: `fireball_placeholder`, `ice_wall_placeholder`, ring sheets | **Long Way**, `assets/art/weapons/` | Copied in the step of the weapon that uses them. Keep `_placeholder` until replaced. |
-| `export_art.lua` | **Shared**, `dev-scripts/aseprite/`, if no existing script does the job | Depends on D2. Check the shared scripts first. |
+| `export_art.lua` | **Dropped** | Replaced by run-time strips in the kit (`fx_strip.rs`, D2). No export step. |
 | `draw_*.lua` | **Dropped** | They only made the placeholders. |
 
 ## Dependency and build guard
@@ -64,7 +64,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | # | Question | Status |
 |---|---|---|
 | D1 | Additive blending (glow) needs a patched Enoki (about 10 lines). | **Decided:** keep a vendored copy at `vendor/bevy_enoki` with the root `[patch.crates-io]`. Fallback: drop glow. |
-| D2 | Enoki cannot read `.aseprite`. Sheets must be PNG strips, and `assets/generated/` is git-ignored (`adr-a1`). | **Decided:** check in P3 whether the `Aseprite` asset can feed Enoki. If not, add an export step and a start-up check. |
+| D2 | Enoki cannot read `.aseprite`. Sheets must be one row of equal cells. | **Decided (2026-11-11):** the `Aseprite` asset cannot feed Enoki as it is (a packed 2D atlas of full-canvas frames). **Build the strips at run time** in the kit: `fx_strip.rs` cuts a tag into a cropped strip when the art loads. No export script, no generated PNG, no start-up check, and a fresh clone works. |
 | D3 | Where does the Enoki code live? | **Decided: `game-kit`**, as `fx.rs`. See G1. |
 | D4 | The wall blocks ghosts, the player and projectiles. | **Decided:** a body inside the wall rectangle when it appears walks out. No push, no shifting. |
 | D5 | How do we trigger a weapon in a test? | **Replaced.** The drawer exists (`WeaponChosen`, `adr-lw31`). Scripted runs click it with `ui_click:<x>:<y>` (`dev-feedback.md`). **No env variable trigger.** For an all-weapons stress run, a script casts every weapon in turn. |
@@ -130,11 +130,11 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 **P2 result (2026-11-11):** tree diff is the 5 crates only (`bevy_enoki`, `wide`, `chacha20`, `getrandom` 0.4.3 and, on other targets, 0.3.4) for `long-way`, `r-town` and `game-kit`. Bevy features identical. `Cargo.lock` gains one line (`game-kit` depends on `bevy_enoki`). `build long-way` compiled no Bevy crate. Rebuild after touching `main.rs`: 4.8 s (baseline 5.7 s). Second `lint` compiles nothing. `target/` 7.9 GB after `prune`. A screenshot before and after matched except the line order of the debug info box.
 
 
-### P3. Shared asset pipeline (D2)
+### P3. Particle sprites from Aseprite (D2) (done)
 
-- Check whether the `Aseprite` asset can feed Enoki directly. If not: one shared Lua script in `dev-scripts/aseprite/` (do not copy `export_art.lua` as it is, it hard-codes the spike's tags), a line in `dev-docs/extensions/dev-scripts.md`, and a start-up check that reports a missing sheet.
+- Result of the D2 check: not directly (see D2). `crates/game-kit/src/fx_strip.rs` builds the strips at run time (`strip_from_atlas`, `FxLooks`). Unit tests on plain pixel buffers. Checked on the real art: `blob`, `fire_ring` and `ice_ring1` to `ice_ring4` of `fireball_placeholder.aseprite` give the same cell sizes as the spike's exported PNGs (4×32, 6×64, 4×59, 4×60, 4×59, 4×60). Pixel by pixel equality was not compared.
 - Art rule from the spike: after a script makes tags, run `./dev-scripts/aseprite.sh check <file>` and read the frame ranges. Tags must not overlap.
-- The art and effect files themselves are copied in the weapon step that uses them. Update `games/long-way/docs/art-pipeline.md` and `art-tags.md` in the same step. Do not touch `diodrama-assets`.
+- `fireball_placeholder.aseprite` is copied to `games/long-way/assets/art/weapons/` (it holds the ring, blob and fireball head tags). `art-pipeline.md` and `art-tags.md` are updated. The other art and the effect files are copied
 
 ## Part 2: Weapons
 
@@ -183,7 +183,7 @@ D11 to D13 are decided. Then:
 Every weapon step follows the same checklist. Do not start the next weapon before the user has accepted the current one.
 
 1. **Design questions** to the user (listed per weapon below).
-2. **Assets:** copy this weapon's art and effect files from the spike (only what it uses), update `art-pipeline.md` and `art-tags.md`, run the sheet export or check (P3).
+2. **Assets:** copy this weapon's art and effect files from the spike (only what it uses), update `art-pipeline.md` and `art-tags.md`, request the particle looks from `FxLooks` (P3).
 3. **Gameplay:** the weapon's state machine, hit test, `WeaponHit` messages with the values from `values.rs`. Unit tests in plain Rust for the mechanic (the spike tests move or are rewritten here).
 4. **Visuals:** the emitters and sprites, reading the gameplay state. `DepthSort` on all of them.
 5. **Wire into the drawer:** the button for this weapon (already in `weapon_menu.rs`) now produces a working cast through `CastWeapon`. Check the button after a cast (no double cast from one click) and that closing the drawer does not cancel the weapon.
@@ -275,7 +275,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
   - `ENGINE.md`: Enoki accepted, the patch decision (D1), G1 to G4 as rules (the spike plan step 10 may already have done part of it: check first).
   - `EXTENSIONS-GAMEPLAY.md`: area geometry and the temporary blocker in the kit; Enoki in the kit (D3: why, the 5-crate cost to R-Town, no Cargo features, split to `game-fx` if the cost grows).
   - `games/long-way/docs/adr.md`: enemy HP, the damage and pushback model (D7 to D9), the ring and feature rule (D10), weapons built behind `CastWeapon` and `WeaponHit`, gameplay and visuals separate.
-- Docs: `games/long-way/docs/weapons.md` (final: accepted values per weapon, files, tuning loop), `source-layout.md` (the `weapons/` folder, `enemy_hp.rs`, the extension table), `dev-docs/extensions/area-effects.md` (final), `dev-docs/README.md` map, `docs/README.md` (the effect export step if D2 needs it). Check `CLAUDE.md` for lines to change (commands table, game table).
+- Docs: `games/long-way/docs/weapons.md` (final: accepted values per weapon, files, tuning loop), `source-layout.md` (the `weapons/` folder, `enemy_hp.rs`, the extension table), `dev-docs/extensions/area-effects.md` (final), `dev-docs/README.md` map, `docs/README.md` . Check `CLAUDE.md` for lines to change (commands table, game table).
 - Update `rm9` in `dev-docs/ROADMAP.md`: weapons and enemy HP are done and live; what stays open is the death screen, the restart flow, enemy attacks, sound and the impact sound. Move finished parts to `ROADMAP-completed.md`.
 - Delete `games/particle-spike/`, the root `[patch.crates-io]` and `exclude` lines if no longer needed (the patch stays if the kit still uses the vendored Enoki, D1), and `PLAN-particle-spike.md`. Then delete this plan. Git history keeps both.
 - Run `./dev-scripts/rust.sh prune`. Ask before `cargo clean`.
@@ -288,7 +288,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 | The patched Enoki breaks on an upgrade | The patch is 10 lines. The ADR lists them. Upstream issue. D1 fallback removes the risk. |
 | The wall blocker costs too much (outline and nav rebuild per change) | Measured in P1. A wall appears once per cast, not every frame. |
 | Enoki in the kit slows R-Town builds | Accepted (D3). Measured in P2. Split `game-fx` if it grows. |
-| A fresh clone misses the generated sheets | D2, with a start-up check. |
+| A particle look is not ready in the first frames, or its tag is missing | `FxLooks::get` gives `None` until ready (the caller falls back to squares); a missing tag logs an error (D2). |
 | Spike values are mistaken for design | `values.rs` names the source of each number and each weapon step ends with the user's tuning. |
 | Pushback and damage ticks double-apply when two weapons overlap | Per-target timers are per weapon cast. Tested in P4. |
 | Pushing a ghost through a feature or out of the map | Push uses `move_feet`, so blocked areas stop it. Tested in P4 and W1. |

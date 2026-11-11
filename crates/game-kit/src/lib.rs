@@ -10,6 +10,7 @@ pub mod collision_debug;
 pub mod debug;
 pub mod depth;
 pub mod fx;
+pub mod fx_strip;
 pub mod groups;
 pub mod hitbox;
 pub mod hud;

@@ -15,6 +15,7 @@ use bevy::shader::ShaderRef;
 use bevy_enoki::prelude::*;
 use bevy_enoki::{PARTICLE_COLOR_FRAG, PARTICLE_SPRITE_FRAG};
 
+pub use crate::fx_strip::FxLooks;
 pub use bevy_enoki::prelude::{
     OneShot, Particle2dEffect, ParticleEffectHandle, ParticleSpawnerState,
 };
@@ -31,8 +32,9 @@ impl Plugin for FxPlugin {
             Particle2dMaterialPlugin::<AdditiveColor>::default(),
         ))
         .init_resource::<EffectLibrary>()
+        .init_resource::<FxLooks>()
         .add_systems(Startup, setup_materials)
-        .add_systems(Update, emitters_follow);
+        .add_systems(Update, (emitters_follow, crate::fx_strip::build_looks));
     }
 }
 

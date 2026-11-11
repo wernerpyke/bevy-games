@@ -13,6 +13,7 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 | `pickups/pickups.aseprite` | `pickup_blue` (frames 1-8), `pickup_red` (frames 9-16), `pickup_violet` (frames 17-24), `pickup_black` (frames 25-32). Each tag is an 8 frame pulse loop (100 ms per frame, set in the file). One layer, `Pickup`. |
 | `ui/hp.aseprite` | `Full` (frame 1), `Empty` (frame 2). One frame each, a state not an animation. One layer, `Icon`. The HUD shows one icon per point of max HP. |
 | `ui/weapon_icons.aseprite` | `fireball`, `fire_ring`, `ice_ring`, `fire_wall`, `ice_wall`, `whirlpool` (frames 1 to 6, one frame each, a weapon icon not an animation). One layer, `Icon`. The tag name is `WeaponKind::icon_tag` in `weapon_menu.rs` (`adr-lw31`). |
+| `weapons/fireball_placeholder.aseprite` | `head` (frames 1-8, loop), `blob` (9-12), `fire_ring` (13-18), `ice_ring1` (19-22), `ice_ring2` (23-26), `ice_ring3` (27-30), `ice_ring4` (31-34). `head` is played as an animation. The others are particle sprites: `fx_strip.rs` cuts each tag into a strip of cells (one cell per frame, cropped to the tag's visible pixels, square for the rings), so the frame order inside a tag is the particle's life order. Placeholder art. |
 | `ui/weapon_drawer.aseprite` | none (one frame, the picture of the weapon drawer). One layer, `Background`. |
 
 ## Map kinds

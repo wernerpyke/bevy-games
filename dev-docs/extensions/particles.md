@@ -11,6 +11,7 @@
 | Part | Code today | Shared? |
 |---|---|---|
 | `FxPlugin`, `Fx` (system parameter), `Follows`, `EffectLibrary`, `Look`, `SpriteLook`, `AdditiveSprite`, `AdditiveColor` | `crates/game-kit/src/fx.rs` | Shared. Used by Long Way only. |
+| `FxLooks`, `strip_from_atlas` (particle sprite strips cut from an `.aseprite` tag at run time) | `crates/game-kit/src/fx_strip.rs` | Shared. |
 | Patched Enoki (`blend_state()` on `Particle2dMaterial`, about 10 lines) | `vendor/bevy_enoki`, root `[patch.crates-io]` | Workspace. |
 | Effect files, sprite sheets, weapons | `games/long-way/` (`PLAN-weapons.md`) | No. |
 
@@ -24,7 +25,7 @@ Cost accepted by the user: the kit depends on Enoki, so R-Town also compiles the
 
 ## Parameters the game supplies
 
-Effect files (`*.particle.ron`), sprite sheets as PNG strips (Enoki cannot read `.aseprite`), which effects glow, and the draw order of each emitter (`DepthSort`, `adr-x9`).
+Effect files (`*.particle.ron`), the `.aseprite` file and tag of each particle sprite (Enoki cannot read `.aseprite`, so `FxLooks` cuts a strip from the tag), which effects glow, and the draw order of each emitter (`DepthSort`, `adr-x9`).
 
 ## Specification
 
@@ -33,7 +34,8 @@ Effect files (`*.particle.ron`), sprite sheets as PNG strips (Enoki cannot read 
 3. `Look::Squares` draws flat colour squares. `Look::Sprites(SpriteLook)` draws a sprite strip, made once as a normal and an additive material.
 4. `Follows { owner, offset, rotation }` moves an emitter with its owner: the owner's x and y plus `offset`, and the owner's rotation turned by `rotation`. It never writes z. When the owner is gone, the emitter stops spawning, loses `Follows` and gets `OneShot::Despawn`.
 5. `EffectLibrary::keep(&server, file)` keeps a file loaded. Without it a file is dropped when its last emitter dies.
-6. Effect files are not reloaded while the game runs (no file watcher, `PLAN-weapons.md` G3). Restart the game to see a change.
+6. `FxLooks::request(&server, name, file, tag, square)` (in `Startup`) asks for a look made from the frames of a tag. When the file has loaded, a system copies the frames out of the Aseprite atlas into one row of equal cells, cropped to the union of the visible pixels of the tag, padded to square cells when `square` is set (Enoki draws every particle as a square quad). `FxLooks::get(name)` returns the `Look`, or `None` until it is ready, so a caller uses `unwrap_or_default()` (flat squares) for the first frames. A failed look (no such tag, no visible pixel) logs an error and is never ready. The spike's exported sheets and these strips have the same cell sizes. The frames of the tag are the particle's life, in order.
+7. Effect files are not reloaded while the game runs (no file watcher, `PLAN-weapons.md` G3). Restart the game to see a change.
 
 ## Usage
 
@@ -48,9 +50,9 @@ fn burst(mut fx: Fx, look: Res<MyLook>) {
 ## Limits
 
 - Enoki draws with alpha blending only. Additive blending needs the vendored patch. Re-apply it on every Enoki upgrade, or drop glow.
-- Sprite sheets must be PNG strips. `assets/generated/` is git-ignored (`adr-a1`), so a fresh clone must export them first.
+- The strip is built once, when the art loads. A changed `.aseprite` needs a restart. The atlas keeps its pixels on the CPU (the loader's default), which the builder reads.
 - Not measured on the web.
 
 ## Tests
 
-`fx.rs` has unit tests for the follow system (position, offset, rotation, owner gone) and the blend state. Rendering is checked by a scripted run.
+`fx.rs` has unit tests for the follow system (position, offset, rotation, owner gone) and the blend state. `fx_strip.rs` has unit tests on plain pixel buffers (union of the visible pixels, cell contents, frame order, square padding, empty input). Rendering is checked by a scripted run.
