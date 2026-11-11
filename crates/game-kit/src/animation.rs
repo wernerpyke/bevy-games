@@ -163,12 +163,18 @@ fn frame_range(
     }
 }
 
+/// The set of the system that plays the `FacingTags` of a sprite. A game system that takes over an animation (a death, an
+/// attack) runs `.before(FacingSet)`: it plays its tag and removes `FacingTags` with a command, and the command is
+/// applied before this set runs. Without that order the facing tag can overwrite the new tag in the same frame.
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct FacingSet;
+
 pub struct AnimationHelpPlugin;
 
 impl Plugin for AnimationHelpPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (apply_random_start, apply_static_frame))
-            .add_systems(Update, animate_facing.after(FollowSet));
+            .add_systems(Update, animate_facing.in_set(FacingSet).after(FollowSet));
     }
 }
 
