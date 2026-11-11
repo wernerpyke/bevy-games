@@ -120,7 +120,9 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 
 1. Run `./dev-scripts/rust.sh size`.
 2. Over 8 GB: tell the user, then run `./dev-scripts/rust.sh prune`.
-3. Still over 8 GB after the prune: ask before `cargo clean` (about 10 minutes to rebuild).
-4. After a Bevy version or feature change, run `cargo clean` once.
-5. Do not add `debug = true` or `bevy/dynamic_linking` as a default to a profile without asking.
+3. Still over 8 GB after the prune (`prune` only removes the incremental cache, not `deps/`): find duplicate crates with `ls target/debug/deps | sed 's/-[0-9a-f]*\..*//' | sort | uniq -c | sort -rn | head`. A crate built many times means a feature or profile mismatch. Then ask before `cargo clean` (about 10 minutes to rebuild).
+4. After a Bevy version or feature change, run `cargo clean` once (ask first, see 3).
+5. Do not add `debug = true` or `bevy/dynamic_linking` as a default to a profile without asking. Every different Bevy feature set builds a full extra copy of Bevy (about 2 GB, 5 minutes).
 6. Delete files in `target/screenshots/` when the check that needed them is done.
+7. Never use `cargo clean --target <triple>`: on 2026-11-11 it deleted all of `target/` (15 GiB), not only that target. To drop only the wasm build, use `rm -rf target/wasm32-unknown-unknown`.
+8. Normal sizes after a clean rebuild of all games (2026-11-11): 2.9 GB after `build`, 3.3 GB with `lint`, 3.9 GB with `test`, 4.3 GB with `web`, about 5 GB after the first `run <game>`. The first `build` takes about 9 minutes. A size near 8 GB means stale or duplicate outputs, not normal growth.
