@@ -10,7 +10,7 @@
 #   ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title]
 #                                             # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map).
 #                                             # --debug turns on the F2 info box and the F3 grid (off without it)
-#   ./dev-scripts/rust.sh lint                # cargo fmt --check + clippy -D warnings (all games)
+#   ./dev-scripts/rust.sh lint                # cargo fmt (formats, lists changed files) + clippy -D warnings (all crates)
 #   ./dev-scripts/rust.sh web [game]          # cargo check for wasm32-unknown-unknown
 #   ./dev-scripts/rust.sh script <game> "<commands>" [--debug]
 #                                             # run a game with scripted key presses and print its log,
@@ -105,7 +105,13 @@ case "${1:-}" in
       | grep -E "${LOG_FILTER:-script:|collision:|WARN|ERROR|panicked}" || true
     ;;
   lint)
-    cargo fmt --all --check
+    # Formats instead of only checking, so a format slip costs no extra run. The changed files are listed.
+    changed=$(cargo fmt --all -- --check -l 2>/dev/null || true)
+    cargo fmt --all
+    if [ -n "$changed" ]; then
+      echo "lint: formatted"
+      echo "$changed" | sed "s|^$PWD/|  |"
+    fi
     cargo clippy --workspace --all-targets -- -D warnings
     ;;
   web)

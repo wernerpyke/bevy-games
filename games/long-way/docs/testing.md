@@ -33,7 +33,7 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 ./dev-scripts/rust.sh test long-way                 # all Long Way tests
 ./dev-scripts/rust.sh test long-way weapons::ring   # only tests whose path contains "weapons::ring"
 ./dev-scripts/rust.sh test game-kit                 # the kit's tests (collision, maps, transitions)
-./dev-scripts/rust.sh lint                          # fmt check and clippy, including test code
+./dev-scripts/rust.sh lint                          # formats, then clippy, including test code
 ```
 
 ## Checks in the real game

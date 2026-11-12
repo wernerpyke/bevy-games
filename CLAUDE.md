@@ -118,7 +118,7 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 - Run: `./dev-scripts/rust.sh run <game>` (add `--debug` to start with the F2 info box and the F3 grid visible, and `--skip-title` to skip a title screen; the flags are not passed to cargo)
 - Scripted run: `./dev-scripts/rust.sh script <game> "<commands>" [map-file]` (the optional map file, for example `2.txt`, starts the game in that map), for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the debug overlays are drawn. `screenshot:<name>` saves to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
 - Zoomed screenshot: `./dev-scripts/shot.sh <game> <name> "<commands>" cx= cy= w= h= scale=`. Aseprite checks: `./dev-scripts/aseprite.sh <script> <file> key=value ...`. Both are in `dev-docs/extensions/dev-scripts.md`. Allowlist: `Bash(./dev-scripts/shot.sh:*)`, `Bash(./dev-scripts/aseprite.sh:*)`.
-- Lint (fmt check and clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
+- Lint (formats all crates with `cargo fmt` and lists the changed files, then clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
 - Web compile check: `./dev-scripts/rust.sh web`
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)
 - Web release build (to define): record the chosen method in `dev-docs/adr/ENGINE.md`.
