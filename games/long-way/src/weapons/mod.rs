@@ -18,7 +18,7 @@ use game_kit::hitbox::HitBox;
 use game_kit::movement::MoveState;
 
 use crate::player::feet_of;
-use crate::weapon_menu::{WeaponChosen, WeaponKind};
+use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, WeaponKind};
 
 pub struct WeaponPlugin;
 
@@ -27,7 +27,7 @@ impl Plugin for WeaponPlugin {
         app.add_message::<CastWeapon>()
             .add_message::<WeaponHit>()
             .add_plugins(ring::RingPlugin)
-            .add_systems(Update, (cast_chosen, damage::apply_hits).chain());
+            .add_systems(Update, (cast_active, damage::apply_hits).chain());
     }
 }
 
@@ -53,29 +53,31 @@ pub struct WeaponHit {
     pub push: Vec2,
 }
 
-/// The player chose a weapon in the drawer: cast it from where the player stands.
-fn cast_chosen(
-    mut chosen: MessageReader<WeaponChosen>,
+/// The player clicked an active weapon button: cast the weapon in that slot from where the player stands. An empty
+/// slot, or one whose weapon is not built, casts nothing.
+fn cast_active(
+    mut clicks: MessageReader<ActiveWeaponClicked>,
+    active: Res<ActiveWeapons>,
     player: Query<(&Transform, &MoveState, &HitBox), With<Controlled>>,
     mut cast: MessageWriter<CastWeapon>,
 ) {
-    for choice in chosen.read() {
+    for click in clicks.read() {
+        let Some(weapon) = active.get(click.0) else {
+            continue;
+        };
         let Ok((transform, state, hit_box)) = player.single() else {
-            warn!(
-                "weapons: {} chosen but there is no player",
-                choice.0.label()
-            );
+            warn!("weapons: {} clicked but there is no player", weapon.label());
             continue;
         };
         let origin = feet_of(transform);
         info!(
             "weapons: cast {} at {origin:?}, facing ({:.2}, {:.2})",
-            choice.0.label(),
+            weapon.label(),
             state.facing.x,
             state.facing.y
         );
         cast.write(CastWeapon {
-            weapon: choice.0,
+            weapon,
             origin,
             // The player's hit box is relative to its `Transform` (the middle of the canvas), not to the feet.
             centre: hit_box.rect_at(transform.translation.truncate()).center(),
@@ -87,13 +89,21 @@ fn cast_chosen(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inventory::Energy;
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.add_message::<ActiveWeaponClicked>()
+            .add_message::<CastWeapon>()
+            .init_resource::<ActiveWeapons>()
+            .add_systems(Update, cast_active);
+        app
+    }
 
     #[test]
-    fn a_chosen_weapon_is_cast_from_the_players_feet_with_its_facing() {
-        let mut app = App::new();
-        app.add_message::<WeaponChosen>()
-            .add_message::<CastWeapon>()
-            .add_systems(Update, cast_chosen);
+    fn the_active_weapon_is_cast_from_the_players_feet_with_its_facing_and_a_blank_slot_casts_nothing()
+     {
+        let mut app = app();
         app.world_mut().spawn((
             Controlled,
             Transform::from_xyz(100.0, 200.0, 0.0),
@@ -107,12 +117,14 @@ mod tests {
                 ..default()
             },
         ));
-        app.world_mut()
-            .write_message(WeaponChosen(WeaponKind::IceRing));
+        // Violet has no weapon and blue holds the ice ring, which is not built: only red casts.
+        for energy in [Energy::Violet, Energy::Red, Energy::Blue] {
+            app.world_mut().write_message(ActiveWeaponClicked(energy));
+        }
         app.update();
         let sent: Vec<CastWeapon> = crate::test_util::messages(&app);
         assert_eq!(sent.len(), 1);
-        assert_eq!(sent[0].weapon, WeaponKind::IceRing);
+        assert_eq!(sent[0].weapon, WeaponKind::FireRing);
         assert_eq!(
             sent[0].origin,
             feet_of(&Transform::from_xyz(100.0, 200.0, 0.0))
@@ -123,12 +135,9 @@ mod tests {
 
     #[test]
     fn without_a_player_nothing_is_cast() {
-        let mut app = App::new();
-        app.add_message::<WeaponChosen>()
-            .add_message::<CastWeapon>()
-            .add_systems(Update, cast_chosen);
+        let mut app = app();
         app.world_mut()
-            .write_message(WeaponChosen(WeaponKind::FireRing));
+            .write_message(ActiveWeaponClicked(Energy::Red));
         app.update();
         assert_eq!(app.world().resource::<Messages<CastWeapon>>().len(), 0);
     }

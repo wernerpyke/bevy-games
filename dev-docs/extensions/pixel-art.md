@@ -53,7 +53,7 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 
 ### Still frame
 
-18. `StaticFrame { relative }` shows one frame and never plays, for an icon. It sets the frame (counted from the first frame of the tag, kept inside the range) once the file has loaded, then stops the animation. Long Way draws its energy icons in the HUD from the pickup art this way, at the size of the pickup in the world.
+18. `StaticFrame { relative }` shows one frame and never plays, for an icon. It sets the frame (counted from the first frame of the tag, kept inside the range) once the file has loaded, then stops the animation. Long Way draws its weapon icons and the frames of its HUD buttons this way.
 
 ## Usage
 

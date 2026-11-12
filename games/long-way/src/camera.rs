@@ -13,9 +13,6 @@ pub const HUD_BAR_RATIO: f32 = 0.3125;
 /// Palette colour `#e78d7b`.
 pub const HUD_TEXT: Color = Color::srgb(0.9059, 0.5529, 0.4824);
 
-/// Size of the HUD text in art pixels.
-pub const HUD_FONT_SIZE: f32 = 32.0;
-
 /// Background colour behind the world.
 pub const CLEAR_COLOR: Color = Color::srgb(0.16, 0.17, 0.2);
 

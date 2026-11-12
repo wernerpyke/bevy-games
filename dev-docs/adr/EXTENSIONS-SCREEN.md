@@ -60,3 +60,11 @@ Screen regions, app states, camera, draw order layers and animation. Index of al
 
 **How to apply.** `dev-docs/extensions/pixel-art.md`, "Random start frame". Add `AnimationHelpPlugin` and put `RandomStartFrame::for_cell(..)` in the spawn bundle. Long Way: trees (`trees.rs`) and pickups (`pickups.rs`).
 
+
+## adr-x45. The kit has an image button and a gauge for the HUD; the game handles the click (2026-11-12)
+
+**Decision.** `hud.rs` has two widgets besides `label`. `image_button(server, path, up, down)` draws a button from two tags of an Aseprite file: `up` normally, `down` while a primary press holds it, with Bevy's `Pressed` marker on it then. A release, the pointer leaving or a cancelled press puts it back up. `gauge(GaugeStyle)` is a track bar with a fill that follows `Gauge::fraction` (0 to 1, clamped), a click pad above and below, and an optional line below the bar while the pointer is over it. The game spawns them with its own size, values and marker, sets the fraction, and observes `PointerClick` on the entity for what a click does. The kit sends no messages for them and has no disabled state. `ScreenPlugin`, which spawns the `Hud`, adds their behaviour, so a game needs no extra plugin.
+
+**Rationale.** The user asked for the Long Way button and gauge to be reusable (2026-11-12). Bevy 0.20 has a headless `Button` in `bevy_ui_widgets`, but it is in the `ui` feature collection and the workspace builds only `2d`: a new Bevy feature means a full rebuild and about 2 GB more in `target/` (`adr-e8`). It has no gauge or progress bar. The two widgets are small, and they use only `bevy_ui` (`Pressed` included) and the Aseprite plugin the kit already has (`adr-x39`). Leaving the click to the game keeps game types out of the kit and lets a game decide what a click on an empty button means. A disabled state was left out on purpose: Bevy's `InteractionDisabled` means "cannot be used", and Long Way wants a click on a blank button to still close its drawer. Add a disabled state when a game needs one.
+
+**How to apply.** Code and tests: `crates/game-kit/src/hud.rs`. Use and limits: `dev-docs/extensions/screen-layout.md`, "HUD". Long Way uses both (`adr-lw34`). Move to `bevy_ui_widgets` if keyboard or gamepad control of the HUD is needed.

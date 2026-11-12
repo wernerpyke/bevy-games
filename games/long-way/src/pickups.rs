@@ -17,8 +17,8 @@ const ART_WIDTH: f32 = 64.0;
 const ART_HEIGHT: f32 = 96.0;
 /// Drawn size as a multiple of the art size.
 const PICKUP_SCALE: f32 = 0.25;
-/// The drawn size of a pickup in art pixels. The HUD icons use the same size.
-pub const DRAWN_SIZE: Vec2 = Vec2::new(ART_WIDTH * PICKUP_SCALE, ART_HEIGHT * PICKUP_SCALE);
+/// The drawn size of a pickup in art pixels.
+const DRAWN_SIZE: Vec2 = Vec2::new(ART_WIDTH * PICKUP_SCALE, ART_HEIGHT * PICKUP_SCALE);
 /// The touch box: 52 wide (the touch width of an exit marker, `markers.rs`) and one cell high, centred on the bottom of the cell. It reaches 32 pixels below the base of the pickup, so a player walking past in front of it collects it.
 const TOUCH_SIZE: Vec2 = Vec2::new(52.0, 64.0);
 const TOUCH_CENTRE_Y: f32 = 0.0;
@@ -89,16 +89,15 @@ mod tests {
 
     #[test]
     fn each_pickup_kind_has_the_art_and_the_name_of_its_own_energy() {
-        // The name is what `Collected` carries, so it must be the legend name of the same kind and give the energy
-        // whose HUD icon uses the same tag.
-        for (name, energy) in [
-            ("energy_blue", Energy::Blue),
-            ("energy_red", Energy::Red),
-            ("energy_violet", Energy::Violet),
-            ("energy_black", Energy::Black),
+        // The name is what `Collected` carries, so it must be the legend name of the same kind and give its energy.
+        for (name, energy, tag) in [
+            ("energy_blue", Energy::Blue, "pickup_blue"),
+            ("energy_red", Energy::Red, "pickup_red"),
+            ("energy_violet", Energy::Violet, "pickup_violet"),
+            ("energy_black", Energy::Black, "pickup_black"),
         ] {
             let kind = Kind::of(&object(name, 0, 0, &[]));
-            assert_eq!(art(kind), Some((energy.pickup_tag(), name)), "{name}");
+            assert_eq!(art(kind), Some((tag, name)), "{name}");
             assert_eq!(Energy::from_kind(name), Some(energy));
         }
         assert_eq!(art(Kind::Rock0), None);

@@ -15,10 +15,10 @@ How the window is shared between the game and a HUD, and how the app flow (loadi
 |---|---|---|
 | `GameCamera`, `PixelCameraPlugin` | `crates/game-kit/src/camera.rs` | Shared. |
 | `ScreenMode`, `regions`, `ui_scale`, `ScreenPlugin`, `ScreenLayout` | `crates/game-kit/src/screen.rs` | Shared. Long Way uses a bar below the game. |
-| `Hud`, `HudCamera`, `label` | `crates/game-kit/src/hud.rs` | Shared. |
+| `Hud`, `HudCamera`, `label`, `image_button`, `gauge` | `crates/game-kit/src/hud.rs` | Shared. Long Way uses the button and the gauge (`adr-lw34`). |
 | `AppState`, `PlayState`, `AppFlowPlugin`, `state_root`, `PauseDialog` | `crates/game-kit/src/app_state.rs` | Shared. Long Way starts in `Playing` and has no other screens. R-Town does not use it yet. |
 
-Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
+Decisions: `adr-x34`, `adr-x35`, `adr-x45`, and `adr-lw24` and `adr-lw34` for Long Way.
 
 ## Terms
 
@@ -50,7 +50,10 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 ### HUD
 
 7. The `Hud` root fills the HUD region and draws no background. A game puts its own background (a picture or a colour) inside it or on it.
-8. A game adds its content as children of the `Hud` entity, for example in a `PostStartup` system with `Single<Entity, With<Hud>>`. The kit has generic widgets only (`label`). Icons and gauges are added when a game needs them.
+8. A game adds its content as children of the `Hud` entity, for example in a `PostStartup` system with `Single<Entity, With<Hud>>`. The kit has generic widgets only: `label`, `image_button` and `gauge` (`adr-x45`). They carry no game values, and the game observes `PointerClick` on a widget for what a click does.
+   - `image_button(server, path, up, down)`: add a `Node` with the size in the same bundle. It shows the `up` tag, and the `down` tag with Bevy's `Pressed` marker while a primary press holds it. A release, the pointer leaving or a cancel puts it back. Children (an icon) are drawn on top. There is no disabled state.
+   - `gauge(GaugeStyle)`: a `track` bar of `size` with a `fill` over its left part, set by `Gauge::fraction` (0 to 1, clamped). `click_pad` above and below takes the pointer too. While the pointer is over it, a line of `hover` colour and `hover_height` shows just below the bar; it takes its height from the bottom pad (`hover_height` 0 for none).
+   - `ScreenPlugin` adds their behaviour (observers and one system).
    - A panel that must be drawn over the game region (a drawer, a dialog) cannot be a child of `Hud`: the HUD camera clips it to the HUD region. Spawn it as its own UI root with no `UiTargetCamera`, so it is on the game camera, and put `GlobalZIndex` from `layers.rs` on it. Add `BlocksWorldClick` to its root so a click on it does not become a `WorldClick` (`pointer.md`, `adr-x44`). A full-screen transparent root (the map fade) must carry `Pickable::IGNORE`, or it takes the clicks from the panels below it. Long Way: `weapon_menu.rs`, `adr-lw31`.
 
 ### App states
@@ -84,3 +87,4 @@ Decisions: `adr-x34`, `adr-x35`, and `adr-lw24` for Long Way.
 - `screen.rs`: the regions for each mode and at odd sizes, the UI scale, and the plugin setting both cameras and `UiScale`, and switching the HUD camera off.
 - `app_state.rs`: the start state with and without the skip, loading to title or game, the skip used once, the layout for each state, screen roots removed with their state, pause (clock, dim layers, dialog slot, HUD dim), leaving the game while paused, and no pause key.
 - `camera.rs`: a second camera does not stop the game camera following.
+- `hud.rs`: a primary press shows the `down` tag and `Pressed` until a release, a leave or a cancel, and other buttons do nothing; the gauge fill follows the fraction, clamped; the hover line shows its colour only while the pointer is over the gauge.

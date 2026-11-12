@@ -1,5 +1,6 @@
 //! What the player carries: a count of each energy colour. It grows when the kit reports a collected pickup
-//! (`game_kit::collectable::Collected`). Energy has no use yet and no cap.
+//! (`game_kit::collectable::Collected`), up to `MAX_ENERGY` each. A pickup collected at the maximum is lost
+//! (`adr-lw34`). Energy has no use yet.
 
 use bevy::prelude::*;
 use game_kit::collectable::Collected;
@@ -27,17 +28,8 @@ impl Energy {
         }
     }
 
-    /// The tag of its colour in `pickups.aseprite`.
-    pub fn pickup_tag(self) -> &'static str {
-        match self {
-            Energy::Blue => "pickup_blue",
-            Energy::Red => "pickup_red",
-            Energy::Violet => "pickup_violet",
-            Energy::Black => "pickup_black",
-        }
-    }
-
-    fn index(self) -> usize {
+    /// Its position in `Energy::ALL`, for arrays with one entry per energy.
+    pub fn index(self) -> usize {
         self as usize
     }
 
@@ -51,21 +43,31 @@ impl Energy {
     }
 }
 
+/// The most of one energy the player can carry (the user's value, 2026-11-12).
+pub const MAX_ENERGY: u32 = 10;
+
 #[derive(Resource, Default, Debug)]
 pub struct Inventory {
     energy: [u32; 4],
 }
 
 impl Inventory {
+    /// Adds one of `energy`, unless it is at `MAX_ENERGY`.
     pub fn add(&mut self, energy: Energy) {
-        self.energy[energy.index()] += 1;
+        let count = &mut self.energy[energy.index()];
+        *count = (*count + 1).min(MAX_ENERGY);
     }
 
     pub fn count(&self, energy: Energy) -> u32 {
         self.energy[energy.index()]
     }
 
-    /// One line for the HUD, for example `B 1  R 0  V 2  K 0`.
+    /// How full `energy` is, from 0 (none) to 1 (`MAX_ENERGY`).
+    pub fn fraction(&self, energy: Energy) -> f32 {
+        self.count(energy) as f32 / MAX_ENERGY as f32
+    }
+
+    /// One line for the log, for example `B 1  R 0  V 2  K 0`.
     pub fn summary(&self) -> String {
         Energy::ALL
             .iter()
@@ -101,15 +103,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn each_energy_has_its_own_count() {
+    fn each_energy_has_its_own_count_and_stops_at_the_maximum() {
         let mut inventory = Inventory::default();
         inventory.add(Energy::Blue);
         inventory.add(Energy::Violet);
         inventory.add(Energy::Violet);
-        assert_eq!(inventory.count(Energy::Blue), 1);
-        assert_eq!(inventory.count(Energy::Red), 0);
-        assert_eq!(inventory.count(Energy::Violet), 2);
         assert_eq!(inventory.summary(), "B 1  R 0  V 2  K 0");
+        for _ in 0..MAX_ENERGY - 1 {
+            inventory.add(Energy::Red);
+        }
+        assert_eq!(inventory.count(Energy::Red), MAX_ENERGY - 1);
+        inventory.add(Energy::Red);
+        assert_eq!(inventory.count(Energy::Red), MAX_ENERGY);
+        inventory.add(Energy::Red);
+        assert_eq!(inventory.summary(), "B 1  R 10  V 2  K 0");
+        // The fraction for an empty, a partly full and a full energy. Exact in f32: these are n / 10 in one division.
+        assert_eq!(
+            [Energy::Black, Energy::Violet, Energy::Red].map(|e| inventory.fraction(e)),
+            [0.0, 0.2, 1.0]
+        );
     }
 
     #[test]

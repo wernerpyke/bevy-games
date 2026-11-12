@@ -35,7 +35,7 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [dev-scripts.md](dev-scripts.md) | Zoomed screenshots and Aseprite checks (`shot.sh`, `aseprite.sh`) | `dev-scripts/` | |
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | x5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |
-| [screen-layout.md](screen-layout.md) | Screen regions, HUD bar, app states, pause | `game-kit` `screen.rs`, `hud.rs`, `app_state.rs`, `camera.rs` | x34, x35, lw24 |
+| [screen-layout.md](screen-layout.md) | Screen regions, HUD bar, app states, pause | `game-kit` `screen.rs`, `hud.rs`, `app_state.rs`, `camera.rs` | x34, x35, x45, lw24, lw34 |
 | [pixel-art.md](pixel-art.md) | View height scale, animation tag switching, animation speed, random start frame | `game-kit` `camera.rs`, `animation.rs` | e7, a6, x39 |
 | [tile-sheet-catalogue.md](tile-sheet-catalogue.md) | Make a bought tile sheet readable (rulers and grid, 1:1) and cut sprites by position | `dev-scripts/aseprite/catalogue.lua` | a7 |
 

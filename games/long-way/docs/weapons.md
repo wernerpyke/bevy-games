@@ -4,8 +4,8 @@ Design: the user (2026-11-11). Decisions: `adr-lw32`. Plan: `dev-docs/PLAN-weapo
 
 ## How a weapon works
 
-1. The player clicks an energy icon, then a weapon button (`weapon_menu.rs`, `adr-lw31`). That sends `WeaponChosen`.
-2. `weapons/mod.rs` turns it into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in.
+1. The player loads a weapon once: a click on an energy gauge opens the drawer, and a click on a weapon there puts it in the active slot of its energy (`weapon_menu.rs`, `adr-lw31`, `adr-lw34`). Red starts with the fire ring.
+2. A click on the active weapon button sends `ActiveWeaponClicked`. `weapons/mod.rs` turns it into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in.
 3. The weapon's gameplay system reads `CastWeapon`, owns the weapon's state and sends `WeaponHit { target, weapon, amount, push }` for each enemy it touches. Its visuals read the same state.
 4. `weapons/damage.rs` turns a hit into `DamageEnemy` (`enemy_hp.rs`) and moves the enemy by `push` through the collision world, inside the map.
 5. At 0 hit points an enemy sends `EnemyDied`. The ghost plays `Die` and is removed, and does not hurt the player.
@@ -76,6 +76,6 @@ For the kit's movement and collision lines add `long_way=debug,game_kit=debug` t
 
 Change a number in `values.rs`, run the game or a scripted run (`dev-feedback.md`), and read the `enemy:` log lines (see above). For example:
 
-`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:66:588;wait:0.5;ui_click:136:465;wait:3;quit" --debug`
+`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:67:562;wait:3;quit" --debug`
 
-`ui_click:66:588` is the red energy icon and `ui_click:136:465` the first button of its drawer.
+`ui_click:67:562` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 319 and 445 (blue, violet, black), and the gauges below them at y 602. Coordinates are art pixels from the top left of the window (the bar starts at y 512).

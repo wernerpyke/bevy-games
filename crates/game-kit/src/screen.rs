@@ -112,6 +112,7 @@ impl Plugin for ScreenPlugin {
             regions: regions(UVec2::ZERO, self.mode),
         })
         .insert_resource(PlayingLayout(self.mode))
+        .add_plugins(crate::hud::HudWidgetsPlugin)
         .add_systems(Startup, crate::hud::spawn_hud)
         .add_systems(
             PostUpdate,

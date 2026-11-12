@@ -1,6 +1,8 @@
-//! The weapon drawer: a click on an energy icon in the HUD slides a drawer up over the game area, with one button for
-//! each weapon of that energy. A click on a button sends `WeaponChosen` and the drawer slides away. The game does
-//! not pause. `weapons/mod.rs` turns `WeaponChosen` into `CastWeapon` (`adr-lw31`, `PLAN-weapons.md`).
+//! The weapon drawer and the active weapons. A click on an energy gauge in the HUD slides a drawer up over the game
+//! area, with one button for each weapon of that energy. A click on a button loads that weapon into the active slot
+//! of its energy (`ActiveWeapons`) and the drawer slides away. It does not cast: a click on the active weapon button
+//! in the HUD sends `ActiveWeaponClicked`, and `weapons/mod.rs` turns it into `CastWeapon` (`adr-lw31`,
+//! `adr-lw34`). The game does not pause.
 //!
 //! The drawer is its own UI root on the game camera (a child of `Hud` would be clipped to the HUD region). It is
 //! `BlocksWorldClick`, so a click on it does not walk the player (`adr-x44`). Times use real time, so they would
@@ -51,6 +53,8 @@ const BORDER_HEIGHT: f32 = 2.0;
 const BUTTON_NORMAL: Color = Color::srgb(0.1373, 0.1843, 0.3137);
 const BUTTON_HOVER: Color = Color::srgb(0.2549, 0.3569, 0.5804);
 const BUTTON_PRESSED: Color = Color::srgb(0.1216, 0.0980, 0.1961);
+/// The opacity of the button, icon and label of a weapon that is not built yet (`WeaponKind::is_built`).
+const DIM_ALPHA: f32 = 0.35;
 
 /// The weapons the player can choose. The label is the text of the button, at most `MAX_LABEL` characters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -99,6 +103,48 @@ impl WeaponKind {
             WeaponKind::Whirlpool => "whirlpool",
         }
     }
+
+    /// Whether the weapon works yet. Each weapon step of `PLAN-weapons.md` (W1 to W6) adds its weapon here. A weapon
+    /// that is not built is dimmed in the drawer and cannot be loaded, and an active button that holds it is blank.
+    pub fn is_built(self) -> bool {
+        matches!(self, WeaponKind::FireRing)
+    }
+}
+
+/// The weapon in the active slot of an energy when the game starts (the user's choice, 2026-11-12).
+fn default_weapon(energy: Energy) -> Option<WeaponKind> {
+    match energy {
+        Energy::Red => Some(WeaponKind::FireRing),
+        Energy::Blue => Some(WeaponKind::IceRing),
+        Energy::Violet | Energy::Black => None,
+    }
+}
+
+/// The weapon loaded in the active slot of each energy. It belongs to no map, so it stays when the player changes
+/// map.
+#[derive(Resource, Debug)]
+pub struct ActiveWeapons([Option<WeaponKind>; 4]);
+
+impl Default for ActiveWeapons {
+    fn default() -> Self {
+        Self(Energy::ALL.map(default_weapon))
+    }
+}
+
+impl ActiveWeapons {
+    /// The weapon that the active button of `energy` shows and casts: the loaded weapon, if it is built.
+    pub fn get(&self, energy: Energy) -> Option<WeaponKind> {
+        self.0[energy.index()].filter(|weapon| weapon.is_built())
+    }
+
+    fn load(&mut self, energy: Energy, weapon: WeaponKind) {
+        self.0[energy.index()] = Some(weapon);
+    }
+
+    #[cfg(test)]
+    pub fn set_for_test(&mut self, energy: Energy, weapon: Option<WeaponKind>) {
+        self.0[energy.index()] = weapon;
+    }
 }
 
 /// The weapons in the drawer of an energy (the user's choice, 2026-11-11). Violet and black have none yet.
@@ -118,13 +164,13 @@ pub fn weapons_for(energy: Energy) -> &'static [WeaponKind] {
     }
 }
 
-/// An energy icon in the HUD was clicked.
+/// An energy gauge in the HUD was clicked: open, switch or close the drawer.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct EnergyIconClicked(pub Energy);
+pub struct GaugeClicked(pub Energy);
 
-/// The player chose a weapon in the drawer. `weapons/mod.rs` reads it.
+/// The active weapon button of an energy in the HUD was clicked. `weapons/mod.rs` casts the weapon in its slot.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct WeaponChosen(pub WeaponKind);
+pub struct ActiveWeaponClicked(pub Energy);
 
 /// What the drawer shows. `open` is the energy whose drawer is up (or sliding up), `slide` goes from 0 (hidden) to 1
 /// (fully up), and `shown` is the energy that the buttons were built for. They stay while the drawer slides down.
@@ -142,22 +188,28 @@ struct Drawer;
 #[derive(Component)]
 struct ButtonRow;
 
+/// A drawer button: the weapon it loads into the slot of `energy`.
 #[derive(Component)]
-struct WeaponButton(WeaponKind);
+struct WeaponButton {
+    energy: Energy,
+    weapon: WeaponKind,
+}
 
 pub struct WeaponMenuPlugin;
 
 impl Plugin for WeaponMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DrawerState>()
-            .add_message::<EnergyIconClicked>()
-            .add_message::<WeaponChosen>()
+            .init_resource::<ActiveWeapons>()
+            .add_message::<GaugeClicked>()
+            .add_message::<ActiveWeaponClicked>()
             .add_systems(Startup, spawn_drawer)
             .add_systems(
                 Update,
                 (
-                    open_on_icon_click,
+                    open_on_gauge_click,
                     close_on_world_click,
+                    close_on_active_click,
                     rebuild_buttons,
                     slide_drawer,
                 )
@@ -166,7 +218,7 @@ impl Plugin for WeaponMenuPlugin {
     }
 }
 
-/// The drawer after a click on the icon of `clicked`: the same icon closes it, another one switches it.
+/// The drawer after a click on the gauge of `clicked`: the same gauge closes it, another one switches it.
 fn next_open(current: Option<Energy>, clicked: Energy) -> Option<Energy> {
     if current == Some(clicked) {
         None
@@ -236,10 +288,7 @@ fn spawn_drawer(mut commands: Commands, server: Res<AssetServer>) {
         });
 }
 
-fn open_on_icon_click(
-    mut clicks: MessageReader<EnergyIconClicked>,
-    mut state: ResMut<DrawerState>,
-) {
+fn open_on_gauge_click(mut clicks: MessageReader<GaugeClicked>, mut state: ResMut<DrawerState>) {
     for click in clicks.read() {
         state.open = next_open(state.open, click.0);
     }
@@ -247,6 +296,16 @@ fn open_on_icon_click(
 
 /// A click in the game area, outside the drawer, closes it. The click still walks the player.
 fn close_on_world_click(mut clicks: MessageReader<WorldClick>, mut state: ResMut<DrawerState>) {
+    if clicks.read().next().is_some() {
+        state.open = None;
+    }
+}
+
+/// A click on an active weapon button closes the drawer (the user's choice, 2026-11-12), also on a blank button.
+fn close_on_active_click(
+    mut clicks: MessageReader<ActiveWeaponClicked>,
+    mut state: ResMut<DrawerState>,
+) {
     if clicks.read().next().is_some() {
         state.open = None;
     }
@@ -266,18 +325,20 @@ fn rebuild_buttons(
         return;
     }
     state.shown = Some(energy);
-    let font = TextFont::from_font_size(LABEL_SIZE).with_font(server.load(FONT));
     commands
         .entity(*row)
         .despawn_children()
         .with_children(|row| {
             let weapons = weapons_for(energy);
             if weapons.is_empty() {
-                row.spawn(label("No weapons yet", font.clone(), HUD_TEXT));
+                let font = TextFont::from_font_size(LABEL_SIZE).with_font(server.load(FONT));
+                row.spawn(label("No weapons yet", font, HUD_TEXT));
             }
             for &weapon in weapons {
-                row.spawn((
-                    WeaponButton(weapon),
+                // A weapon that is not built is dimmed and takes no clicks.
+                let alpha = if weapon.is_built() { 1.0 } else { DIM_ALPHA };
+                let mut button = row.spawn((
+                    WeaponButton { energy, weapon },
                     Node {
                         width: px(BUTTON_SIZE.x),
                         height: px(BUTTON_SIZE.y),
@@ -287,28 +348,53 @@ fn rebuild_buttons(
                         row_gap: px(ICON_LABEL_GAP),
                         ..default()
                     },
-                    BackgroundColor(BUTTON_NORMAL),
-                ))
-                .observe(set_colour::<PointerEnter>(BUTTON_HOVER))
-                .observe(set_colour::<PointerLeave>(BUTTON_NORMAL))
-                .observe(set_colour::<PointerPress>(BUTTON_PRESSED))
-                .observe(set_colour::<PointerRelease>(BUTTON_HOVER))
-                .observe(choose_weapon)
-                .with_children(|button| {
-                    button.spawn((
-                        Node {
-                            width: px(ICON_SIZE),
-                            height: px(ICON_SIZE),
-                            ..default()
-                        },
-                        tag_animation(&server, ICON_ART, weapon.icon_tag()),
-                        StaticFrame { relative: 0 },
-                        ImageNode::default().with_mode(NodeImageMode::Stretch),
-                    ));
-                    button.spawn(label(weapon.label(), font.clone(), HUD_TEXT));
-                });
+                    BackgroundColor(BUTTON_NORMAL.with_alpha(alpha)),
+                ));
+                if weapon.is_built() {
+                    button
+                        .observe(set_colour::<PointerEnter>(BUTTON_HOVER))
+                        .observe(set_colour::<PointerLeave>(BUTTON_NORMAL))
+                        .observe(set_colour::<PointerPress>(BUTTON_PRESSED))
+                        .observe(set_colour::<PointerRelease>(BUTTON_HOVER))
+                        .observe(load_weapon);
+                }
+                button.with_children(|button| weapon_face(button, &server, weapon, alpha));
             }
         });
+}
+
+/// The icon of `weapon` above its label, at `alpha` opacity: the face of a drawer button.
+fn weapon_face(
+    button: &mut ChildSpawnerCommands,
+    server: &AssetServer,
+    weapon: WeaponKind,
+    alpha: f32,
+) {
+    weapon_icon(button, server, weapon, alpha);
+    let font = TextFont::from_font_size(LABEL_SIZE).with_font(server.load(FONT));
+    button.spawn(label(weapon.label(), font, HUD_TEXT.with_alpha(alpha)));
+}
+
+/// The icon of `weapon` at `alpha` opacity: in the drawer above its label, and alone on an active weapon button in
+/// the HUD.
+pub fn weapon_icon(
+    button: &mut ChildSpawnerCommands,
+    server: &AssetServer,
+    weapon: WeaponKind,
+    alpha: f32,
+) {
+    button.spawn((
+        Node {
+            width: px(ICON_SIZE),
+            height: px(ICON_SIZE),
+            ..default()
+        },
+        tag_animation(server, ICON_ART, weapon.icon_tag()),
+        StaticFrame { relative: 0 },
+        ImageNode::default()
+            .with_mode(NodeImageMode::Stretch)
+            .with_color(Color::WHITE.with_alpha(alpha)),
+    ));
 }
 
 /// An observer that gives the button under the pointer a colour.
@@ -322,18 +408,19 @@ fn set_colour<E: EntityEvent>(
     }
 }
 
-/// A completed left click on a weapon button: report the weapon and close the drawer.
-fn choose_weapon(
+/// A completed left click on the button of a built weapon: load it into the slot of its energy and close the drawer.
+fn load_weapon(
     click: On<PointerClick>,
     buttons: Query<&WeaponButton>,
-    mut chosen: MessageWriter<WeaponChosen>,
+    mut active: ResMut<ActiveWeapons>,
     mut state: ResMut<DrawerState>,
 ) {
     if click.button != PointerButton::Primary {
         return;
     }
-    if let Ok(button) = buttons.get(click.event_target()) {
-        chosen.write(WeaponChosen(button.0));
+    if let Ok(&WeaponButton { energy, weapon }) = buttons.get(click.event_target()) {
+        active.load(energy, weapon);
+        info!("weapons: loaded {} for {energy:?}", weapon.label());
         state.open = None;
     }
 }
@@ -361,7 +448,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_same_icon_closes_and_another_switches() {
+    fn the_same_gauge_closes_and_another_switches() {
         assert_eq!(next_open(None, Energy::Red), Some(Energy::Red));
         assert_eq!(next_open(Some(Energy::Red), Energy::Red), None);
         assert_eq!(
@@ -406,6 +493,30 @@ mod tests {
     }
 
     #[test]
+    fn each_energy_starts_with_its_default_and_only_a_built_weapon_is_active() {
+        let active = ActiveWeapons::default();
+        // Red holds the fire ring, blue the ice ring, which is not built yet, so its button is blank.
+        assert_eq!(
+            active.0,
+            [
+                Some(WeaponKind::IceRing),
+                Some(WeaponKind::FireRing),
+                None,
+                None
+            ]
+        );
+        assert_eq!(
+            Energy::ALL.map(|energy| active.get(energy)),
+            [None, Some(WeaponKind::FireRing), None, None]
+        );
+        for energy in Energy::ALL {
+            if let Some(weapon) = default_weapon(energy) {
+                assert!(weapons_for(energy).contains(&weapon), "{energy:?}");
+            }
+        }
+    }
+
+    #[test]
     fn no_drawer_has_more_buttons_than_fit_its_picture() {
         // The row of `MAX_BUTTONS` fits the picture: a compile-time assert beside the constants.
         for energy in Energy::ALL {
@@ -425,24 +536,32 @@ mod tests {
         app.world().resource::<DrawerState>().open
     }
 
-    fn click_icon(app: &mut App, energy: Energy) {
-        app.world_mut().write_message(EnergyIconClicked(energy));
+    fn click_gauge(app: &mut App, energy: Energy) {
+        app.world_mut().write_message(GaugeClicked(energy));
         app.update();
     }
 
     #[test]
-    fn an_icon_opens_its_drawer_and_the_same_icon_or_a_click_in_the_world_closes_it() {
+    fn a_gauge_opens_its_drawer_and_the_same_gauge_a_click_in_the_world_or_an_active_button_closes_it()
+     {
         let mut app = app();
-        click_icon(&mut app, Energy::Red);
+        click_gauge(&mut app, Energy::Red);
         assert_eq!(open(&app), Some(Energy::Red));
-        click_icon(&mut app, Energy::Red);
+        click_gauge(&mut app, Energy::Red);
         assert_eq!(open(&app), None);
-        click_icon(&mut app, Energy::Blue);
+        click_gauge(&mut app, Energy::Blue);
         assert_eq!(open(&app), Some(Energy::Blue));
         app.world_mut().write_message(WorldClick {
             position: Vec2::new(30.0, 40.0),
             button: MouseButton::Left,
         });
+        app.update();
+        assert_eq!(open(&app), None);
+        // A blank slot (violet) closes it too.
+        click_gauge(&mut app, Energy::Red);
+        assert_eq!(open(&app), Some(Energy::Red));
+        app.world_mut()
+            .write_message(ActiveWeaponClicked(Energy::Violet));
         app.update();
         assert_eq!(open(&app), None);
     }
@@ -457,7 +576,11 @@ mod tests {
             .unwrap_or_default();
         let buttons = row
             .iter()
-            .filter_map(|child| world.get::<WeaponButton>(*child).map(|button| button.0))
+            .filter_map(|child| {
+                world
+                    .get::<WeaponButton>(*child)
+                    .map(|button| button.weapon)
+            })
             .collect();
         let texts = row
             .iter()
@@ -469,9 +592,9 @@ mod tests {
     #[test]
     fn an_energy_with_no_weapons_shows_a_text_and_one_with_weapons_a_button_each() {
         let mut app = app();
-        click_icon(&mut app, Energy::Violet);
+        click_gauge(&mut app, Energy::Violet);
         assert_eq!(row(&mut app), (vec![], vec!["No weapons yet".to_string()]));
-        click_icon(&mut app, Energy::Red);
+        click_gauge(&mut app, Energy::Red);
         assert_eq!(
             row(&mut app),
             (
@@ -485,47 +608,44 @@ mod tests {
         );
     }
 
-    fn click(app: &mut App, entity: Entity, button: PointerButton) {
-        let location = bevy::picking::pointer::Location {
-            target: bevy::camera::NormalizedRenderTarget::None {
-                width: 1,
-                height: 1,
-            },
-            position: Vec2::ZERO,
-        };
-        app.world_mut().trigger(PointerClick {
-            entity,
-            pointer: bevy::picking::events::Pointer::new(
-                bevy::picking::pointer::PointerId::Mouse,
-                location,
-            ),
-            button,
-            hit: bevy::picking::backend::HitData::new(Entity::PLACEHOLDER, 0.0, None, None),
-            duration: std::time::Duration::ZERO,
-            count: 1,
-        });
+    fn button(app: &mut App, weapon: WeaponKind) -> Entity {
+        app.world_mut()
+            .query::<(Entity, &WeaponButton)>()
+            .iter(app.world())
+            .find(|(_, button)| button.weapon == weapon)
+            .map(|(entity, _)| entity)
+            .unwrap()
     }
 
     #[test]
-    fn only_a_primary_click_on_a_button_chooses_its_weapon_and_closes_the_drawer() {
+    fn only_a_primary_click_on_a_built_weapon_loads_it_into_its_own_slot_and_closes_the_drawer() {
         let mut app = app();
-        click_icon(&mut app, Energy::Red);
-        let ring = app
-            .world_mut()
-            .query::<(Entity, &WeaponButton)>()
-            .iter(app.world())
-            .find(|(_, button)| button.0 == WeaponKind::FireRing)
-            .map(|(entity, _)| entity)
-            .unwrap();
+        // Empty the red slot, so that loading the fire ring (the only built weapon) changes it.
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Red, None);
+        click_gauge(&mut app, Energy::Red);
+        let slots = |app: &App| app.world().resource::<ActiveWeapons>().0;
+        let before = slots(&app);
+        let ring = button(&mut app, WeaponKind::FireRing);
         for other in [PointerButton::Secondary, PointerButton::Middle] {
-            click(&mut app, ring, other);
-            assert_eq!(crate::test_util::messages::<WeaponChosen>(&app), vec![]);
+            crate::test_util::click(&mut app, ring, other);
+            assert_eq!(slots(&app), before, "{other:?}");
             assert_eq!(open(&app), Some(Energy::Red), "{other:?}");
         }
-        click(&mut app, ring, PointerButton::Primary);
+        let fireball = button(&mut app, WeaponKind::Fireball);
+        crate::test_util::click(&mut app, fireball, PointerButton::Primary);
+        assert_eq!(slots(&app), before, "the fireball is not built");
+        assert_eq!(open(&app), Some(Energy::Red));
+        crate::test_util::click(&mut app, ring, PointerButton::Primary);
         assert_eq!(
-            crate::test_util::messages::<WeaponChosen>(&app),
-            vec![WeaponChosen(WeaponKind::FireRing)]
+            slots(&app),
+            [
+                Some(WeaponKind::IceRing),
+                Some(WeaponKind::FireRing),
+                None,
+                None
+            ]
         );
         assert_eq!(open(&app), None);
     }
@@ -541,12 +661,12 @@ mod tests {
                 .display
         };
         assert_eq!(display(&mut app), Display::None);
-        click_icon(&mut app, Energy::Red);
+        click_gauge(&mut app, Energy::Red);
         assert_eq!(display(&mut app), Display::Flex);
         while app.world().resource::<DrawerState>().slide < 1.0 {
             app.update();
         }
-        click_icon(&mut app, Energy::Red);
+        click_gauge(&mut app, Energy::Red);
         let mut frames = 0;
         while app.world().resource::<DrawerState>().slide > 0.0 {
             assert_eq!(display(&mut app), Display::Flex);

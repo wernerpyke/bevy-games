@@ -71,3 +71,27 @@ pub fn messages<M: Message + Clone>(app: &App) -> Vec<M> {
         .cloned()
         .collect()
 }
+
+/// The mouse pointer, for picking events triggered in a test.
+fn pointer() -> bevy::picking::events::Pointer {
+    let location = bevy::picking::pointer::Location {
+        target: bevy::camera::NormalizedRenderTarget::None {
+            width: 1,
+            height: 1,
+        },
+        position: Vec2::ZERO,
+    };
+    bevy::picking::events::Pointer::new(bevy::picking::pointer::PointerId::Mouse, location)
+}
+
+/// Triggers a completed click with `button` on `entity`, as the picking backend does.
+pub fn click(app: &mut App, entity: Entity, button: PointerButton) {
+    app.world_mut().trigger(PointerClick {
+        entity,
+        pointer: pointer(),
+        button,
+        hit: bevy::picking::backend::HitData::new(Entity::PLACEHOLDER, 0.0, None, None),
+        duration: std::time::Duration::ZERO,
+        count: 1,
+    });
+}

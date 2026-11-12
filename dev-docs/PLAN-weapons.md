@@ -4,12 +4,12 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Status (2026-11-11, end of session): resume here
 
-Done and committed: P0 to P4, W1 (fire ring, built, **values not tuned yet**), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). Next: tune W1 with the user's numbers, then **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen yet: a ghost pinned against a tree by a push, a cast near the map edge.
+Done and committed: P0 to P4, W1 (fire ring, built, **values not tuned yet**), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. Then tune W1 with the user's numbers, then **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen yet: a ghost pinned against a tree by a push, a cast near the map edge.
 
 ## Goal
 
 1. **Part 1, migrate.** Move what is reusable into `game-kit` (geometry, the wall blocker, **and all Enoki code**). Move the rest into `long-way`. Add `bevy_enoki` to `game-kit` without making the main build slower or `target/` bigger than it must be.
-2. **Part 2, weapons.** First build the shared base: enemy hit points, damage, pushback and the link from the weapon drawer. Then add the weapons **one at a time**. Each weapon is built, wired into the drawer (`WeaponChosen`), tested and tuned before the next one starts. Order set by the user: (1) fire ring, (2) ice ring, (3) fire wall, (4) ice wall, (5) whirlpool, (6) fireball.
+2. **Part 2, weapons.** First build the shared base: enemy hit points, damage, pushback and the link from the weapon drawer. Then add the weapons **one at a time**. Each weapon is built, wired into the drawer and the active weapon button (`WeaponKind::is_built`, `adr-lw34`), tested and tuned before the next one starts. Order set by the user: (1) fire ring, (2) ice ring, (3) fire wall, (4) ice wall, (5) whirlpool, (6) fireball.
 
 ## Out of scope
 
@@ -71,7 +71,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | D2 | Enoki cannot read `.aseprite`. Sheets must be one row of equal cells. | **Decided (2026-11-11):** the `Aseprite` asset cannot feed Enoki as it is (a packed 2D atlas of full-canvas frames). **Build the strips at run time** in the kit: `fx_strip.rs` cuts a tag into a cropped strip when the art loads. No export script, no generated PNG, no start-up check, and a fresh clone works. |
 | D3 | Where does the Enoki code live? | **Decided: `game-kit`**, as `fx.rs`. See G1. |
 | D4 | The wall blocks ghosts, the player and projectiles. | **Decided:** a body inside the wall rectangle when it appears walks out. No push, no shifting. |
-| D5 | How do we trigger a weapon in a test? | **Replaced.** The drawer exists (`WeaponChosen`, `adr-lw31`). Scripted runs click it with `ui_click:<x>:<y>` (`dev-feedback.md`). **No env variable trigger.** For an all-weapons stress run, a script casts every weapon in turn. |
+| D5 | How do we trigger a weapon in a test? | **Replaced.** Load the weapon in the drawer (a gauge, then a weapon button), then click the active weapon button (`adr-lw34`). Scripted runs click with `ui_click:<x>:<y>` (`dev-feedback.md`, coordinates in `weapons.md`). **No env variable trigger.** For an all-weapons stress run, a script casts every weapon in turn. |
 | D6 | Whirlpool variant | **Decided (user, 2026-11-11): variant B** (attractor, spiral outward, with push). |
 | D7 | Enemy hit points | **Decided: enemies need HP.** Design in P4. |
 | D8 | Damage model | **Decided:** every weapon has a tunable **damage per second** (`dps`). A weapon that hits once (the fireball) has a tunable **impact damage** instead. |
@@ -148,7 +148,7 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 
 ```
 games/long-way/src/weapons/
-├── mod.rs        WeaponPlugin: the messages, the sub-plugins, the WeaponChosen to CastWeapon link
+├── mod.rs        WeaponPlugin: the messages, the sub-plugins, the ActiveWeaponClicked to CastWeapon link
 ├── values.rs     every number of every weapon in one place (WeaponValues per WeaponKind)
 ├── damage.rs     applies WeaponHit to enemy HP, pushback application
 ├── ring.rs       RingPlugin (fire and ice)
@@ -162,7 +162,7 @@ Each weapon file is added in its own step. Do not create empty files for later w
 
 - **Weapon kinds:** reuse `WeaponKind` from `weapon_menu.rs` (fire ring, ice ring, fire wall, ice wall, whirlpool, fireball). Do not make a second enum.
 - **Messages:**
-  - `CastWeapon { weapon, origin, facing }`: asks for a weapon. Built from `WeaponChosen` for the player.
+  - `CastWeapon { weapon, origin, facing }`: asks for a weapon. Built from `ActiveWeaponClicked` for the player (`adr-lw34`).
   - `WeaponHit { target, weapon, amount, push }`: a damage tick, an impact, or a push on one target. `amount` is already `dps * tick` or the impact damage. `damage.rs` turns it into HP loss and movement.
 - **Gameplay and visuals are separate systems.** Gameplay owns the state (ring radius, wall rectangle and timer, whirlpool band) and sends `WeaponHit`. Visuals read that state and spawn emitters and sprites. The gameplay half runs and is tested with no particles.
 - **Values in one place.** `values.rs` holds, per weapon: `damage` (`PerSecond(f32)` or `Impact(f32)`), `pushback` (`None`, `Pixels(f32)`, `ToEdge`), `tick` (seconds between hits on one target, 0.5 s in the spike), size, duration, speed, `glow: bool`. Each number names its source (spike default or tuned).
@@ -194,7 +194,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 2. **Assets:** copy this weapon's art and effect files from the spike (only what it uses), update `art-pipeline.md` and `art-tags.md`, request the particle looks from `FxLooks` (P3).
 3. **Gameplay:** the weapon's state machine, hit test, `WeaponHit` messages with the values from `values.rs`. Unit tests in plain Rust for the mechanic (the spike tests move or are rewritten here).
 4. **Visuals:** the emitters and sprites, reading the gameplay state. `DepthSort` on all of them.
-5. **Wire into the drawer:** the button for this weapon (already in `weapon_menu.rs`) now produces a working cast through `CastWeapon`. Check the button after a cast (no double cast from one click) and that closing the drawer does not cancel the weapon.
+5. **Wire into the drawer:** return `true` for this weapon in `WeaponKind::is_built` (`weapon_menu.rs`), so its drawer button is no longer dimmed and it can be loaded; the active button then casts it through `CastWeapon` (`adr-lw34`). Update the tests that list the built weapons. Check one click casts once and that closing the drawer does not cancel the weapon.
 6. **Scripted test:** `rust.sh script long-way "...;ui_click:...;ui_click:...;wait:...;screenshot:...;quit" --debug` with ghosts placed at set distances (a ghost inside, on the edge and outside the effect). Read the log for the per-hit lines. Say what was not seen on screen (motion, timing, feel).
 7. **Tune with the user:** the user plays it. The values to tune are `dps`, `pushback`, size, duration, and `glow`. Change `values.rs`, rerun, repeat until the user accepts. Record the accepted values in `weapons.md`. A tuning note per weapon says which numbers moved and why.
 8. **Performance check:** frame time and particle count with the weapon cast every 0.7 s (spike reference: about 3.4 ms native at about 3400 particles).

@@ -11,8 +11,8 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 | `weapons/damage.rs` | `Contact`: damage ticks, the first tick at once, a long frame deals one tick with no burst (D14), pushback limits. `pushed_feet` stops at a blocked area and the map edge. `apply_hits` sends `DamageEnemy` and moves the enemy |
 | `weapons/ring.rs` | The fire ring: a cast makes a ring, the front hurts once, the burn hurts every tick until the ring ends, no body is skipped at a low frame rate, the pushback limit, the burn starts at the lead radius, the damaging band. A body without `EnemyHp` and a dead enemy with a `HitBox` are not hit (D15) |
 | `weapons/values.rs` | Data rules across all weapons. The ring size is a compile-time assert |
-| `weapons/mod.rs` | A chosen weapon is cast from the player's feet with the player's facing; no player, no cast |
-| `weapon_menu.rs` | Which icon opens or closes the drawer, the slide, one drawer per weapon and the label length. Systems: an icon and a click in the world, the buttons or the "no weapons" text, only a primary click chooses, the drawer is hidden at slide 0. The drawer sizes are compile-time asserts |
+| `weapons/mod.rs` | The active weapon is cast from the player's feet with the player's facing, a blank slot casts nothing; no player, no cast |
+| `weapon_menu.rs` | Which gauge opens or closes the drawer, the slide, one drawer per weapon and the label length, the default weapons and only built weapons active. Systems: a gauge, a click in the world and an active button click, the buttons or the "no weapons" text, only a primary click on a built weapon loads it into its own slot, the drawer is hidden at slide 0. The drawer sizes are compile-time asserts |
 | `enemy_hp.rs` | `EnemyHp::lose`, the hurt colour hex, the tint and its end, one `EnemyDied`, hurt frames instead of the tint, a target without HP is left alone |
 | `hp.rs` | The player's points stop at 0, and no `PlayerHurt` is sent at 0 |
 | `ghost.rs` | Attack, death and hurt: which animation wins and when the player loses HP. The ghost's systems run before the kit's facing tags. A marker puts the ghost's feet at the cell centre; a bad strategy is skipped |
@@ -21,8 +21,8 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 | `rocks.rs` | Placement (whole scale, the sort line), the blocked area in a group (with and without an open top) and alone, the jitter range |
 | `trees.rs`, `scenery.rs` | Where the canvas hangs, the trunk band of an object alone and the anchor cell in a group |
 | `markers.rs` | The blocked area on whole pixels and the touch area of an exit marker |
-| `pickups.rs`, `inventory.rs` | Each pickup kind has the art and the name of its own energy. Counts per energy; an unknown kind is not counted |
-| `hud.rs` | HP icon tags, and the systems that update the energy counts and the HP row |
+| `pickups.rs`, `inventory.rs` | Each pickup kind has the art and the name of its own energy. Counts per energy, the maximum and the fraction; an unknown kind is not counted |
+| `hud.rs` | HP icon tags. Systems: each gauge follows its own energy, an active button shows its slot's weapon icon (no label) or is blank, only a primary click on a button or a gauge sends its energy, the HP row. The button frames, the gauge fill and the hover line are kit tests (`game_kit::hud`) |
 | `background.rs` | Unknown tile names, the colour rectangle and the tile images of a map |
 
 `test_util.rs` holds the helpers that several modules share: an app with manual time, an app that can load assets, small maps and objects, and the messages of the last update.
