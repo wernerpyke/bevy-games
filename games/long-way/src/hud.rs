@@ -24,25 +24,27 @@ impl Plugin for HudPlugin {
 
 /// The energies from left to right: one column each for a button and a gauge.
 const COLUMNS: [Energy; 4] = [Energy::Red, Energy::Blue, Energy::Violet, Energy::Black];
-/// Width of the bar, and the columns in it, in art pixels.
+/// Width of the bar, and the columns in it, in art pixels. The columns fill the bar from x 2 to the right edge, under
+/// the four fence segments of `backgrounds/hud.aseprite` (its separators are 2 pixels wide, the first at x 0).
 const BAR_WIDTH: f32 = VIEW_HEIGHT;
-const COLUMN_LEFT: f32 = 8.0;
-const COLUMN_WIDTH: f32 = 118.0;
-const COLUMN_GAP: f32 = 8.0;
+const COLUMN_LEFT: f32 = 2.0;
+const COLUMN_RIGHT: f32 = 0.0;
+const COLUMN_WIDTH: f32 = 126.0;
+const COLUMN_GAP: f32 = 2.0;
 const _: () = assert!(
-    2.0 * COLUMN_LEFT + 4.0 * COLUMN_WIDTH + 3.0 * COLUMN_GAP == BAR_WIDTH,
+    COLUMN_LEFT + 4.0 * COLUMN_WIDTH + 3.0 * COLUMN_GAP + COLUMN_RIGHT == BAR_WIDTH,
     "the four columns fill the bar"
 );
 
 /// Top and height of the active weapon buttons, in art pixels. The height is that of `ui/weapon_button.aseprite`.
-const BUTTON_TOP: f32 = 22.0;
+const BUTTON_TOP: f32 = 12.0;
 const BUTTON_HEIGHT: f32 = 56.0;
 const BUTTON_ART: &str = "art/ui/weapon_button.aseprite";
 
 /// Top and height of a gauge, and the space above and below it that also takes the click, in art pixels.
-const GAUGE_TOP: f32 = 84.0;
+const GAUGE_TOP: f32 = 70.0;
 const GAUGE_HEIGHT: f32 = 12.0;
-const GAUGE_CLICK_PAD: f32 = 6.0;
+const GAUGE_CLICK_PAD: f32 = 2.0;
 /// The empty part of a gauge: palette colour `#1f1932`.
 const GAUGE_TRACK: Color = Color::srgb(0.1216, 0.0980, 0.1961);
 /// The line just below a gauge while the pointer is over it (the user's choice, 2026-11-12), and its height.

@@ -76,6 +76,6 @@ For the kit's movement and collision lines add `long_way=debug,game_kit=debug` t
 
 Change a number in `values.rs`, run the game or a scripted run (`dev-feedback.md`), and read the `enemy:` log lines (see above). For example:
 
-`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:67:562;wait:3;quit" --debug`
+`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:65:552;wait:3;quit" --debug`
 
-`ui_click:67:562` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 319 and 445 (blue, violet, black), and the gauges below them at y 602. Coordinates are art pixels from the top left of the window (the bar starts at y 512).
+`ui_click:65:552` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 321 and 449 (blue, violet, black), and the gauges below them at y 588. Coordinates are art pixels from the top left of the window (the bar starts at y 512).

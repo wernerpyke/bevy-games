@@ -210,7 +210,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** The weapons need a real trigger before they are built, so the player can pick one without a test variable. A drawer over the world keeps the bar small and the 8 by 8 cell view as it is. The drawer is its own UI root on the game camera, because a child of `Hud` is clipped to the HUD region. It carries `BlocksWorldClick` (`adr-x44`), or a click on a button would also walk the player. The map fade overlay now ignores picking, because it covers the whole game region and took the clicks from the drawer. Real time for the slide means a pause key added later does not freeze the drawer half way.
 
-**How to apply.** Code: `weapon_menu.rs` (the table `weapons_for` is the energy to weapon mapping, the constants at the top hold sizes, times and colours), `hud.rs` (the clickable gauges, `adr-lw34`), `main.rs`. Art: `art-pipeline.md`, `art-tags.md`. Test it with `script long-way "ui_click:193:602;wait:0.5;screenshot:drawer;quit" --debug` (the blue gauge, `dev-feedback.md`).
+**How to apply.** Code: `weapon_menu.rs` (the table `weapons_for` is the energy to weapon mapping, the constants at the top hold sizes, times and colours), `hud.rs` (the clickable gauges, `adr-lw34`), `main.rs`. Art: `art-pipeline.md`, `art-tags.md`. Test it with `script long-way "ui_click:193:588;wait:0.5;screenshot:drawer;quit" --debug` (the blue gauge, `dev-feedback.md`).
 
 ## adr-lw32. Enemies have float hit points, weapons deal damage per second and push, and each weapon has its own aim rule (2026-11-11)
 
