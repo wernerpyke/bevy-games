@@ -47,7 +47,7 @@ A projectile flies in a straight line over the ground and disappears when it rea
 ## Limits
 
 - The edges are the ones built for the shooter's feet, grown sideways by the feet half width. A projectile stops up to that far before the side of a blocked area. A lone tree blocks only its base band, so a shot hits it only where its ground line crosses that band (`adr-x21`).
-- No range limit, no cooldown, no hit points, no hit effects. A game that wants a range limit despawns the projectile itself (Long Way does it for the fireball, `PLAN-weapons.md`). R-Town removes projectiles in flight when the map reloads (`adr-rt13`).
+- No range limit, no cooldown, no hit points, no hit effects. A game that wants a range limit despawns the projectile itself (Long Way does it for the fireball, and steers it by setting `velocity` every frame: `games/long-way/src/weapons/fireball.rs`). R-Town removes projectiles in flight when the map reloads (`adr-rt13`).
 - Straight flight only. There is no gravity, homing or bounce.
 
 ## Tests

@@ -1,0 +1,22 @@
+#![enable(implicit_some)]
+// Fire ball of the explosion: a radial burst that slows down and cools.
+(
+    spawn_rate: 0.001,
+    spawn_amount: 44,
+    emission_shape: Circle(10.0),
+    lifetime: (0.55, 0.35),
+    linear_speed: (220.0, 0.6),
+    direction: ((1.0, 0.0), 1.0),
+    linear_damp: (4.0, 0.0),
+    gravity_direction: ((0.0, 1.0), 0.0),
+    gravity_speed: (30.0, 0.2),
+    scale: (20.0, 0.0),
+    scale_curve: (points: [(20.0, 0.0, None), (14.0, 0.3, None), (4.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 0.85, blue: 0.8, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 1.0), 0.25, None),
+        ((red: 0.9, green: 0.42, blue: 0.36, alpha: 0.9), 0.55, None),
+        ((red: 0.7, green: 0.26, blue: 0.26, alpha: 0.5), 0.8, None),
+        ((red: 0.7, green: 0.26, blue: 0.26, alpha: 0.0), 1.0, None),
+    ]),
+)

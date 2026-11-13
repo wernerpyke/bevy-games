@@ -9,8 +9,9 @@ use crate::weapon_menu::WeaponKind;
 pub enum Damage {
     /// Hit points per second while a target is in the effect. It is dealt in ticks of `WeaponValues::tick` seconds.
     PerSecond(f32),
-    /// Hit points dealt once, on impact (the fireball).
-    Impact(f32),
+    /// Hit points dealt once, on impact (the fireball): `direct` to the enemy it hits, and `blast` to every other enemy
+    /// in the explosion (`FireballShape::blast_radius`).
+    Impact { direct: f32, blast: f32 },
     /// Hit points dealt once to a target the weapon pushes (`push`), and once per cast to a target that walks into it
     /// (`touch`). The ice ring deals them itself, so `Contact::damage` gives `None` for it.
     PushAndTouch { push: f32, touch: f32 },
@@ -141,6 +142,33 @@ pub const TORNADO: TornadoShape = TornadoShape {
 
 const _: () = assert!(TORNADO.start_radius < TORNADO.radius && TORNADO.bump_every > 0);
 
+/// The flight and explosion of the fireball (`weapons/fireball.rs`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct FireballShape {
+    /// Pixels per second. It steers to its target every frame, so it does not miss a target that moves.
+    pub speed: f32,
+    /// A shot with no target (no enemy on the map) explodes after this many pixels.
+    pub range: f32,
+    /// The blast damages every other enemy whose body is within this radius of the explosion.
+    pub blast_radius: f32,
+    /// The shot starts this far from the player's feet, towards its target.
+    pub muzzle: f32,
+    /// How high above its ground point the ball flies (`Projectile::height`): about the middle of a ghost's body, so
+    /// the ground point heads for the ghost's feet.
+    pub height: f32,
+}
+
+/// Start values (the user's design, 2026-11-13). Speed, range and muzzle from the spike. The blast radius is 1.25
+/// cells, a little more than 1 cell (the user: "may have to be slightly larger than 1 cell"), where the spike's
+/// shockwave ends (the test in `fireball.rs`).
+pub const FIREBALL: FireballShape = FireballShape {
+    speed: 420.0,
+    range: 1100.0,
+    blast_radius: 1.25 * CELL_SIZE,
+    muzzle: 34.0,
+    height: 14.0,
+};
+
 /// The shape of a ring weapon, `None` for the other weapons.
 pub fn ring_shape(weapon: WeaponKind) -> Option<RingShape> {
     match weapon {
@@ -193,8 +221,13 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             tick: 0.5,
             glow: false,
         },
+        // The user's design (2026-11-13), start values to tune. A direct hit and the blast each kill a ghost (b10,
+        // b11), and the blast is the smaller (b12).
         WeaponKind::Fireball => WeaponValues {
-            damage: Damage::Impact(40.0),
+            damage: Damage::Impact {
+                direct: 150.0,
+                blast: 100.0,
+            },
             pushback: Pushback::None,
             tick: 0.5,
             glow: true,
@@ -212,9 +245,12 @@ mod tests {
             let v = values(weapon);
             assert!(v.tick > 0.0, "{weapon:?}");
             match v.damage {
-                Damage::PerSecond(n) | Damage::Impact(n) => assert!(n > 0.0, "{weapon:?}"),
+                Damage::PerSecond(n) => assert!(n > 0.0, "{weapon:?}"),
                 Damage::PushAndTouch { push, touch } => {
                     assert!(push > 0.0 && touch > 0.0, "{weapon:?}")
+                }
+                Damage::Impact { direct, blast } => {
+                    assert!(direct > 0.0 && blast > 0.0, "{weapon:?}")
                 }
             }
             if let Pushback::Pixels(n) | Pushback::Outward(n) = v.pushback {
@@ -226,10 +262,39 @@ mod tests {
     #[test]
     fn only_the_fireball_deals_impact_damage_and_it_does_not_push() {
         for weapon in WeaponKind::ALL {
-            let impact = matches!(values(weapon).damage, Damage::Impact(_));
+            let impact = matches!(values(weapon).damage, Damage::Impact { .. });
             assert_eq!(impact, weapon == WeaponKind::Fireball, "{weapon:?}");
         }
         assert_eq!(values(WeaponKind::Fireball).pushback, Pushback::None);
+    }
+
+    /// The fireball's direct hit and blast.
+    fn fireball_damage() -> (f32, f32) {
+        let Damage::Impact { direct, blast } = values(WeaponKind::Fireball).damage else {
+            panic!("the fireball should deal impact damage");
+        };
+        (direct, blast)
+    }
+
+    /// Balance rule b10 (`docs/balance.md`).
+    #[test]
+    fn b10_a_direct_fireball_hit_kills_a_ghost() {
+        let (direct, _) = fireball_damage();
+        assert!(direct >= crate::ghost::HIT_POINTS, "{direct}");
+    }
+
+    /// Balance rule b11 (`docs/balance.md`).
+    #[test]
+    fn b11_the_fireball_blast_alone_kills_a_ghost() {
+        let (_, blast) = fireball_damage();
+        assert!(blast >= crate::ghost::HIT_POINTS, "{blast}");
+    }
+
+    /// Balance rule b12 (`docs/balance.md`).
+    #[test]
+    fn b12_the_fireball_blast_deals_less_than_a_direct_hit() {
+        let (direct, blast) = fireball_damage();
+        assert!(blast < direct, "blast {blast}, direct {direct}");
     }
 
     /// Balance rule b3 (`docs/balance.md`): one ice ring deals at most its push and its touch to a ghost, and that

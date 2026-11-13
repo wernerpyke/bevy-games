@@ -109,7 +109,7 @@ impl WeaponKind {
     pub fn is_built(self) -> bool {
         matches!(
             self,
-            WeaponKind::FireRing | WeaponKind::IceRing | WeaponKind::Tornado
+            WeaponKind::FireRing | WeaponKind::IceRing | WeaponKind::Tornado | WeaponKind::Fireball
         )
     }
 }
@@ -621,7 +621,7 @@ mod tests {
     #[test]
     fn only_a_primary_click_on_a_built_weapon_loads_it_into_its_own_slot_and_closes_the_drawer() {
         let mut app = app();
-        // Empty the red slot, so that loading the fire ring (the only built weapon) changes it.
+        // Empty the red slot, so that loading the fire ring changes it.
         app.world_mut()
             .resource_mut::<ActiveWeapons>()
             .set_for_test(Energy::Red, None);
@@ -634,9 +634,9 @@ mod tests {
             assert_eq!(slots(&app), before, "{other:?}");
             assert_eq!(open(&app), Some(Energy::Red), "{other:?}");
         }
-        let fireball = button(&mut app, WeaponKind::Fireball);
-        crate::test_util::click(&mut app, fireball, PointerButton::Primary);
-        assert_eq!(slots(&app), before, "the fireball is not built");
+        let wall = button(&mut app, WeaponKind::FireWall);
+        crate::test_util::click(&mut app, wall, PointerButton::Primary);
+        assert_eq!(slots(&app), before, "the fire wall is not built");
         assert_eq!(open(&app), Some(Energy::Red));
         crate::test_util::click(&mut app, ring, PointerButton::Primary);
         assert_eq!(

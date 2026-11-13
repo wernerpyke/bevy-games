@@ -1,0 +1,21 @@
+#![enable(implicit_some)]
+// Flame tail: a cone. Starts as wide as the ball and narrows to a point. +X of the emitter points backwards.
+(
+    spawn_rate: 0.016,
+    spawn_amount: 3,
+    emission_shape: Circle(4.0),
+    lifetime: (0.55, 0.15),
+    linear_speed: (30.0, 0.3),
+    direction: ((1.0, 0.0), 0.06),
+    linear_damp: (1.5, 0.0),
+    gravity_direction: ((0.0, 1.0), 0.0),
+    gravity_speed: (12.0, 0.3),
+    scale: (26.0, 0.0),
+    scale_curve: (points: [(26.0, 0.0, None), (16.0, 0.25, None), (6.0, 0.6, None), (1.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 1.0), 0.0, None),
+        ((red: 0.9, green: 0.42, blue: 0.36, alpha: 0.9), 0.4, None),
+        ((red: 0.7, green: 0.26, blue: 0.26, alpha: 0.6), 0.75, None),
+        ((red: 0.7, green: 0.26, blue: 0.26, alpha: 0.0), 1.0, None),
+    ]),
+)

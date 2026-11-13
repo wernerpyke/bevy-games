@@ -253,3 +253,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Changed after the first play test (the user, 2026-11-13).** The push edge is where the player sees the dense droplets: it starts at their inner edge (1 cell) and grows to 1.5 cells, shown by a ring of dots that moves with the player. A weaker steady push plus a bump on every second tick knocks a ghost walking in back a couple of times (b9), so the push reads as a hit rather than a slow drift. The ghost still gets through to a player who stands still (b7).
 
 **How to apply.** Code: `weapons/tornado.rs`, `weapons/values.rs` (`TORNADO`, `Pushback::Outward`, the tornado row). Docs: `weapons.md`, `balance.md` (b4 to b9).
+
+## adr-lw37. The fireball is aimed by the game, steers to its target and explodes with a blast that spares the enemy it hit (2026-11-13)
+
+**Decision.** The fireball goes for the closest living enemy on screen, or the closest on the map when none is on screen, and flies in a random direction when there is no enemy. It steers to its target every frame, so it does not miss a moving one. It explodes on the first enemy it touches, on a blocking feature, at the map edge, at the end of its range with no target, and at the last place of a target that dies or vanishes in flight. The enemy it touched takes the direct hit; every other enemy within the blast radius takes a smaller blast damage, through features. The blast does not hurt the player and does not push. Balance rules b10 to b14.
+
+**Rationale.** The user's intent (2026-11-13, quoted in `weapons.md`): a high-power shot the player does not aim. Steering keeps the promise "does not miss" without aim prediction; at 420 px/s against a ghost's 90 it does not read as a homing missile (the user). Enemies on screen first, because the player sees them. A feature in the way is the one way to miss, as the user wants, and the blast through features still reaches an enemy close behind it. The direct target is spared the blast so that a stronger enemy that survives the direct hit is not punished twice (b14). The kit's `Projectile` already moves a shot and reports what it hits; the fireball only changes its velocity.
+
+**How to apply.** Code: `weapons/fireball.rs`, `weapons/values.rs` (`FIREBALL`, `Damage::Impact`, the fireball row). Docs: `weapons.md`, `balance.md` (b10 to b14).

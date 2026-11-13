@@ -8,6 +8,7 @@
     reason = "Contact and pushed_feet are used by the weapon steps, W1 onwards"
 )]
 pub mod damage;
+pub mod fireball;
 pub mod ice_ring;
 pub mod ring;
 pub mod tornado;
@@ -37,7 +38,11 @@ impl Plugin for WeaponPlugin {
                 )
                     .chain(),
             )
-            .add_plugins((ring::RingPlugin, tornado::TornadoPlugin))
+            .add_plugins((
+                ring::RingPlugin,
+                tornado::TornadoPlugin,
+                fireball::FireballPlugin,
+            ))
             .add_systems(Update, cast_active.in_set(WeaponSystems::Cast))
             .add_systems(Update, damage::apply_hits.in_set(WeaponSystems::Apply));
     }
@@ -142,7 +147,7 @@ mod tests {
         // Violet has no weapon and black holds one that is not built: only red casts.
         app.world_mut()
             .resource_mut::<ActiveWeapons>()
-            .set_for_test(Energy::Black, Some(WeaponKind::Fireball));
+            .set_for_test(Energy::Black, Some(WeaponKind::IceWall));
         for energy in [Energy::Violet, Energy::Red, Energy::Black] {
             app.world_mut().write_message(ActiveWeaponClicked(energy));
         }

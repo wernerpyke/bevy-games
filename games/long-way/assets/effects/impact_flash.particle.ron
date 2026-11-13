@@ -1,0 +1,15 @@
+#![enable(implicit_some)]
+// One big white blob for the first frames of the explosion.
+(
+    spawn_rate: 0.001,
+    spawn_amount: 1,
+    emission_shape: Point,
+    lifetime: (0.14, 0.0),
+    scale: (30.0, 0.0),
+    scale_curve: (points: [(30.0, 0.0, None), (90.0, 0.3, None), (0.0, 1.0, None)]),
+    color_curve: (points: [
+        ((red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0), 0.0, None),
+        ((red: 1.0, green: 0.85, blue: 0.8, alpha: 0.8), 0.4, None),
+        ((red: 1.0, green: 0.62, blue: 0.52, alpha: 0.0), 1.0, None),
+    ]),
+)

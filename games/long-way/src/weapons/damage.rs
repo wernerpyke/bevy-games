@@ -180,7 +180,13 @@ mod tests {
 
     #[test]
     fn impact_weapons_get_no_ticks() {
-        let v = values(Damage::Impact(40.0), Pushback::None);
+        let v = values(
+            Damage::Impact {
+                direct: 40.0,
+                blast: 20.0,
+            },
+            Pushback::None,
+        );
         assert_eq!(Contact::default().damage(&v, 1.0), None);
     }
 

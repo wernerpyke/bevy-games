@@ -4,7 +4,7 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Status (2026-11-13): resume here
 
-Done and committed: P0 to P4, W1 (fire ring), W2 (ice ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. **W3 (tornado) accepted by the user on 2026-11-13** after one play test: the push edge grows from 1 to 1.5 cells and is shown by a ring of dots, a steady push of 20 px/s plus a 40 px bump on every second tick (`adr-lw36`, b4 to b9 enforced by tests). Not seen on screen in W3: a ghost killed by holding the tornado against it, a ghost pinned against a tree. Next: W4 (fireball), W5 (fire wall), W6 (ice wall). WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
+Done and committed: P0 to P4, W1 (fire ring), W2 (ice ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. **W3 (tornado) accepted by the user on 2026-11-13** after one play test: the push edge grows from 1 to 1.5 cells and is shown by a ring of dots, a steady push of 20 px/s plus a 40 px bump on every second tick (`adr-lw36`, b4 to b9 enforced by tests). Not seen on screen in W3: a ghost killed by holding the tornado against it, a ghost pinned against a tree. **W4 (fireball) accepted by the user on 2026-11-13** with its start values after one play test; the trail now uses the `tail` tag, one full-size frame, as in the spike (`adr-lw37`, b10 to b14; b10 to b12 and b14 enforced by tests, b13 by hand). Not seen on screen in W4: a blast kill, a cast with no enemy, a cast with no enemy on screen. Next: W5 (fire wall), W6 (ice wall). WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
 
 ## Goal
 
@@ -92,9 +92,9 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | W1 fire ring, W2 ice ring | The player's position at cast time. **Does not follow the player.** | None (a full circle). |
 | W5 fire wall, W6 ice wall | In front of the player. | The player's facing direction sets the orientation (horizontal or vertical) and the travel direction. |
 | W3 tornado | The player. **Follows the player** while it lasts. | None (surrounds the player). |
-| W4 fireball | The player's muzzle point. | **Auto-target the nearest visible enemy.** |
+| W4 fireball | The player's muzzle point. | **Auto-target the closest enemy on screen, or on the map when none is on screen; a random direction with none** (decided in W4). |
 
-Open details, asked in the weapon step: what "facing" gives when the player faces a diagonal (W5), what "visible" means and what the fireball does with no enemy visible (W4).
+Open details, asked in the weapon step: what "facing" gives when the player faces a diagonal (W5), what "visible" means and what the fireball does with no enemy visible (W4, decided: see W4).
 
 ## Part 1: Migrate
 
@@ -281,7 +281,11 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 **Play test 1 (the user, 2026-11-13).** The feel is fine. Changes: the push edge sits on the dense droplets (it grows from their inner edge, 1 cell, to 1.5 cells), a ring of 1 px dots shows it, and a ghost walking in is bumped back a couple of times (option B: 40 px on every second tick, also while the edge grows). New rule b9. Details in `weapons.md` and adr-lw36.
 
-#### W4. Fireball
+#### W4. Fireball (accepted 2026-11-13)
+
+**Intent (the user, 2026-11-13, quoted in `weapons.md`).** A high-power projectile aimed by the game at the enemy closest to the player. It does not miss that enemy, unless a blocking feature is in the way: then it explodes on the feature. A direct hit kills many enemies, but not all. The explosion deals a second, smaller damage to every enemy in a circle around it. With no enemy on the map it flies in a random direction. Later: in a cluster, target the enemy with the highest HP.
+
+**Decisions (the user, 2026-11-13).** A direct hit and the blast each kill a ghost (b10, b11); the blast is smaller (b12); a direct hit does not kill every kind (b13). The enemy hit takes only the direct hit (b14). Blast radius 1.25 cells to start, to tune. It steers to its target (fast enough not to feel like a homing missile). Enemies on screen first, then the whole map. An enemy in the way takes the direct hit. A target gone in flight is missed: it explodes at the target's last place. It explodes at the end of its range and always at the map edge. Assumptions accepted: the blast goes through features, does not hurt the player, does not push; the look is the spike's. Built: `weapons/fireball.rs`, `adr-lw37`, the kit's `ProjectilePlugin` now added by Long Way. The bullets below are the original questions.
 
 - It adds a moving shot, impact damage and no pushback.
 - **Design questions:**

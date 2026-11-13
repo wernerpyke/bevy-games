@@ -21,7 +21,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 | Fire wall | 40 per second | none | 0.5 s | on | not built |
 | Ice wall | 20 per second | none | 0.5 s | off | not built |
 | Tornado | 26 per second (13 per tick of contact, b5) | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off | **accepted** (W3, 2026-11-13) |
-| Fireball | 40 once | none | | on | not built |
+| Fireball | 150 to the enemy hit, 100 to every other enemy within 1.25 cells of the explosion (b10 to b14) | none | | on | **accepted** (W4, 2026-11-13) |
 
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
 - **Long frame (D14 in `PLAN-weapons.md`):** a frame longer than the tick deals one tick, and the rhythm starts again from it. Missed ticks are not dealt later.
@@ -91,6 +91,30 @@ Files: `weapons/tornado.rs` (gameplay and look), `weapons/values.rs` (`TORNADO`,
 - **Push edge** (the user, 2026-11-13): 48 dots of 1 px (`#EBF7FF`) on the edge of the disc grow with it, turn clockwise at 1 rad/s and move with the player, so a walking player sees where the push starts. They are sprites placed each frame, not particles: a particle in flight either trails behind or, moved with its emitter (Enoki's `relative_positioning`), smears along the emitter's turn. Values: `EDGE_DOTS`, `EDGE_SPIN`, `EDGE_COLOR` in `tornado.rs`.
 - Checked with scripted runs in map 1, after the play test changes: with the player standing, a ghost first touched the edge 0.83 s after the cast. It made no progress across its 2nd and 4th ticks (the bumps), took 5 ticks (35 HP left), reached the player 2.3 s after its first contact, then attacked and died (the player lost 1 HP). At 0.6 s the edge dots sat on the dense droplet band. Before the changes: With the player walking, the ghost did not touch the tornado for about 4 s; it took 3 ticks when the player walked back towards it. Not seen yet: a ghost killed by holding the tornado against it, a ghost pinned against a tree. Frame time not measured.
 
+## Fireball (W4)
+
+Design: `PLAN-weapons.md` W4 (in progress).
+
+**Intent and purpose (the user, 2026-11-13, in the user's words):**
+
+> The intent with fireball is that it is a high-power, targeted projectile that explodes on impact. A direct hit will kill numerous (but not all) enemies. When the fireball explodes it causes a secondary amount of damage to all enemies in a circle around the explosion. The ghost dies from both a direct hit and the secondary explosion damage.
+> The targeting/aim for the fireball is auto-determined (the player does not aim it). The fireball fires towards the enemy closest to the player and does not miss that enemy.
+> In a later version of the fireball we will implement a targeting strategy that, in a cluster of enemies, targets the enemy with the highest HP.
+> The only condition under which the fireball will miss is if the closest enemy is behind a blocking feature. In that case the fireball still targets that enemy but explodes on impact with the blocking feature. The enemy may still be damaged by the secondary explosion.
+> If the fireball is fired with no enemies on the map it fires in a random direction.
+
+Clarified by the user the same day: a direct hit and the blast each kill a ghost on their own. The enemy hit directly takes only the direct hit (b14). Enemies on screen come first; only when none is on screen does the whole map count. An enemy that steps into the path takes the direct hit. A target that dies or vanishes in flight is missed: the fireball explodes at its last place (later enemies that disappear are missed the same way). With no target it explodes at the end of its range, and it always explodes at the map edge. The blast goes through features, does not hurt the player and does not push.
+
+Design: `adr-lw37`. Files: `weapons/fireball.rs`, `weapons/values.rs` (`FIREBALL`, `Damage::Impact`), effects `assets/effects/fireball_*.particle.ron` (trail), `impact_*.particle.ron` (explosion) and `muzzle.particle.ron` (all from the spike), art tags `head` and `tail` of `art/weapons/fireball_and_rings.aseprite`. The kit's `Projectile` moves the ball (`dev-docs/extensions/projectiles.md`).
+
+**Start values (to tune):** 420 px/s, direct 150, blast 100 within 1.25 cells (80 px) of the explosion, range 1100 px with no target, the ball 14 px above its ground point, the muzzle 34 px from the player's feet.
+
+- **Target:** the living enemy whose body centre is closest to the middle of the player's body, among those whose centre is in the game camera's view; when none is in view, the closest on the map. Measured at the cast.
+- **Flight:** every frame it steers to the middle of the target's body. The kit stops it at the first enemy body it enters (`ProjectileTarget`, living enemies only), at a blocking feature (tested on the ground under the ball) and at the map edge.
+- **Explosion:** at the ball's height over the point where it stopped. The enemy it touched takes `direct`; every other living enemy whose body is within the blast radius takes `blast`.
+- **Look:** the `head` animation lifted to the ball's height and turned along the flight, four trail emitters that follow it (smoke, flame, core, embers, glow on), a muzzle burst, and five bursts at the explosion (smoke, fire, shockwave, sparks, flash). Every particle is drawn with `tail`, one full-size blob, for its whole life, so the trail is a cone as wide as the head (the user, 2026-11-13: with the old four-frame `blob` tag each particle started as a 1 px dot and the trail was thin at the head; the user then cut the tag to its last frame and renamed it `tail`). The shockwave ends at about the blast radius (a test). If the blast radius is tuned, change the shockwave in `impact_shockwave.particle.ron` with it.
+- Checked with scripted runs in map 1, the player at (-480, -224): the first cast went for the closest ghost (94 px, on screen), hit it directly for 150 and the ghost died. The second went for the other ghost, 253 px away behind the tree group, and exploded on the trees; the ghost was outside the blast. A screenshot in flight showed the head and the trail. Not seen yet: a blast kill, a target that moves out of the line, a cast with no enemy, a cast with no enemy on screen. Frame time not measured.
+
 ## Aim rules
 
 | Weapon | Anchor | Aim |
@@ -98,7 +122,7 @@ Files: `weapons/tornado.rs` (gameplay and look), `weapons/values.rs` (`TORNADO`,
 | Fire ring, ice ring | The middle of the player's body at the cast. Does not follow the player. | Full circle |
 | Fire wall, ice wall | In front of the player | The way the player faces sets the orientation and the travel direction |
 | Tornado | The player, and it follows | Surrounds the player |
-| Fireball | The player | The nearest visible enemy |
+| Fireball | The player | The closest living enemy on screen, or on the map when none is on screen; a random direction with none at all. It steers to the target, so it does not miss a moving one |
 
 ## Reporting a problem from a manual test
 
@@ -122,6 +146,9 @@ The lines (all `info`, one per event, `adr-lw32`):
 | `ice ring: <id> pinned at (x, y), stunned until the ring goes` | A push was stopped by a feature or the map edge |
 | `tornado: started at (x, y), edge 64 to 96 in 1.3 s, lasts d s` and `tornado: ended at age 5.55 s, touched 1: [<id> 6 ticks, pushed 125 px]` | The tornado: ticks dealt and pixels pushed per enemy. Each tick is also an `enemy:` line |
 | `ring: Ice ring ended at age 2.77 s` and `ice ring: ended, touched 2: [<id> pushed 114 px, push damage, stunned; ...]` | The ice ring is over, and what it did to each enemy. Stunned enemies walk again |
+| `fireball: cast at (x, y) at <id>, 146 px away, on screen` or `... with no enemy on the map, towards (x, y)` | The fireball left the muzzle, and what it goes for |
+| `fireball: target <id> is gone, flies on to (x, y)` | The target died or vanished in flight. The fireball explodes at its last place |
+| `fireball: exploded at (x, y) (Enemy), direct Some(<id>), blast 1: [<id>]` | Why it exploded (`Enemy`, `Blocked`, `MapEdge`, `Range`, `Lost`), who took the direct hit and who took the blast |
 
 For the kit's movement and collision lines add `long_way=debug,game_kit=debug` to `RUST_LOG`. Say where the player stood and what the ghost did on screen.
 

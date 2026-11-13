@@ -19,6 +19,11 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 | b7 | **A ghost walking at a standing player gets through the tornado.** | 2026-11-13 | `b7_a_ghost_walking_at_a_standing_player_gets_through` in `weapons/values.rs`; at work: `a_ghost_walking_at_a_standing_player_is_bumped_back_at_least_twice_and_gets_through` in `weapons/tornado.rs` |
 | b8 | **A moving player is safe: the player's own movement never carries a ghost deeper into the tornado.** | 2026-11-13 | `the_players_own_movement_never_takes_an_enemy_deeper` in `weapons/tornado.rs` |
 | b9 | **A ghost walking at a standing player is bumped back at least twice before it gets through the tornado.** | 2026-11-13 | `b9_a_ghost_walking_at_a_standing_player_is_bumped_back_at_least_twice` in `weapons/values.rs`; at work: the b7 test in `weapons/tornado.rs` |
+| b10 | **A direct fireball hit kills a ghost.** | 2026-11-13 | `b10_a_direct_fireball_hit_kills_a_ghost` in `weapons/values.rs` |
+| b11 | **The fireball blast alone kills a ghost.** | 2026-11-13 | `b11_the_fireball_blast_alone_kills_a_ghost` in `weapons/values.rs` |
+| b12 | **The fireball blast deals less than a direct hit.** | 2026-11-13 | `b12_the_fireball_blast_deals_less_than_a_direct_hit` in `weapons/values.rs` |
+| b13 | **A direct fireball hit does not kill every enemy kind.** | 2026-11-13 | By hand: check it when a new enemy kind is added (the ghost is the only enemy now) |
+| b14 | **The enemy a fireball hits directly takes only the direct hit, never the blast as well.** | 2026-11-13 | `the_blast_hits_every_other_living_enemy_within_its_radius_and_no_one_else` and `an_enemy_in_the_way_takes_the_direct_hit_and_the_target_near_it_the_blast` in `weapons/fireball.rs` |
 
 ## b1. The fire ring always kills a ghost
 
@@ -59,3 +64,14 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 - b7: the steady push (20 px/s) is slower than the ghost (90 px/s), so between bumps a ghost walking in gets closer at 70 px/s. A bump takes back 40 px on every second tick (b9). The test walks a ghost across the whole radius (96 px) in contact time: it takes about 2.4 s and 5 ticks (65 of 100), so the ghost survives and arrives before the tornado ends. The real crossing ends at the player's body, which is shorter. In the game the ghost reaches the player, attacks and dies as usual.
 - b8: the depth of an enemy in the tornado may only grow by its own steps, less the push. The player's movement adds nothing, so the edge shoves an enemy ahead of the player. The player walks at 300 px/s and a ghost at 90 px/s, so a moving player leaves ghosts behind. A bump only moves an enemy outward. Accepted gap (the user): walking straight at one ghost lets it through, in about the time of b7 (about 2.3 s of contact).
 - b9: on the way in of b7, bumps land on the 2nd and 4th ticks (at 0.5 s and 1.5 s of contact). The test counts them in the same walk. In the game a bump is a 40 px shove over 0.1 s, so it reads as a knock back, together with the ghost's hurt animation.
+
+## b10 to b14. The fireball
+
+**Rules.** The user's intent (2026-11-13, `weapons.md`, "Fireball"): a high-power shot. A direct hit kills many enemies but not all (b13). The explosion deals a second, smaller damage to every enemy around it (b12). A ghost dies from either a direct hit or the blast alone (b10, b11). The enemy hit directly does not also take the blast (b14, the user the same day): a strong enemy that survives the direct hit is not punished a second time.
+
+**How (start values, built in W4).**
+- b10: direct 150 against a ghost's 100.
+- b11: blast 100 against a ghost's 100, so a ghost anywhere in the blast (1.25 cells from the explosion to the nearest side of its body) dies.
+- b12: 100 < 150.
+- b13: no test yet. When an enemy kind with more than 150 HP exists, or the direct hit grows, check that at least one kind survives a direct hit.
+- b14: the explosion deals the direct hit to the enemy touched and the blast only to the others (`explode` in `weapons/fireball.rs`).
