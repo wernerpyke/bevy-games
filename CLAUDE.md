@@ -6,7 +6,7 @@
 
 1. Load the deferred tool: ToolSearch with `select:LSP`.
 2. Make one LSP call on a Rust file to start rust-analyzer, for example `documentSymbol` on `games/long-way/src/main.rs`. If it answers that the server is starting, carry on with the user's request and retry before you first need it. Indexing Bevy takes about a minute.
-3. Use the LSP (goToDefinition, hover, findReferences) for all Rust and Bevy source reading afterwards, including `bevy-src/` and `~/.cargo/registry/src/`. Do not use `cat`, `sed` or grep to read Rust symbols. Use grep only for text search in examples and docs.
+3. Use the LSP for definitions, references, types and dependency APIs (goToDefinition, findReferences, hover, workspaceSymbol), including `bevy-src/` and `~/.cargo/registry/src/`. Use `Read` for a known line range, and grep for text (docs, maps, `.ron` files, comments). Do not use `cat`, `sed` or grep to find Rust symbols. When `findReferences` returns nothing, check the position with `workspaceSymbol` before you believe it: a wrong position also returns nothing.
 
 ## Purpose
 

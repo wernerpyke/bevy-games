@@ -12,6 +12,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 |---|---|---|---|
 | b1 | **The fire ring always kills a ghost it touches.** Where the ghost stands at the cast, how far it is pushed and whether it walks out of the ring make no difference. | 2026-11-13 | `b1_the_first_tick_of_the_fire_ring_kills_a_ghost` in `weapons/values.rs` |
 | b2 | **The fire ring does not promise a one-hit kill on any enemy other than the ghost.** Such an enemy can die if it stays in the burn band for enough ticks, but that is not guaranteed. | 2026-11-13 | By hand: check it when a new enemy kind is added |
+| b3 | **One ice ring on its own never kills a ghost. A second ice ring can.** | 2026-11-13 | `b3_one_ice_ring_never_kills_a_ghost` in `weapons/values.rs` (`push + touch < ghost HP`) |
 
 ## b1. The fire ring always kills a ghost
 
@@ -34,3 +35,9 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 - Do not raise the fire ring damage to one-hit kill it. That needs a new rule from the user.
 - Give it a `max` HP of its own (`EnemyHp`). The ticks it needs are `HP / 100`, rounded up. The burn band is 48 px wide and is active for about 2.4 s (from 0.34 s after the cast to the end at 2.77 s). An enemy that stands in it the whole time gets 5 ticks (the unit test `a_body_in_the_burn_band_is_hurt_again_every_tick_until_the_ring_ends`), so an enemy with more than 500 HP cannot die from one ring.
 - Keep b1: the new enemy's values must not change the ghost's HP or the ring's damage.
+
+## b3. One ice ring never kills a ghost
+
+**Rule.** The ice ring is a shield, not a damage weapon. It deals a medium amount once to an enemy it pushes, and a small amount once per cast to an enemy that walks into it. One ring on its own must not kill a full-HP ghost, but a second ring may finish a ghost that the first one hurt.
+
+**How.** The most one ring can deal to one ghost is the push plus the touch. So `push + touch < ghost HP`. Start values: push 50, touch 10, so one ring deals at most 60 of 100, and two pushes deal 100.

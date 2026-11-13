@@ -8,6 +8,7 @@
     reason = "Contact and pushed_feet are used by the weapon steps, W1 onwards"
 )]
 pub mod damage;
+pub mod ice_ring;
 pub mod ring;
 #[allow(dead_code, reason = "used by the weapon steps, W1 onwards")]
 pub mod values;
@@ -15,7 +16,7 @@ pub mod values;
 use bevy::prelude::*;
 use game_kit::Controlled;
 use game_kit::hitbox::HitBox;
-use game_kit::movement::MoveState;
+use game_kit::movement::{FollowSet, MoveState};
 
 use crate::player::feet_of;
 use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, WeaponKind};
@@ -26,9 +27,29 @@ impl Plugin for WeaponPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<CastWeapon>()
             .add_message::<WeaponHit>()
+            .configure_sets(
+                Update,
+                (
+                    WeaponSystems::Cast,
+                    WeaponSystems::Effect.after(FollowSet),
+                    WeaponSystems::Apply,
+                )
+                    .chain(),
+            )
             .add_plugins(ring::RingPlugin)
-            .add_systems(Update, (cast_active, damage::apply_hits).chain());
+            .add_systems(Update, cast_active.in_set(WeaponSystems::Cast))
+            .add_systems(Update, damage::apply_hits.in_set(WeaponSystems::Apply));
     }
+}
+
+/// The order of the weapon systems in a frame. `Effect` (the weapons' gameplay) runs after the kit has moved the
+/// enemies (`FollowSet`), so a barrier can undo a step in the same frame. `Apply` then turns the hits into damage and
+/// pushes.
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub enum WeaponSystems {
+    Cast,
+    Effect,
+    Apply,
 }
 
 /// Asks for a weapon to be cast.
@@ -117,8 +138,11 @@ mod tests {
                 ..default()
             },
         ));
-        // Violet has no weapon and blue holds the ice ring, which is not built: only red casts.
-        for energy in [Energy::Violet, Energy::Red, Energy::Blue] {
+        // Violet has no weapon and black holds one that is not built: only red casts.
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Black, Some(WeaponKind::Fireball));
+        for energy in [Energy::Violet, Energy::Red, Energy::Black] {
             app.world_mut().write_message(ActiveWeaponClicked(energy));
         }
         app.update();

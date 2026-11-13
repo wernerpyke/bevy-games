@@ -330,8 +330,13 @@ mod tests {
         let mut app = app();
         // The icon alone, no label (the user's choice, 2026-11-12).
         assert_eq!(button_icons(&mut app, Energy::Red), ["fire_ring"]);
-        // Blue holds the ice ring, which is not built yet. Violet has no weapon.
-        assert!(button_icons(&mut app, Energy::Blue).is_empty());
+        assert_eq!(button_icons(&mut app, Energy::Blue), ["ice_ring"]);
+        // Violet has no weapon, then one that is not built.
+        assert!(button_icons(&mut app, Energy::Violet).is_empty());
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Violet, Some(WeaponKind::Whirlpool));
+        app.update();
         assert!(button_icons(&mut app, Energy::Violet).is_empty());
         app.world_mut()
             .resource_mut::<ActiveWeapons>()

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
 use crate::map_background::{cell_rng, hash_name};
-use crate::movement::{FollowSet, MoveState};
+use crate::movement::{FollowSet, MoveState, Stunned};
 use crate::rng::Rng;
 
 /// Put this on an entity with an `AseAnimation`. Once the Aseprite file has loaded, the plugin moves the animation
@@ -131,13 +131,16 @@ impl FacingTags {
 }
 
 fn animate_facing(
-    movers: Query<&MoveState>,
+    movers: Query<(&MoveState, Has<Stunned>)>,
     mut sprites: Query<(&ChildOf, &FacingTags, &mut AseAnimation, &mut Sprite)>,
 ) {
     for (parent, tags, mut ase, mut sprite) in &mut sprites {
-        let Ok(state) = movers.get(parent.parent()) else {
+        let Ok((state, stunned)) = movers.get(parent.parent()) else {
             continue;
         };
+        if stunned {
+            continue;
+        }
         let (view, flip) = view_of(state.facing);
         play_if_changed(&mut ase, tags.tag(view), tags.speed);
         sprite.flip_x = flip;
@@ -174,7 +177,36 @@ pub struct AnimationHelpPlugin;
 impl Plugin for AnimationHelpPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, (apply_random_start, apply_static_frame))
-            .add_systems(Update, animate_facing.in_set(FacingSet).after(FollowSet));
+            .add_systems(Update, animate_facing.in_set(FacingSet).after(FollowSet))
+            .add_systems(Update, hold_stunned.after(FacingSet));
+    }
+}
+
+/// Stops the sprite children of an entity that becomes `Stunned` in their current frame, and starts them again when
+/// the marker is removed. It runs after `FacingSet`, so a tag that a game starts in the frame of the stun (a hurt
+/// animation) stops too. A tag played while stunned (a death) plays: `play` starts the animation.
+fn hold_stunned(
+    stunned: Query<&Children, Added<Stunned>>,
+    mut released: RemovedComponents<Stunned>,
+    parents: Query<&Children>,
+    mut animations: Query<&mut AseAnimation>,
+) {
+    for children in &stunned {
+        for child in children {
+            if let Ok(mut ase) = animations.get_mut(*child) {
+                ase.animation.pause();
+            }
+        }
+    }
+    for entity in released.read() {
+        let Ok(children) = parents.get(entity) else {
+            continue;
+        };
+        for child in children {
+            if let Ok(mut ase) = animations.get_mut(*child) {
+                ase.animation.start();
+            }
+        }
     }
 }
 
@@ -277,6 +309,50 @@ mod tests {
             ))
             .id();
         (app, mover, sprite)
+    }
+
+    fn playing(app: &App, sprite: Entity) -> (bool, Option<String>) {
+        let ase = app.world().get::<AseAnimation>(sprite).unwrap();
+        (ase.animation.playing, ase.animation.tag.clone())
+    }
+
+    #[test]
+    fn a_stunned_sprite_stops_in_its_tag_and_ignores_the_facing_until_the_stun_ends() {
+        let (mut app, mover, sprite) = facing_app();
+        app.add_systems(Update, hold_stunned.after(animate_facing));
+        face(&mut app, mover, Vec2::NEG_Y);
+        assert_eq!(playing(&app, sprite), (true, Some("Down".into())));
+        app.world_mut().entity_mut(mover).insert(Stunned);
+        app.update();
+        assert_eq!(playing(&app, sprite), (false, Some("Down".into())));
+        // A push can turn the facing of a stunned entity: the tag stays.
+        face(&mut app, mover, Vec2::Y);
+        assert_eq!(playing(&app, sprite), (false, Some("Down".into())));
+        app.world_mut().entity_mut(mover).remove::<Stunned>();
+        app.update();
+        assert_eq!(playing(&app, sprite), (true, Some("Up".into())));
+    }
+
+    #[test]
+    fn a_tag_started_in_the_frame_of_the_stun_stops_and_one_started_later_plays() {
+        let (mut app, mover, sprite) = facing_app();
+        app.add_systems(Update, hold_stunned.after(animate_facing));
+        face(&mut app, mover, Vec2::NEG_Y);
+        app.world_mut().entity_mut(mover).insert(Stunned);
+        app.world_mut()
+            .get_mut::<AseAnimation>(sprite)
+            .unwrap()
+            .animation
+            .play("Hurt", AnimationRepeat::Count(0));
+        app.update();
+        assert_eq!(playing(&app, sprite), (false, Some("Hurt".into())));
+        app.world_mut()
+            .get_mut::<AseAnimation>(sprite)
+            .unwrap()
+            .animation
+            .play("Die", AnimationRepeat::Count(0));
+        app.update();
+        assert_eq!(playing(&app, sprite), (true, Some("Die".into())));
     }
 
     fn face(app: &mut App, mover: Entity, facing: Vec2) {

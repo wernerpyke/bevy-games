@@ -4,7 +4,7 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Status (2026-11-13): resume here
 
-Done and committed: P0 to P4, W1 (fire ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). Next: **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
+Done and committed: P0 to P4, W1 (fire ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. Next: **W3 (fire wall)**, starting with its design questions. WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
 
 ## Goal
 
@@ -76,7 +76,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | D7 | Enemy hit points | **Decided: enemies need HP.** Design in P4. |
 | D8 | Damage model | **Decided:** every weapon has a tunable **damage per second** (`dps`). A weapon that hits once (the fireball) has a tunable **impact damage** instead. |
 | D9 | Pushback model | **Decided:** every weapon has a tunable pushback, one of: `None`, `Pixels(n)` (push back by a set distance, then stop), `ToEdge` (push all the way to the weapon's final radius or distance). The fireball has `None` and ends on its first hit. Pushback stops at features and walls (the collision world). |
-| D10 | How a ring interacts with features (trees, rocks, markers, scenery) | **Decided (user, 2026-11-11), `adr-lw33`:** the ring passes over features (no shielding), features do not react to it, a pushed enemy stops at a feature and keeps taking damage there, and the ring does not hit markers. |
+| D10 | How a ring interacts with features (trees, rocks, markers, scenery) | **Decided (user, 2026-11-11), `adr-lw33`:** the ring passes over features (no shielding), features do not react to it, a pushed enemy stops at a feature and keeps taking damage there, and the ring does not hit markers. The ice ring differs: it stops at features (W2). |
 | D11 | Aim from a drawer button (the cursor is on the button) | **Decided: no cursor aim. Each weapon has its own aim rule**, taken from the player (facing, position) or the world (nearest enemy). See the table below. |
 | D12 | Energy cost and cooldown per cast (`Inventory`, `adr-lw27`) | **Decided: out of scope.** A separate plan will build them later. Weapons in this plan cost nothing and have no cooldown. |
 | D13 | What a ghost does when its HP reaches 0 | **Decided: it dies.** The ghost is removed (despawned) when `EnemyDied` fires. No drop. A death animation or effect is not part of this plan unless the user asks. |
@@ -218,15 +218,38 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 - This step also proves the base (P4): fix any gap in `damage.rs` here.
 - Record D10 as an ADR in `games/long-way/docs/adr.md`.
 
-#### W2. Ice ring
+#### W2. Ice ring (accepted 2026-11-13)
 
-- **Design questions:**
-  - Pushback: `ToEdge`. Does the ghost move with the front (carried) or jump to the final radius? Does a ghost stay frozen or slowed after (a status is a new mechanic: ask, do not invent)?
-  - Damage: `dps` start value, and how it compares to the fire ring.
-  - Do the D10 answers for the fire ring hold for the ice ring (an ice reaction on features)?
-- Reuse the ring code from W1: one `RingPlugin`, two value sets and two sprite sheets and effect sets. Only add what differs.
-- Tests: `ToEdge` carries a body to the final radius, a body behind a tree stops at the tree, damage per second matches `dps`.
-- Scripted run: ghosts at three distances, and one with a tree between the player and the ghost.
+**Design.** The ice ring is a shield, not a damage weapon.
+
+| Topic | Rule |
+|---|---|
+| Size and timing | Radius 3 cells (192 px), 6 cells across. It grows from the middle of the player's body like the fire ring (eased out, 0.767 s), stays where it was cast (D11), holds at full size for a set time (spike default 2 s, to tune) and then goes. |
+| Push | The growing front carries every enemy it reaches outward to the end of the ring (`ToEdge`, carried with the front, not a jump). |
+| Barrier | Until the ring goes, no enemy can cross it, in either direction. **The player passes freely.** Only enemies are blocked. |
+| Features and map edge | Each part of the ring stops where it meets a blocking feature (tree, rock, lantern) or the map edge. The ring then hugs the obstacle and is not a full circle. An enemy behind a feature is not reached: it is neither pushed nor hurt. **This differs from the fire ring** (`adr-lw33`), so it needs its own ADR. |
+| Damage | A medium amount, once, to an enemy that the ring pushes. A small amount, **once per cast**, to an enemy that walks into the full ring (a ghost that keeps pressing against it is hurt once). Start values: push 50, touch 10 (to tune). |
+| Pinned | An enemy pushed into a blocking feature or the map edge takes no extra damage. It is **stunned** until the ring goes: it does not move, and its animation stops in its current frame. **No tint and no new art.** An enemy pushed into open space is not stunned: it ends at the ring and can walk away, but cannot cross back in. (Term: "stunned", the user, 2026-11-13, used for the kit marker and the ice ring alike.) |
+| Balance | **b3** (`games/long-way/docs/balance.md`): one ice ring on its own never kills a ghost; a second ring can. So `push + touch < ghost HP`. Start values: 50 + 10 = 60 < 100, and two pushes deal 100. |
+
+**Assumption to confirm when the user tests it:** a stunned enemy also cannot attack the player.
+
+**Build.**
+
+- **Shape per direction (rays).** At the cast, cast N rays from the centre (for example 64). The final radius of each ray is the smallest of: 192, the distance to the first blocked edge in the collision world, and the distance to the map edge (less the enemy edge margin). This needs a ray test against the collision edges: a new kit function in `collision.rs`, for example `ray_distance(from, dir, max, edges)`, tested in the kit (approved by the user, 2026-11-13). The shape is computed once, at the cast. Walls (W3) can change the world during a ring later: decide that in W3.
+- **Front and hit test.** The front radius of a ray is the smaller of the eased radius and the ray's final radius. An enemy is tested against the ray at the angle of its body centre, interpolated between the two nearest rays.
+- **Push.** As in the fire ring, by the front's advance, through `damage.rs` (`pushed_feet`: the collision world and the map edge). **Pinned** means the push moved the enemy less than asked (stopped by a feature or the map edge). A pinned enemy gets the kit marker `Stunned` until its ring ends. An enemy that reaches the ring's edge in open space does not.
+- **Barrier.** A Long Way system that runs after the kit's movement. An enemy whose body has entered the ring's shape is moved back out to the ring along its ray, through the collision world. It is for enemies only, so the kit's collision and `nav.rs` do not change. A ghost still walks toward the player and presses against the ring: that is the touch.
+- **Stunned.** A kit marker `Stunned` in `movement.rs` that `follow_goals` skips: a general "stop moving" that any game can use (the user approved the kit change on 2026-11-13). The animation pauses, and the ghost's attack check skips a stunned ghost. The marker is removed when the ring ends.
+- **Values.** The ice ring needs two damage amounts, so add a variant to `Damage` (for example `OnPushAndTouch { push, touch }`). Update D8 and `weapons.md`. A b3 test in `values.rs` checks `push + touch < ghost HP`.
+- **Look.** Assets from the spike: the `ice_ring1` to `ice_ring4` looks (`FxLooks`, already in `fireball_and_rings.aseprite`), the effect files `ring_front_ice` and `ring_burn_ice`, and two emitters per position as in the spike. The front emitters stop at their ray's final radius, and the burners sit at it. Glow off.
+- **Reuse.** One `RingPlugin` for both rings. The growth, the band and the look are shared. Only the ice parts (rays, barrier, stun, push and touch damage) are new.
+
+**Tests.**
+- Kit: the ray test (an open ray, a blocked ray, a ray that starts next to an edge). `Stunned` stops `follow_goals`, and removing it lets the mover go on.
+- Ring: a body is carried to 192 px; a body is carried to a tree and is stunned; a body carried into open space is not stunned; a body behind a tree is not reached; a body at the map edge is stunned; push damage is dealt once; touch damage is dealt once per cast, however long the body presses; a body cannot cross the barrier from outside or from inside; stunned bodies move again when the ring ends; a dead enemy is skipped (D15); b3 holds.
+
+**Scripted runs.** Ghosts at three distances. A ghost between the player and a tree: it is pinned and stunned, then walks on after the ring goes. A cast near the map edge. A ghost pressing against the ring takes the touch damage once. One ring never kills a ghost. Two rings in a row can kill.
 
 #### W3. Fire wall
 

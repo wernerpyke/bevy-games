@@ -11,6 +11,9 @@ pub enum Damage {
     PerSecond(f32),
     /// Hit points dealt once, on impact (the fireball).
     Impact(f32),
+    /// Hit points dealt once to a target the weapon pushes (`push`), and once per cast to a target that walks into it
+    /// (`touch`). The ice ring deals them itself, so `Contact::damage` gives `None` for it.
+    PushAndTouch { push: f32, touch: f32 },
 }
 
 /// How a weapon moves a target.
@@ -34,8 +37,7 @@ pub struct WeaponValues {
     pub glow: bool,
 }
 
-/// The shape and timing of a ring (`weapons/ring.rs`). Spike defaults, except `max_radius`: 2 cells, so the ring is
-/// 4 cells across (the user, 2026-11-13, after a manual test; it was 6 cells across).
+/// The shape and timing of a ring (`weapons/ring.rs`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RingShape {
     /// The ring grows to this radius, in pixels.
@@ -55,7 +57,9 @@ pub struct RingShape {
     pub trail_secs: f32,
 }
 
-pub const RING: RingShape = RingShape {
+/// Spike defaults, except `max_radius`: 2 cells, so the ring is 4 cells across (the user, 2026-11-13, after a manual
+/// test; it was 6 cells across).
+pub const FIRE_RING: RingShape = RingShape {
     max_radius: 2.0 * CELL_SIZE,
     grow_secs: 0.767,
     burn_secs: 2.0,
@@ -66,9 +70,41 @@ pub const RING: RingShape = RingShape {
     trail_secs: 0.12,
 };
 
-const _: () = assert!(RING.burn_lead < RING.max_radius && RING.band_half < RING.max_radius);
+const _: () = assert!(
+    FIRE_RING.burn_lead < FIRE_RING.max_radius && FIRE_RING.band_half < FIRE_RING.max_radius
+);
 // The ring has a radius of 2 cells (the user, 2026-11-13).
-const _: () = assert!(RING.max_radius == 2.0 * CELL_SIZE);
+const _: () = assert!(FIRE_RING.max_radius == 2.0 * CELL_SIZE);
+
+/// Spike defaults, except `max_radius`: 3 cells, so the ring is 6 cells across (the user, 2026-11-13). `burn_secs` is
+/// how long the full ring holds as a barrier. `band_half` and `trail_secs` are not used: the ice ring pushes every
+/// body that its front has passed (`weapons/ice_ring.rs`).
+pub const ICE_RING: RingShape = RingShape {
+    max_radius: 3.0 * CELL_SIZE,
+    grow_secs: 0.767,
+    burn_secs: 2.0,
+    burn_lead: 40.0,
+    front_emitters: 40,
+    burners: 40,
+    band_half: 24.0,
+    trail_secs: 0.12,
+};
+
+// The ice ring has a radius of 3 cells (the user, 2026-11-13).
+const _: () = assert!(ICE_RING.max_radius == 3.0 * CELL_SIZE);
+
+/// Rays cast from the centre of an ice ring at the cast. Each ray stops at the first blocking feature or at the map
+/// edge, and the ring stops with it (`weapons/ice_ring.rs`).
+pub const ICE_RAYS: usize = 64;
+
+/// The shape of a ring weapon, `None` for the other weapons.
+pub fn ring_shape(weapon: WeaponKind) -> Option<RingShape> {
+    match weapon {
+        WeaponKind::FireRing => Some(FIRE_RING),
+        WeaponKind::IceRing => Some(ICE_RING),
+        _ => None,
+    }
+}
 
 /// The values of a weapon. Placeholders (P4): damage and pushback are guesses to be tuned.
 pub fn values(weapon: WeaponKind) -> WeaponValues {
@@ -81,8 +117,13 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             tick: 0.5,
             glow: true,
         },
+        // A shield (the user, 2026-11-13): a medium amount once on the push, a small amount once per cast on a touch.
+        // Start values, to tune. Balance rule b3 (`docs/balance.md`): push + touch < ghost HP.
         WeaponKind::IceRing => WeaponValues {
-            damage: Damage::PerSecond(20.0),
+            damage: Damage::PushAndTouch {
+                push: 50.0,
+                touch: 10.0,
+            },
             pushback: Pushback::ToEdge,
             tick: 0.5,
             glow: false,
@@ -125,6 +166,9 @@ mod tests {
             assert!(v.tick > 0.0, "{weapon:?}");
             match v.damage {
                 Damage::PerSecond(n) | Damage::Impact(n) => assert!(n > 0.0, "{weapon:?}"),
+                Damage::PushAndTouch { push, touch } => {
+                    assert!(push > 0.0 && touch > 0.0, "{weapon:?}")
+                }
             }
             if let Pushback::Pixels(n) = v.pushback {
                 assert!(n > 0.0, "{weapon:?}");
@@ -139,6 +183,31 @@ mod tests {
             assert_eq!(impact, weapon == WeaponKind::Fireball, "{weapon:?}");
         }
         assert_eq!(values(WeaponKind::Fireball).pushback, Pushback::None);
+    }
+
+    /// Balance rule b3 (`docs/balance.md`): one ice ring deals at most its push and its touch to a ghost, and that
+    /// must not kill it. A second ring may.
+    #[test]
+    fn b3_one_ice_ring_never_kills_a_ghost() {
+        let Damage::PushAndTouch { push, touch } = values(WeaponKind::IceRing).damage else {
+            panic!("the ice ring should deal push and touch damage");
+        };
+        let ghost = crate::ghost::HIT_POINTS;
+        assert!(
+            push + touch < ghost,
+            "one ring deals {}, a ghost has {ghost}",
+            push + touch
+        );
+    }
+
+    #[test]
+    fn only_the_rings_have_a_ring_shape() {
+        for weapon in WeaponKind::ALL {
+            let ring = matches!(weapon, WeaponKind::FireRing | WeaponKind::IceRing);
+            assert_eq!(ring_shape(weapon).is_some(), ring, "{weapon:?}");
+        }
+        assert_eq!(ring_shape(WeaponKind::FireRing), Some(FIRE_RING));
+        assert_eq!(ring_shape(WeaponKind::IceRing), Some(ICE_RING));
     }
 
     /// Balance rule b1 (`docs/balance.md`): the fire ring kills a ghost with its first tick, so a ghost it touches dies

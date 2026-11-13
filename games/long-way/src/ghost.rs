@@ -16,7 +16,7 @@ use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
 use game_kit::map::Map;
 use game_kit::map_transition::{MapId, MapLoad};
-use game_kit::movement::Mover;
+use game_kit::movement::{Mover, Stunned};
 use game_kit::strategies::{Pursue, RandomPatrol, Sentry, Strategy};
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
 
@@ -120,11 +120,15 @@ pub fn spawn_ghosts(commands: &mut Commands, server: &AssetServer, map: &Map, lo
     }
 }
 
-/// A ghost that touches the player stops walking and cannot touch again, and its sprite plays `Attack` once.
+/// A ghost that can attack: it can still touch and is not stunned.
+type CanAttack = (With<Ghost>, With<Touchable>, Without<Stunned>);
+
+/// A ghost that touches the player stops walking and cannot touch again, and its sprite plays `Attack` once. A stunned
+/// ghost (the ice ring) does not attack: the kit sends the touch every frame, so it attacks when the stun ends.
 fn start_attack(
     mut commands: Commands,
     mut touched: MessageReader<ControlledTouched>,
-    ghosts: Query<&Children, (With<Ghost>, With<Touchable>)>,
+    ghosts: Query<&Children, CanAttack>,
     mut animations: Query<&mut AseAnimation>,
 ) {
     for touch in touched.read() {
@@ -172,7 +176,8 @@ fn play_hurt(
     }
 }
 
-/// A ghost whose hit points reached 0 stops, cannot be hit or touch again, and plays `Die`. It does not hurt the player.
+/// A ghost whose hit points reached 0 stops, cannot be hit or touch again, and plays `Die`. It does not hurt the player. A
+/// stun ends with it, so `Die` plays.
 fn die_when_killed(
     mut commands: Commands,
     mut died: MessageReader<EnemyDied>,
@@ -183,9 +188,15 @@ fn die_when_killed(
         let Ok(children) = ghosts.get(*entity) else {
             continue;
         };
-        commands
-            .entity(*entity)
-            .remove::<(Touchable, Mover, RandomPatrol, Pursue, Sentry, HitBox)>();
+        commands.entity(*entity).remove::<(
+            Touchable,
+            Mover,
+            RandomPatrol,
+            Pursue,
+            Sentry,
+            HitBox,
+            Stunned,
+        )>();
         for child in children {
             commands
                 .entity(*child)
@@ -415,6 +426,35 @@ mod tests {
             .write_message(AnimationEvents::Finished(sprite));
         app.update();
         assert_eq!(damage_messages(&app), 0);
+    }
+
+    #[test]
+    fn a_stunned_ghost_does_not_attack_until_the_stun_ends() {
+        let mut app = app();
+        let (ghost, sprite) = spawn_ghost(&mut app);
+        app.world_mut().entity_mut(ghost).insert(Stunned);
+        app.world_mut()
+            .write_message(ControlledTouched { by: ghost });
+        app.update();
+        assert!(app.world().get::<Attacking>(sprite).is_none());
+        assert!(app.world().get::<Touchable>(ghost).is_some());
+        app.world_mut().entity_mut(ghost).remove::<Stunned>();
+        app.world_mut()
+            .write_message(ControlledTouched { by: ghost });
+        app.update();
+        assert!(app.world().get::<Attacking>(sprite).is_some());
+        assert_eq!(tag(&app, sprite), Some("Attack"));
+    }
+
+    #[test]
+    fn a_stunned_ghost_that_is_killed_is_no_longer_stunned_and_plays_die() {
+        let mut app = app();
+        let (ghost, sprite) = spawn_ghost(&mut app);
+        app.world_mut().entity_mut(ghost).insert(Stunned);
+        app.world_mut().write_message(EnemyDied(ghost));
+        app.update();
+        assert!(app.world().get::<Stunned>(ghost).is_none());
+        assert_eq!(tag(&app, sprite), Some("Die"));
     }
 
     #[test]

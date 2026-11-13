@@ -107,7 +107,7 @@ impl WeaponKind {
     /// Whether the weapon works yet. Each weapon step of `PLAN-weapons.md` (W1 to W6) adds its weapon here. A weapon
     /// that is not built is dimmed in the drawer and cannot be loaded, and an active button that holds it is blank.
     pub fn is_built(self) -> bool {
-        matches!(self, WeaponKind::FireRing)
+        matches!(self, WeaponKind::FireRing | WeaponKind::IceRing)
     }
 }
 
@@ -494,21 +494,19 @@ mod tests {
 
     #[test]
     fn each_energy_starts_with_its_default_and_only_a_built_weapon_is_active() {
-        let active = ActiveWeapons::default();
-        // Red holds the fire ring, blue the ice ring, which is not built yet, so its button is blank.
-        assert_eq!(
-            active.0,
-            [
-                Some(WeaponKind::IceRing),
-                Some(WeaponKind::FireRing),
-                None,
-                None
-            ]
-        );
-        assert_eq!(
-            Energy::ALL.map(|energy| active.get(energy)),
-            [None, Some(WeaponKind::FireRing), None, None]
-        );
+        let mut active = ActiveWeapons::default();
+        // Blue holds the ice ring and red the fire ring. Violet and black have no weapon.
+        let defaults = [
+            Some(WeaponKind::IceRing),
+            Some(WeaponKind::FireRing),
+            None,
+            None,
+        ];
+        assert_eq!(active.0, defaults);
+        assert_eq!(Energy::ALL.map(|energy| active.get(energy)), defaults);
+        // A weapon that is not built is held but not active.
+        active.set_for_test(Energy::Violet, Some(WeaponKind::Whirlpool));
+        assert_eq!(active.get(Energy::Violet), None);
         for energy in Energy::ALL {
             if let Some(weapon) = default_weapon(energy) {
                 assert!(weapons_for(energy).contains(&weapon), "{energy:?}");

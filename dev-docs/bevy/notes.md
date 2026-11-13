@@ -37,6 +37,11 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction depending on the length, so comparing normalised vectors between frames fires randomly. Compare signs or an enum.
 - Stored and recomputed positions drift by millionths (for example 76.8 comes back as 76.800003). Do not test exact equality against a coordinate. Use a tolerance.
 
+## Observers
+
+- Run code when a component goes, including on despawn: `app.add_observer(f)` with `fn f(remove: On<Remove<T>>, query: Query<&T>, ..)`. The component can still be read with `query.get(remove.entity)` inside the observer. Long Way's ice ring releases the enemies it stunned this way (`weapons/ice_ring.rs`). Example: `bevy-src/examples/ecs/observers.rs`.
+- `commands.entity(e).try_remove::<T>()` does nothing when `e` is gone by then, where `remove` would log an error.
+
 ## Screenshots
 
 - `commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path))` with `use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};`.

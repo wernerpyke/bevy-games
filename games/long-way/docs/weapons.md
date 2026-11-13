@@ -17,7 +17,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 | Weapon | Damage | Pushback | Tick | Glow | Status |
 |---|---|---|---|---|---|
 | Fire ring | 200 per second (100 per tick: the first tick kills a ghost, b1) | none | 0.5 s | on | **accepted** (W1, 2026-11-13) |
-| Ice ring | 20 per second | to the edge | 0.5 s | off | not built |
+| Ice ring | 50 once when pushed, 10 once per cast when it walks in (b3) | to the edge, then a barrier | | off | **accepted** (W2, 2026-11-13) |
 | Fire wall | 40 per second | none | 0.5 s | on | not built |
 | Ice wall | 20 per second | none | 0.5 s | off | not built |
 | Whirlpool | 20 per second | at most 96 px | 0.5 s | off | not built |
@@ -32,7 +32,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 
 ## Fire ring (W1)
 
-Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`RING`), effects `assets/effects/fire_ring_front.particle.ron` and `fire_ring_burn.particle.ron`, art tag `fire_ring` of `art/weapons/fireball_and_rings.aseprite`.
+Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`FIRE_RING`), effects `assets/effects/fire_ring_front.particle.ron` and `fire_ring_burn.particle.ron`, art tag `fire_ring` of `art/weapons/fireball_and_rings.aseprite`.
 
 - The ring grows from the middle of the player's body to a radius of 2 cells (128 px, so **4 cells across**, the user's choice on 2026-11-13; it was 6 cells across) in 0.767 s, eased out (fast first, slowing to a stop). It then burns for 2 s and goes. It stays where it was cast.
 - A body is hit when its `HitBox` touches the damaging band. While the ring grows the band reaches from the radius 0.12 s ago to the radius now (the trail of the 40 moving front emitters). While it burns, the band is 24 px each side of the full radius (40 burners).
@@ -42,6 +42,19 @@ Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`RING`), effects
 - Checked with a scripted run (`teleport:-608:-150` in map 1, the ghost 100 px above): the ghost lost 20 per tick (100, 80, 60, 40 ...) and died at 0 or walked out of the band (before b1). The ring was 6.1 cells across in the screenshot (before the change to 4 cells across).
 - Frame time with the ring cast every 0.7 s (up to four rings at once, vsync off): 2.7 to 3.1 ms per frame on native, idle 2.7 to 3.9 ms. No measurable cost. The web was not measured. Measured with the 6-cell ring. The 4-cell ring has the same number of emitters, so the cost is the same or lower.
 - **Tuning note (accepted by the user on 2026-11-13):** the radius went from 3 cells to 2 cells (4 cells across), after a manual test. The damage went from 40 to 200 per second (20 to 100 per tick) and the pushback from 64 px to none, so the first touch kills a ghost (balance rule b1, `balance.md`). With the old values, a ghost close to the player at the cast took one tick and walked back to attack. Grow time, burn time, band width and glow are the spike values and were not changed.
+
+## Ice ring (W2)
+
+Design: the user, 2026-11-13 (`adr-lw35`). Files: `weapons/ice_ring.rs` (reach, push, barrier, stun), `weapons/ring.rs` (growth and look, shared), shape numbers in `weapons/values.rs` (`ICE_RING`, `ICE_RAYS`), effects `assets/effects/ice_ring_front.particle.ron` and `ice_ring_burn.particle.ron` (from the spike), art tags `ice_ring1` to `ice_ring4` of `art/weapons/fireball_and_rings.aseprite`. Two emitters per position, each with one of the four shard sets.
+
+- The ring grows from the middle of the player's body to a radius of 3 cells (192 px, 6 cells across) in 0.767 s, holds for 2 s and goes. It stays where it was cast.
+- **Reach.** At the cast, 64 rays leave the centre. Each stops at the first blocking feature (the collision outlines) and at the map edge, and the ring stops with it. Near a tree the ring is not a full circle. An enemy behind a feature is not reached.
+- **Push.** The growing front carries every enemy it reaches to the edge of the ring (its near side ends on the ring). The first push deals 50.
+- **Barrier.** At full size an enemy that walks into the ring is moved back out in the same frame (the weapon systems run after the kit has moved the enemies) and takes 10, once per cast. The player passes freely.
+- **Stun.** An enemy whose push is stopped by a feature or the map edge is `Stunned` (the kit marker): it stands still in its current frame, does not attack and takes no more damage from this ring. It walks again when the ring goes. An enemy pushed into open space is not stunned.
+- **Balance:** one ring deals at most 50 + 10 = 60, so it never kills a ghost (b3). Two pushes deal 100.
+- Checked with scripted runs in map 1: the ring stopped at the trees, a ghost was held at the edge and took 50 then 10, and a ghost under the top map edge was pinned, stunned and walked again after the ring. Not seen on screen: the stunned ghost's paused animation, a pin against a tree. Frame time not measured yet.
+- **Tuning note (accepted by the user on 2026-11-13 after playing it):** no number moved. The start values hold: push 50, touch 10, hold 2 s, radius 3 cells, 64 rays. A stunned enemy does not attack, as built.
 
 ## Aim rules
 
@@ -63,13 +76,16 @@ The lines (all `info`, one per event, `adr-lw32`):
 | Line | Means |
 |---|---|
 | `weapons: cast <weapon> at <feet>, facing (x, y)` | The drawer button sent the cast |
-| `ring: started at (x, y), max radius r` | The ring exists. It is centred on the player's body |
+| `ring: Fire ring started at (x, y), max radius r` | The ring exists (`Fire ring` or `Ice ring`). It is centred on the player's body |
 | `enemy: <id> lost 20.0, 80.0 of 100.0 left, at (x, y)` | A damage tick, and where the enemy stood |
 | `ghost: <id> hurt, plays Hurt` | The ghost survived the hit |
 | `enemy: <id> died` and `ghost: <id> was killed, plays Die` | HP reached 0 and `Die` starts |
 | `ghost: <id> removed after Die` | `Die` ended and the ghost is gone. **A `died` without a `removed` is a bug** |
 | `ghost: <id> touched the player and attacks` and `ghost: <id> attack landed ...` | The ghost reached the player |
-| `ring: ended at age 2.77 s, touched 1: [<id> 5 ticks, pushed 62 px]` | The ring is over: ticks dealt and pixels pushed per enemy |
+| `ring: Fire ring ended at age 2.77 s, touched 1: [<id> 5 ticks, pushed 62 px]` | The fire ring is over: ticks dealt and pixels pushed per enemy |
+| `ice ring: <id> pushed, 50 damage` and `ice ring: <id> walked into the ring, 10 damage` | The ice ring's two kinds of damage, each once per enemy per cast |
+| `ice ring: <id> pinned at (x, y), stunned until the ring goes` | A push was stopped by a feature or the map edge |
+| `ring: Ice ring ended at age 2.77 s` and `ice ring: ended, touched 2: [<id> pushed 114 px, push damage, stunned; ...]` | The ice ring is over, and what it did to each enemy. Stunned enemies walk again |
 
 For the kit's movement and collision lines add `long_way=debug,game_kit=debug` to `RUST_LOG`. Say where the player stood and what the ghost did on screen.
 

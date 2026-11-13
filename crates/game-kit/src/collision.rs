@@ -256,6 +256,40 @@ fn crosses(blocked_positive: bool, old: f32, new: f32, at: f32) -> bool {
     }
 }
 
+/// How far a ray from `from` in the unit direction `dir` goes before it reaches an outline edge from the edge's free
+/// side, at most `max`. It follows the rules of `resolve`: an edge stops only a ray that moves towards its blocked
+/// side, and the ends of an edge count as in `Edge::covers`. A ray that starts on an edge and leaves it is not stopped.
+/// For example the reach of a spell that stops at the first tree or rock.
+pub fn ray_distance(from: Vec2, dir: Vec2, max: f32, edges: &[Edge]) -> f32 {
+    let mut nearest = max;
+    for edge in edges {
+        let (start, step) = match edge.orientation {
+            Orientation::Vertical => (from.x, dir.x),
+            Orientation::Horizontal => (from.y, dir.y),
+        };
+        let towards_blocked = if edge.blocked_positive {
+            step > 0.0
+        } else {
+            step < 0.0
+        };
+        if !towards_blocked {
+            continue;
+        }
+        let distance = (edge.at - start) / step;
+        if distance < 0.0 || distance >= nearest {
+            continue;
+        }
+        let along = match edge.orientation {
+            Orientation::Vertical => from.y + dir.y * distance,
+            Orientation::Horizontal => from.x + dir.x * distance,
+        };
+        if edge.covers(along) {
+            nearest = distance;
+        }
+    }
+    nearest
+}
+
 /// Moves the player's feet by `step` for one frame of `dt` seconds, applying the sliding setting.
 ///
 /// With `allow_sliding` off, a blocked move leaves the player where it was.
@@ -952,6 +986,84 @@ mod tests {
         assert_eq!(world.clusters().len(), 1);
         assert_eq!(world.edges().len(), 6, "an L shape has six edges");
         assert!(!world.is_interior(0));
+    }
+}
+
+#[cfg(test)]
+mod ray_tests {
+    use super::*;
+
+    /// A block x 100 to 110, y 0 to 200.
+    fn world() -> CollisionWorld {
+        let mut world = CollisionWorld::default();
+        world.add_blocked(&[Rect::new(100.0, 0.0, 110.0, 200.0)]);
+        world
+    }
+
+    #[test]
+    fn a_ray_stops_at_the_face_it_meets_from_either_side() {
+        let world = world();
+        assert_eq!(
+            ray_distance(Vec2::new(30.0, 50.0), Vec2::X, 500.0, world.edges()),
+            70.0
+        );
+        assert_eq!(
+            ray_distance(Vec2::new(170.0, 120.0), Vec2::NEG_X, 500.0, world.edges()),
+            60.0
+        );
+        // From below, the bottom face (y 0) stops it.
+        assert_eq!(
+            ray_distance(Vec2::new(105.0, -40.0), Vec2::Y, 500.0, world.edges()),
+            40.0
+        );
+    }
+
+    #[test]
+    fn a_slanted_ray_stops_where_it_crosses_the_face() {
+        let world = world();
+        let dir = Vec2::new(3.0, 4.0).normalize();
+        // From (40, 20) the ray reaches x 100 after 60 / 0.6 = 100, at y 100.
+        let distance = ray_distance(Vec2::new(40.0, 20.0), dir, 500.0, world.edges());
+        assert!((distance - 100.0).abs() < 1e-3, "{distance}");
+    }
+
+    #[test]
+    fn a_ray_that_misses_or_ends_short_or_leaves_a_face_goes_its_full_length() {
+        let world = world();
+        // Passes above the block.
+        assert_eq!(
+            ray_distance(Vec2::new(30.0, 250.0), Vec2::X, 500.0, world.edges()),
+            500.0
+        );
+        // Ends before the block.
+        assert_eq!(
+            ray_distance(Vec2::new(30.0, 50.0), Vec2::X, 60.0, world.edges()),
+            60.0
+        );
+        // Starts on the right face and moves away from it.
+        assert_eq!(
+            ray_distance(Vec2::new(110.0, 50.0), Vec2::X, 80.0, world.edges()),
+            80.0
+        );
+        // Moves away from the block.
+        assert_eq!(
+            ray_distance(Vec2::new(30.0, 50.0), Vec2::NEG_X, 90.0, world.edges()),
+            90.0
+        );
+    }
+
+    #[test]
+    fn a_ray_stops_at_the_nearer_of_two_blocks_in_either_order() {
+        let near = Rect::new(60.0, 0.0, 70.0, 100.0);
+        let far = Rect::new(150.0, 0.0, 160.0, 100.0);
+        for areas in [[near, far], [far, near]] {
+            let mut world = CollisionWorld::default();
+            world.add_blocked(&areas);
+            assert_eq!(
+                ray_distance(Vec2::new(0.0, 50.0), Vec2::X, 500.0, world.edges()),
+                60.0
+            );
+        }
     }
 }
 

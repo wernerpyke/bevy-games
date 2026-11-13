@@ -54,6 +54,12 @@ impl Plugin for MovementPlugin {
     }
 }
 
+/// A stunned entity does not walk, and its sprite animation stops in its current frame (`animation.rs`), until a game
+/// removes the marker. It keeps its goal and its path, so it walks on from where it stands. A game adds and removes
+/// it, for example a weapon that pins an enemy.
+#[derive(Component, Default, Clone, Copy, Debug, PartialEq)]
+pub struct Stunned;
+
 /// The point the entity should walk to. `None` means stand still.
 #[derive(Component, Default, Clone, Copy, Debug, PartialEq)]
 pub struct MoveGoal(pub Option<Vec2>);
@@ -167,12 +173,18 @@ fn follow_goals(
         &mut MoveState,
         &mut PathFollower,
         &mut SlideAssist,
+        Has<Stunned>,
     )>,
     mut searches_left: Local<usize>,
 ) {
     let dt = time.delta_secs();
     *searches_left = budget.0;
-    for (mut transform, mover, goal, mut state, mut follower, mut assist) in &mut movers {
+    for (mut transform, mover, goal, mut state, mut follower, mut assist, stunned) in &mut movers {
+        if stunned {
+            state.walking = false;
+            assist.reset();
+            continue;
+        }
         follower.since_search += dt;
         let feet = Vec2::new(
             transform.translation.x,
@@ -337,6 +349,33 @@ mod tests {
         }
         assert_eq!(feet(&app, entity), Vec2::new(50.0, 50.0));
         assert!(!app.world().get::<MoveState>(entity).unwrap().walking);
+    }
+
+    #[test]
+    fn a_stunned_entity_stands_still_and_walks_on_when_the_stun_is_removed() {
+        let mut app = app_with(&[]);
+        let entity = spawn(
+            &mut app,
+            Vec2::new(30.0, 70.0),
+            Some(Vec2::new(170.0, 70.0)),
+        );
+        for _ in 0..10 {
+            app.update();
+        }
+        let before = feet(&app, entity);
+        assert!(before.x > 30.0, "{before:?}");
+        app.world_mut().entity_mut(entity).insert(Stunned);
+        for _ in 0..20 {
+            app.update();
+        }
+        assert_eq!(feet(&app, entity), before);
+        assert!(!app.world().get::<MoveState>(entity).unwrap().walking);
+        app.world_mut().entity_mut(entity).remove::<Stunned>();
+        for _ in 0..5 {
+            app.update();
+        }
+        assert!(feet(&app, entity).x > before.x, "{:?}", feet(&app, entity));
+        assert!(app.world().get::<MoveState>(entity).unwrap().walking);
     }
 
     #[test]

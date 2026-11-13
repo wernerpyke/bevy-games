@@ -52,3 +52,11 @@ Enemy strategies, spawners, random numbers, touch and collectables. Index of all
 
 **How to apply.** `dev-docs/extensions/enemy-movement.md`. R-Town uses the touch (`death.rs`). The ghost of Long Way uses both.
 
+
+## adr-x46. The kit has a `Stunned` marker and a ray test against the collision outlines (2026-11-13)
+
+**Decision.** `movement::Stunned` is a marker a game adds and removes. A stunned mover does not walk (`follow_goals` reports it as not walking and keeps its goal and path), `animate_facing` leaves its sprite alone, and `hold_stunned` pauses the sprite children's animation when the marker is added and starts it again when it is removed. A tag played while stunned (a death) plays. `collision::ray_distance(from, dir, max, edges)` gives how far a ray goes before it meets an outline edge from its free side, with the rules of `resolve`.
+
+**Rationale.** The user approved both for Long Way's ice ring (2026-11-13). Neither holds a Long Way value: a stun and "how far does this reach before a wall" are useful to any game, such as a spell or a trap in R-Town. A marker read by the kit's own systems is the smallest change: the alternative, removing `Mover` and the strategy and putting them back, would lose the path and the strategy's state. The ray test follows `resolve` so that the reach agrees with where a pushed body actually stops.
+
+**How to apply.** `dev-docs/extensions/enemy-movement.md` (Stunned), `dev-docs/extensions/collision.md` (`ray_distance`). Long Way: `weapons/ice_ring.rs`.
