@@ -20,7 +20,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 | Ice ring | 50 once when pushed, 10 once per cast when it walks in (b3) | to the edge, then a barrier | | off | **accepted** (W2, 2026-11-13) |
 | Fire wall | 40 per second | none | 0.5 s | on | not built |
 | Ice wall | 20 per second | none | 0.5 s | off | not built |
-| Whirlpool | 20 per second | at most 96 px | 0.5 s | off | not built |
+| Tornado | 26 per second (13 per tick of contact, b5) | out at 45 px/s, the ghost still gains (b7, b8) | 0.5 s | off | designed (W3), not built |
 | Fireball | 40 once | none | | on | not built |
 
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
@@ -56,13 +56,27 @@ Design: the user, 2026-11-13 (`adr-lw35`). Files: `weapons/ice_ring.rs` (reach, 
 - Checked with scripted runs in map 1: the ring stopped at the trees, a ghost was held at the edge and took 50 then 10, and a ghost under the top map edge was pinned, stunned and walked again after the ring. Not seen on screen: the stunned ghost's paused animation, a pin against a tree. Frame time not measured yet.
 - **Tuning note (accepted by the user on 2026-11-13 after playing it):** no number moved. The start values hold: push 50, touch 10, hold 2 s, radius 3 cells, 64 rays. A stunned enemy does not attack, as built.
 
+## Tornado (W3, not built yet)
+
+Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `PLAN-weapons.md` W3. Balance rules b4 to b8 (`balance.md`).
+
+**Intent and purpose (the user, 2026-11-13, in the user's words; "ice wall" in the first version meant the ice ring):**
+
+> The intent with tornado is that its total duration is twice that of ice ring and its purpose is as a mobile shield which moves with the player.
+> In terms of damage it does more damage than ice ring and can kill a ghost if it keeps in contact with a ghost for >60% of its duration.
+> In terms of pushback, it continually pushes the ghost back but the ghost does incrementally make progress through it. The feel that I am trying to achieve with the pushback is that, if a player is static and just fires tornado then the ghost can reach the player. However, if the player is moving while tornado runs then the player remains safe.
+
+Clarified by the user the same day: contact is total contact time, so a player can kill a ghost by holding the tornado against it. A ghost pushed into a tree or the map edge is not stunned: it keeps being pushed and hurt there. Walking straight at one ghost for about 2.4 s lets it through, and that is accepted. The look stays the spike's water spiral for now.
+
+**Start values (to tune):** a disc of radius 2 cells on the player's body, 5.53 s (twice the ice ring), 26 per second in ticks of 13 every 0.5 s of contact (a ghost dies at 3.5 s of contact), pushed out at 45 px/s (a ghost walks at 90).
+
 ## Aim rules
 
 | Weapon | Anchor | Aim |
 |---|---|---|
 | Fire ring, ice ring | The middle of the player's body at the cast. Does not follow the player. | Full circle |
 | Fire wall, ice wall | In front of the player | The way the player faces sets the orientation and the travel direction |
-| Whirlpool | The player, and it follows | Surrounds the player |
+| Tornado | The player, and it follows | Surrounds the player |
 | Fireball | The player | The nearest visible enemy |
 
 ## Reporting a problem from a manual test

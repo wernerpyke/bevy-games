@@ -4,7 +4,7 @@
 #
 # Usage:
 #   ./dev-scripts/aseprite.sh <script> <input-file> [key=value ...]
-#     <script>      a name in dev-scripts/aseprite/ without .lua: crop, frame_grid, check, sheet_analysis, set_durations, catalogue
+#     <script>      a name in dev-scripts/aseprite/ without .lua: crop, frame_grid, check, sheet_analysis, set_durations, rename_tag, catalogue
 #     <input-file>  the file the script opens (.aseprite or .png)
 #     key=value     passed as --script-param key=value
 #

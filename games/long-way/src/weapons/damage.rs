@@ -276,7 +276,7 @@ mod tests {
         let (mut app, enemy) = app();
         app.world_mut().write_message(WeaponHit {
             target: enemy,
-            weapon: WeaponKind::Whirlpool,
+            weapon: WeaponKind::Tornado,
             amount: 0.0,
             push: Vec2::new(5.0, 0.0),
         });

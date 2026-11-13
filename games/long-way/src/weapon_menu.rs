@@ -64,7 +64,7 @@ pub enum WeaponKind {
     IceRing,
     FireWall,
     IceWall,
-    Whirlpool,
+    Tornado,
 }
 
 #[cfg(test)]
@@ -78,7 +78,7 @@ impl WeaponKind {
         WeaponKind::IceRing,
         WeaponKind::FireWall,
         WeaponKind::IceWall,
-        WeaponKind::Whirlpool,
+        WeaponKind::Tornado,
     ];
 
     pub fn label(self) -> &'static str {
@@ -88,7 +88,7 @@ impl WeaponKind {
             WeaponKind::IceRing => "Ice ring",
             WeaponKind::FireWall => "Fire wall",
             WeaponKind::IceWall => "Ice wall",
-            WeaponKind::Whirlpool => "Whirlpool",
+            WeaponKind::Tornado => "Tornado",
         }
     }
 
@@ -100,7 +100,7 @@ impl WeaponKind {
             WeaponKind::IceRing => "ice_ring",
             WeaponKind::FireWall => "fire_wall",
             WeaponKind::IceWall => "ice_wall",
-            WeaponKind::Whirlpool => "whirlpool",
+            WeaponKind::Tornado => "tornado",
         }
     }
 
@@ -158,7 +158,7 @@ pub fn weapons_for(energy: Energy) -> &'static [WeaponKind] {
         Energy::Blue => &[
             WeaponKind::IceRing,
             WeaponKind::IceWall,
-            WeaponKind::Whirlpool,
+            WeaponKind::Tornado,
         ],
         Energy::Violet | Energy::Black => &[],
     }
@@ -505,7 +505,7 @@ mod tests {
         assert_eq!(active.0, defaults);
         assert_eq!(Energy::ALL.map(|energy| active.get(energy)), defaults);
         // A weapon that is not built is held but not active.
-        active.set_for_test(Energy::Violet, Some(WeaponKind::Whirlpool));
+        active.set_for_test(Energy::Violet, Some(WeaponKind::Tornado));
         assert_eq!(active.get(Energy::Violet), None);
         for energy in Energy::ALL {
             if let Some(weapon) = default_weapon(energy) {

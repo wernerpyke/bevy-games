@@ -4,12 +4,12 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Status (2026-11-13): resume here
 
-Done and committed: P0 to P4, W1 (fire ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. Next: **W3 (fire wall)**, starting with its design questions. WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
+Done and committed: P0 to P4, W1 (fire ring), W2 (ice ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. Next: **W3 (tornado)**: design decided on 2026-11-13 (see its section, balance rules b4 to b8), build next, then W4 (fireball), W5 (fire wall), W6 (ice wall). WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
 
 ## Goal
 
 1. **Part 1, migrate.** Move what is reusable into `game-kit` (geometry, the wall blocker, **and all Enoki code**). Move the rest into `long-way`. Add `bevy_enoki` to `game-kit` without making the main build slower or `target/` bigger than it must be.
-2. **Part 2, weapons.** First build the shared base: enemy hit points, damage, pushback and the link from the weapon drawer. Then add the weapons **one at a time**. Each weapon is built, wired into the drawer and the active weapon button (`WeaponKind::is_built`, `adr-lw34`), tested and tuned before the next one starts. Order set by the user: (1) fire ring, (2) ice ring, (3) fire wall, (4) ice wall, (5) whirlpool, (6) fireball.
+2. **Part 2, weapons.** First build the shared base: enemy hit points, damage, pushback and the link from the weapon drawer. Then add the weapons **one at a time**. Each weapon is built, wired into the drawer and the active weapon button (`WeaponKind::is_built`, `adr-lw34`), tested and tuned before the next one starts. Order set by the user: (1) fire ring, (2) ice ring, (3) tornado, (4) fireball, (5) fire wall, (6) ice wall (the user moved the whirlpool (now the tornado) and the fireball before the walls on 2026-11-13).
 
 ## Out of scope
 
@@ -28,9 +28,9 @@ Rule (`CLAUDE.md`, `adr-x12`): code goes into the kit only when R-Town could use
 | `rules.rs`: `move_rect`, `sweep_circle`, `first_hit`                                                                    | **Dropped**                                                                  | The kit has `collision::move_feet` and `projectile`.                                                                                                                                                                                                                                     |
 | Fireball flight and hits                                                                                                | **Kit, already there**: `projectile.rs`                                      | Needs no change. The range limit is a Long Way system that despawns the shot.                                                                                                                                                                                                            |
 | Wall as a blocker                                                                                                       | **Kit**, `collision.rs`: add and remove a temporary blocked area at run time | `CollisionWorld` is only rebuilt on map load today (`rocks.rs` `rebuild_collision`). See D4 and P1.                                                                                                                                                                                      |
-| Draw order                                                                                                              | **Kit `layers.rs` only if needed**                                           | Every effect uses `DepthSort` in the world layer. Add a named layer only if a ring or the whirlpool must draw below the player.                                                                                                                                                          |
+| Draw order                                                                                                              | **Kit `layers.rs` only if needed**                                           | Every effect uses `DepthSort` in the world layer. Add a named layer only if a ring or the tornado must draw below the player.                                                                                                                                                          |
 | Enoki integration: `EnokiPlugin`, effect library, one-shot and follow-the-owner helpers, additive materials (`glow.rs`) | **Kit**, new `fx.rs` (D3)                                                    | Generic: no weapon values, no assets. **Cost accepted by the user:** the kit depends on Enoki, so R-Town also compiles the 5 extra crates. `FxPlugin` is opt-in, so R-Town runs no Enoki code. If the cost grows, split a `game-fx` crate (`adr-x12` allows it). Record this in the ADR. |
-| `fireball.rs`, `ring.rs`, `wall.rs`, `whirlpool.rs`                                                                     | **Long Way**, `src/weapons/`                                                 | Weapons, values and art are game content.                                                                                                                                                                                                                                                |
+| `fireball.rs`, `ring.rs`, `wall.rs`, `tornado.rs`                                                                     | **Long Way**, `src/weapons/`                                                 | Weapons, values and art are game content.                                                                                                                                                                                                                                                |
 | `harness.rs`, `main.rs`, `SPIKE_*` env, benchmark mode                                                                  | **Dropped**                                                                  | Spike tooling. Long Way has the script runner.                                                                                                                                                                                                                                           |
 | Whirlpool variants A and C                                                                                              | **Dropped**                                                                  | Variant B is the pick (D6).                                                                                                                                                                                                                                                              |
 | Effect files (16 `.particle.ron`)                                                                                       | **Long Way**, `assets/effects/`                                              | Copied **in the step of the weapon that uses them**.                                                                                                                                                                                                                                     |
@@ -72,7 +72,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | D3 | Where does the Enoki code live? | **Decided: `game-kit`**, as `fx.rs`. See G1. |
 | D4 | The wall blocks ghosts, the player and projectiles. | **Decided:** a body inside the wall rectangle when it appears walks out. No push, no shifting. |
 | D5 | How do we trigger a weapon in a test? | **Replaced.** Load the weapon in the drawer (a gauge, then a weapon button), then click the active weapon button (`adr-lw34`). Scripted runs click with `ui_click:<x>:<y>` (`dev-feedback.md`, coordinates in `weapons.md`). **No env variable trigger.** For an all-weapons stress run, a script casts every weapon in turn. |
-| D6 | Whirlpool variant | **Decided (user, 2026-11-11): variant B** (attractor, spiral outward, with push). |
+| D6 | Whirlpool (now the tornado) variant | **Decided (user, 2026-11-11): variant B** (attractor, spiral outward, with push). |
 | D7 | Enemy hit points | **Decided: enemies need HP.** Design in P4. |
 | D8 | Damage model | **Decided:** every weapon has a tunable **damage per second** (`dps`). A weapon that hits once (the fireball) has a tunable **impact damage** instead. |
 | D9 | Pushback model | **Decided:** every weapon has a tunable pushback, one of: `None`, `Pixels(n)` (push back by a set distance, then stop), `ToEdge` (push all the way to the weapon's final radius or distance). The fireball has `None` and ends on its first hit. Pushback stops at features and walls (the collision world). |
@@ -85,16 +85,16 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 
 ### Aim rules (D11)
 
-`CastWeapon { weapon, origin, facing }` is built from the player's state at the moment of the click: the player's feet and the direction the player last moved in. The aim is a rule per weapon, not a cursor point. The fireball's nearest-enemy search is done by the fireball itself (W6).
+`CastWeapon { weapon, origin, facing }` is built from the player's state at the moment of the click: the player's feet and the direction the player last moved in. The aim is a rule per weapon, not a cursor point. The fireball's nearest-enemy search is done by the fireball itself (W4).
 
 | Weapon | Anchor | Aim |
 |---|---|---|
 | W1 fire ring, W2 ice ring | The player's position at cast time. **Does not follow the player.** | None (a full circle). |
-| W3 fire wall, W4 ice wall | In front of the player. | The player's facing direction sets the orientation (horizontal or vertical) and the travel direction. |
-| W5 whirlpool | The player. **Follows the player** while it lasts. | None (surrounds the player). |
-| W6 fireball | The player's muzzle point. | **Auto-target the nearest visible enemy.** |
+| W5 fire wall, W6 ice wall | In front of the player. | The player's facing direction sets the orientation (horizontal or vertical) and the travel direction. |
+| W3 tornado | The player. **Follows the player** while it lasts. | None (surrounds the player). |
+| W4 fireball | The player's muzzle point. | **Auto-target the nearest visible enemy.** |
 
-Open details, asked in the weapon step: what "facing" gives when the player faces a diagonal (W3), what "visible" means and what the fireball does with no enemy visible (W6).
+Open details, asked in the weapon step: what "facing" gives when the player faces a diagonal (W5), what "visible" means and what the fireball does with no enemy visible (W4).
 
 ## Part 1: Migrate
 
@@ -118,7 +118,7 @@ Open details, asked in the weapon step: what "facing" gives when the player face
 ### P1. Kit geometry and the wall blocker (no Enoki)
 
 - `crates/game-kit/src/area.rs`: port the five functions on Bevy `Rect`. Tests moved from the spike (`ease_out`, ring radius, band overlap including the "consecutive frames overlap, so no body is skipped" test, push). Export in `lib.rs`.
-- `crates/game-kit/src/collision.rs`: a temporary blocker. Needs: add at run time, remove on expiry, no stale edges, cost of one outline rebuild per change (measure), and `nav.rs` picking it up. Unit tests in the kit (a shot, a body and a path against a wall that appears and expires). Built here, used in W3.
+- `crates/game-kit/src/collision.rs`: a temporary blocker. Needs: add at run time, remove on expiry, no stale edges, cost of one outline rebuild per change (measure), and `nav.rs` picking it up. Unit tests in the kit (a shot, a body and a path against a wall that appears and expires). Built here, used in W5.
 - `layers.rs`: change only if a weapon step shows a need.
 - Docs: `dev-docs/extensions/area-effects.md` (new), updates to `collision.md` and `projectiles.md` (no range limit: the game despawns). Add to `dev-docs/extensions/README.md`.
 - Check: `./dev-scripts/rust.sh test game-kit`, `lint`, `build r-town`. No `Cargo.toml` change, so the tree must not move.
@@ -153,18 +153,18 @@ games/long-way/src/weapons/
 ├── damage.rs     applies WeaponHit to enemy HP, pushback application
 ├── ring.rs       RingPlugin (fire and ice)
 ├── wall.rs       WallPlugin (fire and ice)
-├── whirlpool.rs  WhirlpoolPlugin (variant B)
+├── tornado.rs    TornadoPlugin (the spike's whirlpool, variant B look)
 └── fireball.rs   FireballPlugin
 games/long-way/src/enemy_hp.rs   EnemyHp, DamageEnemy, EnemyDied, the hurt flash (P4)
 ```
 
 Each weapon file is added in its own step. Do not create empty files for later weapons.
 
-- **Weapon kinds:** reuse `WeaponKind` from `weapon_menu.rs` (fire ring, ice ring, fire wall, ice wall, whirlpool, fireball). Do not make a second enum.
+- **Weapon kinds:** reuse `WeaponKind` from `weapon_menu.rs` (fire ring, ice ring, fire wall, ice wall, tornado, fireball). Do not make a second enum.
 - **Messages:**
   - `CastWeapon { weapon, origin, facing }`: asks for a weapon. Built from `ActiveWeaponClicked` for the player (`adr-lw34`).
   - `WeaponHit { target, weapon, amount, push }`: a damage tick, an impact, or a push on one target. `amount` is already `dps * tick` or the impact damage. `damage.rs` turns it into HP loss and movement.
-- **Gameplay and visuals are separate systems.** Gameplay owns the state (ring radius, wall rectangle and timer, whirlpool band) and sends `WeaponHit`. Visuals read that state and spawn emitters and sprites. The gameplay half runs and is tested with no particles.
+- **Gameplay and visuals are separate systems.** Gameplay owns the state (ring radius, wall rectangle and timer, tornado band) and sends `WeaponHit`. Visuals read that state and spawn emitters and sprites. The gameplay half runs and is tested with no particles.
 - **Values in one place.** `values.rs` holds, per weapon: `damage` (`PerSecond(f32)` or `Impact(f32)`), `pushback` (`None`, `Pixels(f32)`, `ToEdge`), `tick` (seconds between hits on one target, 0.5 s in the spike), size, duration, speed, `glow: bool`. Each number names its source (spike default or tuned).
 - **Pushback rules (D9):** push is a movement of the target's feet through `collision::move_feet`, so trees, rocks and walls stop it. `Pixels(n)`: the target is moved back by at most `n` pixels in total per cast, then left alone. `ToEdge`: the target is carried outward with the front until the final radius or distance. A target that is stopped by a feature stays there and keeps taking damage.
 - Hit targets use the `HitBox` of a ghost.
@@ -236,7 +236,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 **Build.**
 
-- **Shape per direction (rays).** At the cast, cast N rays from the centre (for example 64). The final radius of each ray is the smallest of: 192, the distance to the first blocked edge in the collision world, and the distance to the map edge (less the enemy edge margin). This needs a ray test against the collision edges: a new kit function in `collision.rs`, for example `ray_distance(from, dir, max, edges)`, tested in the kit (approved by the user, 2026-11-13). The shape is computed once, at the cast. Walls (W3) can change the world during a ring later: decide that in W3.
+- **Shape per direction (rays).** At the cast, cast N rays from the centre (for example 64). The final radius of each ray is the smallest of: 192, the distance to the first blocked edge in the collision world, and the distance to the map edge (less the enemy edge margin). This needs a ray test against the collision edges: a new kit function in `collision.rs`, for example `ray_distance(from, dir, max, edges)`, tested in the kit (approved by the user, 2026-11-13). The shape is computed once, at the cast. Walls (W5) can change the world during a ring later: decide that in W5.
 - **Front and hit test.** The front radius of a ray is the smaller of the eased radius and the ray's final radius. An enemy is tested against the ray at the angle of its body centre, interpolated between the two nearest rays.
 - **Push.** As in the fire ring, by the front's advance, through `damage.rs` (`pushed_feet`: the collision world and the map edge). **Pinned** means the push moved the enemy less than asked (stopped by a feature or the map edge). A pinned enemy gets the kit marker `Stunned` until its ring ends. An enemy that reaches the ring's edge in open space does not.
 - **Barrier.** A Long Way system that runs after the kit's movement. An enemy whose body has entered the ring's shape is moved back out to the ring along its ray, through the collision world. It is for enemies only, so the kit's collision and `nav.rs` do not change. A ghost still walks toward the player and presses against the ring: that is the touch.
@@ -251,7 +251,42 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 **Scripted runs.** Ghosts at three distances. A ghost between the player and a tree: it is pinned and stunned, then walks on after the ring goes. A cast near the map edge. A ghost pressing against the ring takes the touch damage once. One ring never kills a ghost. Two rings in a row can kill.
 
-#### W3. Fire wall
+#### W3. Tornado (was whirlpool; renamed by the user on 2026-11-13; design decided the same day)
+
+**Intent (the user).** A mobile shield that moves with the player. It lasts twice as long as the ice ring. It does more damage than the ice ring and can kill a ghost that stays in contact with it for more than 60% of its duration. It keeps pushing a ghost back, but the ghost slowly makes progress through it: a player who stands still and casts it can be reached, a player who keeps moving stays safe.
+
+| Topic | Rule |
+|---|---|
+| Shape and timing | A disc of radius 2 cells (128 px, start value) on the middle of the player's body. It follows the player. It lasts 2 × (ice ring growth + hold) = 5.53 s (b4). It does not affect the player's movement. |
+| Contact | An enemy whose body overlaps the disc is in contact. Damage counts **total** contact time: a ghost pushed out that comes back keeps its count. |
+| Damage | 26 per second, in ticks of 13 every 0.5 s of contact (start values). A ghost dies on the 8th tick, at 3.5 s of contact (63% of the duration); after 7 ticks (3.0 s, 54%) it has 9 HP (b5). At most 12 ticks (156) per cast, more than the ice ring's 60 (b6). The player can kill a ghost by holding the tornado against it. |
+| Push | Inside the disc an enemy is pushed outward at 45 px/s (start value), less than the ghost's 90 px/s, so a ghost walking in gets closer at 45 px/s: about 2.4 s from the edge to a standing player, before the 3.5 s kill (b7). The player's own movement never carries an enemy deeper: the edge shoves an enemy ahead of the player (b8). The user accepts that walking straight at one ghost for about 2.4 s lets it through. |
+| Features | The tornado passes over trees, rocks and markers. A pushed enemy stops at them and at the map edge, is **not** stunned, and keeps being pushed and hurt there. |
+| Look | The spike's variant B (D6), kept for now (the user): 10 emitters on a small circle send droplets that an attractor at the player bends into an outward spiral. Icon tag `tornado` (renamed from `whirlpool`). |
+
+**Build.**
+- `weapons/tornado.rs`, values in `values.rs` (a `TORNADO` shape: radius, push speed; the duration computed from `ICE_RING`; damage `PerSecond(26.0)`, tick 0.5, pushback through its own rule, glow off).
+- **Push rule per enemy and frame.** Keep the enemy's depth into the disc (radius minus the distance from the centre to its body) and its feet from the last frame. Its own inward step is its feet movement since then, along the line from the centre. The depth may grow by that step only, less `push speed × dt`, and not below 0. When the depth now is larger, push the enemy out by the difference through `pushed_feet` (features and the map edge stop it). So the player's movement adds nothing, a ghost walking in makes 45 px/s, and a ghost that stands is pushed out at 45 px/s.
+- Damage through `Contact::damage` (it only counts frames in contact, so the count is total contact time). Dead enemies are skipped (D15). It runs in `WeaponSystems::Effect`, after the kit has moved the enemies.
+- Look: port variant B (`whirl_orbit.particle.ron` copied as `tornado_orbit.particle.ron`, the per-emitter attractor), emitters follow the player. `DepthSort` on all of them.
+- Expose the ghost's walk speed to the balance tests (`ghost.rs`).
+
+**Tests.** Balance b4 to b7 in `values.rs`. Mechanic: a ghost walking at a standing player closes in at walk speed less push speed; a standing ghost is pushed out; a player walking at a ghost does not make it deeper (b8); total contact is counted across a break; a pinned ghost stays at the tree, not stunned, and keeps taking ticks; the tornado follows the player and ends at its duration; a dead enemy is skipped. Keep the spike test that integrates the attractor (droplets spiral outward).
+
+**Scripted runs.** A standing player and a ghost walking in (it gets through, with about 5 ticks). A player walking away and around (no touch). A ghost held against a tree until it dies.
+
+#### W4. Fireball
+
+- It adds a moving shot, impact damage and no pushback.
+- **Design questions:**
+  - Impact damage (`Impact(f32)`, one hit), or also an area at the explosion (a radius and a damage)? The user said it explodes and ends on hitting an enemy: confirm the explosion hurts only the enemy hit or nearby enemies too.
+  - Speed, range (1100 px in the spike), what it does when it hits a tree or rock (explode, as in the spike).
+  - Target rule (D11): nearest visible enemy. What counts as visible (on screen, or in line of sight past trees and rocks, or both)? What happens when none is visible (no cast, or a shot straight ahead)? How is a tie or a moving target handled (fire at the position at cast time)?
+- `Projectile` from the kit, head sprite, four trail emitters that follow it and stop with it, impact bursts on `ProjectileHit`, muzzle burst, range limit system that despawns the shot. The ghost's `HitBox` is the target (add `ProjectileTarget` to ghosts). Pushback is `None`. The shot ends on its first enemy hit and sends one `WeaponHit` with the impact damage.
+- Tests: the range limit, the muzzle point, one hit and then the shot is gone, no push.
+- Scripted run: flight, hit on a tree, hit on a ghost, miss to the range limit.
+
+#### W5. Fire wall
 
 - Uses the temporary blocker from P1.
 - **Design questions:**
@@ -264,34 +299,12 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 - Tests: the lifetime, the placement and orientation from the facing (all four directions), removal of the blocker on expiry, `dps` through the rectangle (Long Way side; the blocker is tested in the kit, P1).
 - Scripted run: the ghost stops at the wall, burns, then walks on after it expires. Check a horizontal and a vertical wall and the ghost path (`nav.rs`).
 
-#### W4. Ice wall
+#### W6. Ice wall
 
 - **Design questions:** damage, pushback, lifetime, and whether the ice wall differs in mechanic from the fire wall (it blocks without damage? it is only a barrier?). Ask. Do not invent.
-- Reuse `WallPlugin` from W3. Add the ice sprites: animated, one tag per cube height, played once, fade by alpha.
+- Reuse `WallPlugin` from W5. Add the ice sprites: animated, one tag per cube height, played once, fade by alpha.
 - Tests: the values differ as agreed and the shared rules hold.
-- Scripted run: same as W3 with the ice art.
-
-#### W5. Whirlpool
-
-- Variant B only (D6): 10 emitters with attractors set per emitter, spiral outward, band hit test.
-- **Design questions:**
-  - Pushback: the spike pushes away from the player (blocked by the collision world). Is that `Pixels(n)` or `ToEdge`? Does it also deal `dps`, or only push?
-  - Does it affect the player's movement (the plan says no unless you decide yes)?
-  - Duration and size. The whirlpool is centred on the player and moves with it (D11): check that the band, the emitters and the push all follow, and what happens when the player walks into a tree.
-- Keep the unit test that integrates the Enoki attractor formula (droplets spiral outward across the band).
-- Tests: the push is blocked by a tree, the damage per second if any, the duration.
-- Scripted run: a ghost walking at the player.
-
-#### W6. Fireball
-
-- Last, because it adds a moving shot, impact and no pushback.
-- **Design questions:**
-  - Impact damage (`Impact(f32)`, one hit), or also an area at the explosion (a radius and a damage)? The user said it explodes and ends on hitting an enemy: confirm the explosion hurts only the enemy hit or nearby enemies too.
-  - Speed, range (1100 px in the spike), what it does when it hits a tree or rock (explode, as in the spike).
-  - Target rule (D11): nearest visible enemy. What counts as visible (on screen, or in line of sight past trees and rocks, or both)? What happens when none is visible (no cast, or a shot straight ahead)? How is a tie or a moving target handled (fire at the position at cast time)?
-- `Projectile` from the kit, head sprite, four trail emitters that follow it and stop with it, impact bursts on `ProjectileHit`, muzzle burst, range limit system that despawns the shot. The ghost's `HitBox` is the target (add `ProjectileTarget` to ghosts). Pushback is `None`. The shot ends on its first enemy hit and sends one `WeaponHit` with the impact damage.
-- Tests: the range limit, the muzzle point, one hit and then the shot is gone, no push.
-- Scripted run: flight, hit on a tree, hit on a ghost, miss to the range limit.
+- Scripted run: same as W5 with the ice art.
 
 ### P5. Verify all (after W6)
 

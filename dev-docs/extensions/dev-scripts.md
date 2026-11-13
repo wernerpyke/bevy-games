@@ -1,6 +1,6 @@
 # Dev scripts for screenshots and art checks
 
-All scripts take the game, file and sizes as arguments. They never change the input file, except `set_durations` with `apply=1`. Screenshots and grids go in `target/screenshots/`. Delete them after the check (`CLAUDE.md`, "Disk use").
+All scripts take the game, file and sizes as arguments. They never change the input file, except `set_durations` and `rename_tag` with `apply=1`. Screenshots and grids go in `target/screenshots/`. Delete them after the check (`CLAUDE.md`, "Disk use").
 
 ## Zoomed screenshot
 
@@ -21,6 +21,7 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `frame_grid` | `.aseprite` | `out=`, `tag=` or `frames=a-b`, `cols=`, `scale=`, `gap=` | One PNG grid of the visible layers |
 | `sheet_analysis` | sheet `.png` | `frame=WxH` | Bounds and colour count per frame, all colours of the sheet |
 | `set_durations` | `.aseprite` | `tags=a,b` or `all`, `ms=`, `apply=1`, `out=` | Sets the frame duration of those tags. A dry run (lists the frames it would change) unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first |
+| `rename_tag` | `.aseprite` | `from=`, `to=`, `apply=1`, `out=` | Renames one tag. Refuses a missing or repeated `from` and an existing `to`. A dry run unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first. Rename the tag in the code too |
 | `crop` | `.png` | `out=`, `scale=`, `cx cy w h view_height=` or `x y w h` | Cropped and scaled PNG |
 | `catalogue` | sheet `.png` | `tile=` (or `tilew tileh`), `out=`, `backdrop=` | `.aseprite` copy of the sheet at 1:1 with column and row rulers and a grid. See `tile-sheet-catalogue.md` |
 | `extract_block` | original sheet `.png` | `col row cols rows tile=`, `scale=`, `anchor=bottom\|trunk\|none`, `out=` | One-frame `.aseprite` of that block, anchored in its cell space and scaled. See `tile-sheet-catalogue.md` |

@@ -140,7 +140,7 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             tick: 0.5,
             glow: false,
         },
-        WeaponKind::Whirlpool => WeaponValues {
+        WeaponKind::Tornado => WeaponValues {
             damage: Damage::PerSecond(20.0),
             pushback: Pushback::Pixels(96.0),
             tick: 0.5,

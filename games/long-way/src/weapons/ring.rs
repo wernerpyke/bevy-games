@@ -491,7 +491,7 @@ mod tests {
     fn a_ring_cast_makes_a_ring_of_its_shape_at_the_centre_and_other_weapons_make_none() {
         let mut app = app(16);
         cast(&mut app, WeaponKind::Fireball, Vec2::ZERO);
-        cast(&mut app, WeaponKind::Whirlpool, Vec2::ZERO);
+        cast(&mut app, WeaponKind::Tornado, Vec2::ZERO);
         app.update();
         assert_eq!(rings(&mut app), 0);
         cast(&mut app, WeaponKind::FireRing, Vec2::new(10.0, 20.0));
