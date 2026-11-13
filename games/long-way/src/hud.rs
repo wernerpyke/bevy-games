@@ -17,8 +17,37 @@ impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(PostStartup, spawn_hud_content).add_systems(
             Update,
-            (update_gauges, update_active_buttons, update_hp_row),
+            (
+                press_weapon_keys,
+                update_gauges,
+                update_active_buttons,
+                update_hp_row,
+            ),
         );
+    }
+}
+
+/// The keys that do what a click on a gauge (open the drawer) and on an active weapon button (cast) do, per energy.
+const WEAPON_KEYS: [(Energy, KeyCode, KeyCode); 4] = [
+    (Energy::Red, KeyCode::Digit1, KeyCode::KeyZ),
+    (Energy::Blue, KeyCode::Digit2, KeyCode::KeyX),
+    (Energy::Violet, KeyCode::Digit3, KeyCode::KeyC),
+    (Energy::Black, KeyCode::Digit4, KeyCode::KeyV),
+];
+
+/// A key press sends the same message as a click on its gauge or active weapon button.
+fn press_weapon_keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut gauge: MessageWriter<GaugeClicked>,
+    mut button: MessageWriter<ActiveWeaponClicked>,
+) {
+    for (energy, drawer_key, cast_key) in WEAPON_KEYS {
+        if keys.just_pressed(drawer_key) {
+            gauge.write(GaugeClicked(energy));
+        }
+        if keys.just_pressed(cast_key) {
+            button.write(ActiveWeaponClicked(energy));
+        }
     }
 }
 
@@ -380,6 +409,54 @@ mod tests {
         assert_eq!(
             crate::test_util::messages::<GaugeClicked>(&app),
             vec![GaugeClicked(Energy::Blue), GaugeClicked(Energy::Red)]
+        );
+    }
+
+    #[test]
+    fn each_weapon_key_sends_the_energy_of_its_gauge_or_button_once_per_press() {
+        // No time plugin, so the messages are swapped in every update (`test_util::messages`).
+        let mut app = App::new();
+        app.init_resource::<ButtonInput<KeyCode>>()
+            .add_message::<ActiveWeaponClicked>()
+            .add_message::<GaugeClicked>()
+            .add_systems(Update, press_weapon_keys);
+        // One key per frame, so a key that sends the energy of another one shows.
+        for (key, gauge, cast) in [
+            (KeyCode::Digit1, Some(Energy::Red), None),
+            (KeyCode::Digit2, Some(Energy::Blue), None),
+            (KeyCode::Digit3, Some(Energy::Violet), None),
+            (KeyCode::Digit4, Some(Energy::Black), None),
+            (KeyCode::KeyZ, None, Some(Energy::Red)),
+            (KeyCode::KeyX, None, Some(Energy::Blue)),
+            (KeyCode::KeyC, None, Some(Energy::Violet)),
+            (KeyCode::KeyV, None, Some(Energy::Black)),
+        ] {
+            let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            keys.reset_all();
+            keys.press(key);
+            app.update();
+            assert_eq!(
+                crate::test_util::messages::<GaugeClicked>(&app),
+                gauge.map(GaugeClicked).into_iter().collect::<Vec<_>>(),
+                "{key:?}"
+            );
+            assert_eq!(
+                crate::test_util::messages::<ActiveWeaponClicked>(&app),
+                cast.map(ActiveWeaponClicked)
+                    .into_iter()
+                    .collect::<Vec<_>>(),
+                "{key:?}"
+            );
+        }
+        // A held key of each kind sends nothing more (the input plugin clears `just_pressed` in each frame).
+        let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        keys.press(KeyCode::Digit3);
+        keys.clear();
+        app.update();
+        assert_eq!(crate::test_util::messages::<GaugeClicked>(&app), vec![]);
+        assert_eq!(
+            crate::test_util::messages::<ActiveWeaponClicked>(&app),
+            vec![]
         );
     }
 

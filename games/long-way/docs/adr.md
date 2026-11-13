@@ -196,7 +196,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **How to apply.** Code: `ghost.rs`, `hp.rs`, `map.rs` (`Kind::SpawnGhost`). Kinds: `games/long-way/docs/maps.md`. The art is `characters/ghost.aseprite` (`art-tags.md`).
 
-## adr-lw30. The player moves by mouse click only, to one goal at a time (2026-11-09)
+## adr-lw30. The player moves by mouse click only, to one goal at a time (2026-11-09, amended by adr-lw38: the arrow keys walk again)
 
 **Decision.** The player walks to the place where the left mouse button went down (`WorldClick`, `adr-x42`) and goes around blocked cells with the kit path finder (`Mover`, `adr-x43`). A new click replaces the goal while the player is walking. A click on a blocked place, or outside the walkable area, sends the player to the nearest place it can reach. There is no hold-to-follow, and the arrow keys no longer move the player. While the screen fades the click is dropped and the player stands still, and a map change clears the goal. A hit that hurts the player does not stop the walk.
 
@@ -261,3 +261,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The user's intent (2026-11-13, quoted in `weapons.md`): a high-power shot the player does not aim. Steering keeps the promise "does not miss" without aim prediction; at 420 px/s against a ghost's 90 it does not read as a homing missile (the user). Enemies on screen first, because the player sees them. A feature in the way is the one way to miss, as the user wants, and the blast through features still reaches an enemy close behind it. The direct target is spared the blast so that a stronger enemy that survives the direct hit is not punished twice (b14). The kit's `Projectile` already moves a shot and reports what it hits; the fireball only changes its velocity.
 
 **How to apply.** Code: `weapons/fireball.rs`, `weapons/values.rs` (`FIREBALL`, `Damage::Impact`, the fireball row). Docs: `weapons.md`, `balance.md` (b10 to b14).
+
+## adr-lw38. The keyboard comes back next to the mouse: arrows walk, 1 to 4 open a drawer, Z X C V cast (2026-11-13)
+
+**Decision.** This amends `adr-lw30`. The arrow keys walk the player again, with the collision and sliding rules of `move_feet`, as before `adr-lw30`. A click still walks the player to its goal. While an arrow key is held the player has no goal: the keys win over a click in the same frame and stop a walk to a click, and the player stands when the keys are released. Two opposite keys cancel each other and do not stop a walk to a click. The keys 1, 2, 3 and 4 do what a click on the red, blue, violet and black gauge does (open, switch or close the drawer), and Z, X, C and V do what a click on the active weapon button of the same energy does (cast). They send the same messages as the clicks (`GaugeClicked`, `ActiveWeaponClicked`). A weapon in the drawer is still loaded by a click. Each key acts once per press.
+
+**Rationale.** The user chose this control scheme (2026-11-13). Sending the click messages keeps one path from input to the drawer and the cast, so the keys and the clicks cannot drift apart. The key walk writes `MoveState` as the mover does, so the animation, `limit_player` and the aim of the weapons (the last walk direction) are the same for both walks. It has its own slide assist (`KeyAssist`), because `follow_goals` resets the mover's `SlideAssist` in every frame without a goal, and the push into a trunk would never last long enough to slide.
+
+**How to apply.** Code: `player.rs` (`key_direction`, `stop_goal_on_keys`, `walk_by_keys`, `KeyAssist`), `hud.rs` (`WEAPON_KEYS`, `press_weapon_keys`). Test it with `script long-way "hold:left+up:0.4;hold:2:0.1;wait:0.4;hold:x:0.1;quit" --debug` (the script knows `z`, `x`, `c`, `v` and `1` to `4`, `dev-feedback.md`).

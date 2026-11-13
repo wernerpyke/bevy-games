@@ -4,7 +4,7 @@
 //!
 //! Commands are separated by `;`:
 //! - `teleport:<feet_x>:<feet_y>`   put the feet of the controlled entity at a position
-//! - `hold:<keys>:<seconds>`        hold arrow keys, `x` or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`. A
+//! - `hold:<keys>:<seconds>`        hold arrow keys, `z`, `x`, `c`, `v`, `1` to `4`, `escape` or `f1` to `f3`, for example `hold:up:3` or `hold:up+left:2`. A
 //!   short hold of `x` (`hold:x:0.1`) is one key press
 //! - `click:<world_x>:<world_y>`    a left mouse click at a world position (`pointer::WorldClick`)
 //! - `ui_click:<x>:<y>`            a left click on the UI at a window position in art pixels from the top left (the
@@ -155,6 +155,13 @@ fn key(name: &str) -> Option<KeyCode> {
         "left" => Some(KeyCode::ArrowLeft),
         "right" => Some(KeyCode::ArrowRight),
         "x" => Some(KeyCode::KeyX),
+        "z" => Some(KeyCode::KeyZ),
+        "c" => Some(KeyCode::KeyC),
+        "v" => Some(KeyCode::KeyV),
+        "1" => Some(KeyCode::Digit1),
+        "2" => Some(KeyCode::Digit2),
+        "3" => Some(KeyCode::Digit3),
+        "4" => Some(KeyCode::Digit4),
         "escape" => Some(KeyCode::Escape),
         "f1" => Some(KeyCode::F1),
         "f2" => Some(KeyCode::F2),
@@ -457,6 +464,13 @@ mod tests {
             ("left", KeyCode::ArrowLeft),
             ("right", KeyCode::ArrowRight),
             ("x", KeyCode::KeyX),
+            ("z", KeyCode::KeyZ),
+            ("c", KeyCode::KeyC),
+            ("v", KeyCode::KeyV),
+            ("1", KeyCode::Digit1),
+            ("2", KeyCode::Digit2),
+            ("3", KeyCode::Digit3),
+            ("4", KeyCode::Digit4),
             ("escape", KeyCode::Escape),
             ("f1", KeyCode::F1),
             ("f2", KeyCode::F2),

@@ -5,13 +5,14 @@ use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
 use crate::hp::{Hp, PlayerHurt};
 use game_kit::animation::play_if_changed;
-use game_kit::collision::SlideAssist;
+use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
 use game_kit::map::{Facing as EntryFacing, start_feet};
 use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
 use game_kit::movement::{FollowSet, MoveGoal, MoveState, Mover, StrategySet};
 use game_kit::nav::{NavGrid, NavInset};
+use game_kit::outline::Edge;
 use game_kit::pointer::WorldClick;
 
 /// Walk speed in art pixels per second.
@@ -39,10 +40,13 @@ impl Plugin for PlayerPlugin {
             max: Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT),
         })
         .add_systems(Startup, spawn_player)
-        .add_systems(Update, set_goal.in_set(StrategySet))
         .add_systems(
             Update,
-            (limit_player, hurt_player, animate_player)
+            (set_goal, stop_goal_on_keys).chain().in_set(StrategySet),
+        )
+        .add_systems(
+            Update,
+            (walk_by_keys, limit_player, hurt_player, animate_player)
                 .chain()
                 .after(FollowSet),
         );
@@ -121,12 +125,110 @@ pub fn spawn_player(
             feet_offset: PLAYER_FEET_OFFSET,
         },
         Mover::new(WALK_SPEED).with_feet_offset(PLAYER_FEET_OFFSET),
+        KeyAssist::default(),
         Transform::from_translation(start.extend(0.0)),
     ));
 }
 
+/// The slide assist of the walk by the arrow keys. The mover's `SlideAssist` cannot be used: `follow_goals` resets it in
+/// every frame without a goal, so the time pushed into a trunk would never add up.
+#[derive(Component, Default)]
+struct KeyAssist(SlideAssist);
+
+/// The way the arrow keys point, not normalised. Two opposite keys cancel each other.
+fn key_direction(keys: &ButtonInput<KeyCode>) -> Vec2 {
+    let mut direction = Vec2::ZERO;
+    if keys.pressed(KeyCode::ArrowLeft) {
+        direction.x -= 1.0;
+    }
+    if keys.pressed(KeyCode::ArrowRight) {
+        direction.x += 1.0;
+    }
+    if keys.pressed(KeyCode::ArrowUp) {
+        direction.y += 1.0;
+    }
+    if keys.pressed(KeyCode::ArrowDown) {
+        direction.y -= 1.0;
+    }
+    direction
+}
+
+/// While an arrow key is held, the player has no goal: the keys win over a click in the same frame and stop a walk to a
+/// clicked goal. Runs after `set_goal`.
+fn stop_goal_on_keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut query: Query<&mut MoveGoal, With<Player>>,
+) {
+    if key_direction(&keys) == Vec2::ZERO {
+        return;
+    }
+    for mut goal in &mut query {
+        goal.0 = None;
+    }
+}
+
+/// Walks the player the way the arrow keys point, with the collision and sliding rules of `move_feet`. It writes
+/// `MoveState` as the mover does, so `limit_player`, the animation and the aim of the weapons treat both walks the same.
+fn walk_by_keys(
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    transition: Res<MapTransition>,
+    world: Res<CollisionWorld>,
+    settings: Res<CollisionSettings>,
+    mut query: Query<(&mut Transform, &mut MoveState, &mut KeyAssist), With<Player>>,
+) {
+    let direction = key_direction(&keys);
+    let locked = transition.locks_input();
+    for (mut transform, mut state, mut assist) in &mut query {
+        walk_one(
+            direction,
+            locked,
+            time.delta_secs(),
+            &settings,
+            world.edges(),
+            &mut transform,
+            &mut state,
+            &mut assist.0,
+        );
+    }
+}
+
+/// `walk_by_keys` for one player. No direction, or a fade, leaves the player as it is.
+#[allow(clippy::too_many_arguments)]
+fn walk_one(
+    direction: Vec2,
+    locked: bool,
+    dt: f32,
+    settings: &CollisionSettings,
+    edges: &[Edge],
+    transform: &mut Transform,
+    state: &mut MoveState,
+    assist: &mut SlideAssist,
+) {
+    if direction == Vec2::ZERO || locked {
+        assist.reset();
+        return;
+    }
+    let direction = direction.normalize();
+    let old = feet_of(transform);
+    let feet = move_feet(
+        settings,
+        assist,
+        old,
+        direction * WALK_SPEED * dt,
+        dt,
+        edges,
+    );
+    transform.translation.x = feet.x;
+    transform.translation.y = feet.y + PLAYER_FEET_OFFSET;
+    // The walk plays also while a trunk blocks the feet, as it did before the mouse.
+    state.walking = true;
+    state.facing = direction;
+}
+
 /// A left click sets the goal. The player walks there by the nav grid (`game_kit::movement`), around blocked cells. A
-/// click on a blocked place, or outside the walkable area, goes to the nearest place the player can reach.
+/// click on a blocked place, or outside the walkable area, goes to the nearest place the player can reach. A held arrow
+/// key clears the goal again (`stop_goal_on_keys`).
 fn set_goal(
     mut clicks: MessageReader<WorldClick>,
     active: Res<ActiveMaps>,
@@ -455,6 +557,144 @@ mod tests {
                 Some(Vec2::new(50.0, 50.0))
             };
             assert_eq!(goal.0, kept, "locked {locked}");
+        }
+    }
+
+    fn keys(held: &[KeyCode]) -> ButtonInput<KeyCode> {
+        let mut keys = ButtonInput::default();
+        for key in held {
+            keys.press(*key);
+        }
+        keys
+    }
+
+    #[test]
+    fn each_arrow_key_points_its_way_and_opposite_keys_cancel() {
+        use KeyCode::{ArrowDown, ArrowLeft, ArrowRight, ArrowUp};
+        for (held, direction) in [
+            (vec![], Vec2::ZERO),
+            (vec![ArrowLeft], Vec2::NEG_X),
+            (vec![ArrowRight], Vec2::X),
+            (vec![ArrowUp], Vec2::Y),
+            (vec![ArrowDown], Vec2::NEG_Y),
+            (vec![ArrowLeft, ArrowUp], Vec2::new(-1.0, 1.0)),
+            (vec![ArrowLeft, ArrowRight, ArrowDown], Vec2::NEG_Y),
+            (vec![ArrowUp, ArrowDown], Vec2::ZERO),
+        ] {
+            assert_eq!(key_direction(&keys(&held)), direction, "{held:?}");
+        }
+    }
+
+    #[test]
+    fn a_held_arrow_key_clears_the_goal_and_no_key_keeps_it() {
+        for (held, kept) in [
+            (vec![], Some(Vec2::new(50.0, 60.0))),
+            (vec![KeyCode::ArrowDown], None),
+            // Opposite keys do not walk, so they do not stop a walk to a click.
+            (
+                vec![KeyCode::ArrowLeft, KeyCode::ArrowRight],
+                Some(Vec2::new(50.0, 60.0)),
+            ),
+        ] {
+            let mut app = App::new();
+            app.insert_resource(keys(&held))
+                .add_systems(Update, stop_goal_on_keys);
+            let (_, player) = player_at(Vec2::ZERO);
+            let entity = app
+                .world_mut()
+                .spawn((player, MoveGoal(Some(Vec2::new(50.0, 60.0)))))
+                .id();
+            app.update();
+            assert_eq!(
+                app.world().get::<MoveGoal>(entity).unwrap().0,
+                kept,
+                "{held:?}"
+            );
+        }
+    }
+
+    const SETTINGS: CollisionSettings = CollisionSettings {
+        allow_sliding: true,
+        slide: game_kit::collision::SlideTuning::for_cell_size(48.0),
+    };
+
+    #[test]
+    fn the_arrow_keys_walk_the_feet_at_walk_speed_and_a_trunk_stops_them_while_the_walk_plays() {
+        // A diagonal is as fast as a straight walk: 0.1 s at 300 px/s is 30 pixels, 21.21 on each axis.
+        let (mut transform, _) = player_at(Vec2::new(100.0, 100.0));
+        let mut state = MoveState::default();
+        walk_one(
+            Vec2::new(-1.0, 1.0),
+            false,
+            0.1,
+            &SETTINGS,
+            &[],
+            &mut transform,
+            &mut state,
+            &mut SlideAssist::default(),
+        );
+        let diagonal = 30.0 / 2.0_f32.sqrt();
+        let expected = Vec2::new(100.0 - diagonal, 100.0 + diagonal);
+        // f32 rounding of the normalised direction and the step.
+        assert!(
+            feet_of(&transform).distance(expected) < 1e-3,
+            "{:?}",
+            feet_of(&transform)
+        );
+        assert!(state.walking);
+        assert!(state.facing.distance(Vec2::new(-1.0, 1.0).normalize()) < 1e-6);
+
+        // A blocked area 10 pixels to the right: the feet stop at its left side, and the walk still plays.
+        let mut world = CollisionWorld::default();
+        world.add_blocked(&[Rect::new(110.0, 50.0, 200.0, 150.0)]);
+        let (mut transform, _) = player_at(Vec2::new(100.0, 100.0));
+        let mut state = MoveState {
+            facing: Vec2::NEG_Y,
+            ..default()
+        };
+        walk_one(
+            Vec2::X,
+            false,
+            0.1,
+            &SETTINGS,
+            world.edges(),
+            &mut transform,
+            &mut state,
+            &mut SlideAssist::default(),
+        );
+        assert!(
+            feet_of(&transform).distance(Vec2::new(110.0, 100.0)) < 1e-3,
+            "{:?}",
+            feet_of(&transform)
+        );
+        assert_eq!((state.walking, state.facing), (true, Vec2::X));
+    }
+
+    #[test]
+    fn no_arrow_key_or_a_transition_leaves_the_player_as_it_is() {
+        for (direction, locked) in [(Vec2::ZERO, false), (Vec2::X, true)] {
+            let (mut transform, _) = player_at(Vec2::new(100.0, 100.0));
+            let before = transform;
+            let mut state = MoveState {
+                facing: Vec2::NEG_Y,
+                ..default()
+            };
+            walk_one(
+                direction,
+                locked,
+                0.1,
+                &SETTINGS,
+                &[],
+                &mut transform,
+                &mut state,
+                &mut SlideAssist::default(),
+            );
+            assert_eq!(transform, before, "locked {locked}");
+            assert_eq!(
+                (state.walking, state.facing),
+                (false, Vec2::NEG_Y),
+                "locked {locked}"
+            );
         }
     }
 

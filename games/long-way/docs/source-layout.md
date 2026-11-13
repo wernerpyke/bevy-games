@@ -12,9 +12,9 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
-    ├── hud.rs          HudPlugin: the content of the HUD bar (the title, one clickable icon with a count for each energy, and the row of HP icons). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── hud.rs          HudPlugin: the content of the HUD bar (active weapon buttons, energy gauges, the row of HP icons, and the weapon keys 1 to 4 and Z X C V). The bar is `game_kit::screen` and `game_kit::hud`
     ├── weapon_menu.rs  WeaponMenuPlugin: the weapon drawer that slides up over the game area from an energy gauge, `WeaponKind` (with `is_built`), `weapons_for` (energy to weapons), `ActiveWeapons` (the loaded weapon per energy), the messages `GaugeClicked` and `ActiveWeaponClicked` (`adr-lw31`, `adr-lw34`)
-    ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), animation
+    ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), arrow keys walk, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map

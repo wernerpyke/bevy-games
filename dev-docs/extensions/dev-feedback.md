@@ -43,7 +43,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 | Command | Effect |
 |---|---|
 | `teleport:<feet_x>:<feet_y>` | Moves the entity marked `Controlled` (its feet come from its `DepthSort`). Skipped with a log line when there is no such entity |
-| `hold:<keys>:<seconds>` | Holds keys (`up`, `down`, `left`, `right`, `x`, `escape`, `f1` to `f3`), for example `hold:up+left:2`. `hold:x:0.1` is one key press |
+| `hold:<keys>:<seconds>` | Holds keys (`up`, `down`, `left`, `right`, `z`, `x`, `c`, `v`, `1` to `4`, `escape`, `f1` to `f3`), for example `hold:up+left:2`. `hold:x:0.1` is one key press |
 | `wait:<seconds>` | Waits |
 | `screenshot:<name>` | Saves the window to `target/screenshots/<name>.png` (folder set by `<PREFIX>_SCREENSHOT_DIR`) |
 | `goto:<map>:<entry>` | Starts a scene transition to an entry of a registered map and waits until it is done. The player is put in the middle of the entry (`map_transition.rs`) |
