@@ -26,7 +26,7 @@ The first build takes several minutes.
 
 ## Controls
 
-- Long Way: click with the left mouse button to walk to that place. The player goes around trees and rocks, and a click on a blocked place goes to the nearest place it can reach. A new click changes the goal. The arrow keys do nothing there.
+- Long Way: click with the left mouse button to walk to that place. The player goes around trees and rocks, and a click on a blocked place goes to the nearest place it can reach. A new click changes the goal. The arrow keys do nothing there. Weapons: click an energy gauge in the HUD bar to open its drawer, click a weapon there to load it into that energy's button, then click the button to cast it. Red starts with the fire ring and blue with the ice ring. The fireball aims itself at the closest enemy.
 - R-Town: arrow keys walk. X fires a projectile (R-Town, it flies the way the player faces). F1 reloads the map and resets the game (R-Town), F2 toggles the info box, F3 toggles the grid and the movement debug (they start hidden unless the game runs with `--debug`). Enemies (R-Town) kill the player on a touch: press F1 to start again.
 
 ## Run in a browser (a crate that has no web release yet)

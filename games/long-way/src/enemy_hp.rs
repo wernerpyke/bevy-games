@@ -1,4 +1,4 @@
-//! Enemy hit points (`PLAN-weapons.md` D7). Other systems ask for damage with the `DamageEnemy` message and do not
+//! Enemy hit points (`adr-lw32`). Other systems ask for damage with the `DamageEnemy` message and do not
 //! touch `EnemyHp` themselves, like `hp.rs` does for the player. At 0 the enemy sends `EnemyDied` once and the
 //! enemy's own plugin removes it (the ghost plays `Die`, `ghost.rs`).
 //!

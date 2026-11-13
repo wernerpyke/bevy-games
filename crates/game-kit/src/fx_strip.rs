@@ -1,4 +1,4 @@
-//! Particle sprite sheets built at run time from a tag of an `.aseprite` file (`PLAN-weapons.md` D2).
+//! Particle sprite sheets built at run time from a tag of an `.aseprite` file (`adr-x47`).
 //!
 //! Enoki draws a sprite particle from one texture: a single row of equal cells, each drawn as a square quad. The
 //! `Aseprite` asset holds something else: every frame at full canvas size, packed in a 2D atlas. `strip_from_atlas`

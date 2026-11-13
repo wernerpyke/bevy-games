@@ -1,4 +1,4 @@
-//! The ice ring (W2, `PLAN-weapons.md`): a shield, not a damage weapon (the user, 2026-11-13). It grows and holds
+//! The ice ring (W2, `adr-lw35`): a shield, not a damage weapon (the user, 2026-11-13). It grows and holds
 //! like the fire ring (`Ring` in `ring.rs`), and this module adds what differs:
 //! - **Reach.** At the cast, `ICE_RAYS` rays leave the centre. Each stops at the first blocking feature and at the map
 //!   edge (`ray_limits`), and the ring stops with it, so it is not a full circle near a tree.
@@ -105,7 +105,7 @@ fn distance_to_leave(from: Vec2, dir: Vec2, rect: Rect) -> f32 {
 }
 
 /// Pushes, holds back and stuns the enemies of each ice ring. It runs after the kit has moved the enemies, so a step
-/// into the ring is undone in the same frame. A dead enemy is skipped (D15).
+/// into the ring is undone in the same frame. A dead enemy is skipped (`weapons.md`, "Dead enemies").
 #[allow(clippy::type_complexity)]
 pub(super) fn update_ice_rings(
     mut rings: Query<(&Ring, &mut IceRing)>,
@@ -431,7 +431,7 @@ mod tests {
 
     #[test]
     fn a_dead_enemy_that_still_has_its_hit_box_is_not_pushed() {
-        // D15: the ring does not rely on the enemy's plugin removing the `HitBox`.
+        // Dead enemies (`weapons.md`): the ring does not rely on the enemy's plugin removing the `HitBox`.
         let mut app = app(&[], None);
         let living = enemy(&mut app, 50.0);
         let dead = enemy(&mut app, -50.0);

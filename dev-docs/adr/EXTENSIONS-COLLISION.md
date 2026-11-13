@@ -80,3 +80,11 @@ Refinement (2026-11-02): `parse` takes the list of kind names the game knows and
 
 **How to apply.** Nothing in a game. `resolve`, `move_feet`, projectiles and nav see ordinary edges. Tests: `outline.rs`, `collision.rs`, `projectile.rs` and `nav.rs` (names with "corner contact"). A line of another exact slope through a filler corner can still pass, the same limit as at any convex corner.
 
+
+## adr-x48. The kit has area geometry and temporary blocked areas (2026-11-11)
+
+**Decision.** `area.rs` holds plain geometry for effects that cover an area: an eased growth, a ring band and its hit test, and a push away from a centre, on `Vec2` and `Rect`. `CollisionWorld::add_temporary(Rect)` adds a blocked area for a while and returns a `TemporaryBlocker`; `remove_temporary` takes it away. Each change rebuilds the outlines once, and `nav.rs` picks it up. The game owns the timer.
+
+**Rationale.** Built for Long Way's weapons when they were ported from the particle spike (`PLAN-weapons.md`, 2026-11-11). Neither holds a game value: a growing ring and "a wall that exists for a while" fit a spell or a trap in any game. Before this, the collision world only changed when a map loaded. A rebuild per change is cheap enough because a wall appears and ends once per cast, not every frame. A body inside the area when it appears is not trapped: a move that starts inside may walk out.
+
+**How to apply.** `dev-docs/extensions/area-effects.md`, `dev-docs/extensions/collision.md` ("Temporary blocked areas"). Long Way: `weapons/ring.rs` uses `area.rs`; the walls (`dev-docs/PLAN-walls.md`) will use the temporary blocker.

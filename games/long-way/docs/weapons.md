@@ -1,6 +1,6 @@
 # Weapons
 
-Design: the user (2026-11-11). Decisions: `adr-lw32`. Plan: `dev-docs/PLAN-weapons.md`. Code: `games/long-way/src/weapons/`, `enemy_hp.rs`.
+Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `balance.md`. The walls (W5, W6) are planned in `dev-docs/PLAN-walls.md`. Code: `games/long-way/src/weapons/`, `enemy_hp.rs`.
 
 ## How a weapon works
 
@@ -14,18 +14,18 @@ Design: the user (2026-11-11). Decisions: `adr-lw32`. Plan: `dev-docs/PLAN-weapo
 
 All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders until each weapon has been tuned with the user** (the spike gave looks and sizes, not damage). The values must keep the rules in `balance.md`.
 
-| Weapon | Damage | Pushback | Tick | Glow | Status |
-|---|---|---|---|---|---|
-| Fire ring | 200 per second (100 per tick: the first tick kills a ghost, b1) | none | 0.5 s | on | **accepted** (W1, 2026-11-13) |
-| Ice ring | 50 once when pushed, 10 once per cast when it walks in (b3) | to the edge, then a barrier | | off | **accepted** (W2, 2026-11-13) |
-| Fire wall | 40 per second | none | 0.5 s | on | not built |
-| Ice wall | 20 per second | none | 0.5 s | off | not built |
-| Tornado | 26 per second (13 per tick of contact, b5) | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off | **accepted** (W3, 2026-11-13) |
-| Fireball | 150 to the enemy hit, 100 to every other enemy within 1.25 cells of the explosion (b10 to b14) | none | | on | **accepted** (W4, 2026-11-13) |
+| Weapon    | Damage                                                                                         | Pushback                                                                                 | Tick  | Glow | Status                        |
+| --------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- | ---- | ----------------------------- |
+| Fire ring | 200 per second (100 per tick: the first tick kills a ghost, b1)                                | none                                                                                     | 0.5 s | on   | **accepted** (W1, 2026-11-13) |
+| Ice ring  | 50 once when pushed, 10 once per cast when it walks in (b3)                                    | to the edge, then a barrier                                                              |       | off  | **accepted** (W2, 2026-11-13) |
+| Fire wall | 40 per second                                                                                  | none                                                                                     | 0.5 s | on   | not built                     |
+| Ice wall  | 20 per second                                                                                  | none                                                                                     | 0.5 s | off  | not built                     |
+| Tornado   | 26 per second (13 per tick of contact, b5)                                                     | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off  | **accepted** (W3, 2026-11-13) |
+| Fireball  | 150 to the enemy hit, 100 to every other enemy within 1.25 cells of the explosion (b10 to b14) | none                                                                                     |       | on   | **accepted** (W4, 2026-11-13) |
 
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
-- **Long frame (D14 in `PLAN-weapons.md`):** a frame longer than the tick deals one tick, and the rhythm starts again from it. Missed ticks are not dealt later.
-- **Dead enemies (D15 in `PLAN-weapons.md`):** every weapon skips an enemy whose `EnemyHp` is 0, even while it plays `Die` and still has its `HitBox`. The fire ring does this.
+- **Long frame** (the user, 2026-11-11): a frame longer than the tick deals one tick, and the rhythm starts again from it. Missed ticks are not dealt later.
+- **Dead enemies** (the user, 2026-11-11): every weapon skips an enemy whose `EnemyHp` is 0, in its own query or filter, even while it plays `Die` and still has its `HitBox`. A weapon must not rely on the enemy's plugin removing the `HitBox`. Each weapon has a test for it.
 - **Pushback:** `Pixels(n)` moves a target at most `n` pixels in all per cast, away from the centre. `ToEdge` carries it to the weapon's final radius or distance. A tree, a rock, a wall or the map edge stops a push, and the target keeps taking damage there.
 - **Enemy hit points:** ghost 100 (`ghost.rs`, `HIT_POINTS`).
 - **Hurt look:** an enemy that has its own hurt frames (`HurtFrames`, the ghost's `Hurt` tag) plays them once when it survives a hit. Any other enemy is tinted `#993D41` for 0.12 s.
@@ -68,7 +68,7 @@ Design: the user, 2026-11-13 (`adr-lw35`). Files: `weapons/ice_ring.rs` (reach, 
 
 ## Tornado (W3)
 
-Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `PLAN-weapons.md` W3. Balance rules b4 to b9 (`balance.md`).
+Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `adr-lw36`. Balance rules b4 to b9 (`balance.md`).
 
 **Intent and purpose (the user, 2026-11-13):**
 
@@ -92,8 +92,6 @@ Files: `weapons/tornado.rs` (gameplay and look), `weapons/values.rs` (`TORNADO`,
 - Checked with scripted runs in map 1, after the play test changes: with the player standing, a ghost first touched the edge 0.83 s after the cast. It made no progress across its 2nd and 4th ticks (the bumps), took 5 ticks (35 HP left), reached the player 2.3 s after its first contact, then attacked and died (the player lost 1 HP). At 0.6 s the edge dots sat on the dense droplet band. Before the changes: With the player walking, the ghost did not touch the tornado for about 4 s; it took 3 ticks when the player walked back towards it. Not seen yet: a ghost killed by holding the tornado against it, a ghost pinned against a tree. Frame time not measured.
 
 ## Fireball (W4)
-
-Design: `PLAN-weapons.md` W4 (in progress).
 
 **Intent and purpose (the user, 2026-11-13, in the user's words):**
 
@@ -159,3 +157,20 @@ Change a number in `values.rs`, run the game or a scripted run (`dev-feedback.md
 `LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:65:552;wait:3;quit" --debug`
 
 `ui_click:65:552` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 321 and 449 (blue, violet, black), and the gauges below them at y 588. Coordinates are art pixels from the top left of the window (the bar starts at y 512).
+
+To cast another weapon in a script, load it first: click its gauge, then its button in the drawer, then the active button. The drawer buttons are at y 464, from the left at x about 136, 256 and 375 (red: fireball, fire ring, fire wall; blue: ice ring, ice wall, tornado). For example the fireball: `teleport:-480:-224;wait:0.5;ui_click:65:588;wait:0.6;ui_click:136:464;wait:0.5;ui_click:65:552`. In Long Way the player walks by click only, so a script moves the player with `click:<world x>:<world y>`, not `hold`. A weapon's own lines are not in the default script output: set `LOG_FILTER`, as above (`dev-feedback.md`).
+
+## Adding a weapon
+
+Each weapon is built, tested and tuned before the next one starts. Do not start the next before the user has accepted the current one.
+
+1. **Intent and design questions.** Ask the user for the weapon's intent and quote it in this file in the user's words. Ask what the intent leaves open, with a recommendation each. Derive balance rules with the user and add them to `balance.md` (next free ID).
+2. **Assets.** Copy only the art and effect files this weapon uses (from the spike while it exists). Update `art-pipeline.md` and `art-tags.md`. Request the particle looks from `FxLooks`.
+3. **Gameplay.** The weapon's state, hit test and `WeaponHit` messages, with every number in `values.rs`. It runs in `WeaponSystems::Effect`. Unit tests for the mechanic, a test that a dead enemy is skipped, and a test per balance rule. Prove each test can fail (`dev-docs/testing.md`).
+4. **Visuals.** Separate systems that read the gameplay state, so the gameplay tests need no assets. `DepthSort` on every emitter and sprite.
+5. **Wire it.** Return `true` for it in `WeaponKind::is_built` (`weapon_menu.rs`) and update the tests that use it as the "not built" example.
+6. **Scripted run** with `--debug` and `LOG_FILTER`: ghosts inside, at the edge and outside the effect. Read the log lines and say what was not seen on screen (motion, timing, feel).
+7. **Play test and tuning by the user.** Change `values.rs`, rerun, repeat until the user accepts. Record the accepted values and a tuning note in the weapon's section here.
+8. **Performance:** frame time and particle count with the weapon cast every 0.7 s (spike reference: about 3.4 ms native at about 3400 particles).
+9. **Gates and docs:** `lint`, `test` for each changed crate. This file, `balance.md`, `source-layout.md`, an ADR in `adr.md`. Delete `target/screenshots/` files.
+10. **Commit** only when the user says so, one commit per weapon.

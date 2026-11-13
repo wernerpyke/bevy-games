@@ -1,4 +1,4 @@
-//! The tornado (W3, `PLAN-weapons.md`; it was the whirlpool): a mobile shield. A disc on the middle of the player's
+//! The tornado (W3, `adr-lw36`; it was the whirlpool): a mobile shield. A disc on the middle of the player's
 //! body that follows the player for `TORNADO.duration` (twice the ice ring, b4). Its edge starts at the inner edge of
 //! the dense droplets and grows outward (`TornadoShape::edge_at`).
 //!
@@ -159,7 +159,7 @@ fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: Commands) {
 }
 
 /// Moves each tornado with the player, hurts and pushes the enemies in it, and ends it after its duration. A dead
-/// enemy is skipped (D15).
+/// enemy is skipped (`weapons.md`, "Dead enemies").
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn update_tornadoes(
     time: Res<Time>,
@@ -740,7 +740,7 @@ mod tests {
 
     #[test]
     fn a_dead_enemy_that_still_has_its_hit_box_is_not_hit_or_pushed() {
-        // D15: the tornado does not rely on the enemy's plugin removing the `HitBox`.
+        // Dead enemies (`weapons.md`): the tornado does not rely on the enemy's plugin removing the `HitBox`.
         let mut app = app(&[]);
         player(&mut app, Vec2::ZERO);
         let living = enemy(&mut app, Vec2::new(50.0, 0.0));

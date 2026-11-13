@@ -218,7 +218,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** The user chose these rules (2026-11-11): damage per second and pushback are tuned per weapon, some push a short way and some all the way, and the fireball ends on its first hit. A float keeps per-second damage exact, and a separate type keeps the HUD hearts simple. Messages keep the weapons, the damage and the enemy's death apart, like `DamagePlayer` for the player. An aim from a button has no cursor, so each weapon takes what it needs from the player. The placeholder values come from the spike or are guesses and are tuned weapon by weapon with the user.
 
-**How to apply.** Code: `enemy_hp.rs`, `weapons/` (`mod.rs`, `values.rs`, `damage.rs`), `ghost.rs`. Values and the tuning loop: `weapons.md`. The plan: `dev-docs/PLAN-weapons.md`.
+**How to apply.** Code: `enemy_hp.rs`, `weapons/` (`mod.rs`, `values.rs`, `damage.rs`), `ghost.rs`. Values, the tuning loop and the checklist for a new weapon: `weapons.md`. Balance: `balance.md`.
 
 ## adr-lw33. The fire ring ignores features, features ignore it, and a pushed enemy stops at them (2026-11-11)
 
@@ -234,7 +234,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** Play testing showed that two clicks per cast are too slow (the user's brief, 2026-11-12). Choosing a weapon is rare and casting is frequent, so the frequent action takes one click. A gauge reads at a glance where a count does not, and it needs a maximum, so 10 is a first value. Losing a pickup at the maximum needs no kit change, and energy has no use yet (cost per cast is a later plan). Dimming unbuilt weapons means a slot never holds a weapon that does nothing, while the drawer still shows what will come. The gauge colours are the main colours of the pickups (their own palette), so a gauge matches its pickup in the world.
 
-**How to apply.** Code: `hud.rs` (bands, sizes and gauge colours at the top; the button and the gauge are the kit's `image_button` and `gauge`, `adr-x45`), `weapon_menu.rs` (`ActiveWeapons`, `default_weapon`, `WeaponKind::is_built`, the messages `GaugeClicked` and `ActiveWeaponClicked`), `weapons/mod.rs` (`cast_active`), `inventory.rs` (`MAX_ENERGY`). Each weapon step of `PLAN-weapons.md` turns its weapon on in `is_built`. Art: `art-pipeline.md`, `art-tags.md`. Script clicks are in `weapons.md`.
+**How to apply.** Code: `hud.rs` (bands, sizes and gauge colours at the top; the button and the gauge are the kit's `image_button` and `gauge`, `adr-x45`), `weapon_menu.rs` (`ActiveWeapons`, `default_weapon`, `WeaponKind::is_built`, the messages `GaugeClicked` and `ActiveWeaponClicked`), `weapons/mod.rs` (`cast_active`), `inventory.rs` (`MAX_ENERGY`). A weapon is turned on in `is_built` when it is built (`weapons.md`, "Adding a weapon"). Art: `art-pipeline.md`, `art-tags.md`. Script clicks are in `weapons.md`.
 
 ## adr-lw35. The ice ring is a shield: it stops at features, pushes enemies to its edge, holds them out and stuns a pinned one (2026-11-13)
 

@@ -248,7 +248,7 @@ Fill this table in the research file. Run each effect alone, then fireball + rin
 - **No roadmap item (user, 2026-11-10).** The migration to `game-kit` and `long-way` and the inactive weapons are in `PLAN-weapons.md`. `rm9` is updated there. Write the verdict, the Enoki ADR and the notes here, and leave the code, the `rm9` change and the deletion to that plan.
 - If a reusable design comes out of it (for example a weapon effect spawner), write it up in `dev-docs/extensions/` and link its ADR. Keep it in the game until a second game needs it.
 - Move web-run instructions to `docs/README.md` if D3 produced any.
-- Do NOT delete `games/particle-spike/` yet: it is the porting source for `PLAN-weapons.md`, which deletes it (and the root patch lines) in its last step, then this plan file. Git history keeps it.
+- Do NOT delete `games/particle-spike/` yet: it is the porting source for `PLAN-walls.md` (split from `PLAN-weapons.md` on 2026-11-13), which deletes it (and the root patch lines) in its last step, then this plan file. Git history keeps it.
 - Ask before committing. Do not push.
 
 ## Out of scope

@@ -177,7 +177,7 @@ pub(super) fn cast_rings(
 }
 
 /// Grows every ring and ends it when its time at full size is over. For the fire ring it also hurts and pushes the
-/// enemies in its band. A dead enemy is skipped, even while it still has its `HitBox` (`PLAN-weapons.md` D15).
+/// enemies in its band. A dead enemy is skipped, even while it still has its `HitBox` (`weapons.md`, "Dead enemies").
 pub(super) fn update_rings(
     time: Res<Time>,
     mut rings: Query<(Entity, &mut Ring)>,
@@ -639,7 +639,7 @@ mod tests {
 
     #[test]
     fn a_dead_enemy_that_still_has_its_hit_box_is_not_hit() {
-        // D15: the ring does not rely on the enemy's plugin removing the `HitBox` while it plays `Die`.
+        // Dead enemies (`weapons.md`): the ring does not rely on the enemy's plugin removing the `HitBox` while it plays `Die`.
         let mut app = app(16);
         let living = living_beside(&mut app);
         let dead = enemy(&mut app, FRONT_ONLY);

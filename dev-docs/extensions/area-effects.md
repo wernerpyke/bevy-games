@@ -12,7 +12,7 @@
 |---|---|---|
 | `ease_out`, `ring_radius`, `circle_hits_rect`, `rect_overlaps_band`, `push_delta` | `crates/game-kit/src/area.rs` | Shared. No game values. |
 | Temporary blocked area | `crates/game-kit/src/collision.rs` | Shared. |
-| Weapons that use it | `games/long-way/src/weapons/` (planned, `PLAN-weapons.md`) | No. Game specific. |
+| Weapons that use it | `games/long-way/src/weapons/ring.rs` (the rings). The walls will use the temporary blocked area (`dev-docs/PLAN-walls.md`). | No. Game specific. |
 
 ## Terms
 

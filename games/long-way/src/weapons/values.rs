@@ -1,5 +1,5 @@
-//! Every number that tunes a weapon, in one place. Each row names its source. All of them are placeholders until the
-//! weapon's step in `PLAN-weapons.md` has been tuned with the user: the spike gave the looks and sizes, not damage.
+//! Every number that tunes a weapon, in one place. Each row names its source. A weapon's numbers are placeholders until
+//! the user has tuned and accepted it (`weapons.md`, "Values"): the spike gave the looks and sizes, not damage.
 
 use crate::camera::CELL_SIZE;
 use crate::weapon_menu::WeaponKind;

@@ -1,6 +1,6 @@
 # Research: particles for player weapons
 
-Date: 2026-11-09. Status: spike done, verdict below (2026-11-10). Plan for the port: `PLAN-weapons.md`.
+Date: 2026-11-09. Status: spike done, verdict below (2026-11-10). Plan for the port: `PLAN-weapons.md` (done 2026-11-13, in git history); the walls: `PLAN-walls.md`, which deletes the spike.
 
 ## Goal
 
@@ -125,7 +125,7 @@ Enoki has no swirl motion, so the effect needs a workaround.
 
 What Enoki is good for: trails, bursts, embers, flames. What it is not good for: a placed object with a fixed life and a place in the depth order. The ice wall is plain animated sprites. A swirl has no built-in motion: the whirlpool is variant B (attractors with a start speed above the circular speed, so droplets spiral outward). The pivot (A) and sprite ring (C) variants were built and dropped.
 
-Remaining risks: web frame time under stress, Enoki upgrades (the 10-line additive patch), palette-exact colour from curves, and the wall needing a dynamic blocker in the collision and nav code (`PLAN-weapons.md`, P1). Facts learned about the crate: `dev-docs/bevy/notes.md`, "bevy_enoki".
+Remaining risks: web frame time under stress, Enoki upgrades (the 10-line additive patch), palette-exact colour from curves, and the wall needing a dynamic blocker in the collision and nav code (built: `adr-x48`). Facts learned about the crate: `dev-docs/bevy/notes.md`, "bevy_enoki".
 
 ## Sources
 

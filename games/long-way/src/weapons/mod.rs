@@ -1,4 +1,4 @@
-//! Weapons (`PLAN-weapons.md`). Two messages are the whole public surface: `CastWeapon` asks for a weapon and
+//! Weapons (`games/long-way/docs/weapons.md`). Two messages are the whole public surface: `CastWeapon` asks for a weapon and
 //! `WeaponHit` reports an effect on one enemy. A weapon's gameplay owns its state, sends `WeaponHit` and holds no
 //! particles. Its visuals read that state. `damage.rs` turns a hit into hit points (`enemy_hp.rs`) and a push.
 //! `values.rs` holds every number.

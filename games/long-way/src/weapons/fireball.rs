@@ -1,4 +1,4 @@
-//! The fireball (W4, `PLAN-weapons.md`): a shot that the game aims and that explodes on impact.
+//! The fireball (W4, `adr-lw37`): a shot that the game aims and that explodes on impact.
 //!
 //! - **Target.** The living enemy closest to the player among those on screen, or the closest on the map when none is
 //!   on screen (`choose_target`). With no enemy at all it flies in a random direction and explodes after
@@ -161,7 +161,7 @@ fn in_blast(centre: Vec2, body: Rect) -> bool {
     centre.clamp(body.min, body.max).distance(centre) < FIREBALL.blast_radius
 }
 
-/// Living enemies are projectile targets. A dead one is not, so a dying ghost does not stop a shot (D15).
+/// Living enemies are projectile targets. A dead one is not, so a dying ghost does not stop a shot (`weapons.md`, "Dead enemies").
 fn mark_targets(
     enemies: Query<(Entity, &EnemyHp, Has<ProjectileTarget>), With<HitBox>>,
     mut commands: Commands,

@@ -104,7 +104,7 @@ impl WeaponKind {
         }
     }
 
-    /// Whether the weapon works yet. Each weapon step of `PLAN-weapons.md` (W1 to W6) adds its weapon here. A weapon
+    /// Whether the weapon works yet. Each weapon is added here when it is built (`weapons.md`). A weapon
     /// that is not built is dimmed in the drawer and cannot be loaded, and an active button that holds it is blank.
     pub fn is_built(self) -> bool {
         matches!(

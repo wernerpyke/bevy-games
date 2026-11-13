@@ -58,3 +58,7 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x42 | The kit turns a mouse click into a world position and sends it as a message | EXTENSIONS-INPUT.md |
 | x43 | Walking to a clicked place: `Mover::feet_offset`, `NavInset` and `NavGrid::nearest_reachable` | EXTENSIONS-INPUT.md |
 | x44 | A click on a UI panel over the game region is not a world click: `BlocksWorldClick` | EXTENSIONS-INPUT.md |
+| x45 | The kit has an image button and a gauge for the HUD; the game handles the click | EXTENSIONS-SCREEN.md |
+| x46 | The kit has a `Stunned` marker and a ray test against the collision outlines | EXTENSIONS-GAMEPLAY.md |
+| x47 | The kit holds the particle code (`fx`), and builds particle sheets from `.aseprite` tags at run time | EXTENSIONS-SCREEN.md |
+| x48 | The kit has area geometry and temporary blocked areas | EXTENSIONS-COLLISION.md |

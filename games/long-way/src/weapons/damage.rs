@@ -25,7 +25,7 @@ impl Contact {
     /// Call every frame that the target is in the effect. Returns the damage to deal now, or `None` between ticks.
     /// The first call hits at once, then one tick every `values.tick` seconds, each of `dps * tick`, so the damage
     /// averages `dps`. A frame longer than the tick deals one tick and the rhythm starts again from it: missed ticks
-    /// are not dealt later (`PLAN-weapons.md` D14). `Damage::Impact` weapons deal their damage themselves, so they get
+    /// are not dealt later (`weapons.md`, "Long frame"). `Damage::Impact` weapons deal their damage themselves, so they get
     /// `None` here.
     pub fn damage(&mut self, values: &WeaponValues, dt: f32) -> Option<f32> {
         let Damage::PerSecond(dps) = values.damage else {
@@ -166,7 +166,7 @@ mod tests {
 
     #[test]
     fn a_long_frame_deals_one_tick_and_the_rhythm_starts_again_from_it() {
-        // D14: no burst of missed ticks. Just over the tick and far over it give the same.
+        // Long frame (`weapons.md`): no burst of missed ticks. Just over the tick and far over it give the same.
         let v = values(Damage::PerSecond(10.0), Pushback::None);
         for long in [0.625, 2.0] {
             let mut contact = Contact::default();
