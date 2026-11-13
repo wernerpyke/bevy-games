@@ -4,7 +4,7 @@ Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-part
 
 ## Status (2026-11-13): resume here
 
-Done and committed: P0 to P4, W1 (fire ring), W2 (ice ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. Next: **W3 (tornado)**: design decided on 2026-11-13 (see its section, balance rules b4 to b8), build next, then W4 (fireball), W5 (fire wall), W6 (ice wall). WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
+Done and committed: P0 to P4, W1 (fire ring), W2 (ice ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). **W2 (ice ring) accepted by the user on 2026-11-13** with its start values (push 50, touch 10, hold 2 s; design in its section, `adr-lw35`; kit `Stunned` and `ray_distance`, `adr-x46`; b3 enforced by a test). Not done in W2: the frame-time check with a cast every 0.7 s (do it in P5), a pin against a tree seen on screen. **W3 (tornado) accepted by the user on 2026-11-13** after one play test: the push edge grows from 1 to 1.5 cells and is shown by a ring of dots, a steady push of 20 px/s plus a 40 px bump on every second tick (`adr-lw36`, b4 to b9 enforced by tests). Not seen on screen in W3: a ghost killed by holding the tornado against it, a ghost pinned against a tree. Next: W4 (fireball), W5 (fire wall), W6 (ice wall). WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
 
 ## Goal
 
@@ -203,6 +203,8 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 #### W1. Fire ring (accepted 2026-11-13)
 
+**Intent (the user, quoted in `weapons.md`).** A non-blocking attack that pushes enemies back a little and hurts them while they touch it. The player and enemies move through it. It passes through blocking features, so it stays a full circle. Implementation note: built with no push, because the first tick kills a ghost (b1); see `weapons.md`, "Fire ring".
+
 - **Design questions:**
   - Pushback: `Pixels(n)`. How many pixels (start from the spike feel, tune)?
   - Damage: `dps` start value? Does a ghost at the burn band at the maximum radius keep burning after the front stops (the spike has 40 burners at the maximum radius and repeat ticks while in the burn band)?
@@ -219,6 +221,8 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 - Record D10 as an ADR in `games/long-way/docs/adr.md`.
 
 #### W2. Ice ring (accepted 2026-11-13)
+
+**Intent (the user, quoted in `weapons.md`).** A static shield that protects the player for its duration and does little damage. The player moves through it, enemies cannot, and the growing ring pushes enemies out so none is trapped inside. A blocking feature or the map edge stops the ring there without removing it, so it may not be a full circle. An enemy trapped between the ring and a feature or the map edge is stunned until the ring goes.
 
 **Design.** The ice ring is a shield, not a damage weapon.
 
@@ -251,16 +255,16 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 
 **Scripted runs.** Ghosts at three distances. A ghost between the player and a tree: it is pinned and stunned, then walks on after the ring goes. A cast near the map edge. A ghost pressing against the ring takes the touch damage once. One ring never kills a ghost. Two rings in a row can kill.
 
-#### W3. Tornado (was whirlpool; renamed by the user on 2026-11-13; design decided the same day)
+#### W3. Tornado (was whirlpool; renamed by the user on 2026-11-13; design decided, built and accepted the same day)
 
 **Intent (the user).** A mobile shield that moves with the player. It lasts twice as long as the ice ring. It does more damage than the ice ring and can kill a ghost that stays in contact with it for more than 60% of its duration. It keeps pushing a ghost back, but the ghost slowly makes progress through it: a player who stands still and casts it can be reached, a player who keeps moving stays safe.
 
 | Topic | Rule |
 |---|---|
-| Shape and timing | A disc of radius 2 cells (128 px, start value) on the middle of the player's body. It follows the player. It lasts 2 × (ice ring growth + hold) = 5.53 s (b4). It does not affect the player's movement. |
+| Shape and timing | A disc (after the play test: its edge grows from 1 to 1.5 cells in 1.3 s; first built with a fixed 2 cells) on the middle of the player's body. It follows the player. It lasts 2 × (ice ring growth + hold) = 5.53 s (b4). It does not affect the player's movement. |
 | Contact | An enemy whose body overlaps the disc is in contact. Damage counts **total** contact time: a ghost pushed out that comes back keeps its count. |
 | Damage | 26 per second, in ticks of 13 every 0.5 s of contact (start values). A ghost dies on the 8th tick, at 3.5 s of contact (63% of the duration); after 7 ticks (3.0 s, 54%) it has 9 HP (b5). At most 12 ticks (156) per cast, more than the ice ring's 60 (b6). The player can kill a ghost by holding the tornado against it. |
-| Push | Inside the disc an enemy is pushed outward at 45 px/s (start value), less than the ghost's 90 px/s, so a ghost walking in gets closer at 45 px/s: about 2.4 s from the edge to a standing player, before the 3.5 s kill (b7). The player's own movement never carries an enemy deeper: the edge shoves an enemy ahead of the player (b8). The user accepts that walking straight at one ghost for about 2.4 s lets it through. |
+| Push | (After the play test: 20 px/s plus a 40 px bump on every second tick, b9; the numbers below are the first build.) Inside the disc an enemy is pushed outward at 45 px/s (start value), less than the ghost's 90 px/s, so a ghost walking in gets closer at 45 px/s: about 2.4 s from the edge to a standing player, before the 3.5 s kill (b7). The player's own movement never carries an enemy deeper: the edge shoves an enemy ahead of the player (b8). The user accepts that walking straight at one ghost for about 2.4 s lets it through. |
 | Features | The tornado passes over trees, rocks and markers. A pushed enemy stops at them and at the map edge, is **not** stunned, and keeps being pushed and hurt there. |
 | Look | The spike's variant B (D6), kept for now (the user): 10 emitters on a small circle send droplets that an attractor at the player bends into an outward spiral. Icon tag `tornado` (renamed from `whirlpool`). |
 
@@ -274,6 +278,8 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 **Tests.** Balance b4 to b7 in `values.rs`. Mechanic: a ghost walking at a standing player closes in at walk speed less push speed; a standing ghost is pushed out; a player walking at a ghost does not make it deeper (b8); total contact is counted across a break; a pinned ghost stays at the tree, not stunned, and keeps taking ticks; the tornado follows the player and ends at its duration; a dead enemy is skipped. Keep the spike test that integrates the attractor (droplets spiral outward).
 
 **Scripted runs.** A standing player and a ghost walking in (it gets through, with about 5 ticks). A player walking away and around (no touch). A ghost held against a tree until it dies.
+
+**Play test 1 (the user, 2026-11-13).** The feel is fine. Changes: the push edge sits on the dense droplets (it grows from their inner edge, 1 cell, to 1.5 cells), a ring of 1 px dots shows it, and a ghost walking in is bumped back a couple of times (option B: 40 px on every second tick, also while the edge grows). New rule b9. Details in `weapons.md` and adr-lw36.
 
 #### W4. Fireball
 

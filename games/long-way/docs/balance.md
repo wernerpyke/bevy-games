@@ -13,11 +13,12 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 | b1 | **The fire ring always kills a ghost it touches.** Where the ghost stands at the cast, how far it is pushed and whether it walks out of the ring make no difference. | 2026-11-13 | `b1_the_first_tick_of_the_fire_ring_kills_a_ghost` in `weapons/values.rs` |
 | b2 | **The fire ring does not promise a one-hit kill on any enemy other than the ghost.** Such an enemy can die if it stays in the burn band for enough ticks, but that is not guaranteed. | 2026-11-13 | By hand: check it when a new enemy kind is added |
 | b3 | **One ice ring on its own never kills a ghost. A second ice ring can.** | 2026-11-13 | `b3_one_ice_ring_never_kills_a_ghost` in `weapons/values.rs` (`push + touch < ghost HP`) |
-| b4 | **The tornado lasts twice as long as the ice ring** (its growth plus its hold). | 2026-11-13 | Planned (W3): the duration is computed from the ice ring values, and a test checks it |
-| b5 | **A ghost dies from one tornado only once its total contact passes 60% of the tornado's duration.** | 2026-11-13 | Planned (W3): a test on the tick that kills |
-| b6 | **One tornado can deal more damage than one ice ring.** | 2026-11-13 | Planned (W3): a test on the most each can deal per cast |
-| b7 | **A ghost walking at a standing player gets through the tornado.** | 2026-11-13 | Planned (W3): a test on the push speed, the ghost's speed and the time to cross |
-| b8 | **A moving player is safe: the player's own movement never carries a ghost deeper into the tornado.** | 2026-11-13 | Planned (W3): a test of the push rule |
+| b4 | **The tornado lasts twice as long as the ice ring** (its growth plus its hold). | 2026-11-13 | `b4_the_tornado_lasts_twice_as_long_as_the_ice_ring` in `weapons/values.rs` |
+| b5 | **A ghost dies from one tornado only once its total contact passes 60% of the tornado's duration.** | 2026-11-13 | `b5_a_ghost_dies_from_one_tornado_only_after_60_percent_contact` in `weapons/values.rs`; total contact: `contact_is_counted_in_total_across_a_break` in `weapons/tornado.rs` |
+| b6 | **One tornado can deal more damage than one ice ring.** | 2026-11-13 | `b6_one_tornado_can_deal_more_than_one_ice_ring` in `weapons/values.rs` |
+| b7 | **A ghost walking at a standing player gets through the tornado.** | 2026-11-13 | `b7_a_ghost_walking_at_a_standing_player_gets_through` in `weapons/values.rs`; at work: `a_ghost_walking_at_a_standing_player_is_bumped_back_at_least_twice_and_gets_through` in `weapons/tornado.rs` |
+| b8 | **A moving player is safe: the player's own movement never carries a ghost deeper into the tornado.** | 2026-11-13 | `the_players_own_movement_never_takes_an_enemy_deeper` in `weapons/tornado.rs` |
+| b9 | **A ghost walking at a standing player is bumped back at least twice before it gets through the tornado.** | 2026-11-13 | `b9_a_ghost_walking_at_a_standing_player_is_bumped_back_at_least_twice` in `weapons/values.rs`; at work: the b7 test in `weapons/tornado.rs` |
 
 ## b1. The fire ring always kills a ghost
 
@@ -47,13 +48,14 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 
 **How.** The most one ring can deal to one ghost is the push plus the touch. So `push + touch < ghost HP`. Start values: push 50, touch 10, so one ring deals at most 60 of 100, and two pushes deal 100.
 
-## b4 to b8. The tornado
+## b4 to b9. The tornado
 
-**Rules.** The user's intent (2026-11-13, `weapons.md`, "Tornado"): a mobile shield that lasts twice as long as the ice ring (b4), can kill a ghost that stays in contact with it for more than 60% of its duration (b5), does more damage than the ice ring (b6), lets a ghost reach a player who stands still (b7), and keeps a moving player safe (b8). Contact is total contact time, so a player can kill a ghost by holding the tornado against it.
+**Rules.** The user's intent (2026-11-13, `weapons.md`, "Tornado"): a mobile shield that lasts twice as long as the ice ring (b4), can kill a ghost that stays in contact with it for more than 60% of its duration (b5), does more damage than the ice ring (b6), lets a ghost reach a player who stands still (b7), and keeps a moving player safe (b8). Contact is total contact time, so a player can kill a ghost by holding the tornado against it. After the first play test (the user, 2026-11-13): the ghost is bumped back a couple of times on the way in (b9).
 
-**How (start values, planned for W3).**
+**How (start values, built in W3).**
 - b4: duration 2 × (0.767 + 2) = 5.53 s, computed from `ICE_RING`, so it follows any change to the ice ring.
 - b5: 26 per second in ticks of 13 every 0.5 s. A ghost (100 HP) dies on the 8th tick, at 3.5 s of contact, which is after 60% (3.32 s). The tick before, at 3.0 s, leaves 9 HP. The test: the killing tick is after 60% of the duration, and the tick before it does not kill. With ticks of 0.5 s the kill lands between 54% and 63%.
 - b6: at most 12 ticks in 5.53 s, so 156 per cast. The ice ring deals at most 60 (push plus touch).
-- b7: the push (45 px/s) is slower than the ghost (90 px/s), so a ghost walking in gets closer at 45 px/s. Crossing the whole radius (128 px) takes at most 2.8 s, less than the 3.5 s that kill it and less than the duration. The ghost reaches the player, attacks and dies as usual, after about 5 ticks.
-- b8: the depth of an enemy in the tornado may only grow by its own steps, less the push. The player's movement adds nothing, so the edge shoves an enemy ahead of the player. The player walks at 300 px/s and a ghost at 90 px/s, so a moving player leaves ghosts behind. Accepted gap (the user): walking straight at one ghost for about 2.4 s lets it through.
+- b7: the steady push (20 px/s) is slower than the ghost (90 px/s), so between bumps a ghost walking in gets closer at 70 px/s. A bump takes back 40 px on every second tick (b9). The test walks a ghost across the whole radius (96 px) in contact time: it takes about 2.4 s and 5 ticks (65 of 100), so the ghost survives and arrives before the tornado ends. The real crossing ends at the player's body, which is shorter. In the game the ghost reaches the player, attacks and dies as usual.
+- b8: the depth of an enemy in the tornado may only grow by its own steps, less the push. The player's movement adds nothing, so the edge shoves an enemy ahead of the player. The player walks at 300 px/s and a ghost at 90 px/s, so a moving player leaves ghosts behind. A bump only moves an enemy outward. Accepted gap (the user): walking straight at one ghost lets it through, in about the time of b7 (about 2.3 s of contact).
+- b9: on the way in of b7, bumps land on the 2nd and 4th ticks (at 0.5 s and 1.5 s of contact). The test counts them in the same walk. In the game a bump is a 40 px shove over 0.1 s, so it reads as a knock back, together with the ghost's hurt animation.

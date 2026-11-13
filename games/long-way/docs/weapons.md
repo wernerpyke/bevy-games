@@ -20,7 +20,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 | Ice ring | 50 once when pushed, 10 once per cast when it walks in (b3) | to the edge, then a barrier | | off | **accepted** (W2, 2026-11-13) |
 | Fire wall | 40 per second | none | 0.5 s | on | not built |
 | Ice wall | 20 per second | none | 0.5 s | off | not built |
-| Tornado | 26 per second (13 per tick of contact, b5) | out at 45 px/s, the ghost still gains (b7, b8) | 0.5 s | off | designed (W3), not built |
+| Tornado | 26 per second (13 per tick of contact, b5) | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off | **accepted** (W3, 2026-11-13) |
 | Fireball | 40 once | none | | on | not built |
 
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
@@ -31,6 +31,12 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 - **Hurt look:** an enemy that has its own hurt frames (`HurtFrames`, the ghost's `Hurt` tag) plays them once when it survives a hit. Any other enemy is tinted `#993D41` for 0.12 s.
 
 ## Fire ring (W1)
+
+**Intent and purpose (the user, 2026-11-13, in the user's words):**
+
+> The intent with the fire ring is that it is a non-blocking attack which applies some pushback to enemies and which hurts enemies while they are in contact with it. Both the player and enemies can move through the fire ring. If the fire ring hits a blocking feature it passes through the feature to retain a full circle effect.
+
+**Implementation note (2026-11-13):** the accepted fire ring does not push (`Pushback::None` in the fire ring row of `weapons/values.rs`), which differs from "applies some pushback" in the intent. The push was removed when the ring was tuned for b1: the first tick kills a ghost in the frame it is touched, so a push would never show. The ring code still supports pushback (`Pushback::Pixels(n)`: while the front grows, it carries a hit body outward at the front's speed, up to `n` pixels in all). When an enemy that survives a tick is added (b2), give the fire ring a small push by changing that one value.
 
 Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`FIRE_RING`), effects `assets/effects/fire_ring_front.particle.ron` and `fire_ring_burn.particle.ron`, art tag `fire_ring` of `art/weapons/fireball_and_rings.aseprite`.
 
@@ -45,6 +51,10 @@ Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`FIRE_RING`), ef
 
 ## Ice ring (W2)
 
+**Intent and purpose (the user, 2026-11-13, in the user's words):**
+
+> The intent with the ice ring is that it is a static shield which protects the player for the duration and does little damage to enemies. Once the ice ring is cast the player can move through it but enemies cannot. It also means that enemies are never trapped inside it, they are pushed out as the ring grows. If the ring hits a blocking feature or the map edge then the ring stops growing there but does not disappear. This means that the ring will not necessarily be a full circle. An enemy that is trapped between the ring and a blocking feature or map edge is stunned until the ring disappears.
+
 Design: the user, 2026-11-13 (`adr-lw35`). Files: `weapons/ice_ring.rs` (reach, push, barrier, stun), `weapons/ring.rs` (growth and look, shared), shape numbers in `weapons/values.rs` (`ICE_RING`, `ICE_RAYS`), effects `assets/effects/ice_ring_front.particle.ron` and `ice_ring_burn.particle.ron` (from the spike), art tags `ice_ring1` to `ice_ring4` of `art/weapons/fireball_and_rings.aseprite`. Two emitters per position, each with one of the four shard sets.
 
 - The ring grows from the middle of the player's body to a radius of 3 cells (192 px, 6 cells across) in 0.767 s, holds for 2 s and goes. It stays where it was cast.
@@ -56,11 +66,11 @@ Design: the user, 2026-11-13 (`adr-lw35`). Files: `weapons/ice_ring.rs` (reach, 
 - Checked with scripted runs in map 1: the ring stopped at the trees, a ghost was held at the edge and took 50 then 10, and a ghost under the top map edge was pinned, stunned and walked again after the ring. Not seen on screen: the stunned ghost's paused animation, a pin against a tree. Frame time not measured yet.
 - **Tuning note (accepted by the user on 2026-11-13 after playing it):** no number moved. The start values hold: push 50, touch 10, hold 2 s, radius 3 cells, 64 rays. A stunned enemy does not attack, as built.
 
-## Tornado (W3, not built yet)
+## Tornado (W3)
 
-Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `PLAN-weapons.md` W3. Balance rules b4 to b8 (`balance.md`).
+Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `PLAN-weapons.md` W3. Balance rules b4 to b9 (`balance.md`).
 
-**Intent and purpose (the user, 2026-11-13, in the user's words; "ice wall" in the first version meant the ice ring):**
+**Intent and purpose (the user, 2026-11-13):**
 
 > The intent with tornado is that its total duration is twice that of ice ring and its purpose is as a mobile shield which moves with the player.
 > In terms of damage it does more damage than ice ring and can kill a ghost if it keeps in contact with a ghost for >60% of its duration.
@@ -68,7 +78,18 @@ Renamed from the whirlpool on 2026-11-13 (the icon tag too). Design: `PLAN-weapo
 
 Clarified by the user the same day: contact is total contact time, so a player can kill a ghost by holding the tornado against it. A ghost pushed into a tree or the map edge is not stunned: it keeps being pushed and hurt there. Walking straight at one ghost for about 2.4 s lets it through, and that is accepted. The look stays the spike's water spiral for now.
 
-**Start values (to tune):** a disc of radius 2 cells on the player's body, 5.53 s (twice the ice ring), 26 per second in ticks of 13 every 0.5 s of contact (a ghost dies at 3.5 s of contact), pushed out at 45 px/s (a ghost walks at 90).
+After the first play test (the user, 2026-11-13, with a marked screenshot): the push should sit where the dense droplets are. The edge starts at their inner edge and grows outward to 1.5 cells. A ghost walking in should be bumped back a couple of times (option B: a bigger bump on every second tick, rather than a small one on every tick), and the bump also works while the edge grows.
+
+**Values (to tune):** a disc on the player's body whose edge grows evenly from 1 cell (64 px) to 1.5 cells (96 px) in 1.3 s (a droplet's life), then holds. 5.53 s (twice the ice ring). 26 per second in ticks of 13 every 0.5 s of contact (a ghost dies at 3.5 s of contact). A steady push of 20 px/s (a ghost walks at 90), and a bump of 40 px over 0.1 s on every second tick. Before the play test: a fixed radius of 2 cells and a push of 45 px/s, no bump.
+
+Files: `weapons/tornado.rs` (gameplay and look), `weapons/values.rs` (`TORNADO`, `Pushback::Outward`), effect `assets/effects/tornado_orbit.particle.ron` (the spike's `whirl_orbit`), no sprite art.
+
+- **Contact:** an enemy whose body overlaps the disc. Damage ticks through `Contact`, which only counts frames in contact, so the count is the total contact time.
+- **Push:** each frame an enemy's depth in the disc may grow only by its own step since the last frame, less 20 px/s × the frame time, and not below 0. A deeper enemy is pushed out by the difference through the collision world. So a ghost walking in gains 70 px/s, a standing one is pushed out at 20 px/s, the growing edge carries what it meets (about 25 px/s more for 1.3 s), and the player's movement shoves an enemy ahead at the edge. An enemy that a tree or the map edge stops stays there, is not stunned and keeps taking ticks.
+- **Bump:** on an enemy's 2nd, 4th, 6th... tick it is also shoved 40 px outward over 0.1 s, through the collision world. The shove finishes even when the enemy leaves the disc. Its hurt animation plays on the same tick.
+- **Look:** 10 emitters on a 65 px circle around the centre send droplets along the tangent, and an attractor at the centre bends them outward, from the start of the edge to past its full radius (1.3 s life). The look did not change with the play test. The emitters follow the player. Droplets in flight do not, so the spiral trails behind a walking player.
+- **Push edge** (the user, 2026-11-13): 48 dots of 1 px (`#EBF7FF`) on the edge of the disc grow with it, turn clockwise at 1 rad/s and move with the player, so a walking player sees where the push starts. They are sprites placed each frame, not particles: a particle in flight either trails behind or, moved with its emitter (Enoki's `relative_positioning`), smears along the emitter's turn. Values: `EDGE_DOTS`, `EDGE_SPIN`, `EDGE_COLOR` in `tornado.rs`.
+- Checked with scripted runs in map 1, after the play test changes: with the player standing, a ghost first touched the edge 0.83 s after the cast. It made no progress across its 2nd and 4th ticks (the bumps), took 5 ticks (35 HP left), reached the player 2.3 s after its first contact, then attacked and died (the player lost 1 HP). At 0.6 s the edge dots sat on the dense droplet band. Before the changes: With the player walking, the ghost did not touch the tornado for about 4 s; it took 3 ticks when the player walked back towards it. Not seen yet: a ghost killed by holding the tornado against it, a ghost pinned against a tree. Frame time not measured.
 
 ## Aim rules
 
@@ -99,6 +120,7 @@ The lines (all `info`, one per event, `adr-lw32`):
 | `ring: Fire ring ended at age 2.77 s, touched 1: [<id> 5 ticks, pushed 62 px]` | The fire ring is over: ticks dealt and pixels pushed per enemy |
 | `ice ring: <id> pushed, 50 damage` and `ice ring: <id> walked into the ring, 10 damage` | The ice ring's two kinds of damage, each once per enemy per cast |
 | `ice ring: <id> pinned at (x, y), stunned until the ring goes` | A push was stopped by a feature or the map edge |
+| `tornado: started at (x, y), edge 64 to 96 in 1.3 s, lasts d s` and `tornado: ended at age 5.55 s, touched 1: [<id> 6 ticks, pushed 125 px]` | The tornado: ticks dealt and pixels pushed per enemy. Each tick is also an `enemy:` line |
 | `ring: Ice ring ended at age 2.77 s` and `ice ring: ended, touched 2: [<id> pushed 114 px, push damage, stunned; ...]` | The ice ring is over, and what it did to each enemy. Stunned enemies walk again |
 
 For the kit's movement and collision lines add `long_way=debug,game_kit=debug` to `RUST_LOG`. Say where the player stood and what the ghost did on screen.

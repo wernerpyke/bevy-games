@@ -31,6 +31,7 @@ Effect files (`*.particle.ron`), the `.aseprite` file and tag of each particle s
 
 1. `FxPlugin` adds Enoki, the two additive materials, the `EffectLibrary` resource and the follow system. The additive colour material is made at start-up (`FxMaterials`).
 2. `Fx` is a system parameter. `fx.emitter(file, transform, &look, glow)`, `fx.one_shot(...)` and `fx.following(owner, ...)` spawn emitters and return the entity. `glow` and `look` are chosen per call, so one weapon can glow and another not.
+2b. `game_kit::fx` re-exports the Enoki types a game needs, so a game does not depend on Enoki itself (G1 of the weapons plan): `OneShot`, `Particle2dEffect`, `ParticleEffectHandle`, `ParticleSpawnerState`, and for per-emitter changes `ParticleEffectInstance` and `Attractor`. An emitter's `ParticleEffectInstance` holds its own copy of the effect once loaded; set its `attractors` there (Long Way's tornado, `weapons/tornado.rs`).
 3. `Look::Squares` draws flat colour squares. `Look::Sprites(SpriteLook)` draws a sprite strip, made once as a normal and an additive material.
 4. `Follows { owner, offset, rotation }` moves an emitter with its owner: the owner's x and y plus `offset`, and the owner's rotation turned by `rotation`. It never writes z. When the owner is gone, the emitter stops spawning, loses `Follows` and gets `OneShot::Despawn`.
 5. `EffectLibrary::keep(&server, file)` keeps a file loaded. Without it a file is dropped when its last emitter dies.

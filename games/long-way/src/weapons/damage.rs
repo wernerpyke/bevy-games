@@ -59,7 +59,8 @@ impl Contact {
     pub fn push(&mut self, pushback: Pushback, wanted: Vec2) -> Vec2 {
         let allowed = match pushback {
             Pushback::None => 0.0,
-            Pushback::ToEdge => wanted.length(),
+            // The tornado shapes its push itself (`tornado.rs`).
+            Pushback::ToEdge | Pushback::Outward(_) => wanted.length(),
             Pushback::Pixels(limit) => wanted.length().min((limit - self.pushed).max(0.0)),
         };
         if allowed <= 0.0 {

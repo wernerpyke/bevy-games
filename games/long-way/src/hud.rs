@@ -335,7 +335,7 @@ mod tests {
         assert!(button_icons(&mut app, Energy::Violet).is_empty());
         app.world_mut()
             .resource_mut::<ActiveWeapons>()
-            .set_for_test(Energy::Violet, Some(WeaponKind::Tornado));
+            .set_for_test(Energy::Violet, Some(WeaponKind::IceWall));
         app.update();
         assert!(button_icons(&mut app, Energy::Violet).is_empty());
         app.world_mut()

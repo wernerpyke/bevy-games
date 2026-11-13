@@ -28,6 +28,8 @@ use crate::player::WALK_SPEED;
 const ART: &str = "art/characters/ghost.aseprite";
 /// Walk speed as a share of the player's. The ghost is slow.
 const SPEED_SHARE: f32 = 0.3;
+/// Walk speed in art pixels per second. The tornado's balance rules compare its push with it (b7).
+pub(crate) const SPEED: f32 = WALK_SPEED * SPEED_SHARE;
 /// The ghost is drawn at this share of the art size.
 const SCALE: f32 = 0.6;
 /// The art canvas is 60 by 60 and the feet are about 22 art pixels below the centre (the lowest rows of the body
@@ -100,7 +102,7 @@ pub fn spawn_ghosts(commands: &mut Commands, server: &AssetServer, map: &Map, lo
         let mut ghost = commands.spawn((
             Ghost,
             MapId(load.id.clone()),
-            Mover::new(WALK_SPEED * SPEED_SHARE).with_edge_margin(EDGE_MARGIN),
+            Mover::new(SPEED).with_edge_margin(EDGE_MARGIN),
             HIT_BOX,
             EnemyHp::full(HIT_POINTS),
             HurtFrames,

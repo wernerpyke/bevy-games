@@ -17,7 +17,8 @@ use bevy_enoki::{PARTICLE_COLOR_FRAG, PARTICLE_SPRITE_FRAG};
 
 pub use crate::fx_strip::FxLooks;
 pub use bevy_enoki::prelude::{
-    OneShot, Particle2dEffect, ParticleEffectHandle, ParticleSpawnerState,
+    Attractor, OneShot, Particle2dEffect, ParticleEffectHandle, ParticleEffectInstance,
+    ParticleSpawnerState,
 };
 
 /// Adds Enoki, the two additive materials, the `EffectLibrary` and the system that moves `Follows` emitters.

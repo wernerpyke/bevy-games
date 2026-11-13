@@ -10,6 +10,7 @@
 pub mod damage;
 pub mod ice_ring;
 pub mod ring;
+pub mod tornado;
 #[allow(dead_code, reason = "used by the weapon steps, W1 onwards")]
 pub mod values;
 
@@ -36,7 +37,7 @@ impl Plugin for WeaponPlugin {
                 )
                     .chain(),
             )
-            .add_plugins(ring::RingPlugin)
+            .add_plugins((ring::RingPlugin, tornado::TornadoPlugin))
             .add_systems(Update, cast_active.in_set(WeaponSystems::Cast))
             .add_systems(Update, damage::apply_hits.in_set(WeaponSystems::Apply));
     }

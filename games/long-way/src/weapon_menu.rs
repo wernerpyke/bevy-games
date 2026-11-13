@@ -107,7 +107,10 @@ impl WeaponKind {
     /// Whether the weapon works yet. Each weapon step of `PLAN-weapons.md` (W1 to W6) adds its weapon here. A weapon
     /// that is not built is dimmed in the drawer and cannot be loaded, and an active button that holds it is blank.
     pub fn is_built(self) -> bool {
-        matches!(self, WeaponKind::FireRing | WeaponKind::IceRing)
+        matches!(
+            self,
+            WeaponKind::FireRing | WeaponKind::IceRing | WeaponKind::Tornado
+        )
     }
 }
 
@@ -505,7 +508,7 @@ mod tests {
         assert_eq!(active.0, defaults);
         assert_eq!(Energy::ALL.map(|energy| active.get(energy)), defaults);
         // A weapon that is not built is held but not active.
-        active.set_for_test(Energy::Violet, Some(WeaponKind::Tornado));
+        active.set_for_test(Energy::Violet, Some(WeaponKind::IceWall));
         assert_eq!(active.get(Energy::Violet), None);
         for energy in Energy::ALL {
             if let Some(weapon) = default_weapon(energy) {

@@ -25,6 +25,9 @@ pub enum Pushback {
     Pixels(f32),
     /// Carried outward until the final radius or distance of the weapon.
     ToEdge,
+    /// Pushed outward at this many pixels per second while inside, and only the target's own steps take it deeper,
+    /// so a target that walks in faster still gains (the tornado, b7 and b8).
+    Outward(f32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -97,6 +100,47 @@ const _: () = assert!(ICE_RING.max_radius == 3.0 * CELL_SIZE);
 /// edge, and the ring stops with it (`weapons/ice_ring.rs`).
 pub const ICE_RAYS: usize = 64;
 
+/// The shape of the tornado (`weapons/tornado.rs`): a disc on the middle of the player's body that follows the player.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct TornadoShape {
+    /// The edge of the disc (where it pushes and touches) starts at this radius at the cast...
+    pub start_radius: f32,
+    /// ...and grows at an even speed to this radius in `grow_secs`, then holds.
+    pub radius: f32,
+    pub grow_secs: f32,
+    /// Seconds it lasts.
+    pub duration: f32,
+    /// On every `bump_every`-th damage tick of an enemy, the enemy is also shoved `bump` pixels outward over
+    /// `bump_secs` (b9).
+    pub bump: f32,
+    pub bump_every: u32,
+    pub bump_secs: f32,
+}
+
+impl TornadoShape {
+    /// The radius of the edge `age` seconds after the cast.
+    pub fn edge_at(&self, age: f32) -> f32 {
+        let grown = (age / self.grow_secs).clamp(0.0, 1.0);
+        self.start_radius + (self.radius - self.start_radius) * grown
+    }
+}
+
+/// Start values (the user's design, 2026-11-13), to tune. Balance rule b4: it lasts twice as long as the ice ring's
+/// growth and hold. The edge starts at the inner edge of the dense droplets (1 cell, the emitters' circle in
+/// `tornado.rs`) and grows to 1.5 cells in a droplet's life (the user, 2026-11-13, after a play test). The bump:
+/// option B of the same day, 40 px on every second tick.
+pub const TORNADO: TornadoShape = TornadoShape {
+    start_radius: CELL_SIZE,
+    radius: 1.5 * CELL_SIZE,
+    grow_secs: 1.3,
+    duration: 2.0 * (ICE_RING.grow_secs + ICE_RING.burn_secs),
+    bump: 40.0,
+    bump_every: 2,
+    bump_secs: 0.1,
+};
+
+const _: () = assert!(TORNADO.start_radius < TORNADO.radius && TORNADO.bump_every > 0);
+
 /// The shape of a ring weapon, `None` for the other weapons.
 pub fn ring_shape(weapon: WeaponKind) -> Option<RingShape> {
     match weapon {
@@ -140,9 +184,12 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             tick: 0.5,
             glow: false,
         },
+        // The user's design (2026-11-13), start values to tune. 13 per tick of contact: a ghost dies on the 8th tick,
+        // at 3.5 s of contact, past 60% of the duration (b5). A steady push of 20 px/s, with the bump in `TORNADO` (b7,
+        // b9).
         WeaponKind::Tornado => WeaponValues {
-            damage: Damage::PerSecond(20.0),
-            pushback: Pushback::Pixels(96.0),
+            damage: Damage::PerSecond(26.0),
+            pushback: Pushback::Outward(20.0),
             tick: 0.5,
             glow: false,
         },
@@ -170,7 +217,7 @@ mod tests {
                     assert!(push > 0.0 && touch > 0.0, "{weapon:?}")
                 }
             }
-            if let Pushback::Pixels(n) = v.pushback {
+            if let Pushback::Pixels(n) | Pushback::Outward(n) = v.pushback {
                 assert!(n > 0.0, "{weapon:?}");
             }
         }
@@ -208,6 +255,117 @@ mod tests {
         }
         assert_eq!(ring_shape(WeaponKind::FireRing), Some(FIRE_RING));
         assert_eq!(ring_shape(WeaponKind::IceRing), Some(ICE_RING));
+    }
+
+    /// The tornado's damage per tick and its tick.
+    fn tornado_tick() -> (f32, f32) {
+        let v = values(WeaponKind::Tornado);
+        let Damage::PerSecond(dps) = v.damage else {
+            panic!("the tornado should deal damage per second");
+        };
+        (dps * v.tick, v.tick)
+    }
+
+    /// Seconds of contact at which the tick that kills a ghost lands (the first tick is at 0).
+    fn tornado_kill_secs() -> f32 {
+        let (per_tick, tick) = tornado_tick();
+        ((crate::ghost::HIT_POINTS / per_tick).ceil() - 1.0) * tick
+    }
+
+    #[test]
+    fn the_tornado_edge_grows_evenly_from_its_start_to_its_radius_and_holds() {
+        let middle = (TORNADO.start_radius + TORNADO.radius) / 2.0;
+        assert_eq!(TORNADO.edge_at(0.0), TORNADO.start_radius);
+        assert!((TORNADO.edge_at(TORNADO.grow_secs / 2.0) - middle).abs() < 1e-3);
+        assert_eq!(TORNADO.edge_at(TORNADO.grow_secs), TORNADO.radius);
+        assert_eq!(TORNADO.edge_at(TORNADO.duration), TORNADO.radius);
+        // The user's start and end (2026-11-13): the inner edge of the dense droplets, then 1.5 cells.
+        assert_eq!(TORNADO.start_radius, CELL_SIZE);
+        assert_eq!(TORNADO.radius, 1.5 * CELL_SIZE);
+    }
+
+    /// Balance rule b4 (`docs/balance.md`).
+    #[test]
+    fn b4_the_tornado_lasts_twice_as_long_as_the_ice_ring() {
+        assert_eq!(
+            TORNADO.duration,
+            2.0 * (ICE_RING.grow_secs + ICE_RING.burn_secs)
+        );
+    }
+
+    /// Balance rule b5 (`docs/balance.md`): the tick that kills lands after 60% of the duration, and the tick before
+    /// it does not kill.
+    #[test]
+    fn b5_a_ghost_dies_from_one_tornado_only_after_60_percent_contact() {
+        let (_, tick) = tornado_tick();
+        let threshold = 0.6 * TORNADO.duration;
+        let kill = tornado_kill_secs();
+        assert!(kill > threshold, "kills at {kill} s, 60% is {threshold} s");
+        assert!(
+            kill - tick <= threshold,
+            "the tick at {} s is already past 60% ({threshold} s)",
+            kill - tick
+        );
+        assert!(kill <= TORNADO.duration, "never kills: {kill} s");
+    }
+
+    /// Balance rule b6 (`docs/balance.md`): the most one tornado can deal is more than the most one ice ring can.
+    #[test]
+    fn b6_one_tornado_can_deal_more_than_one_ice_ring() {
+        let (per_tick, tick) = tornado_tick();
+        let tornado = ((TORNADO.duration / tick).floor() + 1.0) * per_tick;
+        let Damage::PushAndTouch { push, touch } = values(WeaponKind::IceRing).damage else {
+            panic!("the ice ring should deal push and touch damage");
+        };
+        assert!(tornado > push + touch, "{tornado} against {}", push + touch);
+    }
+
+    /// A ghost walking straight at a standing player through the full tornado, counted in contact time: it gains at
+    /// its speed less the steady push, and loses `bump` on every `bump_every`-th tick (not below the edge). Returns
+    /// the seconds to cross the whole radius, the ticks dealt and the bumps taken on the way. The real crossing is
+    /// shorter: it ends at the player's body, not at the centre.
+    fn tornado_walk_in() -> (f32, u32, u32) {
+        let Pushback::Outward(push) = values(WeaponKind::Tornado).pushback else {
+            panic!("the tornado should push outward at a speed");
+        };
+        let (_, tick) = tornado_tick();
+        let gain = crate::ghost::SPEED - push;
+        assert!(gain > 0.0, "the push {push} is not slower than a ghost");
+        let dt = 1.0 / 240.0;
+        let (mut secs, mut depth, mut next_tick, mut ticks, mut bumps) = (0.0, 0.0, 0.0, 0, 0);
+        while depth < TORNADO.radius {
+            if secs >= next_tick {
+                ticks += 1;
+                next_tick += tick;
+                if ticks % TORNADO.bump_every == 0 {
+                    bumps += 1;
+                    depth = (depth - TORNADO.bump).max(0.0);
+                }
+            }
+            depth += gain * dt;
+            secs += dt;
+        }
+        (secs, ticks, bumps)
+    }
+
+    /// Balance rule b7 (`docs/balance.md`): a ghost walking in gains on the push and the bumps, and crosses the whole
+    /// radius before the tornado kills it and before it ends.
+    #[test]
+    fn b7_a_ghost_walking_at_a_standing_player_gets_through() {
+        let (secs, ticks, _) = tornado_walk_in();
+        let (per_tick, _) = tornado_tick();
+        assert!(
+            ticks as f32 * per_tick < crate::ghost::HIT_POINTS,
+            "{ticks} ticks kill it on the way in"
+        );
+        assert!(secs < TORNADO.duration, "crosses in {secs} s");
+    }
+
+    /// Balance rule b9 (`docs/balance.md`): that ghost is bumped back at least twice on the way in.
+    #[test]
+    fn b9_a_ghost_walking_at_a_standing_player_is_bumped_back_at_least_twice() {
+        let (secs, _, bumps) = tornado_walk_in();
+        assert!(bumps >= 2, "{bumps} bumps in {secs} s");
     }
 
     /// Balance rule b1 (`docs/balance.md`): the fire ring kills a ghost with its first tick, so a ghost it touches dies
