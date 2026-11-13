@@ -34,8 +34,8 @@ pub struct WeaponValues {
     pub glow: bool,
 }
 
-/// The shape and timing of a ring (`weapons/ring.rs`). Spike defaults, except `max_radius`: 3 cells, so the ring is
-/// 6 cells across (the user, 2026-11-11).
+/// The shape and timing of a ring (`weapons/ring.rs`). Spike defaults, except `max_radius`: 2 cells, so the ring is
+/// 4 cells across (the user, 2026-11-13, after a manual test; it was 6 cells across).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RingShape {
     /// The ring grows to this radius, in pixels.
@@ -56,7 +56,7 @@ pub struct RingShape {
 }
 
 pub const RING: RingShape = RingShape {
-    max_radius: 3.0 * CELL_SIZE,
+    max_radius: 2.0 * CELL_SIZE,
     grow_secs: 0.767,
     burn_secs: 2.0,
     burn_lead: 40.0,
@@ -67,15 +67,17 @@ pub const RING: RingShape = RingShape {
 };
 
 const _: () = assert!(RING.burn_lead < RING.max_radius && RING.band_half < RING.max_radius);
-// The ring is 6 cells across (the user, 2026-11-11).
-const _: () = assert!(RING.max_radius * 2.0 == 6.0 * CELL_SIZE);
+// The ring has a radius of 2 cells (the user, 2026-11-13).
+const _: () = assert!(RING.max_radius == 2.0 * CELL_SIZE);
 
 /// The values of a weapon. Placeholders (P4): damage and pushback are guesses to be tuned.
 pub fn values(weapon: WeaponKind) -> WeaponValues {
     match weapon {
+        // Balance rule b1 (`docs/balance.md`, the user, 2026-11-13): the first tick kills a ghost, so 100 per tick.
+        // A ghost dies in the frame it is first touched, so a push would never show: none.
         WeaponKind::FireRing => WeaponValues {
-            damage: Damage::PerSecond(40.0),
-            pushback: Pushback::Pixels(64.0),
+            damage: Damage::PerSecond(200.0),
+            pushback: Pushback::None,
             tick: 0.5,
             glow: true,
         },
@@ -137,5 +139,24 @@ mod tests {
             assert_eq!(impact, weapon == WeaponKind::Fireball, "{weapon:?}");
         }
         assert_eq!(values(WeaponKind::Fireball).pushback, Pushback::None);
+    }
+
+    /// Balance rule b1 (`docs/balance.md`): the fire ring kills a ghost with its first tick, so a ghost it touches dies
+    /// wherever it stands and however far the ring would have pushed it.
+    #[test]
+    fn b1_the_first_tick_of_the_fire_ring_kills_a_ghost() {
+        let v = values(WeaponKind::FireRing);
+        let Damage::PerSecond(dps) = v.damage else {
+            panic!(
+                "the fire ring should deal damage per second, not {:?}",
+                v.damage
+            );
+        };
+        let first_tick = dps * v.tick;
+        assert!(
+            first_tick >= crate::ghost::HIT_POINTS,
+            "the first tick deals {first_tick}, a ghost has {}",
+            crate::ghost::HIT_POINTS
+        );
     }
 }

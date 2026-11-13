@@ -2,9 +2,9 @@
 
 Source of the code and the findings: `PLAN-particle-spike.md` and `RESEARCH-particles.md`. The spike (`games/particle-spike/`) stays in place until the last step. It is the porting source.
 
-## Status (2026-11-11, end of session): resume here
+## Status (2026-11-13): resume here
 
-Done and committed: P0 to P4, W1 (fire ring, built, **values not tuned yet**), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. Then tune W1 with the user's numbers, then **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen yet: a ghost pinned against a tree by a push, a cast near the map edge.
+Done and committed: P0 to P4, W1 (fire ring), the ghost `Hurt` frames (`HurtFrames`, `EnemyHurt`), the `FacingSet` fix (a ghost did not die because `animate_facing` overwrote `Die`), the `info!` lifecycle logs (`dev-feedback.md` rule 4b, `games/long-way/docs/weapons.md` "Reporting a problem"). The HUD rework is done and committed (`adr-lw34`, kit widgets `adr-x45`): one click on the red active button casts the fire ring. **W1 accepted by the user on 2026-11-13** (radius 2 cells, 200 per second so the first tick kills a ghost, no pushback; balance rules b1 and b2 in `games/long-way/docs/balance.md`; D10 decided). Next: **W2 (ice ring)**: reuse `weapons/ring.rs` (add an ice element, the four `ice_ring1` to `ice_ring4` looks from `FxLooks`, the two ice effect files `ring_front_ice` and `ring_burn_ice` from the spike, two emitters per position), `ToEdge` pushback. Design questions for W2 are in its section. WASM is out of scope (see Out of scope). Not seen on screen: a cast near the map edge. A ghost pinned against a tree by a push can no longer happen with the fire ring (no pushback); check it with the ice ring (`ToEdge`).
 
 ## Goal
 
@@ -76,7 +76,7 @@ Measured on 2026-11-10 with `cargo tree`: the spike and Long Way trees differ by
 | D7 | Enemy hit points | **Decided: enemies need HP.** Design in P4. |
 | D8 | Damage model | **Decided:** every weapon has a tunable **damage per second** (`dps`). A weapon that hits once (the fireball) has a tunable **impact damage** instead. |
 | D9 | Pushback model | **Decided:** every weapon has a tunable pushback, one of: `None`, `Pixels(n)` (push back by a set distance, then stop), `ToEdge` (push all the way to the weapon's final radius or distance). The fireball has `None` and ends on its first hit. Pushback stops at features and walls (the collision world). |
-| D10 | How a ring interacts with features (trees, rocks, markers, scenery) | **Open. Ask the user in step W1.** See the questions there. |
+| D10 | How a ring interacts with features (trees, rocks, markers, scenery) | **Decided (user, 2026-11-11), `adr-lw33`:** the ring passes over features (no shielding), features do not react to it, a pushed enemy stops at a feature and keeps taking damage there, and the ring does not hit markers. |
 | D11 | Aim from a drawer button (the cursor is on the button) | **Decided: no cursor aim. Each weapon has its own aim rule**, taken from the player (facing, position) or the world (nearest enemy). See the table below. |
 | D12 | Energy cost and cooldown per cast (`Inventory`, `adr-lw27`) | **Decided: out of scope.** A separate plan will build them later. Weapons in this plan cost nothing and have no cooldown. |
 | D13 | What a ghost does when its HP reaches 0 | **Decided: it dies.** The ghost is removed (despawned) when `EnemyDied` fires. No drop. A death animation or effect is not part of this plan unless the user asks. |
@@ -201,7 +201,7 @@ Every weapon step follows the same checklist. Do not start the next weapon befor
 9. **Gates and docs:** `lint`, `test` (changed crates). Update `weapons.md`, `source-layout.md`. Delete files in `target/screenshots/`.
 10. **Ask before committing** (one commit per weapon).
 
-#### W1. Fire ring (built 2026-11-11, values not tuned yet)
+#### W1. Fire ring (accepted 2026-11-13)
 
 - **Design questions:**
   - Pushback: `Pixels(n)`. How many pixels (start from the spike feel, tune)?

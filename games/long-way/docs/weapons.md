@@ -12,11 +12,11 @@ Design: the user (2026-11-11). Decisions: `adr-lw32`. Plan: `dev-docs/PLAN-weapo
 
 ## Values
 
-All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders until each weapon has been tuned with the user** (the spike gave looks and sizes, not damage).
+All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders until each weapon has been tuned with the user** (the spike gave looks and sizes, not damage). The values must keep the rules in `balance.md`.
 
 | Weapon | Damage | Pushback | Tick | Glow | Status |
 |---|---|---|---|---|---|
-| Fire ring | 40 per second | at most 64 px | 0.5 s | on | built (W1), values not tuned yet |
+| Fire ring | 200 per second (100 per tick: the first tick kills a ghost, b1) | none | 0.5 s | on | **accepted** (W1, 2026-11-13) |
 | Ice ring | 20 per second | to the edge | 0.5 s | off | not built |
 | Fire wall | 40 per second | none | 0.5 s | on | not built |
 | Ice wall | 20 per second | none | 0.5 s | off | not built |
@@ -34,13 +34,14 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 
 Files: `weapons/ring.rs`, shape numbers in `weapons/values.rs` (`RING`), effects `assets/effects/fire_ring_front.particle.ron` and `fire_ring_burn.particle.ron`, art tag `fire_ring` of `art/weapons/fireball_and_rings.aseprite`.
 
-- The ring grows from the middle of the player's body to a radius of 3 cells (192 px, so **6 cells across**, the user's choice) in 0.767 s, eased out (fast first, slowing to a stop). It then burns for 2 s and goes. It stays where it was cast.
+- The ring grows from the middle of the player's body to a radius of 2 cells (128 px, so **4 cells across**, the user's choice on 2026-11-13; it was 6 cells across) in 0.767 s, eased out (fast first, slowing to a stop). It then burns for 2 s and goes. It stays where it was cast.
 - A body is hit when its `HitBox` touches the damaging band. While the ring grows the band reaches from the radius 0.12 s ago to the radius now (the trail of the 40 moving front emitters). While it burns, the band is 24 px each side of the full radius (40 burners).
 - A body in the band is hurt at once, then every 0.5 s while it stays (`Contact`). A body that walks into the burn band later is hurt too.
-- While the front grows, it carries a hit body outward at the front's speed, until the pushback limit (64 px) is used up. After that the body can walk back in.
+- The first tick (100) kills a ghost, so a ghost the ring touches dies at once, wherever it stands (balance rule b1, `balance.md`). The fire ring does not push. The ring code still supports pushback for other rings: while the front grows, it carries a hit body outward at the front's speed.
 - **Features (D10, `adr-lw33`):** the ring passes over trees, rocks, markers and scenery, and they do not react to it. A pushed body stops at them (the collision world).
-- Checked with a scripted run (`teleport:-608:-150` in map 1, the ghost 100 px above): the ghost loses 20 per tick (100, 80, 60, 40 ...) and dies at 0 or walks out of the band. The ring was 6.1 cells across in the screenshot.
-- Frame time with the ring cast every 0.7 s (up to four rings at once, vsync off): 2.7 to 3.1 ms per frame on native, idle 2.7 to 3.9 ms. No measurable cost. The web was not measured.
+- Checked with a scripted run (`teleport:-608:-150` in map 1, the ghost 100 px above): the ghost lost 20 per tick (100, 80, 60, 40 ...) and died at 0 or walked out of the band (before b1). The ring was 6.1 cells across in the screenshot (before the change to 4 cells across).
+- Frame time with the ring cast every 0.7 s (up to four rings at once, vsync off): 2.7 to 3.1 ms per frame on native, idle 2.7 to 3.9 ms. No measurable cost. The web was not measured. Measured with the 6-cell ring. The 4-cell ring has the same number of emitters, so the cost is the same or lower.
+- **Tuning note (accepted by the user on 2026-11-13):** the radius went from 3 cells to 2 cells (4 cells across), after a manual test. The damage went from 40 to 200 per second (20 to 100 per tick) and the pushback from 64 px to none, so the first touch kills a ghost (balance rule b1, `balance.md`). With the old values, a ghost close to the player at the cast took one tick and walked back to attack. Grow time, burn time, band width and glow are the spike values and were not changed.
 
 ## Aim rules
 

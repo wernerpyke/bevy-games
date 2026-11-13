@@ -318,6 +318,9 @@ mod tests {
         });
     }
 
+    /// Halfway to the radius where the ring starts to burn: only the growing front reaches a body here.
+    const FRONT_ONLY: f32 = (RING.max_radius - RING.burn_lead) / 2.0;
+
     /// An enemy whose body is a 10 by 10 box `distance` pixels to the right of the origin.
     fn enemy(app: &mut App, distance: f32) -> Entity {
         app.world_mut()
@@ -380,13 +383,13 @@ mod tests {
     #[test]
     fn a_body_the_front_passes_is_hurt_once_and_a_body_out_of_reach_never() {
         let mut app = app(16);
-        let near = enemy(&mut app, 100.0);
+        let near = enemy(&mut app, FRONT_ONLY);
         let far = enemy(&mut app, RING.max_radius + RING.band_half + 40.0);
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
         run(&mut app, 4.0, 16);
         let near_hits = damage_hits(&hits_on(&app, near));
         assert_eq!(near_hits.len(), 1, "{near_hits:?}");
-        assert_eq!(hits_on(&app, near)[0].1.amount, 20.0);
+        assert_eq!(hits_on(&app, near)[0].1.amount, 100.0);
         assert!(hits_on(&app, far).is_empty());
     }
 
@@ -404,7 +407,7 @@ mod tests {
         assert_eq!(rings(&mut app), 0);
         run(&mut app, 2.0, 16);
         let times = damage_hits(&hits_on(&app, burning));
-        // The first hit is at 0.43 s, when the band reaches the body. The ring ends after grow 0.77 s plus burn 2 s,
+        // The first hit is at about 0.34 s, when the burn band starts. The ring ends after grow 0.77 s plus burn 2 s,
         // so ticks 0.5 s apart fit 5 times. A tick lands in the first 16 ms frame at or after its time.
         assert_eq!(times.len(), 5, "{times:?}");
         for pair in times.windows(2) {
@@ -417,8 +420,8 @@ mod tests {
     fn no_body_is_skipped_at_a_low_frame_rate() {
         for dt_ms in [16, 50, 100] {
             let mut app = app(dt_ms);
-            let bodies: Vec<Entity> = [30.0, 90.0, 150.0, 190.0]
-                .map(|d| enemy(&mut app, d))
+            let bodies: Vec<Entity> = [0.2, 0.5, 0.8, 1.2]
+                .map(|share| enemy(&mut app, share * RING.max_radius))
                 .to_vec();
             cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
             run(&mut app, 4.0, dt_ms);
@@ -433,18 +436,27 @@ mod tests {
 
     #[test]
     fn pushback_carries_a_body_outward_by_at_most_its_limit() {
+        // The fire ring does not push (b1), so the cast ring is given a pixel limit that the front passes: from
+        // `FRONT_ONLY` the front would carry the body more than 20 px.
+        let limit = 20.0;
         let mut app = app(16);
-        let body = enemy(&mut app, 100.0);
+        let body = enemy(&mut app, FRONT_ONLY);
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
+        app.update();
+        for mut ring in app
+            .world_mut()
+            .query::<&mut Ring>()
+            .iter_mut(app.world_mut())
+        {
+            ring.values.pushback = super::super::values::Pushback::Pixels(limit);
+        }
         run(&mut app, 4.0, 16);
         let pushes: Vec<Vec2> = hits_on(&app, body).iter().map(|(_, h)| h.push).collect();
         let total: Vec2 = pushes.iter().sum();
-        let limit = match values(WeaponKind::FireRing).pushback {
-            super::super::values::Pushback::Pixels(n) => n,
-            other => panic!("the fire ring should push by pixels, not {other:?}"),
-        };
-        assert!(total.x > 0.0 && total.y.abs() < 1e-3, "{total}");
-        assert!(total.length() <= limit + 1e-3, "{total} over {limit}");
+        assert!(
+            (total.x - limit).abs() < 1e-3 && total.y.abs() < 1e-3,
+            "{total}"
+        );
         assert!(pushes.iter().all(|p| p.x >= 0.0));
     }
 
@@ -453,7 +465,7 @@ mod tests {
         app.world_mut()
             .spawn((
                 EnemyHp::full(100.0),
-                Transform::from_xyz(0.0, 100.0, 0.0),
+                Transform::from_xyz(0.0, FRONT_ONLY, 0.0),
                 HitBox {
                     offset: Vec2::ZERO,
                     half_size: Vec2::splat(5.0),
@@ -469,7 +481,7 @@ mod tests {
         let body = app
             .world_mut()
             .spawn((
-                Transform::from_xyz(100.0, 0.0, 0.0),
+                Transform::from_xyz(FRONT_ONLY, 0.0, 0.0),
                 HitBox {
                     offset: Vec2::ZERO,
                     half_size: Vec2::splat(5.0),
@@ -487,7 +499,7 @@ mod tests {
         // D15: the ring does not rely on the enemy's plugin removing the `HitBox` while it plays `Die`.
         let mut app = app(16);
         let living = living_beside(&mut app);
-        let dead = enemy(&mut app, 100.0);
+        let dead = enemy(&mut app, FRONT_ONLY);
         app.world_mut().get_mut::<EnemyHp>(dead).unwrap().current = 0.0;
         cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
         run(&mut app, 4.0, 16);

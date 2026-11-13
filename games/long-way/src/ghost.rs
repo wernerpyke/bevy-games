@@ -43,8 +43,8 @@ const HIT_BOX: HitBox = HitBox {
 };
 /// Damage to the player on touch.
 const DAMAGE: u32 = 1;
-/// Hit points of a ghost. A placeholder until the weapons are tuned (`PLAN-weapons.md`).
-const HIT_POINTS: f32 = 100.0;
+/// Hit points of a ghost. Balance rule b1 (`docs/balance.md`) ties the fire ring damage to it.
+pub(crate) const HIT_POINTS: f32 = 100.0;
 
 pub struct GhostPlugin;
 
