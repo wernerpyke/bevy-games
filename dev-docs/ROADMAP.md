@@ -57,33 +57,55 @@ Known issues: a shrub placed diagonally next to the empty canopy cell of a mediu
 
 Started: the kit turns a mouse click into a world position (`pointer.rs`, `WorldClick`, `adr-x42`), and the Long Way player walks by clicking (see "Click to move (Long Way)" in `ROADMAP-completed.md`). Still open: R-Town's game-local `PlayerInput` resource (move direction, fire) filled from the keyboard (`adr-x22`) should move to the kit, so that no game code reads `KeyCode` or mouse buttons directly. Considerations: keyboard and mouse as two sources that write the same resource, with the last used device winning; mouse aim for R-Town converted through the pixel camera (`pointer::cursor_to_world` already does the conversion) and an aim direction that can replace the facing direction; named actions with default key bindings that a game can override, and later rebinding and gamepads; the scripted run tool (`script.rs`) writes key presses into `ButtonInput` and sends `click:` as a message; touch taps on the web are not handled (a first touch could send `WorldClick`); hold-to-follow was not built (Long Way is click to go only, `adr-lw30`); wasm differences (pointer lock, touch). Keep game specific actions out of the kit, as for the other modules (`adr-x12`).
 
-### rm9. Combat basics (priority 9)
+### rm100. Keyboard-only play in Long Way (priority 9)
+
+Goal: a player can play Long Way with the keyboard only, and can see which key does what. Today the arrow keys walk, 1 to 4 open, switch or close a drawer, and Z, X, C and V cast (`adr-lw38`). A weapon in the drawer can be loaded only with a click, and no key is shown on screen.
+
+Wanted by the user (2026-11-13):
+1. Small text labels with the key on each active weapon button (Z, X, C, V) and each gauge (1 to 4).
+2. A keyboard way to load a weapon from the open drawer. For example, left and right highlight a weapon, and Space or Enter loads it.
+
+Considerations:
+- **Arrow keys in the drawer.** The game does not pause while the drawer is open (`adr-lw31`). If left and right move the highlight, they cannot also walk the player, so the player stands still in danger. Options: the drawer takes the arrow keys and the player stands; the drawer pauses the game; or the drawer uses other keys, for example the energy key again (2 then 2 moves the highlight, but today the same key closes the drawer), or Q and E. Decide before the first build.
+- **Escape closes the drawer.** Recommended. When the game gets a pause key (`rm12`, now `pause_key: None`), Escape must close an open drawer first and pause only when no drawer is open. One key press must not do both.
+- **The first highlight.** Start on the weapon that is in the active slot of that energy. A weapon that is not built (dimmed) is skipped, or it can be highlighted but not loaded. Decide whether the highlight stops at the ends or wraps.
+- **Highlight and mouse hover.** The keyboard highlight and the mouse hover use the same look, and the last device used wins, so two weapons never look selected at the same time.
+- **Load, or load and cast.** A click loads the weapon and closes the drawer (`adr-lw34`). Space or Enter does the same, unless the user wants it to cast too.
+- **Label text from the key table.** Make the labels from `WEAPON_KEYS` (`hud.rs`), not from fixed strings, so that later rebinding (`rm8`) changes them too. `KeyCode` is the physical key: on an AZERTY keyboard, the key at the place of Z shows W. Bevy's logical `Key` can give the right label. Check this on the web too.
+- **Label size.** Text in the 512 pixel wide bar must be easy to read at the window scale, and it must not cover the weapon icon or the gauge fill. Optional: show the labels only after the first key press.
+- **A help overlay.** A key (for example H or ?) can show all controls. F1 to F3 are used by the dev tools.
+- **Web build.** In a browser, the arrow keys and Space can scroll the page, and Escape leaves full screen. Check that the canvas stops the default browser action (the `prevent_default_event_handling` setting of the Bevy window) when the web build is made (`rm10`).
+- **Numpad.** Decide whether numpad 1 to 4 also open a drawer.
+- **A held cast key.** Today one press casts once. When energy cost and cooldown come (`rm9`), decide whether a held key casts again when the cooldown ends.
+- **Tests.** The script runner already knows `z`, `x`, `c`, `v`, `1` to `4` and `escape`. Add `enter` and `space` to it when the drawer keys are built.
+
+### rm9. Combat basics (priority 10)
 
 The player loads a weapon from a drawer that slides up from an energy gauge, and casts it with the active weapon button in the HUD (`adr-lw31`, `adr-lw34`). Enemies have hit points, and four weapons are built and tuned: the fire ring, ice ring, tornado and fireball (`### Weapons: fire ring, ice ring, tornado, fireball (Long Way)` in `ROADMAP-completed.md`, `games/long-way/docs/weapons.md`, `balance.md`). The fire wall and ice wall are in `PLAN-walls.md`. Projectiles and enemies exist (`### Enemies (R-Town)` and `### Ghost enemy and player HP (Long Way)` in `ROADMAP-completed.md`). The player has 3 HP in Long Way, but R-Town has none. When several enemies attack at once, revisit the hit timing: the hit lands when the ghost's `Attack` ends. Open: energy cost and cooldown per cast (a separate plan, the user's decision of 2026-11-11), sound (impacts too), a death screen and a restart flow with a game state (`States`), enemy attacks other than the ghost's touch, more enemy kinds (balance rules b2 and b13 wait for one), the fireball's later target rule (in a cluster, the enemy with the most HP), and exact blocked shapes for projectiles if the 5 px early stop at tree sides is a problem (`adr-x21`). Ask the developer for the design before inventing mechanics.
 
-### rm10. Web release build (priority 10)
+### rm10. Web release build (priority 11)
 
 Goal: build each game for the browser and host it. Both macOS and Web must keep working (`CLAUDE.md`, "Targets and scope"). Done: the `wasm32-unknown-unknown` target is pinned (`adr-e5`), `./dev-scripts/rust.sh web` checks that the games compile for it, and `[profile.wasm-release]` in the root `Cargo.toml` is set for small builds (`adr-e6`). Not done: producing the files, running them in a browser (no game has been run in one yet) and hosting.
 
 Considerations: the tool that turns the `.wasm` into a page (`wasm-bindgen` CLI, Trunk or another), to be checked for the pinned Bevy and Rust versions; the HTML shell and canvas sizing with the fixed-height camera (`adr-e7`); asset loading over HTTP, so a loading state keeps the web build from showing missing assets (`bevy_asset_loader` style, `CLAUDE.md`), and `.aseprite` files loaded through `bevy_aseprite_ultra` must work there; the F1 map reload and the scripted run tool are native only, so the bundled `include_str!` maps are what the web build uses (`rm3`); `wasm-opt` and the size of the download; one build per game; hosting (for example GitHub Pages for the repository `wernerpyke/bevy-games`); keeping `dev-docs/` out of the shipped files; and how to test (a script that builds, serves and opens the page, using `dev-scripts/shot.sh` and `dev-scripts/aseprite.sh`). Record the chosen method in `dev-docs/adr/ENGINE.md` and replace the "to define" lines in `CLAUDE.md` and `adr-e6`.
 
-### rm11. Rethink marker collision and touch areas (priority 11)
+### rm11. Rethink marker collision and touch areas (priority 12)
 
 Goal: decide whether a marker needs two rectangles. Now a marker has a blocked area (the middle 80% of its width and the bottom half of its height, `adr-lw20`) and, when it has `exit_to`, a touch area: the blocked area plus `TOUCH_MARGIN` (2 px), scaled by `TOUCH_SCALE` (2.0) around its centre, 52 by 44 px (`markers.rs`, `adr-lw20`, `adr-lw21`, `adr-x33`). Considerations: one larger blocked area may be simpler, because the player would reach the exit by touching the edge of the box and the margin and the scale would go away. The cost is a larger solid box that blocks more ground and changes how markers merge into clusters with trees and rocks. Compare by playing. Questions: whether lanterns, which have no exit, keep the small box; whether the arrival at `player_start` next to a marker still works with a larger box (the `armed` rule, `adr-x33`); and whether the debug overlay should draw the touch area. Not decided: the two area design stays until this is looked at.
 
-### rm12. Screens and the overlay HUD (priority 12)
+### rm12. Screens and the overlay HUD (priority 13)
 
 Goal: use the screen layout and app states (`adr-x34`, `adr-x35`) for real screens, and the HUD over the game. Long Way now has its HUD bar below the game and a weapon drawer over the game area (`adr-lw31`). Done in the kit: regions, the HUD bar, `AppState` with loading, title, playing and game over, pause with a dim layer and an empty `PauseDialog`. Not done: content for any screen. Long Way starts in `Playing`, has no pause key and no title, pause dialog or game over screen.
 
 Considerations: ask the user what each screen shows before inventing it; the title and game over screens use the full window on their own background (`state_root`), and the title may need the game camera off or a world behind it; a death and restart flow (`rm9`) needs `GameOver` and a reset of the game; the pause dialog is in the game region and may need a full-window position; the HUD needs real content (health, items) and icon and gauge widgets; the overlay mode (the HUD over a full-window game view, same content) is computed and tested but not used, and its transparent root and picking need a try; kit systems are not gated by state, so a game must not spawn the player in the title; a `ViewportNode` spike if one UI tree for all modes is wanted (not checked on wasm); mouse to world must use the game viewport when the mouse is added (`rm8`).
 
-### rm13. Adapt to the screen size and ratio (priority 13)
+### rm13. Adapt to the screen size and ratio (priority 14)
 
 Goal: the kit and the games know the size and shape of the screen they run on and adjust the window and layout, instead of using one fixed window size. Today Long Way has a fixed window of 576 by 756 (`camera.rs`); the game width follows the window aspect ratio (a wider window shows more world), the HUD bar is always the full window width, and nothing checks that the window fits the monitor. Builds on `rm12` (`ScreenLayout` and `UiScale` already follow the window size).
 
 Considerations: read the monitor size and pick a window that fits (a 720 by 945 window did not fit this Mac: macOS shrank it and the view grew wider than 8 cells); fullscreen and free resize; what a very wide or very tall window does (show more world, letterbox, or limit the aspect ratio, and what the camera bounds and map edges then show); the integer scaling rule in `CLAUDE.md`, which the scale of 1.40625 already breaks (choose a whole number scale of the art, or accept a fractional one and say so); the web canvas size and the browser window (`rm10`); whether the HUD size is a fixed share of the view or adapts to the window shape, for example a phone-shaped window; high-DPI screens (scale factor 2 on this Mac); and tests for the layout function with many window shapes. Ask the user for the target screens (desktop only, or also phones and tablets on the web) before deciding.
 
-### rm14. Repeating pattern backgrounds (priority 14)
+### rm14. Repeating pattern backgrounds (priority 15)
 
 The `background:` block already has a mandatory `mode`, and `pattern` is reserved (`adr-x36`): the parser rejects it as not implemented. Build it: how a pattern is written in the map file (a short repeat of image names, or a tile image per cell row), how it combines with `jitter` and `scale`, and whether R-Town uses it for a tiled ground (`rm5`). Ask the user what a pattern should look like before inventing the format.
 
