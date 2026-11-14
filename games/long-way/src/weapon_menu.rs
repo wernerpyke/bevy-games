@@ -114,11 +114,12 @@ impl WeaponKind {
     }
 }
 
-/// The weapon in the active slot of an energy when the game starts (the user's choice, 2026-11-12).
+/// The weapon in the active slot of an energy when the game starts (the user's choice, 2026-11-12; blue changed to the
+/// tornado on 2026-11-14).
 fn default_weapon(energy: Energy) -> Option<WeaponKind> {
     match energy {
         Energy::Red => Some(WeaponKind::FireRing),
-        Energy::Blue => Some(WeaponKind::IceRing),
+        Energy::Blue => Some(WeaponKind::Tornado),
         Energy::Violet | Energy::Black => None,
     }
 }
@@ -150,7 +151,8 @@ impl ActiveWeapons {
     }
 }
 
-/// The weapons in the drawer of an energy (the user's choice, 2026-11-11). Violet and black have none yet.
+/// The weapons in the drawer of an energy, from left to right (the user's choice, 2026-11-11; the tornado first in blue,
+/// 2026-11-14). Violet and black have none yet.
 pub fn weapons_for(energy: Energy) -> &'static [WeaponKind] {
     match energy {
         Energy::Red => &[
@@ -159,9 +161,9 @@ pub fn weapons_for(energy: Energy) -> &'static [WeaponKind] {
             WeaponKind::FireWall,
         ],
         Energy::Blue => &[
+            WeaponKind::Tornado,
             WeaponKind::IceRing,
             WeaponKind::IceWall,
-            WeaponKind::Tornado,
         ],
         Energy::Violet | Energy::Black => &[],
     }
@@ -498,9 +500,9 @@ mod tests {
     #[test]
     fn each_energy_starts_with_its_default_and_only_a_built_weapon_is_active() {
         let mut active = ActiveWeapons::default();
-        // Blue holds the ice ring and red the fire ring. Violet and black have no weapon.
+        // Blue holds the tornado and red the fire ring. Violet and black have no weapon.
         let defaults = [
-            Some(WeaponKind::IceRing),
+            Some(WeaponKind::Tornado),
             Some(WeaponKind::FireRing),
             None,
             None,
@@ -607,6 +609,19 @@ mod tests {
                 vec![]
             )
         );
+        // The tornado is first in blue (the user's choice, 2026-11-14).
+        click_gauge(&mut app, Energy::Blue);
+        assert_eq!(
+            row(&mut app),
+            (
+                vec![
+                    WeaponKind::Tornado,
+                    WeaponKind::IceRing,
+                    WeaponKind::IceWall
+                ],
+                vec![]
+            )
+        );
     }
 
     fn button(app: &mut App, weapon: WeaponKind) -> Entity {
@@ -642,7 +657,7 @@ mod tests {
         assert_eq!(
             slots(&app),
             [
-                Some(WeaponKind::IceRing),
+                Some(WeaponKind::Tornado),
                 Some(WeaponKind::FireRing),
                 None,
                 None

@@ -4,7 +4,7 @@ Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `ba
 
 ## How a weapon works
 
-1. The player loads a weapon once: a click on an energy gauge opens the drawer, and a click on a weapon there puts it in the active slot of its energy (`weapon_menu.rs`, `adr-lw31`, `adr-lw34`). Red starts with the fire ring.
+1. The player loads a weapon once: a click on an energy gauge opens the drawer, and a click on a weapon there puts it in the active slot of its energy (`weapon_menu.rs`, `adr-lw31`, `adr-lw34`). Red starts with the fire ring and blue with the tornado.
 2. A click on the active weapon button, or its key (Z, X, C, V), sends `ActiveWeaponClicked`. `weapons/mod.rs` turns it into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in.
 3. The weapon's gameplay system reads `CastWeapon`, owns the weapon's state and sends `WeaponHit { target, weapon, amount, push }` for each enemy it touches. Its visuals read the same state.
 4. `weapons/damage.rs` turns a hit into `DamageEnemy` (`enemy_hp.rs`) and moves the enemy by `push` through the collision world, inside the map.
@@ -158,7 +158,7 @@ Change a number in `values.rs`, run the game or a scripted run (`dev-feedback.md
 
 `ui_click:65:552` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 321 and 449 (blue, violet, black), and the gauges below them at y 588. Coordinates are art pixels from the top left of the window (the bar starts at y 512).
 
-To cast another weapon in a script, load it first: click its gauge, then its button in the drawer, then the active button. The drawer buttons are at y 464, from the left at x about 136, 256 and 375 (red: fireball, fire ring, fire wall; blue: ice ring, ice wall, tornado). For example the fireball: `teleport:-480:-224;wait:0.5;ui_click:65:588;wait:0.6;ui_click:136:464;wait:0.5;ui_click:65:552`. A script moves the player with `click:<world x>:<world y>` or `hold:<arrows>:<seconds>`, and can use the weapon keys instead of the clicks: `hold:1:0.1` opens the red drawer and `hold:z:0.1` casts the red weapon (`adr-lw38`). A weapon's own lines are not in the default script output: set `LOG_FILTER`, as above (`dev-feedback.md`).
+To cast another weapon in a script, load it first: click its gauge, then its button in the drawer, then the active button. The drawer buttons are at y 464, from the left at x about 136, 256 and 375 (red: fireball, fire ring, fire wall; blue: tornado, ice ring, ice wall). For example the fireball: `teleport:-480:-224;wait:0.5;ui_click:65:588;wait:0.6;ui_click:136:464;wait:0.5;ui_click:65:552`. A script moves the player with `click:<world x>:<world y>` or `hold:<arrows>:<seconds>`, and can use the weapon keys instead of the clicks: `hold:1:0.1` opens the red drawer and `hold:z:0.1` casts the red weapon (`adr-lw38`). A weapon's own lines are not in the default script output: set `LOG_FILTER`, as above (`dev-feedback.md`).
 
 ## Adding a weapon
 

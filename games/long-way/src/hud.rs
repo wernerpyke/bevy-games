@@ -359,7 +359,7 @@ mod tests {
         let mut app = app();
         // The icon alone, no label (the user's choice, 2026-11-12).
         assert_eq!(button_icons(&mut app, Energy::Red), ["fire_ring"]);
-        assert_eq!(button_icons(&mut app, Energy::Blue), ["ice_ring"]);
+        assert_eq!(button_icons(&mut app, Energy::Blue), ["tornado"]);
         // Violet has no weapon, then one that is not built.
         assert!(button_icons(&mut app, Energy::Violet).is_empty());
         app.world_mut()
