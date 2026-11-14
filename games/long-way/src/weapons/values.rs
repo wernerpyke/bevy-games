@@ -39,6 +39,8 @@ pub struct WeaponValues {
     pub tick: f32,
     /// Particles are drawn with additive blending (the spike result: fire and the fireball on, water off).
     pub glow: bool,
+    /// Energy taken from the weapon's own energy (its drawer) by one cast (the user, 2026-11-14).
+    pub cost: u32,
 }
 
 /// The shape and timing of a ring (`weapons/ring.rs`).
@@ -188,6 +190,7 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             pushback: Pushback::None,
             tick: 0.5,
             glow: true,
+            cost: 1,
         },
         // A shield (the user, 2026-11-13): a medium amount once on the push, a small amount once per cast on a touch.
         // Start values, to tune. Balance rule b3 (`docs/balance.md`): push + touch < ghost HP.
@@ -199,18 +202,21 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             pushback: Pushback::ToEdge,
             tick: 0.5,
             glow: false,
+            cost: 2,
         },
         WeaponKind::FireWall => WeaponValues {
             damage: Damage::PerSecond(40.0),
             pushback: Pushback::None,
             tick: 0.5,
             glow: true,
+            cost: 1, // A placeholder: the cost is set when the wall is built.
         },
         WeaponKind::IceWall => WeaponValues {
             damage: Damage::PerSecond(20.0),
             pushback: Pushback::None,
             tick: 0.5,
             glow: false,
+            cost: 1, // A placeholder: the cost is set when the wall is built.
         },
         // The user's design (2026-11-13), start values to tune. 13 per tick of contact: a ghost dies on the 8th tick,
         // at 3.5 s of contact, past 60% of the duration (b5). A steady push of 20 px/s, with the bump in `TORNADO` (b7,
@@ -220,6 +226,7 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             pushback: Pushback::Outward(20.0),
             tick: 0.5,
             glow: false,
+            cost: 1,
         },
         // The user's design (2026-11-13), start values to tune. A direct hit and the blast each kill a ghost (b10,
         // b11), and the blast is the smaller (b12).
@@ -231,6 +238,7 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
             pushback: Pushback::None,
             tick: 0.5,
             glow: true,
+            cost: 3,
         },
     }
 }
@@ -238,6 +246,7 @@ pub fn values(weapon: WeaponKind) -> WeaponValues {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::inventory::MAX_ENERGY;
 
     #[test]
     fn every_weapon_has_values_that_make_sense() {
@@ -256,6 +265,22 @@ mod tests {
             if let Pushback::Pixels(n) | Pushback::Outward(n) = v.pushback {
                 assert!(n > 0.0, "{weapon:?}");
             }
+            // A full gauge can pay for every weapon.
+            assert!((1..=MAX_ENERGY).contains(&v.cost), "{weapon:?}");
+        }
+    }
+
+    #[test]
+    fn each_built_weapon_costs_the_users_value() {
+        // The user's costs (2026-11-14).
+        for (weapon, cost) in [
+            (WeaponKind::FireRing, 1),
+            (WeaponKind::Fireball, 3),
+            (WeaponKind::Tornado, 1),
+            (WeaponKind::IceRing, 2),
+        ] {
+            assert!(weapon.is_built(), "{weapon:?}");
+            assert_eq!(values(weapon).cost, cost, "{weapon:?}");
         }
     }
 

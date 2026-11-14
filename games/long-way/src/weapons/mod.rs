@@ -20,6 +20,7 @@ use game_kit::Controlled;
 use game_kit::hitbox::HitBox;
 use game_kit::movement::{FollowSet, MoveState};
 
+use crate::inventory::Inventory;
 use crate::player::feet_of;
 use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, WeaponKind};
 
@@ -80,11 +81,13 @@ pub struct WeaponHit {
     pub push: Vec2,
 }
 
-/// The player clicked an active weapon button: cast the weapon in that slot from where the player stands. An empty
-/// slot, or one whose weapon is not built, casts nothing.
+/// The player clicked an active weapon button: cast the weapon in that slot from where the player stands, and take its
+/// cost from the energy of that slot. An empty slot, a weapon that is not built, or too little energy casts nothing.
+/// The HUD also disables the button while the energy is too low, but this check is the rule.
 fn cast_active(
     mut clicks: MessageReader<ActiveWeaponClicked>,
     active: Res<ActiveWeapons>,
+    mut inventory: ResMut<Inventory>,
     player: Query<(&Transform, &MoveState, &HitBox), With<Controlled>>,
     mut cast: MessageWriter<CastWeapon>,
 ) {
@@ -96,6 +99,16 @@ fn cast_active(
             warn!("weapons: {} clicked but there is no player", weapon.label());
             continue;
         };
+        let cost = values::values(weapon).cost;
+        if !inventory.try_spend(click.0, cost) {
+            info!(
+                "weapons: {} needs {cost} {:?}, has {}",
+                weapon.label(),
+                click.0,
+                inventory.count(click.0)
+            );
+            continue;
+        }
         let origin = feet_of(transform);
         info!(
             "weapons: cast {} at {origin:?}, facing ({:.2}, {:.2})",
@@ -123,14 +136,12 @@ mod tests {
         app.add_message::<ActiveWeaponClicked>()
             .add_message::<CastWeapon>()
             .init_resource::<ActiveWeapons>()
+            .init_resource::<Inventory>()
             .add_systems(Update, cast_active);
         app
     }
 
-    #[test]
-    fn the_active_weapon_is_cast_from_the_players_feet_with_its_facing_and_a_blank_slot_casts_nothing()
-     {
-        let mut app = app();
+    fn spawn_player(app: &mut App) {
         app.world_mut().spawn((
             Controlled,
             Transform::from_xyz(100.0, 200.0, 0.0),
@@ -144,7 +155,46 @@ mod tests {
                 ..default()
             },
         ));
-        // Violet has no weapon and black holds one that is not built: only red casts.
+    }
+
+    fn set_energy(app: &mut App, counts: [(Energy, u32); 4]) {
+        let mut inventory = app.world_mut().resource_mut::<Inventory>();
+        for (energy, count) in counts {
+            inventory.set_for_test(energy, count);
+        }
+    }
+
+    /// Sends one click per energy in the same frame, then runs it.
+    fn click(app: &mut App, energies: &[Energy]) -> Vec<WeaponKind> {
+        for energy in energies {
+            app.world_mut().write_message(ActiveWeaponClicked(*energy));
+        }
+        app.update();
+        crate::test_util::messages::<CastWeapon>(app)
+            .iter()
+            .map(|cast| cast.weapon)
+            .collect()
+    }
+
+    fn summary(app: &App) -> String {
+        app.world().resource::<Inventory>().summary()
+    }
+
+    #[test]
+    fn the_active_weapon_is_cast_from_the_players_feet_with_its_facing_and_a_blank_slot_casts_nothing()
+     {
+        let mut app = app();
+        spawn_player(&mut app);
+        set_energy(
+            &mut app,
+            [
+                (Energy::Blue, 0),
+                (Energy::Red, 4),
+                (Energy::Violet, 5),
+                (Energy::Black, 6),
+            ],
+        );
+        // Violet has no weapon and black holds one that is not built: only red casts, and they take nothing.
         app.world_mut()
             .resource_mut::<ActiveWeapons>()
             .set_for_test(Energy::Black, Some(WeaponKind::IceWall));
@@ -161,14 +211,92 @@ mod tests {
         );
         assert_eq!(sent[0].centre, sent[0].origin + Vec2::new(0.0, 25.0));
         assert_eq!(sent[0].facing, Vec2::NEG_X);
+        assert_eq!(summary(&app), "B 0  R 3  V 5  K 6");
     }
 
     #[test]
-    fn without_a_player_nothing_is_cast() {
+    fn a_cast_takes_exactly_its_cost_from_its_own_energy() {
         let mut app = app();
+        spawn_player(&mut app);
+        set_energy(
+            &mut app,
+            [
+                (Energy::Blue, 5),
+                (Energy::Red, 5),
+                (Energy::Violet, 5),
+                (Energy::Black, 5),
+            ],
+        );
         app.world_mut()
-            .write_message(ActiveWeaponClicked(Energy::Red));
-        app.update();
-        assert_eq!(app.world().resource::<Messages<CastWeapon>>().len(), 0);
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Red, Some(WeaponKind::Fireball));
+        assert_eq!(click(&mut app, &[Energy::Red]), [WeaponKind::Fireball]);
+        assert_eq!(summary(&app), "B 5  R 2  V 5  K 5");
+        assert_eq!(click(&mut app, &[Energy::Blue]), [WeaponKind::Tornado]);
+        assert_eq!(summary(&app), "B 4  R 2  V 5  K 5");
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Blue, Some(WeaponKind::IceRing));
+        assert_eq!(click(&mut app, &[Energy::Blue]), [WeaponKind::IceRing]);
+        assert_eq!(summary(&app), "B 2  R 2  V 5  K 5");
+    }
+
+    #[test]
+    fn with_too_little_energy_nothing_is_cast_and_nothing_is_taken() {
+        let mut app = app();
+        spawn_player(&mut app);
+        set_energy(
+            &mut app,
+            [
+                (Energy::Blue, 1),
+                (Energy::Red, 2),
+                (Energy::Violet, 0),
+                (Energy::Black, 0),
+            ],
+        );
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Red, Some(WeaponKind::Fireball));
+        app.world_mut()
+            .resource_mut::<ActiveWeapons>()
+            .set_for_test(Energy::Blue, Some(WeaponKind::IceRing));
+        assert_eq!(click(&mut app, &[Energy::Red, Energy::Blue]), []);
+        assert_eq!(summary(&app), "B 1  R 2  V 0  K 0");
+    }
+
+    #[test]
+    fn two_casts_in_one_frame_with_energy_for_one_cast_once() {
+        let mut app = app();
+        spawn_player(&mut app);
+        set_energy(
+            &mut app,
+            [
+                (Energy::Blue, 0),
+                (Energy::Red, 1),
+                (Energy::Violet, 0),
+                (Energy::Black, 0),
+            ],
+        );
+        assert_eq!(
+            click(&mut app, &[Energy::Red, Energy::Red]),
+            [WeaponKind::FireRing]
+        );
+        assert_eq!(summary(&app), "B 0  R 0  V 0  K 0");
+    }
+
+    #[test]
+    fn without_a_player_nothing_is_cast_and_nothing_is_taken() {
+        let mut app = app();
+        set_energy(
+            &mut app,
+            [
+                (Energy::Blue, 3),
+                (Energy::Red, 3),
+                (Energy::Violet, 0),
+                (Energy::Black, 0),
+            ],
+        );
+        assert_eq!(click(&mut app, &[Energy::Red, Energy::Blue]), []);
+        assert_eq!(summary(&app), "B 3  R 3  V 0  K 0");
     }
 }

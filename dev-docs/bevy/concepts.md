@@ -261,6 +261,10 @@ transform.translation += direction.normalize() * WALK_SPEED * time.delta_secs();
 
 A test can run a small Bevy app without a window: `App::new().add_plugins(MinimalPlugins)`, the resources and plugins under test, and `TimeUpdateStrategy::ManualDuration` so that every `app.update()` adds 16 ms. The kit tests movement, strategies, spawners and projectile hits this way (`crates/game-kit/src/movement.rs`). The first update only sets the start time.
 
+## Disabled UI widgets
+
+Bevy marks a UI widget that cannot be used with the component `InteractionDisabled` (`bevy::ui`). It is only a marker: the widget code decides what it means. The kit's image button shows its disabled frame and ignores presses while it has the marker, using observers that run when the marker is added or removed (`On<Add<InteractionDisabled>>`, `crates/game-kit/src/hud.rs`). Long Way adds the marker to an active weapon button while the player cannot pay for its weapon, and its click observer skips a button that has it (`games/long-way/src/hud.rs`, `adr-lw39`).
+
 ## Systems that need one entity
 
 A system with `Single<...>` runs only while exactly one entity matches. Otherwise Bevy skips it without a warning. R-Town relies on this: when the player is removed, the camera, the weapon and the info box simply stop (`games/r-town/src/weapon.rs`). A system that must act when the entity is missing uses a `Query` and handles the empty case (`strategies.rs`, `pursue`).

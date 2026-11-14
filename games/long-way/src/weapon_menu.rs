@@ -42,7 +42,7 @@ const MAX_BUTTONS: usize = 4;
 const _: () = assert!(
     MAX_BUTTONS as f32 * BUTTON_SIZE.x + (MAX_BUTTONS - 1) as f32 * BUTTON_GAP <= DRAWER_ART_WIDTH
 );
-const ICON_SIZE: f32 = 32.0;
+pub const ICON_SIZE: f32 = 32.0;
 const LABEL_SIZE: f32 = 16.0;
 /// Space between the icon and the label of a button.
 const ICON_LABEL_GAP: f32 = 4.0;
@@ -381,13 +381,13 @@ fn weapon_face(
 }
 
 /// The icon of `weapon` at `alpha` opacity: in the drawer above its label, and alone on an active weapon button in
-/// the HUD.
-pub fn weapon_icon(
-    button: &mut ChildSpawnerCommands,
+/// the HUD (with the cost overlay as its child).
+pub fn weapon_icon<'a>(
+    button: &'a mut ChildSpawnerCommands,
     server: &AssetServer,
     weapon: WeaponKind,
     alpha: f32,
-) {
+) -> EntityCommands<'a> {
     button.spawn((
         Node {
             width: px(ICON_SIZE),
@@ -399,7 +399,7 @@ pub fn weapon_icon(
         ImageNode::default()
             .with_mode(NodeImageMode::Stretch)
             .with_color(Color::WHITE.with_alpha(alpha)),
-    ));
+    ))
 }
 
 /// An observer that gives the button under the pointer a colour.

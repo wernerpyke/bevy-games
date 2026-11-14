@@ -17,7 +17,7 @@ Not started. Next: W5 (fire wall), design questions first.
 ## Out of scope
 
 - **WASM** (carried over from `PLAN-weapons.md`, the user's decision of 2026-11-11): no `rust.sh web`, no web run or size check in this plan. A later plan does the WASM check. This overrides `CLAUDE.md` working rule 8 for this plan.
-- Energy cost, cooldown and a disabled drawer button at 0 energy (a separate plan), sound, the game over screen and restart flow (`rm9`), R-Town.
+- A cooldown per cast (a separate plan), sound, the game over screen and restart flow (`rm9`), R-Town.
 
 ## Decisions carried over
 
@@ -35,6 +35,7 @@ Not started. Next: W5 (fire wall), design questions first.
   - Travel: does the wall move (how fast, how far), or does it only face that way? The spike wall is static, so a moving wall is a new mechanic. A moving blocker needs the blocker rebuilt each frame: measure the cost.
   - Damage (`dps`) for a ghost standing in or touching the wall. Pushback: `None`, `Pixels(n)`, or does it only block? Does the fire wall block the player too?
   - Lifetime (3.3 s in the spike) and length.
+  - Energy cost per cast (red; `cost` in `values.rs` is a placeholder of 1, `adr-lw39`). Update the cost test in `values.rs` and the Cost column in `weapons.md`.
   - What if the wall would stand on a feature or outside the map?
   - Balance rules for the walls (next free ID in `balance.md`).
 - Port: the rectangle placed by the facing rule, the blocker added and removed with the wall, fire as Enoki flames.
@@ -43,7 +44,7 @@ Not started. Next: W5 (fire wall), design questions first.
 
 ### W6. Ice wall
 
-- **Design questions:** the intent; damage, pushback, lifetime; does the ice wall differ in mechanic from the fire wall (it blocks without damage? it is only a barrier?). Ask. Do not invent.
+- **Design questions:** the intent; damage, pushback, lifetime; energy cost per cast (blue, a placeholder of 1 now, `adr-lw39`); does the ice wall differ in mechanic from the fire wall (it blocks without damage? it is only a barrier?). Ask. Do not invent.
 - Reuse the fire wall's code. Add the ice sprites: animated, one tag per cube height, played once, fade by alpha.
 - Tests: the values differ as agreed and the shared rules hold.
 - Scripted run: as W5 with the ice art.

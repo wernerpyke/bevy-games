@@ -124,6 +124,7 @@ mod tests {
             pushback,
             tick: 0.5,
             glow: false,
+            cost: 1,
         }
     }
 

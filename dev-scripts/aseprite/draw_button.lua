@@ -1,4 +1,5 @@
--- Make a new RGB .aseprite file with a plain bevelled button: two frames, tags Up (raised) and Down (pressed).
+-- Make a new RGB .aseprite file with a plain bevelled button: two frames, tags Up (raised) and Down (pressed), and with
+-- disabled=1 a third frame, tag Disabled (flat: no bevel, so it does not look pressable).
 -- Colours are palette indexes of the open file (the game palette). Refuses to overwrite an existing file.
 --
 -- Usage (see dev-scripts/aseprite.sh; the input file is the palette file):
@@ -12,13 +13,15 @@
 --   light:          index of the lit edge: top and left when up, bottom and right when down (default 41)
 --   shadow:         index of the shaded edge: bottom and right when up, top and left when down (default 36)
 --   bevel:          width of the lit and shaded edges in pixels (default 2)
+--   disabled:       1 adds the Disabled frame (default: no Disabled frame)
+--   disabled_face:  index of the face and edges of the Disabled frame (default: the face)
 -- The four corner pixels are left clear, so the outline looks rounded.
 local palette_spr = app.sprite
 local out = app.params["out"]
 local width = tonumber(app.params["width"])
 local height = tonumber(app.params["height"])
 if not palette_spr or not out or not width or not height or width < 8 or height < 8 then
-  print("✗ Usage: draw_button <palette.aseprite> out=<file> width=<n> height=<n> [outline= face= light= shadow= bevel=]")
+  print("✗ Usage: draw_button <palette.aseprite> out=<file> width=<n> height=<n> [outline= face= light= shadow= bevel= disabled=1 disabled_face=]")
   return
 end
 if app.fs.isFile(out) then
@@ -39,9 +42,11 @@ local face, face_i = colour("face", 40)
 local light, light_i = colour("light", 41)
 local shadow, shadow_i = colour("shadow", 36)
 local bevel = tonumber(app.params["bevel"]) or 2
+local with_disabled = app.params["disabled"] == "1"
+local disabled_face, disabled_face_i = colour("disabled_face", face_i)
 
--- One frame. `top_left` and `bottom_right` are the colours of the two bevel edges.
-local function draw(top_left, bottom_right)
+-- One frame. `top_left` and `bottom_right` are the colours of the two bevel edges, `fill` the colour of the face.
+local function draw(top_left, bottom_right, fill)
   local image = Image(width, height, ColorMode.RGB)
   image:clear(Color { r = 0, g = 0, b = 0, a = 0 })
   local w, h = width - 1, height - 1
@@ -62,7 +67,7 @@ local function draw(top_left, bottom_right)
         elseif b < bevel or r < bevel then
           c = bottom_right
         else
-          c = face
+          c = fill
         end
       end
       if c then
@@ -77,15 +82,24 @@ local spr = Sprite(width, height, ColorMode.RGB)
 spr:setPalette(palette)
 local layer = spr.layers[1]
 layer.name = "Button"
-spr:newCel(layer, 1, draw(light, shadow), Point(0, 0))
+spr:newCel(layer, 1, draw(light, shadow, face), Point(0, 0))
 spr:newEmptyFrame()
-spr:newCel(layer, 2, draw(shadow, light), Point(0, 0))
+spr:newCel(layer, 2, draw(shadow, light, face), Point(0, 0))
+if with_disabled then
+  spr:newEmptyFrame()
+  spr:newCel(layer, 3, draw(disabled_face, disabled_face, disabled_face), Point(0, 0))
+end
+-- Tags last, after every frame exists (art-pipeline.md, rule 9).
 spr:newTag(1, 1).name = "Up"
 spr:newTag(2, 2).name = "Down"
+if with_disabled then
+  spr:newTag(3, 3).name = "Disabled"
+end
 spr:saveAs(out)
 
 local function hex(c)
   return string.format("#%02x%02x%02x", c.red, c.green, c.blue)
 end
-print(string.format("✓ %s: %dx%d, tags Up and Down, outline %d (%s), face %d (%s), light %d (%s), shadow %d (%s), bevel %d",
-  out, width, height, outline_i, hex(outline), face_i, hex(face), light_i, hex(light), shadow_i, hex(shadow), bevel))
+local disabled_text = with_disabled and string.format(", Disabled face %d (%s)", disabled_face_i, hex(disabled_face)) or ""
+print(string.format("✓ %s: %dx%d, tags Up and Down%s, outline %d (%s), face %d (%s), light %d (%s), shadow %d (%s), bevel %d",
+  out, width, height, disabled_text, outline_i, hex(outline), face_i, hex(face), light_i, hex(light), shadow_i, hex(shadow), bevel))

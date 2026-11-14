@@ -39,6 +39,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 
 ## Observers
 
+- Run code when a component is added: `fn f(add: On<Add<T>>, ..)`, entity `add.entity`. The kit's image button shows its disabled tag when Bevy's `InteractionDisabled` is added, and `up` when it goes (`crates/game-kit/src/hud.rs`).
 - Run code when a component goes, including on despawn: `app.add_observer(f)` with `fn f(remove: On<Remove<T>>, query: Query<&T>, ..)`. The component can still be read with `query.get(remove.entity)` inside the observer. Long Way's ice ring releases the enemies it stunned this way (`weapons/ice_ring.rs`). Example: `bevy-src/examples/ecs/observers.rs`.
 - `commands.entity(e).try_remove::<T>()` does nothing when `e` is gone by then, where `remove` would log an error.
 

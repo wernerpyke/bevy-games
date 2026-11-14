@@ -12,14 +12,14 @@ games/long-way/
 └── src/
     ├── main.rs         builds the App, adds plugins
     ├── camera.rs       Window size, VIEW_HEIGHT, HUD bar ratio and colours, CLEAR_COLOR, CELL_SIZE, MAP_ORIGIN, map_rect (the camera is `game_kit::camera`)
-    ├── hud.rs          HudPlugin: the content of the HUD bar (active weapon buttons, energy gauges, the row of HP icons, and the weapon keys 1 to 4 and Z X C V). The bar is `game_kit::screen` and `game_kit::hud`
+    ├── hud.rs          HudPlugin: the content of the HUD bar (active weapon buttons with their disabled state and cost overlay, energy gauges, the row of HP icons, and the weapon keys 1 to 4 and Z X C V). The bar is `game_kit::screen` and `game_kit::hud`
     ├── weapon_menu.rs  WeaponMenuPlugin: the weapon drawer that slides up over the game area from an energy gauge, `WeaponKind` (with `is_built`), `weapons_for` (energy to weapons), `ActiveWeapons` (the loaded weapon per energy), the messages `GaugeClicked` and `ActiveWeaponClicked` (`adr-lw31`, `adr-lw34`)
     ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), arrow keys walk, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
     ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
     ├── pickups.rs      `spawn_pickups`: energy pickups of one map, each with a `Collectable`
-    ├── inventory.rs    `Inventory` (energy counts, at most `MAX_ENERGY` each), `InventoryPlugin`: fills it from `Collected`
+    ├── inventory.rs    `Inventory` (energy counts, at most `MAX_ENERGY` each; `try_spend` and `cost_share` for the cost of a cast), `InventoryPlugin`: fills it from `Collected`
     ├── hp.rs           `Hp` (the player's hit points), `DamagePlayer` message, `HpPlugin` (`adr-lw28`)
     ├── enemy_hp.rs     `EnemyHp`, the `DamageEnemy` and `EnemyDied` messages, `EnemyHpPlugin`: damage, the hurt flash (`adr-lw32`)
     ├── weapons/        `WeaponPlugin`: `CastWeapon` (from `ActiveWeaponClicked`) and `WeaponHit` messages, `values.rs` (every weapon number), `damage.rs` (hit points and push), `ring.rs` (both rings: growth, look, the fire ring's hits, `adr-lw33`), `ice_ring.rs` (the ice ring's reach, push, barrier and stun, `adr-lw35`), `tornado.rs` (the tornado, `adr-lw36`), `fireball.rs` (the fireball, `adr-lw37`) (`adr-lw32`)

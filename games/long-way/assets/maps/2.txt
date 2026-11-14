@@ -25,17 +25,22 @@ legend:
   "L": lantern_red
   "m": marker exit_to=3
   "M": marker_red
+  "1": energy_blue
+  "2": energy_red
+  "3": energy_violet
+  "4": energy_black
+  "!": spawn_ghost strategy=sentry radius=40 sight=500
   "@": player_start
 ---
    |0                  |
    |0 1 2 3 4 5 6 7 8 9|
- 9 |. . . . . . . . . .|
- 8 |. . . . . . . . . .|
- 7 |. . . . . . . . . .|
+ 9 |! . . t t t . . . .|
+ 8 |. . . . . t ! . . .|
+ 7 |. . 2 . . . . ! . .|
  6 |. . . . . . . . . .|
- 5 |. . . . G G . . . m|
- 4 |. . . . G G . . . .|
- 3 |. . . . . . . . . .|
+ 5 |. . . . G G 1 g . m|
+ 4 |. 2 . R G G g . . .|
+ 3 |. 2 . r r . . . . .|
  2 |. . . . . . . . . .|
- 1 |. . . . . . . . . .|
+ 1 |. . . 1 . . . . . .|
  0 |. . . . @ . . . . .|

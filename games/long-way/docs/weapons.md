@@ -5,7 +5,7 @@ Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `ba
 ## How a weapon works
 
 1. The player loads a weapon once: a click on an energy gauge opens the drawer, and a click on a weapon there puts it in the active slot of its energy (`weapon_menu.rs`, `adr-lw31`, `adr-lw34`). Red starts with the fire ring and blue with the tornado.
-2. A click on the active weapon button, or its key (Z, X, C, V), sends `ActiveWeaponClicked`. `weapons/mod.rs` turns it into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in.
+2. A click on the active weapon button, or its key (Z, X, C, V), sends `ActiveWeaponClicked`. `weapons/mod.rs` takes the weapon's cost from the energy of its slot and turns the click into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in. With too little energy nothing is cast. The button is then disabled (flat, no click, no key) and the icon is greyed from the top by the missing share of the cost (`adr-lw39`). The player starts with no energy, so the first cast needs a pickup.
 3. The weapon's gameplay system reads `CastWeapon`, owns the weapon's state and sends `WeaponHit { target, weapon, amount, push }` for each enemy it touches. Its visuals read the same state.
 4. `weapons/damage.rs` turns a hit into `DamageEnemy` (`enemy_hp.rs`) and moves the enemy by `push` through the collision world, inside the map.
 5. At 0 hit points an enemy sends `EnemyDied`. The ghost plays `Die` and is removed, and does not hurt the player.
@@ -14,15 +14,16 @@ Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `ba
 
 All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders until each weapon has been tuned with the user** (the spike gave looks and sizes, not damage). The values must keep the rules in `balance.md`.
 
-| Weapon    | Damage                                                                                         | Pushback                                                                                 | Tick  | Glow | Status                        |
-| --------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- | ---- | ----------------------------- |
-| Fire ring | 200 per second (100 per tick: the first tick kills a ghost, b1)                                | none                                                                                     | 0.5 s | on   | **accepted** (W1, 2026-11-13) |
-| Ice ring  | 50 once when pushed, 10 once per cast when it walks in (b3)                                    | to the edge, then a barrier                                                              |       | off  | **accepted** (W2, 2026-11-13) |
-| Fire wall | 40 per second                                                                                  | none                                                                                     | 0.5 s | on   | not built                     |
-| Ice wall  | 20 per second                                                                                  | none                                                                                     | 0.5 s | off  | not built                     |
-| Tornado   | 26 per second (13 per tick of contact, b5)                                                     | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off  | **accepted** (W3, 2026-11-13) |
-| Fireball  | 150 to the enemy hit, 100 to every other enemy within 1.25 cells of the explosion (b10 to b14) | none                                                                                     |       | on   | **accepted** (W4, 2026-11-13) |
+| Weapon    | Cost   | Damage                                                                                         | Pushback                                                                                 | Tick  | Glow | Status                        |
+| --------- | ------ | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----- | ---- | ----------------------------- |
+| Fire ring | 1 red  | 200 per second (100 per tick: the first tick kills a ghost, b1)                                | none                                                                                     | 0.5 s | on   | **accepted** (W1, 2026-11-13) |
+| Ice ring  | 2 blue | 50 once when pushed, 10 once per cast when it walks in (b3)                                    | to the edge, then a barrier                                                              |       | off  | **accepted** (W2, 2026-11-13) |
+| Fire wall | to set | 40 per second                                                                                  | none                                                                                     | 0.5 s | on   | not built                     |
+| Ice wall  | to set | 20 per second                                                                                  | none                                                                                     | 0.5 s | off  | not built                     |
+| Tornado   | 1 blue | 26 per second (13 per tick of contact, b5)                                                     | out at 20 px/s, plus a 40 px bump on every second tick; the ghost still gains (b7 to b9) | 0.5 s | off  | **accepted** (W3, 2026-11-13) |
+| Fireball  | 3 red  | 150 to the enemy hit, 100 to every other enemy within 1.25 cells of the explosion (b10 to b14) | none                                                                                     |       | on   | **accepted** (W4, 2026-11-13) |
 
+- **Cost** is energy per cast, taken from the energy of the weapon's drawer (`cost` in `values.rs`, the user's values of 2026-11-14, `adr-lw39`). The walls get theirs when they are built.
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
 - **Long frame** (the user, 2026-11-11): a frame longer than the tick deals one tick, and the rhythm starts again from it. Missed ticks are not dealt later.
 - **Dead enemies** (the user, 2026-11-11): every weapon skips an enemy whose `EnemyHp` is 0, in its own query or filter, even while it plays `Die` and still has its `HitBox`. A weapon must not rely on the enemy's plugin removing the `HitBox`. Each weapon has a test for it.
@@ -132,7 +133,8 @@ The lines (all `info`, one per event, `adr-lw32`):
 
 | Line | Means |
 |---|---|
-| `weapons: cast <weapon> at <feet>, facing (x, y)` | The drawer button sent the cast |
+| `weapons: cast <weapon> at <feet>, facing (x, y)` | The active button or key sent the cast, and its cost was taken |
+| `weapons: <weapon> needs <cost> <energy>, has <count>` | A cast without enough energy. Rare: the disabled button and its key stop it first, so it shows only when a click and a key come in one frame |
 | `ring: Fire ring started at (x, y), max radius r` | The ring exists (`Fire ring` or `Ice ring`). It is centred on the player's body |
 | `enemy: <id> lost 20.0, 80.0 of 100.0 left, at (x, y)` | A damage tick, and where the enemy stood |
 | `ghost: <id> hurt, plays Hurt` | The ghost survived the hit |
@@ -154,11 +156,11 @@ For the kit's movement and collision lines add `long_way=debug,game_kit=debug` t
 
 Change a number in `values.rs`, run the game or a scripted run (`dev-feedback.md`), and read the `enemy:` log lines (see above). For example:
 
-`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "ui_click:65:552;wait:3;quit" --debug`
+`LOG_FILTER="weapons:|enemy:" ./dev-scripts/rust.sh script long-way "teleport:-608:-520;wait:0.3;ui_click:65:552;wait:3;quit" --debug` (the teleport collects 1 red to pay for the fire ring)
 
 `ui_click:65:552` is the red active weapon button (it holds the fire ring at the start). The other buttons are at x 193, 321 and 449 (blue, violet, black), and the gauges below them at y 588. Coordinates are art pixels from the top left of the window (the bar starts at y 512).
 
-To cast another weapon in a script, load it first: click its gauge, then its button in the drawer, then the active button. The drawer buttons are at y 464, from the left at x about 136, 256 and 375 (red: fireball, fire ring, fire wall; blue: tornado, ice ring, ice wall). For example the fireball: `teleport:-480:-224;wait:0.5;ui_click:65:588;wait:0.6;ui_click:136:464;wait:0.5;ui_click:65:552`. A script moves the player with `click:<world x>:<world y>` or `hold:<arrows>:<seconds>`, and can use the weapon keys instead of the clicks: `hold:1:0.1` opens the red drawer and `hold:z:0.1` casts the red weapon (`adr-lw38`). A weapon's own lines are not in the default script output: set `LOG_FILTER`, as above (`dev-feedback.md`).
+A cast needs energy, and the player starts with none: collect pickups first. In map 1 the two red pickups are collected with `teleport:-608:-520` and `teleport:-544:-520`, and the blue one with `teleport:-544:-470` (`inventory:` lines in `LOG_FILTER`). To cast another weapon in a script, load it first: click its gauge, then its button in the drawer, then the active button. The drawer buttons are at y 464, from the left at x about 136, 256 and 375 (red: fireball, fire ring, fire wall; blue: tornado, ice ring, ice wall). For example the fireball: `teleport:-480:-224;wait:0.5;ui_click:65:588;wait:0.6;ui_click:136:464;wait:0.5;ui_click:65:552`. A script moves the player with `click:<world x>:<world y>` or `hold:<arrows>:<seconds>`, and can use the weapon keys instead of the clicks: `hold:1:0.1` opens the red drawer and `hold:z:0.1` casts the red weapon (`adr-lw38`). A weapon's own lines are not in the default script output: set `LOG_FILTER`, as above (`dev-feedback.md`).
 
 ## Adding a weapon
 

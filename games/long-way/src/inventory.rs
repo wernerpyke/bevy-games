@@ -1,6 +1,6 @@
 //! What the player carries: a count of each energy colour. It grows when the kit reports a collected pickup
 //! (`game_kit::collectable::Collected`), up to `MAX_ENERGY` each. A pickup collected at the maximum is lost
-//! (`adr-lw34`). Energy has no use yet.
+//! (`adr-lw34`). A cast spends the cost of its weapon (`try_spend`, called by `weapons/mod.rs`).
 
 use bevy::prelude::*;
 use game_kit::collectable::Collected;
@@ -60,6 +60,30 @@ impl Inventory {
 
     pub fn count(&self, energy: Energy) -> u32 {
         self.energy[energy.index()]
+    }
+
+    /// Takes `cost` of `energy` and returns true when the player has at least that much. Otherwise it changes nothing
+    /// and returns false.
+    pub fn try_spend(&mut self, energy: Energy, cost: u32) -> bool {
+        let count = &mut self.energy[energy.index()];
+        if *count < cost {
+            return false;
+        }
+        *count -= cost;
+        true
+    }
+
+    /// The share of `cost` that the player has of `energy`, from 0 to 1 (1 at or above the cost, and for a cost of 0).
+    pub fn cost_share(&self, energy: Energy, cost: u32) -> f32 {
+        if cost == 0 {
+            return 1.0;
+        }
+        (self.count(energy) as f32 / cost as f32).min(1.0)
+    }
+
+    #[cfg(test)]
+    pub fn set_for_test(&mut self, energy: Energy, count: u32) {
+        self.energy[energy.index()] = count;
     }
 
     /// How full `energy` is, from 0 (none) to 1 (`MAX_ENERGY`).
@@ -122,6 +146,41 @@ mod tests {
             [Energy::Black, Energy::Violet, Energy::Red].map(|e| inventory.fraction(e)),
             [0.0, 0.2, 1.0]
         );
+    }
+
+    #[test]
+    fn a_spend_takes_the_cost_only_when_there_is_enough_and_only_from_its_own_energy() {
+        let mut inventory = Inventory::default();
+        inventory.set_for_test(Energy::Red, 3);
+        inventory.set_for_test(Energy::Blue, 7);
+        // One short changes nothing.
+        assert!(!inventory.try_spend(Energy::Red, 4));
+        assert_eq!(inventory.summary(), "B 7  R 3  V 0  K 0");
+        // Exactly enough leaves 0.
+        assert!(inventory.try_spend(Energy::Red, 3));
+        assert_eq!(inventory.summary(), "B 7  R 0  V 0  K 0");
+        assert!(!inventory.try_spend(Energy::Red, 1));
+        assert!(inventory.try_spend(Energy::Blue, 2));
+        assert_eq!(inventory.summary(), "B 5  R 0  V 0  K 0");
+        inventory.set_for_test(Energy::Black, MAX_ENERGY);
+        assert!(inventory.try_spend(Energy::Black, MAX_ENERGY));
+        assert_eq!(inventory.count(Energy::Black), 0);
+    }
+
+    #[test]
+    fn the_cost_share_is_the_part_of_the_cost_the_player_has_up_to_one() {
+        let mut inventory = Inventory::default();
+        let shares = |inventory: &Inventory, cost| {
+            Energy::ALL.map(|energy| inventory.cost_share(energy, cost))
+        };
+        assert_eq!(shares(&inventory, 3), [0.0; 4]);
+        inventory.set_for_test(Energy::Blue, 1);
+        inventory.set_for_test(Energy::Red, 2);
+        inventory.set_for_test(Energy::Violet, 3);
+        inventory.set_for_test(Energy::Black, 9);
+        assert_eq!(shares(&inventory, 3), [1.0 / 3.0, 2.0 / 3.0, 1.0, 1.0]);
+        assert_eq!(shares(&inventory, 2), [0.5, 1.0, 1.0, 1.0]);
+        assert_eq!(inventory.cost_share(Energy::Blue, 0), 1.0);
     }
 
     #[test]
