@@ -8,7 +8,8 @@ Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `ba
 2. A click on the active weapon button, or its key (Z, X, C, V), sends `ActiveWeaponClicked`. `weapons/mod.rs` takes the weapon's cost from the energy of its slot and turns the click into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in. With too little energy nothing is cast. The button is then disabled (flat, no click, no key) and the icon is greyed from the top by the missing share of the cost (`adr-lw39`). The player starts with no energy, so the first cast needs a pickup.
 3. The weapon's gameplay system reads `CastWeapon`, owns the weapon's state and sends `WeaponHit { target, weapon, amount, push }` for each enemy it touches. Its visuals read the same state.
 4. `weapons/damage.rs` turns a hit into `DamageEnemy` (`enemy_hp.rs`) and moves the enemy by `push` through the collision world, inside the map.
-5. At 0 hit points an enemy sends `EnemyDied`. The ghost plays `Die` and is removed, and does not hurt the player.
+5. A weapon belongs to the map the player is in when it is cast. Every weapon entity gets that map's `MapId` when it appears (`MapBindingPlugin` in `weapons/mod.rs`), so a map change removes it with the map's other entities: a ring, tornado or fireball does not go on in the next map (the user, 2026-11-14).
+6. At 0 hit points an enemy sends `EnemyDied`. The ghost plays `Die` and is removed, and does not hurt the player.
 
 ## Values
 
@@ -170,7 +171,7 @@ Each weapon is built, tested and tuned before the next one starts. Do not start 
 2. **Assets.** Copy only the art and effect files this weapon uses (from the spike while it exists). Update `art-pipeline.md` and `art-tags.md`. Request the particle looks from `FxLooks`.
 3. **Gameplay.** The weapon's state, hit test and `WeaponHit` messages, with every number in `values.rs`. It runs in `WeaponSystems::Effect`. Unit tests for the mechanic, a test that a dead enemy is skipped, and a test per balance rule. Prove each test can fail (`dev-docs/testing.md`).
 4. **Visuals.** Separate systems that read the gameplay state, so the gameplay tests need no assets. `DepthSort` on every emitter and sprite.
-5. **Wire it.** Return `true` for it in `WeaponKind::is_built` (`weapon_menu.rs`) and update the tests that use it as the "not built" example.
+5. **Wire it.** Register the component of each new entity that is not a child of another weapon entity in `MapBindingPlugin` (`weapons/mod.rs`) and add it to its test; particle emitters are already covered. Return `true` for it in `WeaponKind::is_built` (`weapon_menu.rs`) and update the tests that use it as the "not built" example.
 6. **Scripted run** with `--debug` and `LOG_FILTER`: ghosts inside, at the edge and outside the effect. Read the log lines and say what was not seen on screen (motion, timing, feel).
 7. **Play test and tuning by the user.** Change `values.rs`, rerun, repeat until the user accepts. Record the accepted values and a tuning note in the weapon's section here.
 8. **Performance:** frame time and particle count with the weapon cast every 0.7 s (spike reference: about 3.4 ms native at about 3400 particles).

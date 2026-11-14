@@ -120,7 +120,7 @@ struct TornadoEmitter {
 
 /// Dot `slot` of the push edge of a tornado.
 #[derive(Component)]
-struct EdgeDot {
+pub(super) struct EdgeDot {
     owner: Entity,
     slot: usize,
 }
@@ -135,7 +135,7 @@ fn depth_in(centre: Vec2, radius: f32, body: Rect) -> f32 {
     radius - centre.clamp(body.min, body.max).distance(centre)
 }
 
-fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: Commands) {
+pub(super) fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: Commands) {
     for order in cast.read() {
         if order.weapon != WeaponKind::Tornado {
             continue;
@@ -337,7 +337,10 @@ fn edge_dot_at(centre: Vec2, age: f32, slot: usize) -> Vec2 {
     centre + Vec2::from_angle(angle) * TORNADO.edge_at(age)
 }
 
-fn spawn_edge_dots(new: Query<(Entity, &Tornado), Added<Tornado>>, mut commands: Commands) {
+pub(super) fn spawn_edge_dots(
+    new: Query<(Entity, &Tornado), Added<Tornado>>,
+    mut commands: Commands,
+) {
     for (owner, tornado) in &new {
         for slot in 0..EDGE_DOTS {
             let at = edge_dot_at(tornado.centre, tornado.age, slot);

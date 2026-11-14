@@ -175,7 +175,7 @@ fn mark_targets(
     }
 }
 
-fn cast_fireballs(
+pub(super) fn cast_fireballs(
     mut cast: MessageReader<CastWeapon>,
     enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp)>,
     camera: Query<(&GlobalTransform, &Projection), With<GameCamera>>,
