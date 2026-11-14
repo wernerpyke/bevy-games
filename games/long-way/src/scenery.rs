@@ -15,7 +15,7 @@ use crate::collision::Trunk;
 use crate::map::{Group, Kind, blocking_groups};
 use crate::rocks::{SORT_BIAS, footprint_corner};
 use game_kit::collision::Blocker;
-use game_kit::depth::DepthSort;
+use game_kit::depth::{DepthSort, TieBreakX};
 use game_kit::map::Map;
 use game_kit::map_transition::{MapId, MapLoad};
 
@@ -145,6 +145,12 @@ fn blocker(
     .blocker()
 }
 
+/// How far the middle of the footprint is from the base point, in x: ties between equal feet break there, as for the
+/// big trees, whose `Transform` is the middle of their footprint (`TieBreakX`, `adr-x2`).
+fn tie_break(kind: Kind, base: Vec2, corner: Vec2, cell: f32) -> f32 {
+    corner.x + kind.footprint().x as f32 * cell / 2.0 - base.x
+}
+
 /// Spawns the scenery of one map. The blocked areas are added to the collision world by `rebuild_collision`.
 pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
@@ -164,6 +170,7 @@ pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, l
             DepthSort {
                 feet_offset: -SORT_BIAS,
             },
+            TieBreakX(tie_break(Kind::of(object), base, corner, map.cell_size)),
             all_frames_animation(server, art.path),
             Sprite::default(),
             anchor,
@@ -211,6 +218,26 @@ mod tests {
             let (base, left) = placement(&art, CORNER, 64.0);
             let area = blocker(&art, base, left, CORNER, 64.0, grouped).0;
             assert_eq!(area, Rect::new(128.0, 64.0, 192.0, 128.0));
+        }
+    }
+
+    #[test]
+    fn feet_ties_break_at_the_middle_of_the_footprint() {
+        // The medium green tree hangs from its left corner over a 2 cell footprint; the others are centred on 1 cell.
+        for cell in [64.0, 48.0] {
+            for (kind, cells) in [
+                (Kind::GreenTreeMedium, 2.0),
+                (Kind::RedTreeMedium, 1.0),
+                (Kind::GreenShrub, 1.0),
+            ] {
+                let (base, _) = placement(&art(kind).unwrap(), CORNER, cell);
+                let tie_x = base.x + tie_break(kind, base, CORNER, cell);
+                assert_eq!(
+                    tie_x,
+                    CORNER.x + cells * cell / 2.0,
+                    "{kind:?} at cell {cell}"
+                );
+            }
         }
     }
 

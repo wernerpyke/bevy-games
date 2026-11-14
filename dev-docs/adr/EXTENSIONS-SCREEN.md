@@ -2,13 +2,13 @@
 
 Screen regions, app states, camera, draw order layers and animation. Index of all extension decisions: `EXTENSIONS.md`.
 
-## adr-x2. Draw order sorted by feet (2026-10-31)
+## adr-x2. Draw order sorted by feet (2026-10-31, amended 2026-11-14: ties break at the footprint centre)
 
 **Decision.** Entities with a `DepthSort` component get their z set from the y position of their feet: the lower the feet on screen, the closer to the camera.
 
 **Rationale.** The player must draw behind a tree when its feet are above its base and in front when below. A fixed z cannot do both. The same sort line also decides collision, so what the player sees matches where it can walk.
 
-**How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), because equal z flickers (found with the rock rows, 2026-11-01). The sort runs in `Update` with no ordering against movement, so z can lag one frame.
+**How to apply.** Give any sprite that should sort a `DepthSort { feet_offset }`, the distance from its centre down to its feet. `depth.rs` sets `z = -feet_y * 0.001`. Sprites with the same feet y are ordered by x (`z += x * 1e-8`), the one further right in front, because equal z flickers (found with the rock rows, 2026-11-01). The x is the middle of the footprint: a sprite whose `Transform` is elsewhere (anchored at a corner) adds `TieBreakX(offset)`. Without it a corner-anchored object and a centred one can share the same x by chance and tie: on 2026-11-14 a Long Way medium tree (bottom-left anchor) and the big tree one cell to its left had exactly the same z, and their order changed with Bevy's batching (it flipped once per run, and not with the F3 overlay on). The right-in-front rule suits a top-down RPG (the user, 2026-11-14). Another game may want a different tie rule; make it a `DepthPlugin` setting then. The sort runs in `Update` with no ordering against movement, so z can lag one frame.
 
 ## adr-x9. Draw order layers (2026-11-01)
 

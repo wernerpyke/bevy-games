@@ -54,10 +54,20 @@ impl DepthSort {
     }
 }
 
-fn sort_by_feet(settings: Res<DepthSettings>, mut query: Query<(&mut Transform, &DepthSort)>) {
-    for (mut transform, sort) in &mut query {
+/// Moves the x that breaks a tie between equal feet (`depth_z`) this many world units away from the entity's x. A
+/// sprite whose `Transform` is not at the middle of its footprint (one anchored at a corner) uses it, so ties break at
+/// the footprint centre like those of a centred sprite, and two objects never tie only because of their anchors.
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
+pub struct TieBreakX(pub f32);
+
+fn sort_by_feet(
+    settings: Res<DepthSettings>,
+    mut query: Query<(&mut Transform, &DepthSort, Option<&TieBreakX>)>,
+) {
+    for (mut transform, sort, tie) in &mut query {
         let feet_y = sort.feet_y(transform.translation.y);
-        let z = depth_z(transform.translation.x, feet_y);
+        let tie_x = transform.translation.x + tie.map_or(0.0, |tie| tie.0);
+        let z = depth_z(tie_x, feet_y);
         debug_assert!(
             z.abs() < settings.world_half_band,
             "feet at y {feet_y} are outside the world layer, see layers.rs"
@@ -82,6 +92,24 @@ mod tests {
         // Neighbouring rocks 64 apart must differ by more than f32 rounding at this z.
         let z = depth_z(0.0, 50.0);
         assert!(depth_z(64.0, 50.0) - z > z.abs() * f32::EPSILON * 4.0);
+    }
+
+    #[test]
+    fn a_tie_break_offset_moves_the_x_that_breaks_a_tie_of_feet() {
+        let mut app = App::new();
+        app.add_plugins(DepthPlugin::default());
+        // Three sprites at the same place: the offset alone decides their order.
+        let at = Transform::from_xyz(-640.0, -256.0, 0.0);
+        let sort = || DepthSort { feet_offset: 63.0 };
+        let plain = app.world_mut().spawn((at, sort())).id();
+        let right = app.world_mut().spawn((at, sort(), TieBreakX(64.0))).id();
+        let left = app.world_mut().spawn((at, sort(), TieBreakX(-32.0))).id();
+        app.update();
+        let z = |entity| app.world().get::<Transform>(entity).unwrap().translation.z;
+        assert_eq!(z(plain), depth_z(-640.0, -319.0));
+        assert_eq!(z(right), depth_z(-576.0, -319.0));
+        assert_eq!(z(left), depth_z(-672.0, -319.0));
+        assert!(z(left) < z(plain) && z(plain) < z(right));
     }
 
     #[test]

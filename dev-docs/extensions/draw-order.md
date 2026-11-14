@@ -23,7 +23,8 @@ Decisions: `adr-x2`, `adr-x9`, and `adr-lw12` for the Long Way layers. The same 
 
 1. A `DepthSort { feet_offset }` component marks a sprite. `feet_offset` is the distance from the sprite centre down to its feet.
 2. A system sets `z = -feet_y * Z_PER_Y + x * Z_PER_X`. Lower feet have a higher z and draw in front.
-3. `Z_PER_Y` is 0.001. `Z_PER_X` is 1e-8. The x term only breaks ties between equal feet y. It is far too small to override a difference in y.
+3. `Z_PER_Y` is 0.001. `Z_PER_X` is 1e-8. The x term only breaks ties between equal feet y, the one further right in front. It is far too small to override a difference in y.
+3b. The x of the tie break is the middle of the footprint. A sprite whose `Transform` is not there (anchored at a corner) adds `TieBreakX(offset)`, the distance from its x to the footprint middle. Otherwise two objects can tie exactly and swap order from frame to frame (`adr-x2`).
 4. z stays inside `WORLD_HALF_BAND` (100), checked by `debug_assert`. That allows feet y up to about 100000.
 5. The sort runs in `Update` with no ordering against movement, so z can lag one frame.
 6. Objects with a footprint choose their own sort line. The game adds a small bias so a character standing at the object is drawn in front.
@@ -62,4 +63,4 @@ Back to front:
 
 ## Tests
 
-Inline in `game-kit` `depth.rs`: lower feet in front, ties broken by x, the world band holds far positions, x never beats y.
+Inline in `game-kit` `depth.rs`: lower feet in front, ties broken by x, `TieBreakX` moves the tie x, the world band holds far positions, x never beats y. Long Way tests that its scenery breaks ties at the footprint middle (`scenery.rs`).
