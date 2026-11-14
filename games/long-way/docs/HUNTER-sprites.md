@@ -20,7 +20,7 @@ The Hunter is the player in Long Way. The user has drawn the up and down walk fr
 - Standing plays `Idle` for every facing. Walking plays `Run` (sideways), `Up` or `Down`. Horizontal input wins on a diagonal.
 - Walk animations play at `WALK_ANIMATION_SPEED` 2.5, idle at 1.0. Walk speed is 300.
 - The flip stays at the last sideways value while walking up or down. That is fine for art that is symmetric, and needs a decision if the up and down art is not.
-- No code plays `Hurt` or `Die`. No code uses `Block`.
+- `Hurt` plays when the player loses HP (`player.rs`, `adr-lw28`). `Die` is not played yet: it waits for the death flow (`rm12`). The `Block` tag is gone from the file.
 
 **Facts for drawing the up and down frames**
 - The art does not set the feet or the hitbox. They come from `PLAYER_FEET_OFFSET`, `PLAYER_HALF_WIDTH` and `PLAYER_BODY_HEIGHT` in `collision.rs`. The user moved the sprites in `Up` and `Down` up and down to make a bobbing motion like `Run`, so the visible feet row there is 111 to 116 and not 120. That is intended and changes no game value.

@@ -218,7 +218,7 @@ In 2D, the `z` of a `Transform` decides what draws on top: a higher `z` draws in
 
 ## Collision
 
-Bevy 0.20 has no built-in 2D collision. Physics crates such as `avian2d` and `bevy_rapier2d` exist and are not used yet (`rm2`). Our own collision is plain arithmetic on `Vec2` and `Rect`, with no Bevy types needed: `dev-docs/extensions/collision.md`.
+Bevy 0.20 has no built-in 2D collision. Physics crates such as `avian2d` and `bevy_rapier2d` exist and are not used: the custom collision stays (`adr-e10`). Our own collision is plain arithmetic on `Vec2` and `Rect`, with no Bevy types needed: `dev-docs/extensions/collision.md`.
 
 Plugins can be structs with fields, so a game configures shared code with `CollisionPlugin { allow_sliding: true }`. See `dev-docs/extensions/plugin-configuration.md`.
 

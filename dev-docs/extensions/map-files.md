@@ -193,8 +193,8 @@ Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow
 
 - One grid, one object per cell. There are no layers and no ground tiles in the file.
 - One map file is one map. How a game moves between maps is in `dev-docs/extensions/map-transitions.md`.
-- Maps with triggers, paths or nested data may outgrow this format (`rm4` and `rm5`).
-- A visual editor is `rm6`. It must keep this format as the source of truth.
+- Maps with triggers, paths or nested data may outgrow this format (`rm3`).
+- A visual editor is part of `rm3`. It must keep this format as the source of truth.
 
 ## Tests
 

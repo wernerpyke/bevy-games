@@ -1,5 +1,5 @@
 //! The player's hit points (`adr-lw28`). Other systems ask for damage with the `DamagePlayer` message and do not
-//! touch `Hp` themselves. At 0 the player stays alive: there is no game over screen yet (roadmap item 12), so the
+//! touch `Hp` themselves. At 0 the player stays alive: there is no game over screen yet (`rm12`), so the
 //! plugin only logs it and damage stops.
 
 use bevy::prelude::*;

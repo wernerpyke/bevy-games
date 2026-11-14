@@ -14,7 +14,7 @@ Enemy strategies, spawners, random numbers, touch and collectables. Index of all
 
 **Decision.** A legend entry of a map file may have `key=value` parameters after its kind, for example `"S": spawn_skeleton every=10 strategy=patrol radius=120`. The parser keeps them in `MapObject.params` and the line number in `Params::line`. The game decides what they mean and reports errors with the file and the line. `Spawner` (`spawner.rs`) reads `every` and `max`.
 
-**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into `rm4` (objects with settings).
+**Rationale.** The grid keeps one character per cell, and each legend character is one configured spawner. Different intervals use different characters. The change is small and backward compatible. It is a first step into objects with settings (`rm3`).
 
 **How to apply.** See `dev-docs/extensions/spawners.md` and `map-files.md`.
 

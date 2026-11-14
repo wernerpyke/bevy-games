@@ -77,7 +77,7 @@ Decisions: `adr-x34`, `adr-x35`, `adr-x45`, and `adr-lw24` and `adr-lw34` for Lo
 
 - The overlay mode is computed but not used by a game.
 - There is no title, game over or pause content in any game. Long Way starts in `Playing` and has no pause key.
-- A free window shape, monitor fitting and fullscreen are not handled: `rm13`.
+- A free window shape, monitor fitting and fullscreen are not handled: `rm10`.
 - The pause dialog is in the game region, not over the whole window.
 - Kit systems are not gated by state. In `Title` or `GameOver` a game must not spawn the player, or the kit systems that need it are skipped.
 - Not tried: rendering the game into a UI node with `ViewportNode` (one UI tree for every mode). It is not checked on wasm.

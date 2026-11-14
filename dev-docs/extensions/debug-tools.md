@@ -55,4 +55,4 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`, `adr-x28`.
 - Not seen on screen by Claude except through scripted screenshots ([dev-feedback.md](dev-feedback.md)).
 - The overlay is static. Areas added after `PostStartup` are not shown.
 - Remove the tools or gate them behind a debug feature before a release build.
-- With a bottom left origin, the corner labels overlap (`rm99`).
+- With a bottom left origin the column 0 label and the top row label used to overlap; the row label on a map's top edge is now skipped.

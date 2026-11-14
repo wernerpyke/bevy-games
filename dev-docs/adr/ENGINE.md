@@ -98,3 +98,11 @@ Updated 2026-11-05: the player is now the Hunter, a 128x128 canvas with a body a
 **Rationale.** `bevy_hanabi` needs compute shaders, so WebGPU only. `bevy_sprinkles` targets Bevy 0.19 and is 3D first. Enoki simulates on the CPU and runs on WebGL2: the user ran the spike in a browser with all four weapons, saw no console errors and no problem (the web frame time was not measured). On native, all four weapons together (about 3400 particles, 5 times normal use) cost about 3.4 ms a frame on the `dev` profile. Enoki adds 5 crates (Enoki, `wide`, `chacha20`, `getrandom` 0.3 and 0.4) and no Bevy feature, so the build stays small. A feature in the kit would build the kit twice (`--workspace` against `-p`), and `bevy/file_watcher` already doubled every Bevy build in the spike. Enoki hard-codes alpha blending, so glow needs the patch.
 
 **How to apply.** Gates after any change to a `Cargo.toml` are in `dev-docs/extensions/particles.md`, "Build guard" (dependency tree, `Cargo.lock`, no Bevy crate recompiled, sizes). The kit side: `adr-x47`. Re-apply the 10 lines when Enoki is upgraded. Facts about the crate: `dev-docs/bevy/notes.md`, "bevy_enoki". Measurements and the comparison: `dev-docs/RESEARCH-particles.md`.
+
+## adr-e10. No physics crate: the custom collision stays (2026-11-14)
+
+**Decision.** The games keep the kit's own collision (`adr-lw1`, `dev-docs/extensions/collision.md`) and do not add `avian2d`, `bevy_rapier2d` or another physics crate. The roadmap item that was to spike `avian2d` is closed without a spike.
+
+**Rationale.** The collision rules are game rules, not physics: the 50% overlap from below, walking behind from above, sliding round corners, and groups of features that block as one shape. Since the spike was planned, the kit has grown an occupancy grid with A* path finding, groups, temporary blocked areas and sliding, all unit tested without a running world. A physics crate would replace working, tested code, add build time and wasm size, and still need the game rules on top of it. The user's decision (2026-11-14).
+
+**How to apply.** Do not add a physics crate. If a need appears that the custom code cannot meet well (many bodies pushing each other, rotation, joints), open a new roadmap item and weigh it again.
