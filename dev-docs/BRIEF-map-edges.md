@@ -120,6 +120,8 @@ Known limitation of the two steps:
 
 Drawn examples: `games/long-way/input/map_edge_example.aseprite` (the two steps only) and `games/long-way/input/map_edge_example_smooth.aseprite` (the two steps, then the quarter rules below on the whole map).
 
+**Decision (2026-11-15, `adr-x49`).** The kit supports both: each game passes `EdgeMode::Basic` (the two steps only) or `EdgeMode::Smooth` (the two steps, then the quarter rules). Long Way uses `Smooth`.
+
 **Spike.** The plan has a stand-alone spike step that tries both possibilities: the two steps only, and the two steps with smooth corners (both quarter rules below). The criterion is how cleanly the smooth corners can be built in `game-kit` without spilling a lot of complexity into the game code or the art. The game should still only map pieces to frames and set the z-order. If smooth corners need more from the game or the art than that, the plan keeps the two steps only.
 
 Some cells look better when they are split into four quarters, each drawn with a piece at half size. The half-size piece is the existing frame scaled down with nearest-neighbour sampling, so no new frames are drawn. Its pixels are half the size of the other pieces. Its blocked area is a stair-step with the same step size as a full-size piece, so it has half as many steps.

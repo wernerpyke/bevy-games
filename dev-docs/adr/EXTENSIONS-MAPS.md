@@ -86,3 +86,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **How to apply.** `dev-docs/extensions/map-files.md`, "Legend conventions". Use these characters when a new kind is added to any legend. R-Town keeps its legend until the user asks.
 
+
+## adr-x49. Map edges: the kit owns the edge rules, and each game chooses basic or smooth edges (2026-11-15)
+
+**Decision.** With `".": edge` in the legend, each `.` is an edge cell (`dev-docs/BRIEF-map-edges.md`). The kit chooses a piece for each edge cell, reports the shapes it does not support, and gives the sprites, the blocked areas and the player start. A game passes `EdgeMode::Basic` (one piece per cell) or `EdgeMode::Smooth` (the basic pieces, then the quarter rules: cuts and fills drawn as half-size pieces). The game maps each piece to a frame, places the sprites the kit lists, and sets the draw order. Long Way uses `Smooth`.
+
+**Rationale.** The rules are the same for every game, so they are tested once in the kit, and a game only maps pieces to frames. A spike showed that smooth edges fit this split: the game draws a list of sprites, each a frame at a position and a scale, sometimes one quarter of a frame, and the art needs no new frames. Each mode suits some art: smooth edges round the corners, while basic edges keep every pixel the same size and show the art as drawn. So the choice belongs to the game, not the kit.
+
+**How to apply.** `crates/game-kit/src/map_edge.rs`: `edge_quarters(mode, ...)`, `edge_sprites`, `EdgeSprite::place`, `edge_blocked_rects` (grow by the actor half width) and `edge_start_feet`. In smooth mode, art that reaches past the half of a frame can show beside a fill.
