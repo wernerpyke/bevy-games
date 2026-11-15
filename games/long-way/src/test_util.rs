@@ -40,6 +40,7 @@ pub fn map(cell_size: f32, objects: Vec<MapObject>) -> Map {
         objects,
         exits: Vec::new(),
         entries: Vec::new(),
+        edges: Vec::new(),
     }
 }
 

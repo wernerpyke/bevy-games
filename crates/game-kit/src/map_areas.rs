@@ -406,10 +406,36 @@ pub(crate) fn check_areas(
     Ok(())
 }
 
+/// For a map whose `.` cells are edges: no `.` inside an exit or entry area, or the edge would close it.
+pub(crate) fn check_dots(
+    exits: &[MapExit],
+    entries: &[MapEntry],
+    dots: &[IVec2],
+    fail: &Fail,
+) -> Result<(), MapError> {
+    let areas = exits
+        .iter()
+        .map(|e| (&e.area, e.line, "exit", &e.name))
+        .chain(entries.iter().map(|e| (&e.area, e.line, "entry", &e.name)));
+    for (area, line, what, name) in areas {
+        if let Some(dot) = dots.iter().find(|&&d| area.contains(d)) {
+            return Err(fail(
+                line,
+                format!(
+                    "`.` at cell ({},{}) is inside {what} `{name}`, mark the cells of an area with blanks",
+                    dot.x, dot.y
+                ),
+            ));
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::map::{Map, parse};
+    use crate::map_edge::EdgePiece;
 
     const KINDS: &[&str] = &["player_start", "tree_big"];
 
@@ -700,6 +726,51 @@ mod tests {
         ));
         assert_eq!(e.line, 13);
         assert!(e.message.contains("entry `e` overlaps exit `a`"), "{e}");
+    }
+
+    /// `source` with `".": edge` in the legend.
+    fn edge_source(blocks: &str, rows: [&str; 4]) -> String {
+        source(blocks, rows).replace("\".\": empty", "\".\": edge")
+    }
+
+    const RING: [&str; 4] = [DOTS, ".         .", ".         .", DOTS];
+
+    #[test]
+    fn a_dot_inside_an_exit_or_entry_is_an_error_when_dots_are_edges() {
+        let exit = "exits:\n  s: area=2..3,0 to=2 entry=a transition=scene\n";
+        let entry = "entries:\n  e: area=2..3,0\n";
+        for (blocks, message) in [
+            (exit, "`.` at cell (2,0) is inside exit `s`"),
+            (entry, "`.` at cell (2,0) is inside entry `e`"),
+        ] {
+            let e = error(&edge_source(blocks, RING));
+            assert_eq!(e.line, 11, "{blocks}");
+            assert!(e.message.contains(message), "{e}");
+            // Blanks in the area are fine, and so is a `.` when `.` is empty.
+            parse_ok(&edge_source(
+                blocks,
+                [RING[0], RING[1], RING[2], ". .     . ."],
+            ));
+            parse_ok(&source(blocks, RING));
+        }
+    }
+
+    #[test]
+    fn player_start_in_an_entry_on_the_ring_is_free_space() {
+        let map = parse_ok(&edge_source(
+            "entries:\n  e: area=2..3,0\n",
+            [RING[0], RING[1], RING[2], ". .   @ . ."],
+        ));
+        let piece = |x: i32| {
+            map.edges
+                .iter()
+                .find(|e| e.cell == cell(x, 0))
+                .map(|e| e.piece)
+        };
+        assert_eq!(piece(3), None);
+        // The neighbours of the entry see free space on their inner side and on the side of the entry.
+        assert_eq!(piece(1), Some(EdgePiece::SouthWest));
+        assert_eq!(piece(4), Some(EdgePiece::SouthEast));
     }
 
     #[test]

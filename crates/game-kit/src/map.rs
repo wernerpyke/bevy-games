@@ -13,14 +13,15 @@
 //! - `background`: an optional indented block with the ground of the map: `color`, `mode`, `fill`, `jitter`, `scale`,
 //!   `tiles` and `seed` (`Background`). The game draws it. See `dev-docs/extensions/map-files.md`.
 //! - `legend`: indented `char: kind` lines. A kind may be followed by `key=value` parameters, for example
-//!   `"S": spawn_skeleton every=10 radius=120` (`Params`). The game reads them by name. `.` is always empty. Quote the character
-//!   (for example `"#"`), because an unquoted `#` starts a comment.
+//!   `"S": spawn_skeleton every=10 radius=120` (`Params`). The game reads them by name. `.` is `empty` or `edge`
+//!   (`map_edge`). Quote the character (for example `"#"`), because an unquoted `#` starts a comment.
 //!
 //! - `exits` and `entries`: indented `name: key=value ...` lines for the zones that lead to other maps (`map_areas`).
 //!   Both are optional.
 //!
-//! Grid: rows of the form `<label>|<cells>|`. Cell k is the character at offset 2k between the bars, and a
-//! blank or `.` is empty. Ruler lines, blank lines and `#` comment lines are ignored.
+//! Grid: rows of the form `<label>|<cells>|`. Cell k is the character at offset 2k between the bars. A blank is
+//! empty. A `.` is empty, or an edge cell when the legend says `".": edge`. Ruler lines, blank lines and `#` comment
+//! lines are ignored.
 //!
 //! Comments in the front matter start with `#` at the start of a line or after a space.
 
@@ -33,6 +34,7 @@ use bevy::math::{IVec2, Vec2};
 
 use crate::map_areas::{self, RawLink};
 pub use crate::map_areas::{Area, Edge, Facing, MapEntry, MapExit, PLAYER_START, Transition};
+use crate::map_edge::{self, MapEdge};
 
 /// One painted character: an object whose bottom left corner is at `cell`.
 #[derive(Clone, Debug, PartialEq)]
@@ -175,6 +177,8 @@ pub struct Map {
     pub exits: Vec<MapExit>,
     /// Places where the player can arrive, from the `entries:` block. Empty when the file has none.
     pub entries: Vec<MapEntry>,
+    /// Edge cells and their pieces, top row first, then left to right. Empty unless the legend says `".": edge`.
+    pub edges: Vec<MapEdge>,
 }
 
 /// A problem in a map file, with the 1-based line it was found on.
@@ -411,6 +415,8 @@ struct Header {
     draw_size: Option<f32>,
     jitter: Option<f32>,
     legend: HashMap<char, (String, Params)>,
+    /// The line of `".": edge`, when the legend has it.
+    edge_line: Option<usize>,
     exits: Vec<RawLink>,
     entries: Vec<RawLink>,
     background: Option<RawBackground>,
@@ -475,11 +481,27 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
         .ok_or_else(|| fail(1, "missing required key `size`".into()))?;
 
     let origin = header.origin.unwrap_or(Origin::BottomLeft);
-    let objects = parse_grid(&lines, close + 1, size, origin, &header.legend, &fail)?;
+    let grid = parse_grid(&lines, close + 1, size, origin, &header.legend, &fail)?;
+    let objects = grid.objects;
     let exits = map_areas::build_exits(&header.exits, origin, size, &fail)?;
     let entries = map_areas::build_entries(&header.entries, origin, size, &fail)?;
     let background = header.background.map(|raw| raw.finish(&fail)).transpose()?;
     map_areas::check_areas(&exits, &entries, &objects, &fail)?;
+    let edges = match header.edge_line {
+        Some(edge_line) => {
+            map_areas::check_dots(&exits, &entries, &grid.dots, &fail)?;
+            edge_cells(
+                size,
+                &grid.dots,
+                &objects,
+                &entries,
+                &grid.row_lines,
+                edge_line,
+                &fail,
+            )?
+        }
+        None => Vec::new(),
+    };
 
     Ok(Map {
         name,
@@ -492,12 +514,62 @@ pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> 
         objects,
         exits,
         entries,
+        edges,
     })
+}
+
+/// The edge cells of a map whose legend says `".": edge`, with their pieces: every `.`, and every object on the outer
+/// ring of the map that is not in an entry area. An object inside the map stands on free space. `row_lines` gives the
+/// file line of each row, by y, for errors.
+fn edge_cells(
+    size: IVec2,
+    dots: &[IVec2],
+    objects: &[MapObject],
+    entries: &[MapEntry],
+    row_lines: &[usize],
+    edge_line: usize,
+    fail: &Fail,
+) -> Result<Vec<MapEdge>, MapError> {
+    let on_ring = |c: IVec2| c.x == 0 || c.y == 0 || c.x == size.x - 1 || c.y == size.y - 1;
+    let mut cells: Vec<IVec2> = dots
+        .iter()
+        .copied()
+        .chain(
+            objects
+                .iter()
+                .map(|o| o.cell)
+                .filter(|&c| on_ring(c) && !entries.iter().any(|e| e.area.contains(c))),
+        )
+        .collect();
+    cells.sort_by_key(|c| (-c.y, c.x));
+    cells.dedup();
+    if cells.len() == (size.x * size.y) as usize {
+        return Err(fail(
+            edge_line,
+            "every cell is an edge cell, the map needs at least one free cell".into(),
+        ));
+    }
+    map_edge::choose_pieces(size, &cells).map_err(|(cell, sides)| {
+        fail(
+            row_lines[cell.y as usize],
+            format!(
+                "edge cell ({},{}) has free space on {sides}, an edge needs to be at least two cells thick there",
+                cell.x, cell.y
+            ),
+        )
+    })
+}
+
+/// The grid as read: the objects, the cells drawn `.`, and the file line of each row by y.
+struct Grid {
+    objects: Vec<MapObject>,
+    dots: Vec<IVec2>,
+    row_lines: Vec<usize>,
 }
 
 /// Reads the grid rows. `first` is the index in `lines` of the first line after the frontmatter, so line
 /// numbers in errors are `index + 1`. Row labels count down from the top for `BottomLeft` and up from the top for
-/// `TopLeft`. Objects come back top row first, left to right, with cells numbered from the bottom left.
+/// `TopLeft`. Objects and dots come back top row first, left to right, with cells numbered from the bottom left.
 fn parse_grid(
     lines: &[&str],
     first: usize,
@@ -505,9 +577,11 @@ fn parse_grid(
     origin: Origin,
     legend: &HashMap<char, (String, Params)>,
     fail: &Fail,
-) -> Result<Vec<MapObject>, MapError> {
+) -> Result<Grid, MapError> {
     let width = size.x as usize;
     let mut objects = Vec::new();
+    let mut dots = Vec::new();
+    let mut row_lines = vec![0; size.y as usize];
     let mut rows = 0;
     for (index, raw) in lines.iter().enumerate().skip(first) {
         let line = index + 1;
@@ -547,6 +621,7 @@ fn parse_grid(
             ));
         }
         rows += 1;
+        row_lines[y as usize] = line;
         let chars: Vec<char> = cells.chars().collect();
         if chars.len() != 2 * width - 1 {
             return Err(fail(
@@ -570,7 +645,11 @@ fn parse_grid(
                 ));
             }
             let character = chars[2 * x];
-            if character == ' ' || character == '.' {
+            if character == '.' {
+                dots.push(IVec2::new(x as i32, y));
+                continue;
+            }
+            if character == ' ' {
                 continue;
             }
             let Some((kind, params)) = legend.get(&character) else {
@@ -592,7 +671,11 @@ fn parse_grid(
             format!("the grid needs {} rows, found {rows}", size.y),
         ));
     }
-    Ok(objects)
+    Ok(Grid {
+        objects,
+        dots,
+        row_lines,
+    })
 }
 
 pub(crate) type Fail<'a> = dyn Fn(usize, String) -> MapError + 'a;
@@ -691,8 +774,15 @@ fn parse_header(
                 ));
             }
             if character == '.' {
-                if value != "empty" {
-                    return Err(fail(line, "`.` is always empty, use `\".\": empty`".into()));
+                match value {
+                    "empty" => header.edge_line = None,
+                    "edge" => header.edge_line = Some(line),
+                    _ => {
+                        return Err(fail(
+                            line,
+                            format!("`.` must be `empty` or `edge`, found `{value}`"),
+                        ));
+                    }
                 }
                 continue;
             }
@@ -835,6 +925,7 @@ fn positive(value: &str, key: &str, line: usize, fail: &Fail) -> Result<f32, Map
 #[cfg(test)]
 mod text_tests {
     use super::*;
+    use crate::map_edge::EdgePiece;
 
     const KINDS: &[&str] = &["player_start", "tree_big", "red"];
     const RULERS: &str = "   |0 1 2 3 4 5|\n";
@@ -1102,9 +1193,15 @@ mod text_tests {
         assert!(e.message.contains("unknown kind `boulder`"), "{e}");
         let e = error(&format!("{base}  \"ab\": tree_big\n---\n"));
         assert!(e.message.contains("exactly one character"), "{e}");
-        let e = error(&format!("{base}  \".\": tree_big\n---\n"));
-        assert_eq!(e.line, 7);
-        assert!(e.message.contains("always empty"), "{e}");
+        for value in ["tree_big", "empty_ish", "edge x=1"] {
+            let e = error(&format!("{base}  \".\": {value}\n---\n"));
+            assert_eq!(e.line, 7, "{value}");
+            assert!(
+                e.message
+                    .contains(&format!("`.` must be `empty` or `edge`, found `{value}`")),
+                "{e}"
+            );
+        }
         let e = error("---\nmap: t\ncell: 16\norigin: bottom-left\n  \"g\": tree_big\n---\n");
         assert!(e.message.contains("outside `legend`"), "{e}");
     }
@@ -1182,6 +1279,85 @@ mod text_tests {
             assert_eq!(e.line, 8, "{entry}");
             assert!(e.message.contains(text), "{entry}: {e}");
         }
+    }
+
+    /// `grid` with `".": edge` in the legend.
+    fn edge_grid(rows: [&str; 4]) -> String {
+        grid(rows).replace("\".\": empty", "\".\": edge")
+    }
+
+    fn edge_list(map: &Map) -> Vec<(i32, i32)> {
+        map.edges.iter().map(|e| (e.cell.x, e.cell.y)).collect()
+    }
+
+    fn piece_at(map: &Map, x: i32, y: i32) -> Option<EdgePiece> {
+        map.edges
+            .iter()
+            .find(|e| e.cell == IVec2::new(x, y))
+            .map(|e| e.piece)
+    }
+
+    /// The cells of the outer ring of the 6 by 4 test map, plus `extra`, top row first, then left to right.
+    fn ring_and(extra: &[(i32, i32)]) -> Vec<(i32, i32)> {
+        let mut cells: Vec<(i32, i32)> = (0..4)
+            .rev()
+            .flat_map(|y| (0..6).map(move |x| (x, y)))
+            .filter(|&(x, y)| x == 0 || y == 0 || x == 5 || y == 3 || extra.contains(&(x, y)))
+            .collect();
+        cells.dedup();
+        cells
+    }
+
+    #[test]
+    fn a_dot_is_an_edge_cell_only_when_the_legend_says_edge() {
+        // (1,1) is a `.` inside the ring, the other inner cells are blanks.
+        let rows = [DOTS, ".         .", ". .       .", DOTS];
+        let empty = parse_ok(&grid(rows));
+        let edge = parse_ok(&edge_grid(rows));
+        assert!(empty.edges.is_empty());
+        assert_eq!(edge_list(&edge), ring_and(&[(1, 1)]));
+        assert_eq!(edge.objects, empty.objects);
+    }
+
+    #[test]
+    fn objects_on_the_outer_ring_are_edge_cells_and_objects_inside_are_free() {
+        // On the ring: `g` top, `r` left, `@` right, `g` bottom, `r` in the top right corner. Inside: `g` at (2,2).
+        let rows = [". g . . . r", "r   g     .", ".         @", ". . . g . ."];
+        let map = parse_ok(&edge_grid(rows));
+        assert_eq!(edge_list(&map), ring_and(&[]));
+        assert_eq!(piece_at(&map, 2, 2), None);
+        // The ring objects count as edge for their neighbours: the corner is closed on both sides, and (5,2) between
+        // `r` and `@` is a wall with free space only on the west.
+        assert_eq!(piece_at(&map, 0, 3), Some(EdgePiece::Center));
+        assert_eq!(piece_at(&map, 5, 2), Some(EdgePiece::East));
+        assert_eq!(piece_at(&map, 1, 3), Some(EdgePiece::North));
+        let top_left = parse_ok(&grid_top_left(rows).replace("\".\": empty", "\".\": edge"));
+        assert_eq!(top_left.edges, map.edges);
+    }
+
+    #[test]
+    fn an_edge_cell_one_cell_thick_names_its_line() {
+        let e = error(&edge_grid([DOTS, ".   .     .", ".   .     .", DOTS]));
+        assert_eq!(e.line, 14);
+        assert!(
+            e.message
+                .contains("edge cell (2,2) has free space on the east and west sides"),
+            "{e}"
+        );
+        let e = error(&edge_grid([DOTS, ".         .", DOTS, ". .   . . ."]));
+        assert_eq!(e.line, 15);
+        assert!(
+            e.message
+                .contains("edge cell (2,1) has free space on the north and south sides"),
+            "{e}"
+        );
+    }
+
+    #[test]
+    fn a_map_with_no_free_cell_is_an_error() {
+        let e = error(&edge_grid([DOTS; 4]));
+        assert_eq!(e.line, 7);
+        assert!(e.message.contains("needs at least one free cell"), "{e}");
     }
 
     /// The same drawing as `grid`, with rows labelled from the top for `origin: top-left`.
