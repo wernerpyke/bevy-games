@@ -11,7 +11,7 @@ background:
   scale: 0.8
   tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
 legend:
-  ".": empty
+  ".": edge
   "O": rock_0
   "o": rock_1
   "G": green_tree

@@ -1,6 +1,7 @@
 mod background;
 mod camera;
 mod collision;
+mod edges;
 mod enemy_hp;
 mod ghost;
 mod hp;

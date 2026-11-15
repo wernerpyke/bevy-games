@@ -26,6 +26,7 @@ use crate::debug::{DebugGrids, DebugInfo, GridRegion};
 use crate::depth::DepthSort;
 use crate::layers::FADE_Z_INDEX;
 use crate::map::{Area, Edge, Facing, Map, MapEntry, MapExit, Transition, parse, start_feet};
+use crate::map_edge::{EdgeFit, edge_start_feet};
 use crate::map_links::{LinkedMap, validate_links};
 
 /// One map file a game registers. `file` is relative to the game folder: a native run reads it from disk (so F1 reloads
@@ -324,6 +325,8 @@ pub struct MapTransition {
     fade: Fade,
     /// World position of cell (0,0) of the first map of a scene transition.
     origin: Vec2,
+    /// How an arrival at a `player_start` on an edge cell is placed (`edge_start_feet`). `None`: the centre of the cell.
+    edge_fit: Option<EdgeFit>,
     /// An exit can be used. False after a transition, until the feet have left every exit area.
     armed: bool,
     /// Seconds each active map that is not the current one has been out of view. A map is removed after
@@ -337,6 +340,7 @@ impl MapTransition {
             phase: Phase::Idle,
             fade,
             origin,
+            edge_fit: None,
             armed: false,
             hidden_for: std::collections::HashMap::new(),
         }
@@ -462,6 +466,8 @@ pub struct MapTransitionPlugin {
     /// Time constant of the camera glide when the player crosses into another map, in seconds. The camera covers about
     /// two thirds of the way in this time, so larger is slower. `CAMERA_EASE_SECS` is a start.
     pub camera_ease_secs: f32,
+    /// How an arrival at a `player_start` on an edge cell is placed. `None` for a game whose maps have no edges.
+    pub edge_fit: Option<EdgeFit>,
 }
 
 impl Plugin for MapTransitionPlugin {
@@ -485,7 +491,10 @@ impl Plugin for MapTransitionPlugin {
                 current: self.start.clone(),
                 ..default()
             })
-            .insert_resource(MapTransition::new(self.fade, self.origin))
+            .insert_resource(MapTransition {
+                edge_fit: self.edge_fit,
+                ..MapTransition::new(self.fade, self.origin)
+            })
             .insert_resource(CameraSmoothing {
                 tau: self.camera_ease_secs,
                 snap: false,
@@ -675,12 +684,16 @@ fn plan_switch(world: &World, request: &RequestMapChange) -> Result<Switch, Stri
     let registry = world.resource::<MapRegistry>();
     let active = world.resource::<ActiveMaps>();
     let origin = world.resource::<MapTransition>().origin;
+    let edge_fit = world.resource::<MapTransition>().edge_fit;
     let to = registry
         .get(&request.to)
         .ok_or_else(|| format!("map `{}` is not registered", request.to))?;
     let Some(entry_name) = &request.entry else {
-        let feet = start_feet(&to.map, origin)
-            .ok_or_else(|| format!("map `{}` has no `player_start`", request.to))?;
+        let feet = match edge_fit {
+            Some(fit) => edge_start_feet(&to.map, origin, fit.step, fit.half_width),
+            None => start_feet(&to.map, origin),
+        }
+        .ok_or_else(|| format!("map `{}` has no `player_start`", request.to))?;
         return Ok(Switch {
             id: request.to.clone(),
             origin,
@@ -1644,6 +1657,51 @@ mod tests {
             app.world().resource::<Log>().0.last().unwrap(),
             "arrive None"
         );
+    }
+
+    #[test]
+    fn an_arrival_at_a_start_on_an_edge_cell_is_placed_off_its_blocked_half() {
+        // Map 2 has an edge ring with the start on its west side, at cell (0,4): a `west` piece.
+        let head = "---\nmap: 2\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": edge\n  \"@\": player_start\n---\n";
+        let rows: String = (0..10)
+            .rev()
+            .map(|y| {
+                let row: Vec<&str> = (0..10)
+                    .map(|x| match (x, y) {
+                        (0, 4) => "@",
+                        (0 | 9, _) | (_, 0 | 9) => ".",
+                        _ => " ",
+                    })
+                    .collect();
+                format!("{y:>2} |{}|\n", row.join(" "))
+            })
+            .collect();
+        let two = RegisteredMap {
+            id: "2".into(),
+            file: "2.txt".into(),
+            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START]).unwrap(),
+        };
+        let mut app = app_with_two_maps();
+        app.insert_resource(
+            MapRegistry::from_parsed(vec![registered_with_start("1", (0, 0)), two]).unwrap(),
+        );
+        app.world_mut().resource_mut::<MapTransition>().edge_fit = Some(EdgeFit {
+            step: 16.0,
+            half_width: 10.0,
+        });
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.world_mut().write_message(RequestMapChange {
+            to: "2".into(),
+            entry: None,
+            transition: Transition::Scene,
+            source: None,
+        });
+        app.update();
+        app.update();
+        assert_eq!(app.world().resource::<ActiveMaps>().current, "2");
+        // The west half of the cell ends at x 32, grown by the half width 10. The y is the middle of row 4.
+        assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(42.0, 288.0));
     }
 
     #[test]

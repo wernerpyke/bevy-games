@@ -4,7 +4,7 @@ Source: `dev-docs/BRIEF-map-edges.md` (the brief). The brief holds the rules and
 
 ## Status (2026-11-15): resume here
 
-Steps 0 to 4 done. Steps 0 to 3 are committed. The step 4 merge (`EdgeMode`, `adr-x49`) is not committed yet. Next: step 5.
+Steps 0 to 5 done. Steps 0 to 4 are committed, step 5 is not. Next: step 6 (check in the game).
 
 ## Goal
 
@@ -40,8 +40,8 @@ Record these in the ADRs in step 7.
 | Objects | Every kind of object (features, pickups, enemy spawns, markers, `@`) follows one rule. On the outer ring, the cell is an ordinary edge cell: it gets a piece, its neighbours treat it as edge, and it blocks. In an entry area, or inside the map, the cell is free space. The object blocks as it does today. |
 | Footprints | The file is the truth. A `.` footprint cell is an edge, a blank one is free. Footprints inside the map must be drawn with blanks. The kit stays without footprints (`adr-x13`). Map format rule 12 changes. |
 | Player start | The kit gives a start position for each piece: a point outside the blocked area after the game grows it by the actor half width. The game places the player there. On a `center` piece, the start is the centre of the nearest free cell, with ties broken in a fixed order. Implemented: the start is the point nearest the cell centre, away from the opaque side, outside the grown blocked area. A free cell is a cell with no edge and no object. Distance is straight-line, ties go clockwise from north. |
-| Draw order | `layers.rs` names two edge positions: ground at -300 (above the background tiles, below the grid debug) and canopy at +150 (above the world band, below the debug drawings). Each game uses one. Long Way uses the canopy. |
-| Art file | `games/long-way/assets/art/features/map_edge.aseprite`, drawn by the user (final art, not a placeholder). 64×64, 9 frames, one tag per piece with the `EdgePiece` names, a hidden `debug` layer. |
+| Draw order | `layers.rs` names two edge positions: ground at -300 (above the background tiles, below the grid debug) and canopy at +150 (above the world band, below the debug drawings). Each game uses one. Long Way uses the ground (changed on 2026-11-15 from the canopy): the player, ghosts, trees and other objects draw over the edge. |
+| Art file | `games/long-way/assets/art/features/`, drawn by the user (final art). Long Way draws `map_edge_ground.aseprite`. `map_edge_canopy.aseprite` (for a canopy layer) and `map_edge.aseprite` (the first version) are kept. Each is 64×64, 9 frames, one tag per piece with the `EdgePiece` names, a hidden `debug` layer. |
 | Kit and game | The kit owns the parser change, the piece rule, the quarter rules, the errors, the sprite list and placement, the blocked rectangles and the start position. The game chooses its `EdgeMode` and edge layer, maps pieces to frames, and spawns the sprites. |
 | Smooth corners | Decided after the spike (step 4, `adr-x49`): the kit supports both. Each game passes `EdgeMode::Basic` or `EdgeMode::Smooth`, set once per game, not per map. Long Way uses `Smooth`. A half-size corner uses the same step size as a full-size corner, so it has half as many steps. |
 
@@ -136,12 +136,12 @@ A stand-alone step. Its result is a decision by the user, not merged code.
 
 ### 5. Long Way: draw and block the edges
 
-- Use the art `assets/art/features/map_edge.aseprite` (drawn by the user). Map each `EdgePiece` to the tag of the same name (`EdgePiece::name`). Draw only the visible layers (the `debug` layer is hidden).
-- Draw order: add the ground (-300) and canopy (+150) edge positions to `layers.rs`, with `const` asserts for their order. Long Way uses the canopy. Do not use bare z numbers (`adr-x9`, `adr-x14`).
+- Use the art `assets/art/features/map_edge_ground.aseprite` (drawn by the user). Map each `EdgePiece` to the tag of the same name (`EdgePiece::name`). Draw only the visible layers (the `debug` layer is hidden).
+- Draw order: add the ground (-300) and canopy (+150) edge positions to `layers.rs`, with `const` asserts for their order. Long Way uses the ground position. Do not use bare z numbers (`adr-x9`, `adr-x14`).
 - A Long Way constant `EDGE_MODE = EdgeMode::Smooth`. `edge_quarters(EDGE_MODE, ...)`, then spawn one sprite for each item of `edge_sprites`, placed with `EdgeSprite::place` (centre, scale, `Sprite.rect`), tagged with the map id so it is removed with the map and on F1 reload. Nearest-neighbour sampling as for the other art. Half-size pieces draw just above the full-size pieces.
 - Add `edge_blocked_rects` to `CollisionWorld`, grown by `PLAYER_HALF_WIDTH`. Start with a step of 16 px and tune it by playing.
-- Place the player with `edge_start_feet`.
-- Long Way tests only for what is not in the kit: the piece-to-tag table covers every `EdgePiece` (a test fails on a missing name).
+- Place the player with `edge_start_feet`: the first start (`player.rs`) and an arrival at `player_start` through an exit object. The second runs in the kit (`map_transition.rs`), so `MapTransitionPlugin` takes `edge_fit: Option<EdgeFit>` (step and half width). Long Way passes `EDGE_FIT`.
+- Long Way tests only for what is not in the kit: a wiring test that `spawn_edges` spawns the kit sprites (tag = `EdgePiece::name`, placement, ground z, half-size pieces above) and the blocked areas grown by `PLAYER_HALF_WIDTH`. The tags are the piece names, so there is no separate table to test.
 - Change the legend of maps 1 to 3 to `".": edge` (step 0 drew the grids). Run each map with `./dev-scripts/rust.sh script long-way "wait:0.5;screenshot:map<n>;quit" <n>.txt --debug` and check the pieces against the rules by eye.
 
 ### 6. Check in the game
@@ -152,7 +152,7 @@ A stand-alone step. Its result is a decision by the user, not merged code.
   - Close-ups of each fill in map 3: how much of the `north` and other frames shows past the half beside a fill. Show the user.
   - A ghost is stopped by the edge and paths around it.
   - Ghosts that spawn on the ring (user decision, keep and test): map 2 `!` at col=0, row=9 spawns in a fully blocked `center` corner, and map 2 `!` at col=9, row=3 in the blocked half of an `east` piece. Check that each one walks out, finds a path, and chases the player. If a ghost is stuck, write a failing kit test first, then fix, and show the user.
-  - The canopy draws over the player, the ghosts and the trees.
+  - The edge draws below the player, the ghosts and the trees (ground position). With F3, the grid draws over the edge.
   - A blocking feature on the edge (map 1, `g` at col=0, row=3): the edge piece under it blocks, and the trunk blocks as before. Show the blocked areas (F3) to the user with a screenshot.
   - Objects to touch on the ring (user decision, keep and test): the player can touch map 1 `m` at col=3, row=9 (`north` piece), map 2 `m` at col=9, row=5 (`east` piece) and the pickup map 2 `1` at col=8, row=9 (`north` piece). If one cannot be touched, show the user before changing the map or the touch rule.
   - The exit area in map 3 sends the player to the entry in map 1, and both areas are gaps in the edge.
@@ -164,7 +164,7 @@ A stand-alone step. Its result is a decision by the user, not merged code.
 
 - `dev-docs/extensions/map-files.md`: rules 3, 8, 12, 20 and 21 (`.`, blanks, footprints drawn with blanks, the new area error, objects on the ring), a new rule for edges (pieces, errors, objects and `@` on the ring, the start position), the new tests in "Tests", the R-Town note.
 - `dev-docs/adr/EXTENSIONS-MAPS.md`: new `adr-x` entries (next free number): `.` can be an edge (a fixed legend value), the kit owns the edge rules and the start position, objects on the ring stand on edge cells, footprints follow the file. `adr-x49` (kit owns the rules, the game chooses `EdgeMode`, the spike result) is written. `dev-docs/adr/EXTENSIONS-SCREEN.md` or the layers ADR: one edge layer per game, at the ground or the canopy position.
-- `games/long-way/docs/adr.md`: the Long Way choices (canopy layer, smooth mode, art file, step size), next free `adr-lw` number.
+- `games/long-way/docs/adr.md`: the Long Way choices (ground layer, smooth mode, art file, step size), next free `adr-lw` number.
 - `games/long-way/docs/maps.md` (the new exit area and entry), `art-pipeline.md` (the edge art file), `collision.md` (edge blockers), `source-layout.md` (new code).
 - `dev-docs/bevy/notes.md`, only if a new verified Bevy pattern came up.
 - `CLAUDE.md`: the kit list in "Games and workspace rules" (map edges).

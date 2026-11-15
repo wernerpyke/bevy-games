@@ -178,7 +178,7 @@ Place objects on the outer ring with care. A pickup or an exit marker in the blo
 
 ## Additional notes
 - I want the z-order of the map edge to be specified per game so that the edge can either be drawn as shrubbery on the ground (below the player) or a tree canopy (above the player).
-- `layers.rs` names the two positions. Ground: -300, above the background tiles and below the grid debug, so F3 shows the grid over the edge. Canopy: +150, above the world band and below the debug drawings. Each game uses one of them. Long Way uses the canopy.
+- `layers.rs` names the two positions. Ground: -300, above the background tiles and below the grid debug, so F3 shows the grid over the edge. Canopy: +150, above the world band and below the debug drawings. Each game uses one of them. Long Way uses the ground (decision changed on 2026-11-15, it was the canopy).
 
 ## Kit and game
 

@@ -254,6 +254,13 @@ pub fn nearest_free_cell(map: &Map, from: IVec2) -> Option<IVec2> {
         })
 }
 
+/// What `edge_start_feet` needs from a game: the stair step of a corner and the half width of its player.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct EdgeFit {
+    pub step: f32,
+    pub half_width: f32,
+}
+
 /// Where the player's feet start, for a map whose cell (0,0) is at `origin`. On an edge cell, the start is off the
 /// blocked area of its piece (`start_on_piece`), or at the centre of the nearest free cell for a `Center` piece.
 /// Elsewhere it is the centre of the `player_start` cell, as `start_feet`. `None` when the map has no marker.

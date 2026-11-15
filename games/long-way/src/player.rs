@@ -8,7 +8,8 @@ use game_kit::animation::play_if_changed;
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
-use game_kit::map::{Facing as EntryFacing, start_feet};
+use game_kit::map::Facing as EntryFacing;
+use game_kit::map_edge::edge_start_feet;
 use game_kit::map_transition::{ActiveMaps, Arrival, MapRegistry, MapTransition, clamp_to_union};
 use game_kit::movement::{FollowSet, MoveGoal, MoveState, Mover, StrategySet};
 use game_kit::nav::{NavGrid, NavInset};
@@ -93,7 +94,8 @@ pub fn spawn_player(
         return;
     };
     let map = &registered.map;
-    let feet = start_feet(map, MAP_ORIGIN).unwrap_or_else(|| {
+    let fit = crate::edges::EDGE_FIT;
+    let feet = edge_start_feet(map, MAP_ORIGIN, fit.step, fit.half_width).unwrap_or_else(|| {
         error!(
             "map {}: no player_start marker, starting at the bottom middle",
             map.name

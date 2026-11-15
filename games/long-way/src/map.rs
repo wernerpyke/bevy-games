@@ -78,6 +78,7 @@ impl Plugin for MapPlugin {
             origin: MAP_ORIGIN,
             fade: Fade::default(),
             camera_ease_secs: crate::camera::CAMERA_EASE_SECS,
+            edge_fit: Some(crate::edges::EDGE_FIT),
         });
         let hooks = MapHooks {
             load: app.world_mut().register_system(load_hook),
@@ -128,6 +129,7 @@ fn load_hook(
         debug!("map: {} at cell {}", object.kind, object.cell);
     }
     crate::background::spawn_background(&mut commands, &server, map, &load);
+    crate::edges::spawn_edges(&mut commands, &server, map, &load);
     crate::rocks::spawn_rocks(&mut commands, &server, map, &load);
     crate::trees::spawn_trees(&mut commands, &server, map, &load);
     crate::markers::spawn_markers(&mut commands, &server, map, &load);

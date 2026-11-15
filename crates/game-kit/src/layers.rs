@@ -8,8 +8,10 @@
 //! |---|---|---|
 //! | Background | sprite z | `BACKGROUND_Z` |
 //! | Background tile images | sprite z | `BACKGROUND_TILES_Z` plus `BACKGROUND_TILE_Z_STEP` per image |
+//! | Map edge on the ground (one of the two edge layers) | sprite z | `EDGE_GROUND_Z`, half-size pieces `+ EDGE_HALF_Z_OFFSET` |
 //! | Grid debug | sprite z | `GRID_DEBUG_Z` |
 //! | World | sprite z | within `WORLD_HALF_BAND` of 0, set by `depth.rs` from the feet |
+//! | Map edge as a canopy (the other edge layer) | sprite z | `EDGE_CANOPY_Z`, half-size pieces `+ EDGE_HALF_Z_OFFSET` |
 //! | Feature debug | sprite z | `FEATURE_DEBUG_Z` |
 //! | Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 //! | HUD | UI `GlobalZIndex` | `HUD_Z_INDEX` |
@@ -28,6 +30,14 @@ pub const BACKGROUND_Z: f32 = -500.0;
 /// BACKGROUND_TILE_Z_STEP`. Room for `BACKGROUND_TILES_MAX` images below the grid.
 pub const BACKGROUND_TILES_Z: f32 = -490.0;
 pub const BACKGROUND_TILE_Z_STEP: f32 = 0.001;
+/// The map edge drawn on the ground (`map_edge.rs`): below the world, so actors and features stand on it, and below
+/// the grid debug. A game uses this or `EDGE_CANOPY_Z`.
+pub const EDGE_GROUND_Z: f32 = -300.0;
+/// The map edge drawn as a canopy: above the world, so it hides what walks under it, and below the debug drawings.
+pub const EDGE_CANOPY_Z: f32 = 150.0;
+/// Half-size edge pieces (`EdgeMode::Smooth`) are drawn this far above the full-size pieces, so a fill lies over the
+/// frame of its cell.
+pub const EDGE_HALF_Z_OFFSET: f32 = 1.0;
 pub const BACKGROUND_TILES_MAX: usize = 100_000;
 /// The F3 grid lines and their numbers.
 pub const GRID_DEBUG_Z: f32 = -200.0;
@@ -61,6 +71,13 @@ const _: () = {
     );
     assert!(GRID_DEBUG_Z < -WORLD_HALF_BAND);
     assert!(WORLD_HALF_BAND < FEATURE_DEBUG_Z);
+    assert!(
+        BACKGROUND_TILES_Z + BACKGROUND_TILES_MAX as f32 * BACKGROUND_TILE_Z_STEP < EDGE_GROUND_Z
+    );
+    assert!(EDGE_GROUND_Z + EDGE_HALF_Z_OFFSET < GRID_DEBUG_Z);
+    assert!(
+        WORLD_HALF_BAND < EDGE_CANOPY_Z && EDGE_CANOPY_Z + EDGE_HALF_Z_OFFSET < FEATURE_DEBUG_Z
+    );
     assert!(
         FEATURE_DEBUG_Z < FEATURE_DEBUG_INTERIOR_Z
             && FEATURE_DEBUG_INTERIOR_Z < FEATURE_DEBUG_FEET_Z
