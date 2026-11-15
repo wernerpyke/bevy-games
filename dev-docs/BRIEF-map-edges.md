@@ -77,7 +77,7 @@ The drawn example is `games/long-way/input/map_edge_example.aseprite`.
 
 ## Choosing the piece
 
-An edge cell gets its piece from its 4 direct neighbours (north, east, south, west). A neighbour is free when it is a blank. A cell outside the map, and an `@` on a map edge (see "Cells with objects"), count as edge.
+An edge cell gets its piece from its 4 direct neighbours (north, east, south, west). A neighbour is free when it is a blank. A cell outside the map, and an object on the outer ring of the map (see "Cells with objects"), count as edge.
 
 Step 1. The free sides give the piece:
 
@@ -111,6 +111,7 @@ In the example, step 2 changes these cells to `center`:
 
 Not supported:
 - Two free sides that are opposite (N and S, or E and W), and four free sides. These are walls one cell thick, or a single edge cell. An edge is always the border of the map, so it has no such cells. Such a cell is a load error that names the line, like other map format errors.
+- A `.` inside an exit or entry area. It would close the exit or the entry. It is a load error that names the line of the area.
 
 Known limitation of the two steps:
 - **Inside corners.** A cell whose only free neighbour is diagonal gets `center`, which leaves a square corner. Example: col=0, row=9. The quarter rules below remove it.
@@ -121,7 +122,7 @@ Drawn examples: `games/long-way/input/map_edge_example.aseprite` (the two steps 
 
 **Spike.** The plan has a stand-alone spike step that tries both possibilities: the two steps only, and the two steps with smooth corners (both quarter rules below). The criterion is how cleanly the smooth corners can be built in `game-kit` without spilling a lot of complexity into the game code or the art. The game should still only map pieces to frames and set the z-order. If smooth corners need more from the game or the art than that, the plan keeps the two steps only.
 
-Some cells look better when they are split into four quarters, each drawn with a piece at half size. The half-size piece is the existing frame scaled down with nearest-neighbour sampling, so no new frames are drawn. Its pixels are half the size of the other pieces. Its blocked area is the same stair-step shape at half size.
+Some cells look better when they are split into four quarters, each drawn with a piece at half size. The half-size piece is the existing frame scaled down with nearest-neighbour sampling, so no new frames are drawn. Its pixels are half the size of the other pieces. Its blocked area is a stair-step with the same step size as a full-size piece, so it has half as many steps.
 
 ### Quarter rules
 
@@ -159,16 +160,27 @@ Some corners are not changed, because their quarters are not fully opaque or ful
 
 ## Cells with objects
 
-A cell with an object (a letter, digit or special character in the grid) counts as free space. It gets no edge piece and no edge collision. The object blocks as it does today. The outer border of the map keeps the player and the enemies inside the map, as it does today.
+A cell with an object (a letter, digit or special character in the grid) has no `.` or blank, so its place in the map decides what it is. The rule is the same for every kind of object: features, pickups, enemy spawns, markers and `@`.
 
-The exception is `@` (player start) on a map edge. `@` is on a map edge when it is in the outer ring of the map: the first or last row, or the first or last column. An `@` anywhere else is free space, so `@` cannot be placed on an edge cell inside the map. An `@` inside an entry area is also free space, even in the outer ring, because an entry area is a gap in the edge (map format rule 21 allows `@` there). Its cell is an ordinary edge cell: it gets the edge piece, in the edge z-order/layer, it counts as edge when its neighbours choose their pieces, and it blocks like any other edge cell. The player starts at the centre of that cell, over the edge sprite, and cannot move into the blocked half. In the example, the player starts at col=0, row=8 on a `west` piece and cannot move left. The edge is drawn either below or above the player (see "Additional notes"), so this is acceptable.
+- **On the outer ring** (the first or last row, or the first or last column): an ordinary edge cell. It gets an edge piece, it counts as edge when its neighbours choose their pieces, and it blocks like any other edge cell. The object is drawn as usual, and the edge layer draws over or under it (see "Additional notes"). The object also blocks as it does today.
+- **In an entry area** on the outer ring: free space, because an entry area is a gap in the edge. Map format rule 21 allows only `@` there.
+- **Inside the map**: free space. It gets no edge piece and no edge collision. The object blocks as it does today.
+
+The outer border of the map keeps the player and the enemies inside the map, as it does today.
+
+Place objects on the outer ring with care. A pickup or an exit marker in the blocked half of an edge piece can be hard or impossible to touch.
+
+**Player start on the edge.** The kit gives a start position for each piece: a point outside the blocked area of the piece after the game grows it by the actor half width. The player starts there, over the edge sprite, and cannot move into the blocked half. In the example, `@` at col=0, row=8 is on a `west` piece. The player starts to the right of the grown blocked area and cannot move left. A `center` piece blocks the whole cell, so it has no such point: the player then starts at the centre of the nearest free cell. Ties are broken in a fixed order, so the result does not change between runs.
+
+**Footprints.** The file is the truth. The other cells of a footprint are drawn with `.` or blanks (map format rule 12). A `.` footprint cell is an edge cell, and a blank one is free. So footprint cells inside the map must be drawn with blanks. The kit does not know footprints (`adr-x13`).
 
 ## Additional notes
 - I want the z-order of the map edge to be specified per game so that the edge can either be drawn as shrubbery on the ground (below the player) or a tree canopy (above the player).
+- `layers.rs` names the two positions. Ground: -300, above the background tiles and below the grid debug, so F3 shows the grid over the edge. Canopy: +150, above the world band and below the debug drawings. Each game uses one of them. Long Way uses the canopy.
 
 ## Kit and game
 
-- `game-kit` owns the rules: the parser change (`.` can name a kind in the legend), choosing the piece for each cell, the errors, and the blocked rectangles of each piece. These are plain functions with tests in the kit.
+- `game-kit` owns the rules: the parser change (`".": edge` in the legend; `.` may only be `empty` or `edge`), choosing the piece for each cell, the errors, the blocked rectangles of each piece, and the start position on each piece. These are plain functions with tests in the kit.
 - The game owns the art and the drawing: which frame each piece uses, and the z-order of the edge (see "Additional notes").
 - R-Town keeps `".": empty` and does not change.
 
