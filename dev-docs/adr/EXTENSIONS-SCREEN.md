@@ -76,3 +76,11 @@ Screen regions, app states, camera, draw order layers and animation. Index of al
 **Rationale.** The user chose the kit for the Enoki code (2026-11-11), so a second game gets particles without copying the glow patch handling and the helpers. The cost, accepted by the user: R-Town compiles Enoki's 5 extra crates, though it runs no Enoki code. A Cargo feature would avoid that but builds the kit twice (`--workspace` against `-p`), which costs more. If the cost grows, split a `game-fx` crate (`adr-x12` allows it). Enoki cannot read `.aseprite` and the Aseprite asset is a packed 2D atlas of full-canvas frames, so the sheets are cut at run time: a fresh clone works and the `.aseprite` file stays the only source (`adr-a1`).
 
 **How to apply.** `dev-docs/extensions/particles.md` (including the build guard to run after any `Cargo.toml` change). Long Way: `weapons/ring.rs`, `tornado.rs`, `fireball.rs`.
+
+## adr-x51. Map edges are drawn on one of two edge layers, the ground or the canopy (2026-11-15)
+
+**Decision.** `layers.rs` has two positions for map edges: `EDGE_GROUND_Z`, below the world and the grid debug, and `EDGE_CANOPY_Z`, above the world and below the debug drawings. Half-size edge pieces are `EDGE_HALF_Z_OFFSET` above the full-size pieces. Each game uses one of the two. Long Way uses the ground (`adr-lw40`).
+
+**Rationale.** An edge can look like shrubbery or a pit on the ground, which actors and features stand on, or like a tree canopy that hides what walks under it. The choice is a look of the game, so the game makes it, and the kit only names the two positions so no game writes a bare z number (`adr-x9`, `adr-x14`). On the ground, the F3 grid draws over the edge, so cells can still be read.
+
+**How to apply.** Use the constant of the chosen layer, and add `EDGE_HALF_Z_OFFSET` for a sprite with `EdgeSprite::half`. The order is checked when the kit is compiled.

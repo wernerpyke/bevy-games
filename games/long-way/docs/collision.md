@@ -18,6 +18,12 @@ Each tree has a `Trunk { left, right, base_y, height }` in world coordinates. It
 
 Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs`). A trunk that overlaps a rock joins the rock's cluster.
 
+## Map edges
+
+- Each edge cell blocks the opaque half of its piece, `center` the whole cell (`edge_blocked_rects`, `adr-x50`, map files extension rule 34). Corners block a stair of 16 px columns (`EDGE_STEP` in `edges.rs`), half-size corners of smooth mode the same step with half as many columns. The areas are grown sideways by the half width (14), as every blocker.
+- The player starts outside the grown area of its edge cell (`edge_start_feet`, `EDGE_FIT`): on a `west` piece 14 px right of the half line.
+- Checked in the game on 2026-11-15: each stop matches the computed stair, the player glides along a diagonal stair at close to full speed and slides round the tip of a cut, and ghosts that start inside an edge walk out (`resolve` lets a move that starts inside a blocked area leave it).
+
 ## Rocks
 
 - Art: `Rocks.aseprite`, native 32x32, tags `rock_0` and `rock_1`. It is drawn at a whole number scale: `draw / 32` (4 = 128 px, 5 = 160, 6 = 192). Default is 128.

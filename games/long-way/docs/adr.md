@@ -53,13 +53,14 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw12. Long Way draw order layers (2026-11-01)
 
-**Decision.** Long Way uses six layers, from back to front, use the kit defaults in `crates/game-kit/src/layers.rs` (`adr-x9`, `adr-x14`).
+**Decision.** Long Way uses seven layers (the map edge added 2026-11-15, `adr-lw40`), from back to front, use the kit defaults in `crates/game-kit/src/layers.rs` (`adr-x9`, `adr-x14`).
 1. **Background** (sprite z `BACKGROUND_Z`)
-2. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F3 grid
-3. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`
-4. **Feature debug** (sprite z `FEATURE_DEBUG_Z`): the yellow rock outline and other debug drawings of features
-5. **HUD** (UI `GlobalZIndex` `HUD_Z_INDEX`): the info box and other readouts that are always on screen
-6. **UI** (UI `GlobalZIndex` `UI_Z_INDEX`): dialogs and menus, above the HUD
+2. **Map edge** (sprite z `EDGE_GROUND_Z`, half-size pieces `+ EDGE_HALF_Z_OFFSET`): the edge of the map on the ground (`adr-x51`)
+3. **Grid debug** (sprite z `GRID_DEBUG_Z`): the F3 grid
+4. **World** (sprite z within `WORLD_HALF_BAND` of 0): features (rocks, trees) **and** characters (the player, NPCs), sorted together by their feet in `depth.rs`
+5. **Feature debug** (sprite z `FEATURE_DEBUG_Z`): the yellow rock outline and other debug drawings of features
+6. **HUD** (UI `GlobalZIndex` `HUD_Z_INDEX`): the info box and other readouts that are always on screen
+7. **UI** (UI `GlobalZIndex` `UI_Z_INDEX`): dialogs and menus, above the HUD
 
 **Rationale.** The developer asked for formal layers on 2026-11-01. Features and characters share one layer because a character must walk behind a tree or rock when its feet are above the feature's sort line (`adr-lw1`, `adr-x2`). The debug layer is above the world, so debug lines also draw over the player.
 
@@ -277,3 +278,11 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The user's design (2026-11-14). A cost per cast makes the pickups matter and gives each weapon a price that matches its power. Taking the cost in the same step as the cast means that two casts in one frame (a click and a key) cannot both use the same energy. The cast check stays even with the disabled button, because the check is the rule and the button only shows it. The overlay reads as a gauge of the cost, and the flat disabled frame shows that a click will do nothing. Smooth gauges show a change instead of a jump. The button uses the real count, so it is enabled as soon as the energy is there, a moment before the overlay is gone.
 
 **How to apply.** Costs: `cost` in `weapons/values.rs` (the walls have a placeholder until they are built). Spend: `inventory.rs` (`try_spend`, `cost_share`), `weapons/mod.rs` (`cast_active`). HUD: `hud.rs` (`FILL_SECS`, `OVERLAY_COLOUR`, `ShownShare`, `CostOverlay`, `update_cost_overlays`, `disable_unaffordable`, `press_weapon_keys`). Kit widgets: `adr-x45`. Art: `weapon_button.aseprite` is made with `draw_button.lua disabled=1`.
+
+## adr-lw40. Long Way draws smooth map edges on the ground (2026-11-15)
+
+**Decision.** Long Way maps say `".": edge` (`adr-x50`). Long Way uses `EdgeMode::Smooth` (`adr-x49`) and the ground layer (`EDGE_GROUND_Z`, `adr-x51`). The frames are `art/features/map_edge_ground.aseprite`. `map_edge_canopy.aseprite` (for a canopy) and `map_edge.aseprite` (the first version) are kept but not drawn. The corner stair step is 16 px (`EDGE_STEP`), and the blocked areas are grown by `PLAYER_HALF_WIDTH`. The constants are in `src/edges.rs`.
+
+**Rationale.** The developer chose the smooth mode after the spike of 2026-11-15, for rounder corners. The ground layer was chosen over the canopy (first choice of the same day) so the player, the ghosts and the trees stand on the edge and are never hidden by it. A 16 px step is a first value, to tune by playing.
+
+**How to apply.** Draw the edge frames so that nothing reaches past the half of a frame: in smooth mode it shows beside a fill. Place pickups and exit markers on the ring so they stay reachable. Move the player with `edge_start_feet` (`EDGE_FIT`), also for arrivals (`MapTransitionPlugin::edge_fit`).

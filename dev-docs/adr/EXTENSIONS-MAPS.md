@@ -89,8 +89,21 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 ## adr-x49. Map edges: the kit owns the edge rules, and each game chooses basic or smooth edges (2026-11-15)
 
-**Decision.** With `".": edge` in the legend, each `.` is an edge cell (`dev-docs/BRIEF-map-edges.md`). The kit chooses a piece for each edge cell, reports the shapes it does not support, and gives the sprites, the blocked areas and the player start. A game passes `EdgeMode::Basic` (one piece per cell) or `EdgeMode::Smooth` (the basic pieces, then the quarter rules: cuts and fills drawn as half-size pieces). The game maps each piece to a frame, places the sprites the kit lists, and sets the draw order. Long Way uses `Smooth`.
+**Decision.** With `".": edge` in the legend, each `.` is an edge cell (`dev-docs/extensions/map-files.md`, "Map edges"). The kit chooses a piece for each edge cell, reports the shapes it does not support, and gives the sprites, the blocked areas and the player start. A game passes `EdgeMode::Basic` (one piece per cell) or `EdgeMode::Smooth` (the basic pieces, then the quarter rules: cuts and fills drawn as half-size pieces). The game maps each piece to a frame, places the sprites the kit lists, and sets the draw order. Long Way uses `Smooth`.
 
 **Rationale.** The rules are the same for every game, so they are tested once in the kit, and a game only maps pieces to frames. A spike showed that smooth edges fit this split: the game draws a list of sprites, each a frame at a position and a scale, sometimes one quarter of a frame, and the art needs no new frames. Each mode suits some art: smooth edges round the corners, while basic edges keep every pixel the same size and show the art as drawn. So the choice belongs to the game, not the kit.
 
 **How to apply.** `crates/game-kit/src/map_edge.rs`: `edge_quarters(mode, ...)`, `edge_sprites`, `EdgeSprite::place`, `edge_blocked_rects` (grow by the actor half width) and `edge_start_feet`. In smooth mode, art that reaches past the half of a frame can show beside a fill.
+
+## adr-x50. `.` can be an edge cell: the legend value, objects on the ring, footprints and the start (2026-11-15)
+
+**Decision.**
+1. The legend value of `.` is `empty` or `edge`, a value the kit knows. Any other value is an error. With `edge`, a `.` is an edge cell and a blank is free space.
+2. An object on the outer ring of the map stands on an ordinary edge cell, whatever its kind: it gets a piece, its neighbours treat it as edge, and it blocks. An object inside the map, or in an entry area, stands on free space.
+3. Footprints follow the file: a `.` footprint cell is an edge cell, so footprints inside the map are drawn with blanks.
+4. Shapes the pieces cannot draw are load errors that name their line: a wall one cell thick, a single edge cell, a `.` in an exit or entry area, a map with no free cell.
+5. The player start on an edge cell is the point nearest the cell centre outside the grown blocked area. On a `center` piece it is the nearest free cell, ties clockwise from north. Arrivals through exit objects use the same rule (`EdgeFit` on `MapTransitionPlugin`).
+
+**Rationale.** A fixed legend value keeps a rule the kit owns free of game names. Objects on the ring are the edge, as the map border is, so the ring stays closed and there is one rule for every kind, `@` included. The kit does not know footprints (`adr-x13`), so the file decides. The two-step piece rule has no piece for a wall one cell thick, and an edge is always the border of the map, so such a cell is an error like other format errors. A start inside the blocked half would let the player walk into the wall, so the kit places it outside, and a `center` piece has no free point.
+
+**How to apply.** `dev-docs/extensions/map-files.md`, rules 3, 8, 12, 20 and "Map edges" (rules 26 to 34). An object on the ring is blocked on one half: a pickup or an exit marker there must stay reachable. In Long Way, a marker on an `east` or `west` piece is touched only from the lower half of its cell.

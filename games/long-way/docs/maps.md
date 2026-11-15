@@ -26,6 +26,16 @@ Long Way leaves a map by touching a marker (`adr-lw21`, `adr-x33`, rule 24 of th
 - All links are scene transitions. Exit areas and seamless joins (`adr-x30`, `adr-x32`) still work in the kit, but no Long Way map uses them. Do not put a marker with `exit_to` inside an exit area.
 - Start a scripted run in a map with `rust.sh script long-way "<commands>" 2.txt --debug`. `goto:<map>` in a script arrives at the `@`.
 
+## Map edges
+
+All three maps say `".": edge` (`adr-lw40`, "Map edges" in the [map files extension](../../../dev-docs/extensions/map-files.md)). A `.` is the edge of the map and a blank is free space. The edge is drawn on the ground in smooth mode and blocks its opaque half.
+
+- Draw the edge at least two cells thick wherever free space is on both sides of it. A wall one cell thick is a load error.
+- Draw footprint cells inside the map with blanks. A `.` there is an edge cell.
+- An object on the outer ring stands on an edge cell and is blocked on one half. The current maps have the markers `m` of map 1 (3,9) and map 2 (9,5), the pickup of map 2 (8,9), two ghosts of map 2 ((0,9) and (9,3)), the tree `g` of map 1 (0,3) and the trees `t` of map 2 on the ring. All were checked in the game. The marker of map 2 is touched only from the lower half of its cell, because it stands on an `east` piece.
+- The player starts off the blocked half of an `@` on the ring: map 1 on a `south` piece, map 2 on a `center` corner (so in the nearest free cell, (8,1)), map 3 on a `west` piece.
+- The feet stop 50 px below the top of the map (`PLAYER_BODY_HEIGHT`), so edges in the top row are not reached from below.
+
 ## Kinds you can use in a legend
 
 | Kind | Art | Notes |

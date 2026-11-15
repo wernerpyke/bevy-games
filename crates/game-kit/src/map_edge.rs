@@ -1,4 +1,4 @@
-//! Map edges: when the legend says `".": edge`, each `.` in the grid is an edge cell (`dev-docs/BRIEF-map-edges.md`).
+//! Map edges: when the legend says `".": edge`, each `.` in the grid is an edge cell (`dev-docs/extensions/map-files.md`, "Map edges").
 //! The parser finds the edge cells (`map::parse`) and gives each one a piece with `choose_pieces`. A game chooses an
 //! `EdgeMode`, gets the quarter pieces with `edge_quarters`, draws `edge_sprites` (a frame per piece, placed with
 //! `EdgeSprite::place`) and adds `edge_blocked_rects`, grown by its actor half width, to its collision world. Plain
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn the_brief_example_gives_its_pieces() {
-        // `dev-docs/BRIEF-map-edges.md`, "New layout example". The `@` at (0,8) is on the ring, so it is an edge.
+        // The example of "Map edges" in `dev-docs/extensions/map-files.md`. The `@` at (0,8) is on the ring, so it is an edge.
         let (size, cells) = drawn(&[
             "..........",
             ".  ...  ..",
@@ -1014,7 +1014,7 @@ mod tests {
 
     #[test]
     fn the_quarter_rules_give_the_smooth_example() {
-        // `dev-docs/BRIEF-map-edges.md`, "Result in the example".
+        // `dev-docs/extensions/map-files.md`, rule 30 (cuts and fills of the example).
         use Quarter::*;
         let (size, edges) = brief_example();
         let q = |x: i32, y: i32, quarter: Quarter, piece: EdgePiece, cut: bool| QuarterPiece {

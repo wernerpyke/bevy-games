@@ -75,6 +75,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Switch animation: `ase.animation.play_loop("Walk")`. Tag names are case sensitive and match the Aseprite tags. Call it only when the tag changes.
 - A file with no tags: `animation: Animation::default()` plays all frames in a loop. A named tag that does not exist is an error.
 - Frame state is the public component `AnimationState { relative_frame, current_frame, elapsed, .. }`, added with `AseAnimation`. The frame range of a tag is `Assets<Aseprite>::get(handle).tags[tag].range` (`RangeInclusive<u16>`), known only after the asset has loaded. Setting `current_frame` outside the range makes the animation system reset it to the start. Used by `game-kit` `animation.rs`.
+- Draw part of a frame: `Sprite { rect: Some(rect), ..default() }` next to `AseAnimation`. The plugin sets only `image` and `texture_atlas` each frame and keeps `rect`, and Bevy offsets `rect` by the corner of the atlas frame, so `rect` is in pixels of the frame with y down. Verified in the map edges (`EdgeSprite::place`, Long Way `edges.rs`, 2026-11-15).
 - Play a tag once: `ase.animation.play("Die", AnimationRepeat::Count(0))`. The message `AnimationEvents::Finished(entity)` is sent when it ends (the entity is the one with the `AseAnimation`; the enum also has `LoopCycleFinished`, so match it, do not destructure it). Used for the ghost `Attack` and `Die` (`ghost.rs`) and the player `Hurt` (`player.rs`).
 
 ## One-shot systems and UI overlays (verified in `map_transition.rs`)
