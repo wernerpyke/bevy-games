@@ -14,7 +14,7 @@ How art size on screen is set, and how Aseprite tags drive animation.
 | Camera: `PixelCameraPlugin { view_height, clear_color }`, `CameraFollowPlugin`, `CameraBounds`, `visible_rect`, `half_view` | `crates/game-kit/src/camera.rs` | Shared |
 | `VIEW_HEIGHT`, `CELL_SIZE`, `MAP_ORIGIN` | `games/long-way/src/camera.rs` | One set of values per game |
 | Tag switching: `play_if_changed`. Spawn helpers: `tag_sprite`, `tag_animation`, `all_frames_sprite`, `all_frames_animation` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
-| Still frame: `StaticFrame` |  `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
+| Still frame: `StaticFrame`, `RandomStaticFrame` |  `crates/game-kit/src/animation.rs` | Shared (`adr-x39`, `adr-x52`) |
 | Random start frame: `RandomStartFrame`, `AnimationHelpPlugin` | `crates/game-kit/src/animation.rs` | Shared (`adr-x39`) |
 
 Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` and `art-tags.md`.
@@ -54,6 +54,7 @@ Decision: `adr-e7` for the camera. Art pipeline: the game's `art-pipeline.md` an
 ### Still frame
 
 18. `StaticFrame { relative }` shows one frame and never plays, for an icon. It sets the frame (counted from the first frame of the tag, kept inside the range) once the file has loaded, then stops the animation. Long Way draws its weapon icons and the frames of its HUD buttons this way.
+19. `RandomStaticFrame { seed }` does the same with a frame chosen from the seed, for variants of one picture drawn as the frames of one tag. `RandomStaticFrame::for_cell(map_name, cell)` gives a seed that is the same on every load, as in rule 16. Long Way draws its map edges this way (`map-files.md`, rule 31).
 
 ## Usage
 

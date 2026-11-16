@@ -4,6 +4,7 @@
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
+use game_kit::animation::RandomStaticFrame;
 use game_kit::collision::Blocker;
 use game_kit::layers::{EDGE_GROUND_Z, EDGE_HALF_Z_OFFSET};
 use game_kit::map::Map;
@@ -47,6 +48,7 @@ pub fn spawn_edges(commands: &mut Commands, server: &AssetServer, map: &Map, loa
                 aseprite: aseprite.clone(),
                 animation: Animation::tag(sprite.piece.name()),
             },
+            RandomStaticFrame::for_cell(&map.name, sprite.cell),
             Sprite {
                 rect: place.source,
                 ..default()
@@ -93,7 +95,7 @@ mod tests {
         };
         let quarters = edge_quarters(EDGE_MODE, map.size, &map.edges);
         assert!(quarters.iter().any(|q| q.cut) && quarters.iter().any(|q| !q.cut));
-        let mut expected: Vec<(String, Vec3, f32, Option<Rect>)> =
+        let mut expected: Vec<(String, Vec3, f32, Option<Rect>, u64)> =
             edge_sprites(&map.edges, &quarters)
                 .into_iter()
                 .map(|s| {
@@ -108,6 +110,7 @@ mod tests {
                         place.centre.extend(z),
                         place.scale,
                         place.source,
+                        RandomStaticFrame::for_cell(&map.name, s.cell).seed,
                     )
                 })
                 .collect();
@@ -130,15 +133,15 @@ mod tests {
             spawn_edges(commands, server, &map, &spawn_load);
         });
         let world = app.world_mut();
-        let mut sprites: Vec<(String, Vec3, f32, Option<Rect>)> = world
-            .query_filtered::<(&AseAnimation, &Sprite, &Transform), With<MapId>>()
+        let mut sprites: Vec<(String, Vec3, f32, Option<Rect>, u64)> = world
+            .query_filtered::<(&AseAnimation, &Sprite, &Transform, &RandomStaticFrame), With<MapId>>()
             .iter(world)
-            .map(|(ase, sprite, transform)| {
+            .map(|(ase, sprite, transform, frame)| {
                 let tag = ase.animation.tag.clone().unwrap_or_default();
-                (tag, transform.translation, transform.scale.x, sprite.rect)
+                (tag, transform.translation, transform.scale.x, sprite.rect, frame.seed)
             })
             .collect();
-        let key = |s: &(String, Vec3, f32, Option<Rect>)| {
+        let key = |s: &(String, Vec3, f32, Option<Rect>, u64)| {
             (
                 s.0.clone(),
                 (s.1.x * 100.0) as i64,

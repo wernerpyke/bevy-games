@@ -25,7 +25,7 @@ games/long-way/
     ├── weapons/        `WeaponPlugin`: `CastWeapon` (from `ActiveWeaponClicked`) and `WeaponHit` messages, `values.rs` (every weapon number), `damage.rs` (hit points and push), `ring.rs` (both rings: growth, look, the fire ring's hits, `adr-lw33`), `ice_ring.rs` (the ice ring's reach, push, barrier and stun, `adr-lw35`), `tornado.rs` (the tornado, `adr-lw36`), `fireball.rs` (the fireball, `adr-lw37`) (`adr-lw32`)
     ├── ghost.rs        `spawn_ghosts` (from `spawn_ghost` markers, called by the load hook), `GhostPlugin`: the touch (1 HP, then dies) and the removal after `Die` (`adr-lw29`)
     ├── background.rs   `spawn_background`, `check_tiles`: draws the ground colour and the tile images of a map's `background:` block from `ground_tiles.aseprite` (`adr-x36`, `adr-lw26`)
-    ├── edges.rs        `spawn_edges`, `EDGE_MODE`, `EDGE_STEP`, `EDGE_FIT`: draws the map edges from `map_edge_ground.aseprite` and adds their blockers (`adr-lw40`). The rules are `game_kit::map_edge`
+    ├── edges.rs        `spawn_edges`, `EDGE_MODE`, `EDGE_STEP`, `EDGE_FIT`: draws the map edges from `map_edge_ground.aseprite` (one random variant frame per cell, `RandomStaticFrame`) and adds their blockers (`adr-lw40`). The rules are `game_kit::map_edge`
     ├── scenery.rs      `spawn_scenery`: the Zen Garden trees and shrubs of one map, blocking like `green_tree` (`adr-lw23`)
     ├── map.rs          MapPlugin, `Kind`: registers the three maps and the game hooks. Parser and lifecycle: `game_kit::map`, `game_kit::map_transition`
     ├── collision.rs    Trunk and player constants. The engine is `game_kit::collision`

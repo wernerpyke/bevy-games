@@ -107,3 +107,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **Rationale.** A fixed legend value keeps a rule the kit owns free of game names. Objects on the ring are the edge, as the map border is, so the ring stays closed and there is one rule for every kind, `@` included. The kit does not know footprints (`adr-x13`), so the file decides. The two-step piece rule has no piece for a wall one cell thick, and an edge is always the border of the map, so such a cell is an error like other format errors. A start inside the blocked half would let the player walk into the wall, so the kit places it outside, and a `center` piece has no free point.
 
 **How to apply.** `dev-docs/extensions/map-files.md`, rules 3, 8, 12, 20 and "Map edges" (rules 26 to 34). An object on the ring is blocked on one half: a pickup or an exit marker there must stay reachable. In Long Way, a marker on an `east` or `west` piece is touched only from the lower half of its cell.
+
+## adr-x52. An edge tag with several frames is a set of variants, and the kit picks one per cell (2026-11-16)
+
+**Decision.** A tag of the edge art may have more than one frame. Each frame is a variant of the piece and is not animated. The kit component `RandomStaticFrame` shows one frame of the tag, chosen from a seed, and stops the animation. A game seeds it with `RandomStaticFrame::for_cell(map_name, cell)`.
+
+**Rationale.** Long edges built from one frame repeat in a visible pattern. Variants in the same tag need no new piece names and no code change when the artist adds a frame. Without a still frame, a tag with two frames would play as an animation. A seed from the map name and the cell keeps the edges the same on every load, like the background tiles (`adr-x36`) and `RandomStartFrame` (`adr-x39`). All sprites of one cell share the seed, so the quarters of a cut cell come from one frame.
+
+**How to apply.** `dev-docs/extensions/map-files.md`, rule 31, and `dev-docs/extensions/pixel-art.md`, rule 19. The component works for any tag, not only edges.

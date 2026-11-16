@@ -155,6 +155,22 @@ pub struct StaticFrame {
     pub relative: u16,
 }
 
+/// `StaticFrame` with a frame of the tag (or of the whole file) chosen from `seed`, for variants of one picture drawn
+/// as frames of one tag (the map edges). The same seed gives the same frame. A tag with one frame shows that frame.
+#[derive(Component, Clone, Copy, Debug)]
+pub struct RandomStaticFrame {
+    pub seed: u64,
+}
+
+impl RandomStaticFrame {
+    /// A seed from the map name and the cell, like `RandomStartFrame::for_cell`.
+    pub fn for_cell(map_name: &str, cell: IVec2) -> Self {
+        Self {
+            seed: RandomStartFrame::for_cell(map_name, cell).seed,
+        }
+    }
+}
+
 /// The frames of the tag of `animation`, or of the whole file without a tag. None when the tag does not exist.
 fn frame_range(
     aseprite: &Aseprite,
@@ -176,9 +192,12 @@ pub struct AnimationHelpPlugin;
 
 impl Plugin for AnimationHelpPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (apply_random_start, apply_static_frame))
-            .add_systems(Update, animate_facing.in_set(FacingSet).after(FollowSet))
-            .add_systems(Update, hold_stunned.after(FacingSet));
+        app.add_systems(
+            Update,
+            (apply_random_start, apply_static_frame, apply_random_static),
+        )
+        .add_systems(Update, animate_facing.in_set(FacingSet).after(FollowSet))
+        .add_systems(Update, hold_stunned.after(FacingSet));
     }
 }
 
@@ -251,13 +270,45 @@ fn apply_static_frame(
         };
         if let Some(range) = frame_range(aseprite, &animation) {
             let relative = frame.relative.min(range.end() - range.start());
-            state.relative_frame = relative;
-            state.current_frame = range.start() + relative;
-            state.elapsed = std::time::Duration::ZERO;
-            animation.animation.playing = false;
+            show_still(&mut animation, &mut state, &range, relative);
         }
         commands.entity(entity).remove::<StaticFrame>();
     }
+}
+
+/// Waits for the Aseprite asset, then shows the frame of the seed and stops the animation.
+fn apply_random_static(
+    mut commands: Commands,
+    mut query: Query<(
+        Entity,
+        &mut AseAnimation,
+        &mut AnimationState,
+        &RandomStaticFrame,
+    )>,
+    asprites: Res<Assets<Aseprite>>,
+) {
+    for (entity, mut animation, mut state, frame) in &mut query {
+        let Some(aseprite) = asprites.get(&animation.aseprite) else {
+            continue;
+        };
+        if let Some(range) = frame_range(aseprite, &animation) {
+            let relative = start_offset(frame.seed, range.end() - range.start() + 1);
+            show_still(&mut animation, &mut state, &range, relative);
+        }
+        commands.entity(entity).remove::<RandomStaticFrame>();
+    }
+}
+
+fn show_still(
+    animation: &mut AseAnimation,
+    state: &mut AnimationState,
+    range: &std::ops::RangeInclusive<u16>,
+    relative: u16,
+) {
+    state.relative_frame = relative;
+    state.current_frame = range.start() + relative;
+    state.elapsed = std::time::Duration::ZERO;
+    animation.animation.playing = false;
 }
 
 #[cfg(test)]
@@ -405,7 +456,10 @@ mod tests {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default()))
             .init_asset::<Aseprite>()
-            .add_systems(Update, (apply_random_start, apply_static_frame));
+            .add_systems(
+                Update,
+                (apply_random_start, apply_static_frame, apply_random_static),
+            );
         let file = app.world().resource::<Assets<Aseprite>>().reserve_handle();
         (app, file)
     }
@@ -506,6 +560,55 @@ mod tests {
             .id();
         app.update();
         assert!(app.world().get::<StaticFrame>(entity).is_none());
+        assert_eq!(frame_of(&app, entity), (1, 1, ELAPSED));
+        let ase = app.world().get::<AseAnimation>(entity).unwrap();
+        assert!(ase.animation.playing);
+    }
+
+    #[test]
+    fn a_random_static_frame_waits_for_the_file_then_shows_the_frame_of_the_seed_and_stops() {
+        let (mut app, file) = frame_app();
+        // One seed for each of the 4 frames, so each frame shows that the seed counts. The tag of a file cannot be
+        // built in a test (`TagMeta` is private), so this uses a file without tags.
+        let offsets: Vec<u16> = (0..4).collect();
+        let seeds: Vec<u64> = offsets
+            .iter()
+            .map(|&o| (0..100).find(|&s| start_offset(s, 4) == o).unwrap())
+            .collect();
+        let entities: Vec<Entity> = seeds
+            .iter()
+            .map(|&seed| {
+                app.world_mut()
+                    .spawn((animated(&file, None), RandomStaticFrame { seed }))
+                    .id()
+            })
+            .collect();
+        app.update();
+        assert!(app.world().get::<RandomStaticFrame>(entities[0]).is_some());
+        assert_eq!(frame_of(&app, entities[0]), (1, 1, ELAPSED));
+        load(&mut app, &file, 4);
+        app.update();
+        for (entity, offset) in entities.into_iter().zip(offsets) {
+            assert!(app.world().get::<RandomStaticFrame>(entity).is_none());
+            assert_eq!(
+                frame_of(&app, entity),
+                (offset, offset, std::time::Duration::ZERO)
+            );
+            let ase = app.world().get::<AseAnimation>(entity).unwrap();
+            assert!(!ase.animation.playing);
+        }
+    }
+
+    #[test]
+    fn a_random_static_frame_with_a_missing_tag_is_dropped_and_keeps_playing() {
+        let (mut app, file) = frame_app();
+        load(&mut app, &file, 4);
+        let entity = app
+            .world_mut()
+            .spawn((animated(&file, Some("Run")), RandomStaticFrame { seed: 3 }))
+            .id();
+        app.update();
+        assert!(app.world().get::<RandomStaticFrame>(entity).is_none());
         assert_eq!(frame_of(&app, entity), (1, 1, ELAPSED));
         let ase = app.world().get::<AseAnimation>(entity).unwrap();
         assert!(ase.animation.playing);

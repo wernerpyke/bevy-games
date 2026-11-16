@@ -22,7 +22,7 @@ A text file that a human edits to draw a whole map. One character is one cell. T
 | Loading and `Kind` | `games/<game>/src/map.rs` | Per game |
 | Spawning | per game | Per game |
 
-Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-x36` (backgrounds), `adr-x49` and `adr-x50` (map edges), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. The research on other formats was deleted after the decision. It is in git history as `dev-docs/RESEARCH-map-layouts.md`.
+Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `adr-x36` (backgrounds), `adr-x49`, `adr-x50` and `adr-x52` (map edges), `adr-lw8`, `adr-rt7`. `adr-x11` is the markdown format that this one replaced. The research on other formats was deleted after the decision. It is in git history as `dev-docs/RESEARCH-map-layouts.md`.
 
 ## Specification
 
@@ -217,6 +217,8 @@ The grid on the left gives the pieces on the right (`c` is `center`, `n` is `nor
     - A cell without quarter pieces: its whole frame.
     - A quarter piece: the whole frame of its corner piece at half size in that quarter. The frame is scaled down, so no new art is needed and its pixels are half the size.
     - A cell with a cut: only its kept quarters that are not clear, each a quarter of its frame at full size. Art that reaches past the half of a frame does not show beside a cut. Beside a fill it does, so draw the frames so that nothing reaches past the half.
+
+    Variants: a tag may have more than one frame. Put `RandomStaticFrame::for_cell(map_name, cell)` (`animation.rs`) on each sprite. When the file has loaded, it shows one frame of the tag, chosen from the map name and the cell, and the tag does not play (`adr-x52`). So the frame is the same on every load. All sprites of one cell use the same frame number. A tag with one frame shows that frame.
 
     Draw order: a game uses one of two layers from `layers.rs`, `EDGE_GROUND_Z` (below the world and the grid debug) or `EDGE_CANOPY_Z` (above the world, below the debug drawings), with half-size pieces `EDGE_HALF_Z_OFFSET` above.
 32. **Errors.** Each stops loading and names its line:
