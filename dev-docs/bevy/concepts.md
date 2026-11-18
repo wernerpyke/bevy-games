@@ -167,7 +167,7 @@ Define your own with `#[derive(Resource)]` and add it with `app.insert_resource(
 Files load through the `AssetServer`, which returns a handle straight away and loads in the background:
 
 ```rust
-aseprite: server.load("art/characters/Hunter.aseprite")
+aseprite: server.load("art/characters/player.aseprite")
 ```
 
 The path is relative to the game's `assets/` folder (`games/long-way/assets/`). Until the file finishes loading the sprite does not appear. A binary started directly (not through `cargo run`) looks for `assets/` next to the executable. Set `BEVY_ASSET_ROOT` to the game folder in that case.

@@ -9,9 +9,9 @@
 #     key=value     passed as --script-param key=value
 #
 # Examples:
-#   ./dev-scripts/aseprite.sh check games/long-way/assets/art/characters/Hunter.aseprite \
+#   ./dev-scripts/aseprite.sh check games/long-way/assets/art/characters/player.aseprite \
 #     palette=games/long-way/assets/art/game.aseprite
-#   ./dev-scripts/aseprite.sh frame_grid games/long-way/assets/art/characters/Hunter.aseprite \
+#   ./dev-scripts/aseprite.sh frame_grid games/long-way/assets/art/characters/player.aseprite \
 #     tag=Run scale=3 out=target/screenshots/run.png
 #   ./dev-scripts/aseprite.sh sheet_analysis games/long-way/input/hunter/Idle.png frame=96x64
 #   ./dev-scripts/aseprite.sh crop target/screenshots/start.png cx=0 cy=0 w=160 h=160 \

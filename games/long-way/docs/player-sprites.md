@@ -9,11 +9,11 @@ Purpose: replace `Guy.aseprite` as the player sprite. This file lists what the p
 The Hunter is the player in Long Way. The user has drawn the up and down walk frames (2026-11-05). Next work: test them in motion, then settle the open questions (see "Next steps").
 
 **Done**
-- The pack is analysed (below) and built into `characters/Hunter.aseprite`: 128x128, 46 frames, tags `Idle`, `Run`, `Hurt`, `Die` (from the pack) and `Up`, `Down` (placeholders from the jump frames, red tags). Palette is the game palette, grown to 32 colours (`adr-a5`).
+- The pack is analysed (below) and built into `characters/player.aseprite`: 128x128, 46 frames, tags `Idle`, `Run`, `Hurt`, `Die` (from the pack) and `Up`, `Down` (placeholders from the jump frames, red tags). Palette is the game palette, grown to 32 colours (`adr-a5`).
 - `player.rs` and `collision.rs` use the Hunter (`adr-lw15`): `Run` is the sideways walk, the art faces right (`WALK_ART_FACES_RIGHT = true`), the sprite is flipped with `transform.scale.x`, `HALF_SIZE` 64, `PLAYER_FEET_OFFSET` 56, `PLAYER_HALF_WIDTH` 14.
 - Checked in the real game with `script --debug` and zoomed screenshots: the face points the way the player walks, and the cloak is centred on the feet marker in both directions.
 - The user drew the `Up` and `Down` frames (still 6 frames each, same durations as the placeholders), and added two layers: `Weapon` (the blade, split from the body) and `background` (a backdrop for the user's own viewing). Layers are now `background`, `Weapon`, `Body`.
-- The game loads `Hunter.aseprite` with a layer mask by name (`hunter_layers` in `player.rs`). `Body` is always drawn. `Weapon` is drawn only when `SHOW_WEAPON` is `true` (now `false`, for the first test). `background` is never drawn, whatever its visibility in Aseprite.
+- The game loads `player.aseprite` with a layer mask by name (`hunter_layers` in `player.rs`). `Body` is always drawn. `Weapon` is drawn only when `SHOW_WEAPON` is `true` (now `false`, for the first test). `background` is never drawn, whatever its visibility in Aseprite.
 - Checked in the real game (zoomed screenshots): no weapon and no background in the up, down and right views. The up view is a back view and the down view shows the face. Feet are on the marker. Not seen yet: the animations in motion.
 
 **What the player code does now** (`animate_player` in `player.rs`)
@@ -28,7 +28,7 @@ The Hunter is the player in Long Way. The user has drawn the up and down walk fr
 - `Run` has 8 frames of 100 ms. The placeholder `Up` has 6 frames (75, 75, 75, 125, 125, 125 ms) and `Down` has 6 frames of 100 ms. The real frame counts are open.
 - Only colours from the game palette (32 colours; indexes 19 to 31 are the Hunter's). Index 0 is transparent.
 - Layers: `Body` (the character), `Weapon` (the blade) and `background` (the user's own use, never drawn). The code selects layers by name, so keep these names.
-- `Hunter.aseprite` is committed, so git is the safety net. **Do not run the rebuild command** once drawing starts: it overwrites the file. Add or replace frames inside Aseprite. Keep the tag names, because the code uses them.
+- `player.aseprite` is committed, so git is the safety net. **Do not run the rebuild command** once drawing starts: it overwrites the file. Add or replace frames inside Aseprite. Keep the tag names, because the code uses them.
 - Tooling for checks: use `./dev-scripts/shot.sh long-way <name> "teleport:<x>:<y>;wait:0.4;hold:<key>:0.5;wait:0.3" cx=<x> cy=<y> w=160 h=160 scale=4` for a zoomed screenshot, and `./dev-scripts/aseprite.sh check|frame_grid` for the file (`dev-docs/extensions/dev-scripts.md`). Delete the screenshots afterwards.
 
 ## Pack format
@@ -111,11 +111,11 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 5. **Canvas and anchor.** Done: 128x128, feet at y=120, collision values set (`adr-lw15`).
 6. **Block.** `Guy.aseprite` has it. The pack has no equivalent. Not used in code now. Open: draw later or drop the tag. (`Win` is dropped.)
 7. **Effects as separate sprites.** The dash effect is already a separate sheet. The slash arcs and the special attack effects are baked into the character frames. When we add attacks, we must split them out by hand into effect sprites (own file and tags) and remove them from the character frames. Not needed for the first version.
-8. **Source file.** Done: `characters/Hunter.aseprite` is built from the PNGs with the pack's frame durations. The user's own drawings (up and down) go into this file. The PNG sheets in `input/` stay as read-only references.
+8. **Source file.** Done: `characters/player.aseprite` is built from the PNGs with the pack's frame durations. The user's own drawings (up and down) go into this file. The PNG sheets in `input/` stay as read-only references.
 
 ## Decisions
 
-- File: `assets/art/characters/Hunter.aseprite`.
+- File: `assets/art/characters/player.aseprite`.
 - Canvas: 64x64 at first (one map cell), then doubled in Aseprite on 2026-11-05 to **128x128** (two cells) with nearest-neighbour scaling, so every art pixel is 2x2. The body is centred at x=64 and the feet are at y=120 (8 px margin at the bottom). In code the feet are 56 px below the canvas centre. It fits every frame, including the lying death frames. Effects are separate sprites.
 - Source: no per-animation `.aseprite` files in `input/`. `input/` stays read-only. One script builds the file from the PNGs and takes the frame durations from the JSON (`dev-scripts/aseprite/tagged_sheets.lua`).
 - First version: Idle, Run, Hurt and Die, plus placeholder Up and Down (taken from the jump sheets). No attacks. We add the attack, charge, special and dash sheets later with the same script.
@@ -125,7 +125,7 @@ Duplicates to avoid when we build the file: Die contains Hurt and Fall; Special 
 
 ## Build log
 
-`Hunter.aseprite` is built: 128x128 (the file was built at 64x64 and then doubled), 46 frames, 6 tags. Frame durations are the same as in the pack. It has one layer, `Body`, in RGB colour mode with the pack colours. It uses the expanded game palette (every pixel colour is in it, checked).
+`player.aseprite` is built: 128x128 (the file was built at 64x64 and then doubled), 46 frames, 6 tags. Frame durations are the same as in the pack. It has one layer, `Body`, in RGB colour mode with the pack colours. It uses the expanded game palette (every pixel colour is in it, checked).
 
 | Tag | Frames (from 0) | Source | Status |
 |---|---|---|---|
@@ -144,7 +144,7 @@ Rebuild command (from the repo root):
 
 ```
 H=games/long-way/input/hunter; P=Clarice-noctural-creature-hunter; S=$H/SpriteSheets/$P
-aseprite -b --script-param out=games/long-way/assets/art/characters/Hunter.aseprite \
+aseprite -b --script-param out=games/long-way/assets/art/characters/player.aseprite \
   --script-param json=$H/json \
   --script-param "sheets=Idle=$S-Idle.png,Run=$S-Run.png,Hurt=$S-Hurt.png,Die=$S-Die.png,Up=$S-Jump - Up.png@1-6,Down=$S-Jump - Down.png@0-5" \
   --script-param frame=96x64 --script-param canvas=64x64 \
@@ -152,9 +152,9 @@ aseprite -b --script-param out=games/long-way/assets/art/characters/Hunter.asepr
   --script-param placeholders=Up,Down \
   --script dev-scripts/aseprite/tagged_sheets.lua
 aseprite -b --script-param palette=games/long-way/assets/art/game.aseprite \
-  --script-param sprite=games/long-way/assets/art/characters/Hunter.aseprite \
+  --script-param sprite=games/long-way/assets/art/characters/player.aseprite \
   --script dev-scripts/aseprite/extend_palette.lua
-aseprite -b games/long-way/assets/art/characters/Hunter.aseprite \
+aseprite -b games/long-way/assets/art/characters/player.aseprite \
   --script-param width=128 --script-param height=128 \
   --script dev-scripts/aseprite/resize.lua
 ```

@@ -52,4 +52,4 @@ Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `scenery.rs
 
 - `VIEW_HEIGHT` is 512 world units (8 cells) and the game region of the window is square (the window is 576 by 756 with the HUD bar below, `adr-lw24`, `adr-lw31`), so the view is 8 by 8 cells. The Hunter is about 50 pixels tall, so it is about one 10th of the screen height. The camera follows the player and stops at the map edge (`adr-lw16`, `adr-lw17`). The player starts at the `player_start` marker (`adr-lw19`).
 - The player is the Hunter. Walking animation speed is `WALK_ANIMATION_SPEED` 2.5. Idle is 1.0. Walk speed is 300 units per second.
-- The player's tags (`Hunter.aseprite`): `Idle`, `Run`, `Up`, `Down`. `Up` and `Down` are placeholders. See [art-tags.md](art-tags.md).
+- The player's tags (`player.aseprite`): `Idle`, `Run`, `Up`, `Down`. `Up` and `Down` are placeholders. See [art-tags.md](art-tags.md).

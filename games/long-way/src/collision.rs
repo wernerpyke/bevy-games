@@ -6,9 +6,9 @@ use game_kit::collision::Blocker;
 /// Half the width of the player's body. The feet are blocked this far from a trunk's sides.
 /// The Hunter's cloak is about 20 px wide and the hat 30. Keep this above 12.8 (half of the 25.6 gap between two rocks two cells apart), or those rocks stop forming one cluster.
 pub const PLAYER_HALF_WIDTH: f32 = 14.0;
-/// Distance from the centre of the player's canvas down to the feet (feet at y 120 of 128 in `Hunter.aseprite`).
+/// Distance from the centre of the player's canvas down to the feet (feet at y 120 of 128 in `player.aseprite`).
 pub const PLAYER_FEET_OFFSET: f32 = 56.0;
-/// Height of the Hunter's body above the feet (hat top at about y 70 of 128 in `Hunter.aseprite`). The feet stop this far below the top of the map, so the body is not cut off where the camera stops.
+/// Height of the Hunter's body above the feet (hat top at about y 70 of 128 in `player.aseprite`). The feet stop this far below the top of the map, so the body is not cut off where the camera stops.
 pub const PLAYER_BODY_HEIGHT: f32 = 50.0;
 
 /// How much of the tree's bottom the player may not enter when walking down from above, as a fraction of the tree height.

@@ -4,7 +4,7 @@ Tag names are the contract between art and code (`art-pipeline.md`, rule 7). Nam
 
 | File | Tags |
 |---|---|
-| `characters/Hunter.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `HUNTER-sprites.md`. The player (`player.rs`) plays `Hurt` once when it loses HP (`PlayerHurt` message of `hp.rs`, `adr-lw28`). |
+| `characters/player.aseprite` | `Idle`, `Run`, `Hurt`, `Die` (side view, faces right), `Up` and `Down` (drawn by the user). Layers: `Body`, `Weapon`, `background`; the game draws `Body` and optionally `Weapon`. See `player-sprites.md`. The player (`player.rs`) plays `Hurt` once when it loses HP (`PlayerHurt` message of `hp.rs`, `adr-lw28`). |
 | `characters/ghost.aseprite` | `Down`, `Left`, `Up` (4 frames, 200 ms), `Attack` (2 frames, 200 ms, played once on touch), `Hurt` (4 frames, 100 ms, played once when a weapon hits it and it survives; the frames alternate a solid red ghost and the normal one), `Die` (8 frames, 100 ms, played once). `Left` also serves `Right` as a flip. One layer, `Body`. The ghost (`ghost.rs`) uses `Down`, `Left`, `Up`, `Attack`, `Hurt` and `Die`. |
 | `features/Green tree.aseprite` | none (all 8 frames loop) |
 | `features/Red tree.aseprite` | none (all 8 frames loop) |

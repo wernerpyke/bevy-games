@@ -20,7 +20,7 @@ use game_kit::pointer::WorldClick;
 pub const WALK_SPEED: f32 = 300.0;
 /// Playback speed multiplier for the walking animations. 1.0 is the speed set in Aseprite.
 const WALK_ANIMATION_SPEED: f32 = 2.5;
-/// The `Run` tag in `Hunter.aseprite` is the sideways walk. Set to match the way the art faces.
+/// The `Run` tag in `player.aseprite` is the sideways walk. Set to match the way the art faces.
 const WALK_ART_FACES_RIGHT: bool = true;
 /// The body that enemies touch (`game_kit::touch`). It is relative to the `Transform`, which is the centre of the canvas, so it
 /// runs from the feet (`PLAYER_FEET_OFFSET` below) up by the body height.
@@ -28,7 +28,7 @@ const HIT_BOX: HitBox = HitBox {
     offset: Vec2::new(0.0, PLAYER_BODY_HEIGHT / 2.0 - PLAYER_FEET_OFFSET),
     half_size: Vec2::new(PLAYER_HALF_WIDTH, PLAYER_BODY_HEIGHT / 2.0),
 };
-/// Draw the `Weapon` layer of `Hunter.aseprite`. The `background` layer is never drawn.
+/// Draw the `Weapon` layer of `player.aseprite`. The `background` layer is never drawn.
 const SHOW_WEAPON: bool = false;
 
 pub struct PlayerPlugin;
@@ -69,7 +69,7 @@ pub struct Player {
     hurt: bool,
 }
 
-/// Layers of `Hunter.aseprite` that the game draws, by name.
+/// Layers of `player.aseprite` that the game draws, by name.
 fn hunter_layers() -> Vec<String> {
     let mut layers = vec!["Body".to_string()];
     if SHOW_WEAPON {
@@ -119,7 +119,7 @@ pub fn spawn_player(
                 .with_settings::<AsepriteLoaderSettings>(|settings| {
                     settings.layer_selection = LayerSelectionSetting::Mask(hunter_layers());
                 })
-                .load("art/characters/Hunter.aseprite"),
+                .load("art/characters/player.aseprite"),
             animation: Animation::tag("Idle").with_repeat(AnimationRepeat::Loop),
         },
         Sprite::default(),

@@ -4,7 +4,7 @@ The numbers and object rules Long Way gives to the [collision extension](../../.
 
 ## The player
 
-- Feet: the point at the bottom of the player sprite, 56 below the canvas centre (`PLAYER_FEET_OFFSET`). The player is the Hunter (`Hunter.aseprite`, 128x128, feet at y 120), see `adr-lw15`.
+- Feet: the point at the bottom of the player sprite, 56 below the canvas centre (`PLAYER_FEET_OFFSET`). The player is the Hunter (`player.aseprite`, 128x128, feet at y 120), see `adr-lw15`.
 - Half width 14 (`PLAYER_HALF_WIDTH`). It must stay above 12.8, or rocks two cells apart stop merging.
 - The player is clamped to the view after collision (`player.rs`), which can move the feet into a shape.
 
