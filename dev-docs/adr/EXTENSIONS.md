@@ -62,4 +62,8 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x46 | The kit has a `Stunned` marker and a ray test against the collision outlines | EXTENSIONS-GAMEPLAY.md |
 | x47 | The kit holds the particle code (`fx`), and builds particle sheets from `.aseprite` tags at run time | EXTENSIONS-SCREEN.md |
 | x48 | The kit has area geometry and temporary blocked areas | EXTENSIONS-COLLISION.md |
+| x49 | Map edges: the kit owns the edge rules, and each game chooses basic or smooth edges | EXTENSIONS-MAPS.md |
+| x50 | `.` can be an edge cell: the legend value, objects on the ring, footprints and the start | EXTENSIONS-MAPS.md |
+| x51 | Map edges are drawn on one of two edge layers, the ground or the canopy | EXTENSIONS-SCREEN.md |
+| x52 | An edge tag with several frames is a set of variants, and the kit picks one per cell | EXTENSIONS-MAPS.md |
 | x53 | An object that blocks sorts at its blocked area, set by the kit | EXTENSIONS-SCREEN.md |
