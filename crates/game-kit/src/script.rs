@@ -12,7 +12,9 @@
 //!   the node under it gets the click as with a real mouse, and a `BlocksWorldClick` panel blocks the world click
 //! - `wait:<seconds>`
 //! - `screenshot:<name>`            save the window to `<name>.png` and wait until it is written. The folder is
-//!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`.
+//!   `<PREFIX>_SCREENSHOT_DIR`, default `target/screenshots`. Names use letters, digits, `-` and `_`. It also logs
+//!   where the world is in the image (`screenshot view cam_x= cam_y= px= py= ppu=`), which `dev-scripts/shot.sh` uses
+//!   to crop around a world position.
 //!   Add a `wait` before it after a `teleport`, so the frame shows the new position.
 //! - `goto:<map>:<entry>`           start a scene transition to an entry of a registered map and wait until it is done
 //!   (`map_transition.rs`). The player is put in the middle of the entry
@@ -35,6 +37,7 @@ use bevy::window::{PrimaryWindow, WindowRef};
 
 use crate::Controlled;
 use crate::depth::DepthSort;
+use crate::hud::HudCamera;
 use crate::map::Transition;
 use crate::map_transition::{ActiveMaps, MapTransition, RequestMapChange};
 use crate::pointer::{PointerSet, WorldClick};
@@ -252,12 +255,35 @@ impl UiPointer<'_, '_> {
     }
 }
 
+/// The camera that draws the world: every 2D camera except the HUD's.
+type WorldCamera = (With<Camera2d>, Without<HudCamera>);
+
+/// Where the world is in a screenshot, as `key=value` pairs that `dev-scripts/shot.sh` reads: the camera's world
+/// centre (`cam_x`, `cam_y`), the image pixel of that centre (`px`, `py`, from the top left) and image pixels per
+/// world unit (`ppu`). `None` before the camera knows its window.
+fn screenshot_view(camera: &Camera, transform: &GlobalTransform) -> Option<String> {
+    let scale = camera.target_scaling_factor()?;
+    let centre = transform.translation();
+    let pixel = camera.world_to_viewport(transform, centre).ok()? * scale;
+    let right = camera.world_to_viewport(transform, centre + Vec3::X).ok()? * scale;
+    Some(format!(
+        "cam_x={} cam_y={} px={} py={} ppu={}",
+        centre.x,
+        centre.y,
+        pixel.x,
+        pixel.y,
+        right.x - pixel.x
+    ))
+}
+
+#[allow(clippy::too_many_arguments)]
 fn run_script(
     mut commands: Commands,
     mut script: ResMut<Script>,
     mut input: ResMut<ButtonInput<KeyCode>>,
     time: Res<Time<Real>>,
     mut target: Query<(&mut Transform, &DepthSort), With<Controlled>>,
+    cameras: Query<(&Camera, &GlobalTransform), WorldCamera>,
     mut exit: MessageWriter<AppExit>,
     mut link: MapLink,
 ) {
@@ -329,6 +355,14 @@ fn run_script(
                     "script: screenshot requested, saving to {}",
                     shown.display()
                 );
+                match cameras
+                    .single()
+                    .ok()
+                    .and_then(|(camera, transform)| screenshot_view(camera, transform))
+                {
+                    Some(view) => info!("script: screenshot view {view}"),
+                    None => info!("script: screenshot view unknown (no single world camera)"),
+                }
                 script.shot_requested = true;
                 script.shot_saved = false;
                 commands

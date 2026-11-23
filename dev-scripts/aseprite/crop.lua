@@ -4,11 +4,14 @@
 -- Usage (see dev-scripts/aseprite.sh):
 --   aseprite -b <screenshot.png> --script-param out=<file.png> --script-param scale=4 \
 --     --script-param cx=0 --script-param cy=0 --script-param w=200 --script-param h=200 \
---     --script-param view_height=576 --script dev-scripts/aseprite/crop.lua
+--     --script-param cam_x=-736 --script-param cam_y=-300 --script-param px=576 --script-param py=288 \
+--     --script-param ppu=2.25 --script dev-scripts/aseprite/crop.lua
 --
 -- Two ways to say which region:
---   World units: cx, cy (centre, world coordinates, y up), w, h (size) and view_height (the game's
---     VIEW_HEIGHT). screen = image centre + world * (image height / view_height), y flipped.
+--   World units: cx, cy (centre, world coordinates, y up), w, h (size), and the view that the script runner logs
+--     with each screenshot (`screenshot view cam_x= cam_y= px= py= ppu=`): the camera's world centre, its image
+--     pixel and image pixels per world unit. screen = (px, py) + (world - camera) * ppu, y flipped.
+--     dev-scripts/shot.sh passes the view.
 --   Pixels: x, y (top left), w, h, all in image pixels.
 -- scale: whole-number zoom of the result, default 1.
 local spr = app.sprite
@@ -35,15 +38,14 @@ end
 
 local x, y
 if number("cx") and number("cy") then
-  local view = number("view_height")
-  if not view then
-    print("✗ World mode needs view_height")
+  local cam_x, cam_y, px, py, k = number("cam_x"), number("cam_y"), number("px"), number("py"), number("ppu")
+  if not (cam_x and cam_y and px and py and k) then
+    print("✗ World mode needs the view: cam_x, cam_y, px, py and ppu (shot.sh passes them)")
     return
   end
-  local k = spr.height / view
   w, h = math.floor(w * k + 0.5), math.floor(h * k + 0.5)
-  x = math.floor(spr.width / 2 + number("cx") * k - w / 2 + 0.5)
-  y = math.floor(spr.height / 2 - number("cy") * k - h / 2 + 0.5)
+  x = math.floor(px + (number("cx") - cam_x) * k - w / 2 + 0.5)
+  y = math.floor(py - (number("cy") - cam_y) * k - h / 2 + 0.5)
 else
   x, y = number("x"), number("y")
   if not (x and y) then

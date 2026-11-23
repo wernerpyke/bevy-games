@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::collision::Blocker;
 use crate::layers::WORLD_HALF_BAND;
 
 /// Z distance between one world unit of y and the draw order. Small enough to stay inside the camera range.
@@ -32,7 +33,63 @@ impl Plugin for DepthPlugin {
         app.insert_resource(DepthSettings {
             world_half_band: self.world_half_band,
         })
-        .add_systems(Update, sort_by_feet);
+        .add_systems(Update, (sort_at_blocker, sort_by_feet).chain());
+        #[cfg(debug_assertions)]
+        app.add_systems(Update, warn_sort_below_blocker);
+    }
+}
+
+/// How far above the bottom of its blocked area an object sorts. A character's feet stop exactly on that bottom, so
+/// without the bias the two would tie and the character could be drawn behind the object it stands in front of.
+pub const BLOCKER_SORT_BIAS: f32 = 1.0;
+
+/// Sorts a static object at the bottom of its `Blocker` plus `BLOCKER_SORT_BIAS`, so a character standing at it is
+/// drawn in front and one whose feet are above that line is drawn behind (`adr-x2`). The kit keeps its `DepthSort` in
+/// step with the blocker; the game sets no `feet_offset`.
+#[derive(Component, Clone, Copy, Debug, Default)]
+#[require(DepthSort)]
+pub struct SortAtBlocker;
+
+/// The draw line of an object whose feet may not enter `blocked`.
+pub fn sort_line(blocked: Rect) -> f32 {
+    blocked.min.y + BLOCKER_SORT_BIAS
+}
+
+fn sort_at_blocker(mut query: Query<(&Transform, &Blocker, &mut DepthSort), With<SortAtBlocker>>) {
+    for (transform, blocker, mut sort) in &mut query {
+        let feet_offset = transform.translation.y - sort_line(blocker.0);
+        if sort.feet_offset != feet_offset {
+            sort.feet_offset = feet_offset;
+        }
+    }
+}
+
+/// The warning for an object that sorts by hand at `feet_y` with the blocked area `blocked`, when a character standing
+/// at its bottom would not be drawn in front of it. `None` when the sort line is above that bottom.
+fn sort_below_blocker(feet_y: f32, blocked: Rect) -> Option<String> {
+    (feet_y <= blocked.min.y).then(|| {
+        format!(
+            "sorts at y {feet_y}, at or below the bottom of its blocked area (y {}), so a character standing there can be drawn behind it: use SortAtBlocker",
+            blocked.min.y
+        )
+    })
+}
+
+/// An object that has just got a hand-set sort or a blocker.
+#[cfg(debug_assertions)]
+type NewHandSort = (
+    Without<SortAtBlocker>,
+    Or<(Added<DepthSort>, Added<Blocker>)>,
+);
+
+/// Debug builds only: reports, once, a new object with a `Blocker` and a hand-set `DepthSort` that sorts at or below
+/// the bottom of its blocked area.
+#[cfg(debug_assertions)]
+fn warn_sort_below_blocker(new: Query<(Entity, &Transform, &DepthSort, &Blocker), NewHandSort>) {
+    for (entity, transform, sort, blocker) in &new {
+        if let Some(message) = sort_below_blocker(sort.feet_y(transform.translation.y), blocker.0) {
+            warn!("depth: {entity:?} {message}");
+        }
     }
 }
 
@@ -42,8 +99,9 @@ struct DepthSettings {
 }
 
 /// Sorts an entity by its feet so it draws behind things whose feet are lower on the screen.
-/// `feet_offset` is the distance from the entity's centre down to its feet.
-#[derive(Component)]
+/// `feet_offset` is the distance from the entity's centre down to its feet. An object that blocks uses
+/// `SortAtBlocker` instead of setting it.
+#[derive(Component, Default)]
 pub struct DepthSort {
     pub feet_offset: f32,
 }
@@ -110,6 +168,55 @@ mod tests {
         assert_eq!(z(right), depth_z(-576.0, -319.0));
         assert_eq!(z(left), depth_z(-672.0, -319.0));
         assert!(z(left) < z(plain) && z(plain) < z(right));
+    }
+
+    #[test]
+    fn an_object_sorts_just_above_its_blocked_bottom_so_a_character_standing_there_left_of_it_is_in_front()
+     {
+        let mut app = App::new();
+        app.add_plugins(DepthPlugin::default());
+        // The object's centre is not on its blocked area, so the line comes from the blocker alone.
+        let object = app
+            .world_mut()
+            .spawn((
+                SortAtBlocker,
+                Blocker(Rect::new(-70.0, 12.5, 30.0, 40.0)),
+                Transform::from_xyz(-20.0, 90.0, 0.0),
+            ))
+            .id();
+        // A character's feet stop on the blocked bottom, left of the object, where a tie would put it behind.
+        let character = app
+            .world_mut()
+            .spawn((
+                DepthSort { feet_offset: 25.0 },
+                Transform::from_xyz(-60.0, 37.5, 0.0),
+            ))
+            .id();
+        app.update();
+        let z = |app: &App, entity| app.world().get::<Transform>(entity).unwrap().translation.z;
+        assert_eq!(z(&app, object), depth_z(-20.0, 13.5));
+        assert!(z(&app, character) > z(&app, object));
+        // A new blocker moves the line with it.
+        app.world_mut()
+            .entity_mut(object)
+            .insert(Blocker(Rect::new(-70.0, -8.0, 30.0, 40.0)));
+        app.update();
+        assert_eq!(z(&app, object), depth_z(-20.0, -7.0));
+    }
+
+    #[test]
+    fn a_hand_set_sort_at_or_below_the_blocked_bottom_is_reported_and_one_above_it_is_not() {
+        let blocked = Rect::new(0.0, -16.0, 48.0, 8.0);
+        assert_eq!(
+            sort_below_blocker(-16.0, blocked).as_deref(),
+            Some(
+                "sorts at y -16, at or below the bottom of its blocked area (y -16), so a character standing there can be drawn behind it: use SortAtBlocker"
+            )
+        );
+        assert!(
+            sort_below_blocker(-20.0, blocked).is_some_and(|m| m.starts_with("sorts at y -20,"))
+        );
+        assert_eq!(sort_below_blocker(-15.5, blocked), None);
     }
 
     #[test]

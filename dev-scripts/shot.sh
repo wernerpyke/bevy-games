@@ -2,29 +2,43 @@
 # Takes a screenshot of a scripted run and saves a zoomed crop of it, in one call.
 #
 # Usage:
-#   ./dev-scripts/shot.sh <game> <name> "<commands>" [key=value ...]
+#   ./dev-scripts/shot.sh <game> <name> "<commands>" [map=<map>] [key=value ...]
 #     <commands>  the commands of `rust.sh script`, without screenshot and quit (both are added)
-#     key=value   crop options for dev-scripts/aseprite/crop.lua: cx, cy (world centre), w, h (world size),
-#                 scale. Without cx and cy the crop is centred on the world origin. Without w and h the
-#                 whole window is saved.
+#     map=<map>   start in that map, as `rust.sh script` takes it (a name such as 3 or 3.txt, or a path)
+#     key=value   crop options for dev-scripts/aseprite/crop.lua: cx, cy (world centre of the crop), w, h (world
+#                 size), scale. Without cx and cy the crop is centred on the camera. Without w and h the whole
+#                 window is saved.
 #
-# The run uses --debug. view_height comes from `pub const VIEW_HEIGHT` in games/<game>/src/camera.rs.
+# The run uses --debug. The world position of the crop comes from the view the script runner logs with the
+# screenshot (camera centre, its pixel and pixels per world unit), so it is right wherever the camera is,
+# also where it stops at a map edge and below or beside a HUD.
 # Output: target/screenshots/<name>.png (whole window) and, with a crop, target/screenshots/<name>_crop.png.
 # Delete both after the check (CLAUDE.md, "Disk use").
 #
-# Example (the player is in the middle of the view, so cx and cy are the player's world position):
-#   ./dev-scripts/shot.sh long-way hunter "teleport:225:-150;wait:0.4;hold:up:0.5;wait:0.3" cx=225 cy=-94 w=160 h=160 scale=4
+# Example (a 200 by 180 crop around the volcano of map 3, 2x):
+#   ./dev-scripts/shot.sh long-way volcano "wait:1.5;teleport:-753:-430" map=3 cx=-736 cy=-330 w=200 h=180 scale=2
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ -z "${1:-}" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ]; then
-  echo "✗ Usage: ./dev-scripts/shot.sh <game> <name> \"<commands>\" [key=value ...]" >&2
+  echo "✗ Usage: ./dev-scripts/shot.sh <game> <name> \"<commands>\" [map=<map>] [key=value ...]" >&2
   exit 1
 fi
 game="$1"; name="$2"; commands="$3"
 shift 3
 
-./dev-scripts/rust.sh script "$game" "$commands;screenshot:$name;quit" --debug
+map=()
+crop=()
+for arg in "$@"; do
+  case "$arg" in
+    map=*) map=("${arg#map=}") ;;
+    *) crop+=("$arg") ;;
+  esac
+done
+
+log="$(mktemp)"
+trap 'rm -f "$log"' EXIT
+./dev-scripts/rust.sh script "$game" "$commands;screenshot:$name;quit" ${map[@]+"${map[@]}"} --debug 2>&1 | tee "$log"
 
 png="target/screenshots/$name.png"
 if [ ! -f "$png" ]; then
@@ -33,17 +47,19 @@ if [ ! -f "$png" ]; then
 fi
 echo "✓ $png"
 
-if [ "$#" -gt 0 ]; then
-  camera="games/$game/src/camera.rs"
-  view="$(sed -n 's/^pub const VIEW_HEIGHT: f32 = \([0-9.]*\);.*/\1/p' "$camera")"
+if [ "${#crop[@]}" -gt 0 ]; then
+  view="$(sed -n 's/.*script: screenshot view \(cam_x=.*\)$/\1/p' "$log" | tail -1)"
   if [ -z "$view" ]; then
-    echo "✗ No VIEW_HEIGHT in $camera" >&2
+    echo "✗ The log has no screenshot view, so the crop cannot be placed" >&2
     exit 1
   fi
+  echo "✓ view: $view"
+  # shellcheck disable=SC2206
+  view_args=($view)
   extra=()
-  case " $* " in
+  case " ${crop[*]} " in
     *" cx="*) ;;
-    *) extra+=(cx=0 cy=0) ;;
+    *) extra+=("cx=$(sed 's/.*cam_x=\([^ ]*\).*/\1/' <<<"$view")" "cy=$(sed 's/.*cam_y=\([^ ]*\).*/\1/' <<<"$view")") ;;
   esac
-  ./dev-scripts/aseprite.sh crop "$png" "$@" ${extra[@]+"${extra[@]}"} "view_height=$view" "out=target/screenshots/${name}_crop.png"
+  ./dev-scripts/aseprite.sh crop "$png" "${crop[@]}" ${extra[@]+"${extra[@]}"} "${view_args[@]}" "out=target/screenshots/${name}_crop.png"
 fi

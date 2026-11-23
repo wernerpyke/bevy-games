@@ -4,7 +4,7 @@
 use bevy::prelude::*;
 use game_kit::animation::tag_sprite;
 use game_kit::collision::Blocker;
-use game_kit::depth::DepthSort;
+use game_kit::depth::SortAtBlocker;
 use game_kit::map::MapObject;
 
 use crate::camera::CELL_SIZE;
@@ -14,9 +14,6 @@ use crate::map::{CurrentMap, Kind, MapEntity, blocking_group_sizes};
 /// Both art files are packed with the same canvas: 30 wide and 39 high, each tree at the bottom centre
 /// (`dev-scripts/aseprite/pack_pngs.lua`).
 const CANVAS_HEIGHT: f32 = 39.0;
-/// A tree sorts this far above its base, so the player standing on the base line is drawn in front (as `adr-lw13`).
-const SORT_BIAS: f32 = 1.0;
-
 pub struct TreesPlugin;
 
 impl Plugin for TreesPlugin {
@@ -95,9 +92,7 @@ pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
             .spawn((
                 MapEntity,
                 Blocker(area_of(object, &art, group_size)),
-                DepthSort {
-                    feet_offset: -SORT_BIAS,
-                },
+                SortAtBlocker,
                 Transform::from_translation(base.extend(0.0)),
                 Visibility::default(),
             ))

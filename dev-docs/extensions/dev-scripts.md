@@ -4,11 +4,12 @@ All scripts take the game, file and sizes as arguments. They never change the in
 
 ## Zoomed screenshot
 
-`./dev-scripts/shot.sh <game> <name> "<commands>" [cx= cy= w= h= scale=]`
+`./dev-scripts/shot.sh <game> <name> "<commands>" [map=<map>] [cx= cy= w= h= scale=]`
 
 - Runs `rust.sh script` with `--debug`, adds `screenshot:<name>;quit`, then crops.
-- `cx`, `cy`: world centre of the crop (y up). `w`, `h`: world size. `scale`: whole-number zoom.
-- The conversion is `screen = window centre + world * (window height / VIEW_HEIGHT)`, y flipped. `VIEW_HEIGHT` comes from the game's `camera.rs`.
+- `map`: start in that map (`3` or `3.txt`, as `rust.sh script` takes it).
+- `cx`, `cy`: world centre of the crop (y up), the camera centre when left out. `w`, `h`: world size. `scale`: whole-number zoom.
+- With each screenshot the script runner logs `screenshot view cam_x= cam_y= px= py= ppu=`: the world camera's centre, its pixel in the image and image pixels per world unit. `shot.sh` passes these to `crop`, which places the crop at `(px, py) + (world - camera) * ppu`, y flipped. So the crop is right when the camera stops at a map edge and with a HUD bar.
 - Output: `<name>.png` (whole window) and `<name>_crop.png`.
 
 ## Aseprite checks
@@ -22,7 +23,7 @@ All scripts take the game, file and sizes as arguments. They never change the in
 | `sheet_analysis` | sheet `.png` | `frame=WxH` | Bounds and colour count per frame, all colours of the sheet |
 | `set_durations` | `.aseprite` | `tags=a,b` or `all`, `ms=`, `apply=1`, `out=` | Sets the frame duration of those tags. A dry run (lists the frames it would change) unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first |
 | `rename_tag` | `.aseprite` | `from=`, `to=`, `apply=1`, `out=` | Renames one tag. Refuses a missing or repeated `from` and an existing `to`. A dry run unless `apply=1`, which saves to `out=` or over the input. Close the file in Aseprite first. Rename the tag in the code too |
-| `crop` | `.png` | `out=`, `scale=`, `cx cy w h view_height=` or `x y w h` | Cropped and scaled PNG |
+| `crop` | `.png` | `out=`, `scale=`, `cx cy w h` with the logged view `cam_x cam_y px py ppu`, or `x y w h` | Cropped and scaled PNG |
 | `catalogue` | sheet `.png` | `tile=` (or `tilew tileh`), `out=`, `backdrop=` | `.aseprite` copy of the sheet at 1:1 with column and row rulers and a grid. See `tile-sheet-catalogue.md` |
 | `extract_block` | original sheet `.png` | `col row cols rows tile=`, `scale=`, `anchor=bottom\|trunk\|none`, `out=` | One-frame `.aseprite` of that block, anchored in its cell space and scaled. See `tile-sheet-catalogue.md` |
 | `remap_colors` | `.aseprite` (RGB) | `map=from:to,...` (RRGGBB hex), `apply=1`, `out=` | Replaces exact colours in every cel. A dry run (lists pixel counts per pair and untouched colours) unless `apply=1`. Use before `extend_palette` (`adr-a8`) |

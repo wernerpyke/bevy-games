@@ -48,6 +48,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - `commands.spawn(Screenshot::primary_window()).observe(save_to_disk(path))` with `use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};`.
 - The file is written a few frames later, inside the observer. A second `.observe(|_: On<ScreenshotCaptured>, ..| ..)` added after it runs once the file is saved.
 - Saves the window at physical size (2560x1440 on this Mac). Includes UI, sprites and gizmos.
+- World position to screenshot pixel: `camera.world_to_viewport(&global_transform, world)` gives logical pixels from the top left of the window, the viewport offset included. Multiply by `camera.target_scaling_factor()` for the pixel in the screenshot. The script runner logs this per screenshot for `shot.sh` (`script.rs`, `screenshot_view`).
 
 ## Text
 

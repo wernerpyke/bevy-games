@@ -15,7 +15,7 @@ Two parts: sorting world sprites by their feet, and a fixed set of named layers.
 | `DepthSort`, `DepthPlugin { world_half_band }` | `crates/game-kit/src/depth.rs` | Shared. |
 | Layer constants | `crates/game-kit/src/layers.rs` | Shared defaults. A game overrides a value through a plugin field or adds its own layers. |
 
-Decisions: `adr-x2`, `adr-x9`, and `adr-lw12` for the Long Way layers. The same feet line decides collision ([collision.md](collision.md)), so what is drawn matches where the character can walk.
+Decisions: `adr-x2`, `adr-x53` (sort at the blocked area), `adr-x9`, and `adr-lw12` for the Long Way layers. The same feet line decides collision ([collision.md](collision.md)), so what is drawn matches where the character can walk.
 
 ## Specification
 
@@ -27,7 +27,7 @@ Decisions: `adr-x2`, `adr-x9`, and `adr-lw12` for the Long Way layers. The same 
 3b. The x of the tie break is the middle of the footprint. A sprite whose `Transform` is not there (anchored at a corner) adds `TieBreakX(offset)`, the distance from its x to the footprint middle. Otherwise two objects can tie exactly and swap order from frame to frame (`adr-x2`).
 4. z stays inside `WORLD_HALF_BAND` (100), checked by `debug_assert`. That allows feet y up to about 100000.
 5. The sort runs in `Update` with no ordering against movement, so z can lag one frame.
-6. Objects with a footprint choose their own sort line. The game adds a small bias so a character standing at the object is drawn in front.
+6. An object that blocks (`Blocker`) gets `SortAtBlocker`: the kit sorts it at the bottom of its blocked area plus `BLOCKER_SORT_BIAS` (1), so a character standing at it is drawn in front and one above that line behind (`adr-x53`). Debug builds warn once (`depth:` in the log) about an object with a `Blocker` and a hand-set `DepthSort` at or below that bottom. An object whose blocked area is not a `Blocker` (Long Way's rocks) adds the bias itself.
 
 ### Layers
 
@@ -52,7 +52,7 @@ Back to front:
 ## Usage
 
 - Add `DepthPlugin`.
-- Add `DepthSort { feet_offset }` to any sprite that should sort.
+- Add `DepthSort { feet_offset }` to a character or other sprite that should sort, and `SortAtBlocker` (with its `Blocker`) to an object that blocks.
 - Import layer constants from `game_kit::layers`. A debug sprite goes on `FEATURE_DEBUG_Z`. A HUD node uses `GlobalZIndex(HUD_Z_INDEX)`.
 
 ## Limits

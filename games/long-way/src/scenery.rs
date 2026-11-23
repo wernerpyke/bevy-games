@@ -13,9 +13,9 @@ use game_kit::animation::all_frames_animation;
 
 use crate::collision::Trunk;
 use crate::map::{Group, Kind, blocking_groups};
-use crate::rocks::{SORT_BIAS, footprint_corner};
+use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
-use game_kit::depth::{DepthSort, TieBreakX};
+use game_kit::depth::{SortAtBlocker, TieBreakX};
 use game_kit::map::Map;
 use game_kit::map_transition::{MapId, MapLoad};
 
@@ -166,10 +166,7 @@ pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, l
         commands.spawn((
             MapId(load.id.clone()),
             blocker(&art, base, canvas_left, corner, map.cell_size, group),
-            // The feet are the bottom of the canvas, one pixel up like the other objects.
-            DepthSort {
-                feet_offset: -SORT_BIAS,
-            },
+            SortAtBlocker,
             TieBreakX(tie_break(Kind::of(object), base, corner, map.cell_size)),
             all_frames_animation(server, art.path),
             Sprite::default(),

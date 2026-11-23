@@ -62,3 +62,4 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x46 | The kit has a `Stunned` marker and a ray test against the collision outlines | EXTENSIONS-GAMEPLAY.md |
 | x47 | The kit holds the particle code (`fx`), and builds particle sheets from `.aseprite` tags at run time | EXTENSIONS-SCREEN.md |
 | x48 | The kit has area geometry and temporary blocked areas | EXTENSIONS-COLLISION.md |
+| x53 | An object that blocks sorts at its blocked area, set by the kit | EXTENSIONS-SCREEN.md |

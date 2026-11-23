@@ -7,9 +7,9 @@ use game_kit::animation::all_frames_animation;
 
 use crate::collision::Trunk;
 use crate::map::{Group, Kind, blocking_groups};
-use crate::rocks::{SORT_BIAS, footprint_corner};
+use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
-use game_kit::depth::DepthSort;
+use game_kit::depth::SortAtBlocker;
 use game_kit::map::{Map, MapObject};
 use game_kit::map_transition::{MapId, MapLoad};
 
@@ -81,9 +81,7 @@ fn spawn_tree(
     commands.spawn((
         MapId(load.id.clone()),
         tree_blocker(&trunk, corner, map.cell_size, group),
-        DepthSort {
-            feet_offset: TREE_SIZE / 2.0 - SORT_BIAS,
-        },
+        SortAtBlocker,
         all_frames_animation(server, path),
         RandomStartFrame::for_cell(&map.name, object.cell),
         Sprite::default(),

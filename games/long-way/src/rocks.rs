@@ -8,7 +8,7 @@ use game_kit::animation::tag_sprite;
 use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::{Group, Kind, blocking_groups};
 use game_kit::collision::{Blocker, CollisionWorld};
-use game_kit::depth::DepthSort;
+use game_kit::depth::{BLOCKER_SORT_BIAS, DepthSort};
 use game_kit::map::{Map, MapObject};
 use game_kit::map_transition::{MapId, MapLoad};
 
@@ -28,9 +28,10 @@ const BOTTOM_INSET_FRACTION: f32 = 0.0;
 const ALONE_BAND_FRACTION: f32 = 0.1;
 /// Drawn size of a rock in pixels when the map file has no `draw` key.
 const DEFAULT_DRAW_SIZE: f32 = 128.0;
-/// How far above the bottom of the blocked area a rock sorts. The player stops exactly on that line, so without a bias the
-/// draw order of the two would be a tie. With it the player is drawn in front when it stands at the rock or below it.
-pub const SORT_BIAS: f32 = 1.0;
+/// How far above the bottom of the blocked area a rock sorts, the kit's bias for objects that block. A rock's blocked area
+/// is a `RockArea`, not a `Blocker`, so it cannot use `SortAtBlocker`. Pickups use it too, so the player is drawn in
+/// front of a pickup it stands on.
+pub const SORT_BIAS: f32 = BLOCKER_SORT_BIAS;
 
 /// Marker for a rock. The collision code queries it.
 #[derive(Component)]

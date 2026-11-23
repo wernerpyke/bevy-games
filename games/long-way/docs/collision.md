@@ -13,7 +13,7 @@ The numbers and object rules Long Way gives to the [collision extension](../../.
 Each tree has a `Trunk { left, right, base_y, height }` in world coordinates. Its blocked area for the feet is:
 
 - **Sides:** `left - 20` to `right + 20`, so the body cannot overlap the trunk from left or right.
-- **Bottom:** `base_y`, the base of the tree. Walking up from below, the player stops with its feet on the base line, as at the bottom of a rock (changed 2026-11-02, before this it was 30 below the base). A tree sorts at its base plus `SORT_BIAS` (1), as a rock does, so the player standing at the base is drawn in front.
+- **Bottom:** `base_y`, the base of the tree. Walking up from below, the player stops with its feet on the base line, as at the bottom of a rock (changed 2026-11-02, before this it was 30 below the base). A tree sorts at the bottom of its blocked area plus 1 (`SortAtBlocker`, `adr-x53`), as a rock does, so the player standing at the base is drawn in front.
 - **Top:** `base_y + 10%` of the tree height (`BLOCKED_BOTTOM`). Above this line the player walks behind the tree and overlaps the trunk and canopy freely. The player cannot enter the bottom 10%.
 
 Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs`). A trunk that overlaps a rock joins the rock's cluster.

@@ -6,9 +6,9 @@ use bevy::prelude::*;
 use game_kit::animation::tag_sprite;
 
 use crate::map::Kind;
-use crate::rocks::{SORT_BIAS, footprint_corner};
+use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
-use game_kit::depth::DepthSort;
+use game_kit::depth::SortAtBlocker;
 use game_kit::map::{Map, MapObject};
 use game_kit::map_transition::{ExitTrigger, MapId, MapLoad};
 
@@ -88,9 +88,7 @@ fn spawn_marker(
     let mut entity = commands.spawn((
         MapId(load.id.clone()),
         Blocker(blocked),
-        DepthSort {
-            feet_offset: MARKER_HEIGHT / 2.0 - SORT_BIAS,
-        },
+        SortAtBlocker,
         tag_sprite(server, "art/features/Markers.aseprite", tag),
         Transform::from_translation(centre.extend(0.0)),
     ));

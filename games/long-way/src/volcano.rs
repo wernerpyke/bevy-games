@@ -7,13 +7,12 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 use game_kit::collision::Blocker;
-use game_kit::depth::DepthSort;
+use game_kit::depth::SortAtBlocker;
 use game_kit::map::Map;
 use game_kit::map_transition::{MapId, MapLoad};
 
 use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::Kind;
-use crate::rocks::SORT_BIAS;
 
 const ART: &str = "art/characters/volcano.aseprite";
 /// The layers drawn in the game. The file also has `test_bg`, a backdrop for drawing that is never drawn in the game,
@@ -65,10 +64,7 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
             Volcano,
             MapId(load.id.clone()),
             Blocker(blocked_area(feet)),
-            // The player stops on the bottom of the blocked area, so the volcano sorts just above it, like a rock.
-            DepthSort {
-                feet_offset: FEET_BELOW_CENTRE - SORT_BIAS,
-            },
+            SortAtBlocker,
             AseAnimation {
                 aseprite: server
                     .load_builder()
@@ -93,7 +89,7 @@ mod tests {
     use crate::test_util::{asset_app, map, object, spawn_with};
 
     #[test]
-    fn a_marker_puts_a_volcano_on_the_bottom_of_its_cell_on_whole_pixels_with_its_base_blocked_and_sorted_above_it()
+    fn a_marker_puts_a_volcano_on_the_bottom_of_its_cell_on_whole_pixels_with_its_base_blocked_and_sorted_at_it()
      {
         let mut app = asset_app(16);
         let map = map(
@@ -111,29 +107,29 @@ mod tests {
         spawn_with(&mut app, move |commands, server| {
             spawn_volcanoes(commands, server, &map, &load);
         });
-        let volcanoes: Vec<(Vec2, Rect, f32, String)> = app
+        let volcanoes: Vec<(Vec2, Rect, bool, String)> = app
             .world_mut()
-            .query_filtered::<(&Transform, &Blocker, &DepthSort, &MapId), With<Volcano>>()
+            .query_filtered::<(&Transform, &Blocker, Has<SortAtBlocker>, &MapId), With<Volcano>>()
             .iter(app.world())
-            .map(|(transform, blocker, sort, id)| {
+            .map(|(transform, blocker, sorted, id)| {
                 (
                     transform.translation.truncate(),
                     blocker.0,
-                    sort.feet_y(transform.translation.y),
+                    sorted,
                     id.0.clone(),
                 )
             })
             .collect();
         // Centre 31 art px x 2 above the feet. Base x 11 and 54 of the 64 px canvas, so -21 and +22 art px x 2 from the
         // feet, widened by 14 on each side: 130 - 42 - 14 = 74 and 130 + 44 + 14 = 188. Rows 50 to 63 are 13 art px x 2.
-        // The player stops on the bottom of the blocked area, so the volcano sorts `SORT_BIAS` above it, at 165: a player
-        // there is in front whatever its x, not tied with the volcano.
+        // The player stops on the bottom of the blocked area, so the volcano sorts at it (`SortAtBlocker`): a player there is
+        // in front whatever its x.
         assert_eq!(
             volcanoes,
             vec![(
                 Vec2::new(130.0, 226.0),
                 Rect::new(74.0, 164.0, 188.0, 190.0),
-                165.0,
+                true,
                 "m".to_string()
             )]
         );

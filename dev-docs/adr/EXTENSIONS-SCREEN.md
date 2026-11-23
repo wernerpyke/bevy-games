@@ -84,3 +84,11 @@ Screen regions, app states, camera, draw order layers and animation. Index of al
 **Rationale.** An edge can look like shrubbery or a pit on the ground, which actors and features stand on, or like a tree canopy that hides what walks under it. The choice is a look of the game, so the game makes it, and the kit only names the two positions so no game writes a bare z number (`adr-x9`, `adr-x14`). On the ground, the F3 grid draws over the edge, so cells can still be read.
 
 **How to apply.** Use the constant of the chosen layer, and add `EDGE_HALF_Z_OFFSET` for a sprite with `EdgeSprite::half`. The order is checked when the kit is compiled.
+
+## adr-x53. An object that blocks sorts at its blocked area, set by the kit (2026-11-23)
+
+**Decision.** A static object with a `Blocker` gets `SortAtBlocker` in place of a hand-set `DepthSort`. The kit keeps its sort line at the bottom of the blocked area plus `BLOCKER_SORT_BIAS` (1 px). In debug builds the kit warns once about an object with a `Blocker` and a hand-set `DepthSort` that sorts at or below the bottom of its blocked area.
+
+**Rationale.** A character's feet stop exactly on the bottom of a blocked area. An object sorting on that line ties with a character standing there, and the tie breaks by x, so the character is drawn behind the object on one side of it. Each object set its line by hand and had to remember the bias: rocks were wrong first (`adr-lw13`), and the volcano repeated it (2026-11-23). `adr-x2` already says the sort line and the collision line are one line; deriving one from the other makes that true by construction. The warning catches an object that still sorts by hand.
+
+**How to apply.** Spawn a blocking object with `Blocker(area)` and `SortAtBlocker`, and no `feet_offset`. Use a hand-set `DepthSort` only for objects without a `Blocker` (characters, pickups) or whose blocked area is not a `Blocker` (Long Way's rocks, which use `BLOCKER_SORT_BIAS` through their own `SORT_BIAS`). A `depth:` warning in the log names the entity to change.
