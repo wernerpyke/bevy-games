@@ -79,3 +79,11 @@
 **Rationale.** The ghost has five dark reds and two bright ones, but only its eyes are kept. The eyes need a bright red and a dark red. The palette had the bright one. Mapping the dark red to `#1b141c` made the eye sockets nearly black, and mapping it to `#5b283b` changed its hue, so one colour was added. Future enemies can share it. Pack reds are pure saturated red and the palette's reds are muted, so the splatter colours were not adopted.
 
 **How to apply.** Same method as `adr-a8`. Reds for later enemies should reuse `#8c0707`, `#430202` and `#e13737` before a new red is added.
+
+## adr-a11. Draw at the art pixel size, scale in the game by a whole number (2026-11-23)
+
+**Decision.** An art file keeps the size it is drawn at: one drawn dot is one art pixel. When a sprite must be bigger in the game, the game draws it at a whole-number scale (rule 5 of `dev-docs/extensions/pixel-art.md`). The file is not resized. First case: `characters/volcano.aseprite` stays 64x64 and Long Way draws it at 2x (`SCALE` in `volcano.rs`).
+
+**Rationale.** A whole-number nearest-neighbour scale looks the same in the game as a resized file. A resized file makes every art pixel a block of pixels, so each later edit must cover the whole block, or the sprite mixes pixel sizes. At 2x the volcano has the same pixel size as the player and the Zen Garden art, whose files were doubled when they were imported.
+
+**How to apply.** Resize the file only to draw finer detail at the bigger size, and then draw the whole sprite at that size. Values in code that come from the art (feet offset, hit box, blocked area, where a projectile starts) are in art pixels times the scale, as for the ghost.

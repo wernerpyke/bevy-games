@@ -15,9 +15,14 @@ const ART: &str = "art/characters/volcano.aseprite";
 /// The layers drawn in the game. The file also has `test_bg`, a backdrop for drawing that is never drawn in the game,
 /// even when it is saved visible. A new art layer must be added here.
 const LAYERS: [&str; 3] = ["base", "rim", "lava"];
-/// The art canvas is 64 by 64, drawn at its own size, and the lowest row of the body is row 62 of 64, so the bottom of
-/// the body is 31 pixels below the centre.
-const FEET_BELOW_CENTRE: f32 = 31.0;
+/// The volcano is drawn at this many times the art size. The file stays at the size it is drawn at (`adr-a11`).
+const SCALE: f32 = 2.0;
+/// The art canvas is 64 by 64 and the lowest row of the body is row 62 of 64, so the bottom of the body is 31 art
+/// pixels below the centre.
+const FEET_BELOW_CENTRE: f32 = 31.0 * SCALE;
+/// The bottom of the body stands this far below the middle of the cell, whatever the scale: 31 px, 1 px above the
+/// bottom of a 64 px cell.
+const FEET_BELOW_CELL_MIDDLE: f32 = 31.0;
 
 /// The root of a volcano. Its `Transform` is the centre of the sprite.
 #[derive(Component)]
@@ -31,8 +36,9 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
             continue;
         }
         // Whole pixels, so the art pixels line up with the screen pixels.
-        let centre =
+        let cell_middle =
             (load.origin + (object.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size).round();
+        let centre = cell_middle + Vec2::Y * (FEET_BELOW_CENTRE - FEET_BELOW_CELL_MIDDLE);
         commands.spawn((
             Volcano,
             MapId(load.id.clone()),
@@ -50,7 +56,8 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
                 animation: Animation::tag("Attack").with_repeat(AnimationRepeat::Loop),
             },
             Sprite::default(),
-            Transform::from_translation(centre.extend(0.0)),
+            Transform::from_translation(centre.extend(0.0))
+                .with_scale(Vec3::new(SCALE, SCALE, 1.0)),
         ));
         debug!("volcano: placed at {centre:?} in map {}", load.id);
     }
