@@ -43,7 +43,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 3. A rock is solid on all sides. The player walks only around the outline of a rock cluster.
 4. One rock covers 2x2 cells (128 pixels). Its collision rectangle is inset by 10% on the left, right and top, and not at the bottom, so the bottom line sits on the lowest art pixel (changed 2026-11-01 after the developer saw the line cut into the sprite).
 5. Rocks are drawn overlapping (shrub look). Placement is one character per cell, rocks drawn at 128 px with no jitter (variant V1, chosen on 2026-11-01 from three variants). `draw` and `jitter` stay as optional front matter keys (`pitch` went with the markdown format). Collision stays on the inset footprint. The slide range on long edges is decided by experiment.
-6. Map loading starts with `include_str!` and an own parser. A sturdier pipeline is `rm3`.
+6. Maps are read from disk with an own parser (built in with `include_str!` until 2026-11-23, `adr-e11`). A sturdier pipeline is `rm3`.
 7. Map cell (0, 0) is a fixed world position, `MAP_ORIGIN` in `camera.rs` (-1024, -576), the corner of a 16:9 view rounded to whole cells. The F3 grid uses it, so cells do not move when the window is resized. This replaces the window dependent `BottomLeft` grid origin in Long Way.
 8. `Rocks.aseprite` is the native 32x32 art, scaled in the engine by a whole number (`draw` divided by 32).
 

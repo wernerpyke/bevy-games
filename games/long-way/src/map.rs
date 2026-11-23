@@ -11,23 +11,20 @@ use game_kit::map_transition::{
 };
 use game_kit::reload::ReloadMap;
 
-/// Every map of the game. A native run reads the files from disk, so F1 reloads the current one. The web build has no
-/// disk and uses the bundled copies.
+/// Every map of the game. The files are read from disk, so F1 reloads the current one and an edit needs no rebuild (the
+/// web build is paused, `adr-e11`).
 const MAPS: &[MapSource] = &[
     MapSource {
         id: "1",
         file: "assets/maps/1.txt",
-        bundled: include_str!("../assets/maps/1.txt"),
     },
     MapSource {
         id: "2",
         file: "assets/maps/2.txt",
-        bundled: include_str!("../assets/maps/2.txt"),
     },
     MapSource {
         id: "3",
         file: "assets/maps/3.txt",
-        bundled: include_str!("../assets/maps/3.txt"),
     },
 ];
 

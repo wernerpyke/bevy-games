@@ -14,7 +14,7 @@
 //!
 //! Only the scene transition (fade) is built so far. A seamless exit uses the same fade for now.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use bevy::ecs::system::SystemId;
 use bevy::prelude::*;
@@ -29,13 +29,12 @@ use crate::map::{Area, Edge, Facing, Map, MapEntry, MapExit, Transition, parse, 
 use crate::map_edge::{EdgeFit, edge_start_feet};
 use crate::map_links::{LinkedMap, validate_links};
 
-/// One map file a game registers. `file` is relative to the game folder: a native run reads it from disk (so F1 reloads
-/// it), the web build has no disk and uses `bundled`, normally an `include_str!` of the same file.
+/// One map file a game registers. `file` is relative to the game folder: it is read from disk at start and again on F1,
+/// so a map edit needs no rebuild. The maps are not built into the program (the web build is paused, `adr-e11`).
 #[derive(Clone, Copy, Debug)]
 pub struct MapSource {
     pub id: &'static str,
     pub file: &'static str,
-    pub bundled: &'static str,
 }
 
 /// A parsed map with the id it was registered under.
@@ -110,17 +109,23 @@ impl MapRegistry {
     }
 }
 
+/// The folder that map files are relative to: the game folder in a run through Cargo (`CARGO_MANIFEST_DIR`), else the
+/// folder of the program, as Bevy finds `assets/`.
+pub fn game_folder() -> PathBuf {
+    std::env::var_os("CARGO_MANIFEST_DIR")
+        .map(PathBuf::from)
+        .or_else(|| {
+            std::env::current_exe()
+                .ok()
+                .and_then(|exe| exe.parent().map(Path::to_path_buf))
+        })
+        .unwrap_or_default()
+}
+
 fn read(source: &MapSource, kinds: &[&str]) -> Result<RegisteredMap, String> {
-    let (file, text) = match std::env::var_os("CARGO_MANIFEST_DIR") {
-        None => (source.file.to_string(), source.bundled.to_string()),
-        Some(dir) => {
-            let path = Path::new(&dir).join(source.file);
-            let name = path.display().to_string();
-            let text =
-                std::fs::read_to_string(&path).map_err(|error| format!("{name}: {error}"))?;
-            (name, text)
-        }
-    };
+    let path = game_folder().join(source.file);
+    let file = path.display().to_string();
+    let text = std::fs::read_to_string(&path).map_err(|error| format!("{file}: {error}"))?;
     let map = parse(&file, &text, kinds).map_err(|error| error.to_string())?;
     Ok(RegisteredMap {
         id: source.id.to_string(),
@@ -2549,7 +2554,6 @@ mod tests {
         MapSource {
             id,
             file: path.display().to_string().leak(),
-            bundled: "",
         }
     }
 
@@ -2560,7 +2564,6 @@ mod tests {
         let missing = MapSource {
             id: "2",
             file: dir.join("none.txt").display().to_string().leak(),
-            bundled: "",
         };
         let bad = map_file(&dir, "3", "no front matter\n");
         let lost = map_file(

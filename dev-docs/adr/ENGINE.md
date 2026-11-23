@@ -14,7 +14,7 @@
 
 Accepted costs: breaking API changes every Bevy release, slow compiles, larger web builds.
 
-**How to apply.** Keep native macOS and `wasm32-unknown-unknown` builds working. Disable unused Bevy default features to limit web build size.
+**How to apply.** Keep native macOS builds working. The web build (`wasm32-unknown-unknown`) is paused since 2026-11-23 (`adr-e11`). Disable unused Bevy default features to limit build size.
 
 ## adr-e2. Pin Bevy 0.20.1 (2026-10-30)
 
@@ -106,3 +106,11 @@ Updated 2026-11-05: the player is now the Hunter, a 128x128 canvas with a body a
 **Rationale.** The collision rules are game rules, not physics: the 50% overlap from below, walking behind from above, sliding round corners, and groups of features that block as one shape. Since the spike was planned, the kit has grown an occupancy grid with A* path finding, groups, temporary blocked areas and sliding, all unit tested without a running world. A physics crate would replace working, tested code, add build time and wasm size, and still need the game rules on top of it. The user's decision (2026-11-14).
 
 **How to apply.** Do not add a physics crate. If a need appears that the custom code cannot meet well (many bodies pushing each other, rotation, joints), open a new roadmap item and weigh it again.
+
+## adr-e11. The web build is paused; maps are read from disk only (2026-11-23)
+
+**Decision.** macOS native is the only target for now. The games are no longer checked for `wasm32-unknown-unknown`, and a new dependency need not support it. The maps are no longer built into the program: `MapSource` has no `bundled` copy, and Long Way and R-Town read their map files from the game folder (`CARGO_MANIFEST_DIR` in a run through Cargo, else the folder of the program). The parts that make the web easy to bring back stay: the wasm target in `rust-toolchain.toml` (`adr-e5`), the `wasm-server-runner` runner in `.cargo/config.toml`, `[profile.wasm-release]` (`adr-e6`), `./dev-scripts/rust.sh web`, and the small `wasm32` code paths (`rng.rs`, `particle-spike`).
+
+**Rationale.** The user's decision. The web build had a cost on every map edit: `include_str!` made each map file a source file of its game, so a native run rebuilt the game crate (12.8 s for Long Way) although a run through Cargo reads the map from disk and never uses the built-in copy. Dropping the web check also saves its build output (about 420 MB) and the time of `rust.sh web`. No game has run in a browser yet (`rm10`).
+
+**How to apply.** Bringing the web back is `rm10`: maps need a source again (built-in copies or loading over HTTP, which the asset server already does for art), then run `./dev-scripts/rust.sh web` and fix what no longer compiles. Until then, do not run it as a gate.

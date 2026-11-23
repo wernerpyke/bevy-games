@@ -7,16 +7,16 @@ use game_kit::debug::DebugSettings;
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, parse};
+use game_kit::map_transition::game_folder;
 use game_kit::reload::ReloadMap;
 
 use crate::camera::CELL_SIZE;
 use crate::enemy::{EnemyKind, SpawnerDef, spawner_def};
 use crate::water::Part;
 
-/// The default map file, relative to the game folder. A native run reads it from disk, so F1 reloads it. The web
-/// build has no disk and uses the bundled copy.
+/// The default map file, relative to the game folder. It is read from disk, so F1 reloads it and an edit needs no
+/// rebuild (the web build is paused, `adr-e11`).
 const MAP_NAME: &str = "assets/maps/test.txt";
-const BUNDLED_SOURCE: &str = include_str!("../assets/maps/test.txt");
 /// Environment variable with the path of a map file to load instead (`rust.sh run r-town <map>`).
 const MAP_VARIABLE: &str = "R_TOWN_MAP";
 
@@ -84,17 +84,11 @@ impl Plugin for MapPlugin {
 #[derive(Component)]
 pub struct MapEntity;
 
-/// Reads the map file: the path in `R_TOWN_MAP`, else the default file in the game folder, else the bundled copy.
+/// Reads the map file: the path in `R_TOWN_MAP`, else the default file in the game folder.
 fn read_source() -> Result<(String, String), String> {
     let path = std::env::var_os(MAP_VARIABLE)
         .map(std::path::PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("CARGO_MANIFEST_DIR")
-                .map(|dir| std::path::Path::new(&dir).join(MAP_NAME))
-        });
-    let Some(path) = path else {
-        return Ok((MAP_NAME.to_string(), BUNDLED_SOURCE.to_string()));
-    };
+        .unwrap_or_else(|| game_folder().join(MAP_NAME));
     let name = path.display().to_string();
     std::fs::read_to_string(&path)
         .map(|source| (name.clone(), source))
@@ -295,13 +289,18 @@ fn spawn_ground(mut commands: Commands, map: Res<CurrentMap>) {
 mod tests {
     use super::*;
 
+    /// The default map file, read from the game folder.
+    fn source() -> String {
+        std::fs::read_to_string(game_folder().join(MAP_NAME)).unwrap()
+    }
+
     fn inside(map: &Map, cell: IVec2) -> bool {
         cell.x >= 0 && cell.y >= 0 && cell.x < map.size.x && cell.y < map.size.y
     }
 
     #[test]
-    fn the_bundled_map_parses_and_stays_inside_the_map() {
-        let Loaded { map, .. } = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+    fn the_default_map_parses_and_stays_inside_the_map() {
+        let Loaded { map, .. } = parse_map(MAP_NAME, &source()).unwrap();
         assert_eq!(map.cell_size, CELL_SIZE);
         for object in &map.objects {
             assert!(inside(&map, object.cell), "{object:?} is outside the map");
@@ -310,7 +309,7 @@ mod tests {
 
     #[test]
     fn the_player_starts_inside_the_map_and_the_marker_has_no_art() {
-        let Loaded { map, start, .. } = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+        let Loaded { map, start, .. } = parse_map(MAP_NAME, &source()).unwrap();
         assert!(
             inside(&map, start),
             "player start {start} is outside the map"
@@ -320,7 +319,7 @@ mod tests {
 
     #[test]
     fn the_test_map_has_a_skeleton_and_a_goblin_spawner() {
-        let Loaded { map, spawners, .. } = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+        let Loaded { map, spawners, .. } = parse_map(MAP_NAME, &source()).unwrap();
         assert!(map.objects.iter().all(|o| !is_spawner(&o.kind)));
         let kinds: Vec<EnemyKind> = spawners.iter().map(|s| s.kind).collect();
         assert_eq!(kinds, [EnemyKind::Goblin, EnemyKind::Skeleton]);
@@ -328,16 +327,17 @@ mod tests {
 
     #[test]
     fn a_bad_spawner_entry_stops_the_load_with_its_legend_line() {
-        let wrong = BUNDLED_SOURCE.replace("strategy=pursue", "strategy=evade");
+        let source = source();
+        let wrong = source.replace("strategy=pursue", "strategy=evade");
         let error = parse_map("test.txt", &wrong).err().unwrap();
         assert!(error.contains("unknown strategy `evade`"), "{error}");
-        let line = BUNDLED_SOURCE
+        let line = source
             .lines()
             .position(|l| l.contains("spawn_goblin"))
             .unwrap()
             + 1;
         assert!(error.starts_with(&format!("test.txt:{line}:")), "{error}");
-        let no_radius = BUNDLED_SOURCE.replace(" radius=120", "");
+        let no_radius = source.replace(" radius=120", "");
         let error = parse_map("test.txt", &no_radius).err().unwrap();
         assert!(error.contains("radius"), "{error}");
     }
@@ -354,7 +354,7 @@ mod tests {
 
     #[test]
     fn the_map_area_is_the_size_in_cells_times_the_cell_size() {
-        let Loaded { map, .. } = parse_map(MAP_NAME, BUNDLED_SOURCE).unwrap();
+        let Loaded { map, .. } = parse_map(MAP_NAME, &source()).unwrap();
         let expected = map.size.as_vec2() * CELL_SIZE;
         assert_eq!(CurrentMap(map).rect().size(), expected);
     }

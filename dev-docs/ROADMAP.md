@@ -19,7 +19,7 @@ Open:
 
 ### rm3. Map format and tooling (priority 2, absorbs rm4 and rm6)
 
-Maps are text files with front matter and one drawn grid, one character per cell (`dev-docs/extensions/map-files.md`, `games/long-way/docs/maps.md`, `adr-x18`), bundled with `include_str!` and parsed by our own code (`adr-lw8`). Done since this item was written: three Long Way maps joined by exits, entries and seamless doorways with a registry and a link check (`adr-x30`, `adr-x31`); an occupancy grid and A* path finding from the collision outlines (`adr-x23`); F1 reloads the map from disk on native (`reload.rs`, `adr-rt8`); the front matter holds nested blocks (`exits:`, `entries:`, `background:`), and a legend entry can carry settings (`adr-x25`, spawners).
+Maps are text files with front matter and one drawn grid, one character per cell (`dev-docs/extensions/map-files.md`, `games/long-way/docs/maps.md`, `adr-x18`), read from disk (not built in since `adr-e11`) and parsed by our own code (`adr-lw8`). Done since this item was written: three Long Way maps joined by exits, entries and seamless doorways with a registry and a link check (`adr-x30`, `adr-x31`); an occupancy grid and A* path finding from the collision outlines (`adr-x23`); F1 reloads the map from disk on native (`reload.rs`, `adr-rt8`); the front matter holds nested blocks (`exits:`, `entries:`, `background:`), and a legend entry can carry settings (`adr-x25`, spawners).
 
 Open, in three parts:
 1. **Loading.** A Bevy asset loader with hot reload, so an edited map shows without a rebuild, also on the web build (F1 is native only). Validation with clear errors and line numbers. Dynamic obstacles (doors, destroyed objects) that rebuild one cluster (the kit has temporary blocked areas, `adr-x48`). A broad phase if many moving bodies come.
@@ -81,6 +81,8 @@ Open (ask the user for the design before inventing mechanics):
 The death and restart flow is in `rm12`.
 
 ### rm10. Web build and screen size (priority 7, absorbs rm13)
+
+Paused 2026-11-23 (`adr-e11`): the web is not checked, and the maps are no longer built into the program. Bringing it back starts with a map source for the web (built-in copies or loading over HTTP), then `./dev-scripts/rust.sh web`.
 
 Done: the `wasm32-unknown-unknown` target is pinned (`adr-e5`), `./dev-scripts/rust.sh web` checks that the games compile for it, and `[profile.wasm-release]` is set for small builds (`adr-e6`). No game has run in a browser yet.
 

@@ -64,7 +64,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 
 ## Targets and scope
 
-- macOS (native) and Web (WebAssembly). Both must keep working. Do not add a dependency that breaks `wasm32-unknown-unknown` without telling the user first.
+- macOS (native) only. The web build (WebAssembly) is paused (`dev-docs/adr/ENGINE.md` adr-e11): do not check it, and a dependency need not support it. Maps are read from disk, not built in, so a map edit needs no rebuild.
 - 2D only. Disable unused Bevy default features where practical.
 - Pixel art rendering: nearest-neighbour sampling, integer scaling, fixed low-resolution camera.
 - Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (`games/r-town/docs/SPEC.md`). Other games state their own timing model, so ask.
@@ -72,13 +72,13 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 ## Working rules
 
 1. Ask before making an architectural decision (state layout, plugin boundaries, save format, crate choice). Give a recommendation with a short trade-off.
-2. Default to a maintained crate when one exists and supports the pinned Bevy version and wasm. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate (`dev-docs/adr/ENGINE.md` adr-e10).
+2. Default to a maintained crate when one exists and supports the pinned Bevy version. Write custom code when a crate is stale or too heavy. Say which you chose and why. Crate versions are in `dev-docs/adr/ENGINE.md` adr-e4. Long Way uses its own collision (adr-lw1). Do not add a physics crate (`dev-docs/adr/ENGINE.md` adr-e10).
 3. Bevy is pinned to 0.20.1 in the root `Cargo.toml`. Check every Bevy ecosystem crate for compatibility with that version before adding it.
 4. Bevy APIs change between releases. Do not rely on memory or older examples. Bundles such as `SpriteBundle` are removed. Use required components.
 5. Bevy reference order: (a) `bevy-src/` (git-ignored shallow clone of tag `v0.20.1`; update it when the version changes), especially `examples/` and `_release-content/migration-guides/`; (b) the LSP on dependency source; (c) docs.rs for the pinned version. Search for the exact API. Do not read whole files.
 6. Read `dev-docs/bevy/notes.md` (verified patterns) before searching again, and record new verified patterns there. Keep it short. When the project uses a new Bevy concept for the first time, add its section to `dev-docs/bevy/concepts.md` (plain language, project code as the example). Put our own reusable, non-standard designs (such as `allow_sliding`) in `dev-docs/extensions/`, and link their ADR.
 7. Run `./dev-scripts/rust.sh lint` before reporting work as done, and `test` for each crate you changed that has tests (`game-kit` has them; a game may have none).
-8. Run `./dev-scripts/rust.sh web` after adding dependencies, not only the native build.
+8. The web build is paused (adr-e11). Do not run `./dev-scripts/rust.sh web` as a gate. When the web comes back (`rm10`), it is again run after adding dependencies.
 9. When behaviour does not work in the real game, reproduce it with `./dev-scripts/rust.sh script` first, write a failing test for the cause, fix it, then rerun the script. Do not report a fix as working from unit tests alone. Say which parts you did not see on screen.
 10. Match the style of surrounding code. Keep comments sparse.
 
@@ -89,13 +89,13 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - Use events or messages between systems. Do not call across plugins directly.
 - Keep game rules in plain Rust functions and types that do not need Bevy, so they are unit testable.
 - Draw order comes from `crates/game-kit/src/layers.rs` and a game's own overrides (adr-x9, adr-x14). Do not write bare z numbers or `GlobalZIndex` values elsewhere. Debug drawings are sprites on the right layer, not gizmos.
-- Use `bevy_asset_loader` style loading states so the web build does not show missing assets.
+- Use `bevy_asset_loader` style loading states so a game does not show missing assets.
 
 ## Tests
 
 Read `dev-docs/testing.md` before you write or change a test, in any crate. Key rules:
 
-- **Where tests go (`adr-w7`):** code in `game-kit` is tested in `game-kit`. A game adds unit tests only for mechanics that are not in the kit, inline in the file they test. Do not test kit behaviour (collision, map parser, depth sort) or the bundled map file in a game, so maps can change freely. When a game rule moves to the kit, move its tests too.
+- **Where tests go (`adr-w7`):** code in `game-kit` is tested in `game-kit`. A game adds unit tests only for mechanics that are not in the kit, inline in the file they test. Do not test kit behaviour (collision, map parser, depth sort) or its map files in a game, so maps can change freely. When a game rule moves to the kit, move its tests too.
 - **Prove that each test can fail.** Break the line the test targets (remove the guard, swap the checks, change `<` to `<=`). Run the test, see it fail, then undo the change with Edit (not `git checkout`). A test that still passes is wrong.
 - **Make the input cross the boundary that the name describes.** For "X wins over Y", X and Y must happen in the same step. For "ignored while Z", send the input while Z is active, in a later frame.
 - **Assert exact values.** Do not put asserts inside an `if let` or `match` arm that may not run. Do not stop at `is_some()`, `is_ok()` or `matches!(x, Variant(_))`.
@@ -119,9 +119,9 @@ Use the wrapper so one allowlist rule `Bash(./dev-scripts/rust.sh:*)` covers all
 - Scripted run: `./dev-scripts/rust.sh script <game> "<commands>" [map-file]` (the optional map file, for example `2.txt` or `2`, starts the game in that map), for example `script long-way "teleport:225:-150;hold:up:3;quit"`. **When testing or taking screenshots, always add `--debug`** (for example `script long-way "wait:0.5;screenshot:start;quit" --debug`), so the debug overlays are drawn. `screenshot:<name>` saves to `target/screenshots/<name>.png` (native only). Commands are in `crates/game-kit/src/script.rs` (adr-x5).
 - Zoomed screenshot: `./dev-scripts/shot.sh <game> <name> "<commands>" [map=<map>] cx= cy= w= h= scale=` (cx, cy are world positions; the crop follows the camera). Aseprite checks: `./dev-scripts/aseprite.sh <script> <file> key=value ...`. Both are in `dev-docs/extensions/dev-scripts.md`. Allowlist: `Bash(./dev-scripts/shot.sh:*)`, `Bash(./dev-scripts/aseprite.sh:*)`.
 - Lint (formats all crates with `cargo fmt` and lists the changed files, then clippy with `-D warnings`): `./dev-scripts/rust.sh lint`
-- Web compile check: `./dev-scripts/rust.sh web`
+- Web compile check: `./dev-scripts/rust.sh web` (paused, adr-e11; kept to bring the web back)
 - Fast dev builds: `./dev-scripts/rust.sh run long-way --features bevy/dynamic_linking` (native only, never for release or web)
-- Web release build (to define): record the chosen method in `dev-docs/adr/ENGINE.md`.
+- Web release build: paused with the web build (adr-e11, `rm10`).
 - Disk use: `./dev-scripts/rust.sh size` (sizes of `target/`) and `./dev-scripts/rust.sh prune` (see "Disk use")
 
 ## Disk use

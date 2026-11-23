@@ -250,7 +250,7 @@ Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow
 - Items that touch form a solid group in R-Town and Long Way, and an item that stands alone can be walked behind (`groups.md`).
 - Keep rows in a fixed-width font and turn off word wrap. Large maps have long rows.
 - Write blank cells as spaces inside the bars. The closing `|` keeps blanks at the end of a row safe from editors that remove trailing spaces.
-- Long Way reads the map with `include_str!`, so a change needs a rebuild. R-Town reads the file from disk and reloads it on F1 (`adr-rt8`).
+- Both games read the map file from disk at start and on F1, so a change needs no rebuild (`adr-rt8`, `adr-e11`).
 
 ## Limits
 
