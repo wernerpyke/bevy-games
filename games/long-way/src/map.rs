@@ -246,7 +246,8 @@ pub enum Kind {
     EnergyBlack,
     /// Where a ghost is placed when the map loads (`ghost.rs`). It has no art of its own and blocks nothing.
     SpawnGhost,
-    /// Where a volcano is placed when the map loads (`volcano.rs`). It has no art of its own and blocks nothing.
+    /// Where a volcano is placed when the map loads (`volcano.rs`). The marker has no art and blocks nothing; the volcano
+    /// it places has its own blocker.
     SpawnVolcano,
     /// Where the player starts. It has no art and blocks nothing.
     PlayerStart,
