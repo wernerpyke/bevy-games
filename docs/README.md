@@ -20,6 +20,10 @@ Single entry point for players and users: quick start, controls, common commands
 
 # skips the title screen (a game with a title screen only; scripted runs always skip it)
 ./dev-scripts/rust.sh run long-way --skip-title
+
+# starts in a map of games/<game>/assets/maps/ (".txt" may be left out; F1 reloads the map file)
+./dev-scripts/rust.sh run long-way 3
+./dev-scripts/rust.sh run long-way 3 --debug
 ```
 
 The first build takes several minutes.

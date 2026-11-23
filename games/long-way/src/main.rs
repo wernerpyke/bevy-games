@@ -14,6 +14,7 @@ mod player;
 mod rocks;
 mod scenery;
 mod trees;
+mod volcano;
 mod weapon_menu;
 mod weapons;
 

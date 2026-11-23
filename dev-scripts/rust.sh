@@ -8,7 +8,7 @@
 #   ./dev-scripts/rust.sh build [game]        # build one game, or all
 #   ./dev-scripts/rust.sh test [game]         # test one game, or all
 #   ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title]
-#                                             # run a game, for example: run long-way. R-Town: run r-town test.txt (F1 reloads the map).
+#                                             # run a game, for example: run long-way. A map name starts in that map: run long-way 3 (or 3.txt). F1 reloads the map.
 #                                             # --debug turns on the F2 info box and the F3 grid (off without it)
 #   ./dev-scripts/rust.sh lint                # cargo fmt (formats, lists changed files) + clippy -D warnings (all crates)
 #   ./dev-scripts/rust.sh web [game]          # cargo check for wasm32-unknown-unknown
@@ -51,11 +51,12 @@ case "${1:-}" in
       exit 1
     fi
     game="$1"; shift
-    # An optional map file: a path, or a name in games/<game>/assets/maps/. The game reads it from
-    # <GAME>_MAP (only R-Town does so far). F1 in the game reloads it.
+    # An optional map file: a path, or a name in games/<game>/assets/maps/ (".txt" may be left out). The game reads it from
+    # <GAME>_MAP and starts in that map, for example: run long-way 3. F1 in the game reloads it.
     if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then
       map="$1"; shift
       if [ ! -f "$map" ]; then map="games/$game/assets/maps/$map"; fi
+      if [ ! -f "$map" ]; then map="$map.txt"; fi
       if [ ! -f "$map" ]; then
         echo "✗ Map file not found: $map" >&2
         exit 1
@@ -80,12 +81,13 @@ case "${1:-}" in
       exit 1
     fi
     game="$1"; commands="$2"; shift 2
-    # An optional map file after the commands: a path, or a name in games/<game>/assets/maps/. The game starts in
+    # An optional map file after the commands: a path, or a name in games/<game>/assets/maps/ (".txt" may be left out). The game starts in
     # that map (<GAME>_MAP), for example: script long-way "wait:0.5;screenshot:two;quit" 2.txt
     map_env=()
     if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then
       map="$1"
       if [ ! -f "$map" ]; then map="games/$game/assets/maps/$map"; fi
+      if [ ! -f "$map" ]; then map="$map.txt"; fi
       if [ ! -f "$map" ]; then
         echo "✗ Map file not found: $1" >&2
         exit 1

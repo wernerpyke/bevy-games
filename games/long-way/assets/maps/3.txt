@@ -6,10 +6,10 @@ size: 10x10
 background:
   color: "#292829"
   mode: random
-  fill: 0.2
+  fill: 0.4
   jitter: 16
   scale: 0.8
-  tiles: grass_0 grass_1 grass_2 grass_3 flowers_0 flowers_1
+  tiles: grass_0 grass_1 grass_2 grass_3
 legend:
   ".": edge
   "O": rock_0
@@ -26,16 +26,22 @@ legend:
   "m": marker
   "M": marker_red
   "@": player_start
+  "1": energy_blue
+  "2": energy_red
+  "3": energy_violet
+  "4": energy_black
+  "^": spawn_volcano
 ---
    |0                  |
    |0 1 2 3 4 5 6 7 8 9|
  9 |. . . . . . . . . .|
- 8 |@     . . .     . .|
- 7 |.                 .|
- 6 |.     R R         .|
- 5 |.     R R         .|
+ 8 |@   1 . . . 1 1 . .|
+ 7 |.     1         1 .|
+ 6 |.     r R         .|
+ 5 |.     R r         .|
  4 |. .             . .|
- 3 |. . .         . . .|
- 2 |.           . . . .|
- 1 |. . .       . . . .|
+ 3 |. . .   ^     R . .|
+ 2 |. m         r R . .|
+ 1 |. . .     r R . . .|
  0 |. . . . . . . . . .|
+ 
