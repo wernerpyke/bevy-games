@@ -46,6 +46,7 @@ fn main() {
             hp::HpPlugin,
             enemy_hp::EnemyHpPlugin,
             ghost::GhostPlugin,
+            volcano::VolcanoPlugin,
         ))
         .add_plugins((
             game_kit::camera::PixelCameraPlugin {

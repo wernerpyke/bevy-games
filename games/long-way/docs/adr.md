@@ -286,3 +286,19 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 **Rationale.** The developer chose the smooth mode after the spike of 2026-11-15, for rounder corners. The ground layer was chosen over the canopy (first choice of the same day) so the player, the ghosts and the trees stand on the edge and are never hidden by it. A 16 px step is a first value, to tune by playing.
 
 **How to apply.** Draw the edge frames so that nothing reaches past the half of a frame: in smooth mode it shows beside a fill. Place pickups and exit markers on the ring so they stay reachable. Move the player with `edge_start_feet` (`EDGE_FIT`), also for arrivals (`MapTransitionPlugin::edge_fit`).
+
+## adr-lw41. The volcano launches two rolling shots per loop (2026-11-23)
+
+**Decision.** The volcano (`volcano.rs`) launches one shot when its `Attack` loop reaches frame 7 and one at frame 9, each from the middle of the crater of that frame, in its own random direction (`GameRng`, any angle). A shot follows the kit path (`adr-x54`): 5 cells over 2.5 s, a first arc to 96 px, 2 bounces at half height, a roll for the last 30 % of the time, then it is removed. It collides where the ball is drawn: a blocked area or the map edge removes it, its own volcano's base does not (`Projectile::ignoring`), and a touch on the player's body takes 1 HP (`DamagePlayer`) and removes it. It hits no enemy (`without_targets`, `adr-lw42`). The art is the `Projectile` tag of `characters/volcano.aseprite`, drawn at 0.5x: its dots are 4x4 art pixels, so on screen they are 2 px, as on the volcano. There is no shadow and no limit on shots in flight.
+
+**Rationale.** The user's design (2026-11-23), tuned by play testing the same day: half size, two shots a loop, and collision at the ball instead of a ground point. The second shot starts from the frame 9 crater because the cone rises 7 art pixels between the two frames. The 0.5x scale is a whole-number divisor of the art's 4x4 dots, so the pixels stay square.
+
+**How to apply.** Values: `LAUNCHES`, `SHOT_PATH`, `SHOT_SCALE`, `SHOT_HIT_BOX` in `volcano.rs`. Place a volcano with about 5 cells of open ground around it: blocked areas and the map edge band remove shots early, and the bottom rows of a map can sit under the HUD. Repeatable runs: `LONG_WAY_SEED`.
+
+## adr-lw42. No invincibility frames, and no friendly fire between enemies (2026-11-23)
+
+**Decision.** Every hit on the player takes its HP: two hits in the same frame take two. There is no time without damage after a hit. If one is added later, it belongs to the player, one rule for all damage, not to each enemy. Enemies never hurt each other: an enemy's attack hits only the player, and the player's weapons do not hit enemy shots.
+
+**Rationale.** The user's rules (2026-11-23), set when the volcano became the second enemy. The ghost already worked this way. Writing them down keeps each new enemy consistent and puts a later invincibility time in one place.
+
+**How to apply.** Balance rules `b15` and `b16` (`balance.md`). An enemy shot uses `Projectile::without_targets()` and is never a `ProjectileTarget`. A reader of `ControlledTouched` filters on its own enemy marker (`With<Ghost>`, `With<VolcanoShot>`).

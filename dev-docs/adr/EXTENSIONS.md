@@ -67,3 +67,5 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x51 | Map edges are drawn on one of two edge layers, the ground or the canopy | EXTENSIONS-SCREEN.md |
 | x52 | An edge tag with several frames is a set of variants, and the kit picks one per cell | EXTENSIONS-MAPS.md |
 | x53 | An object that blocks sorts at its blocked area, set by the kit | EXTENSIONS-SCREEN.md |
+| x54 | A thrown projectile follows a kit path and collides where it is drawn | EXTENSIONS-COLLISION.md |
+| x55 | A projectile hit names the projectile, which is removed in `PostUpdate`; a projectile can skip all targets | EXTENSIONS-COLLISION.md |

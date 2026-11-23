@@ -4,7 +4,7 @@ Rules that set how the player, the enemies and the weapons compare. Use them whe
 
 The rules are set by the user. Each rule has a stable ID `b<n>` (never reused or renumbered). Each rule says how it is enforced: a test that fails when a value breaks the rule, or "by hand" when no test can check it.
 
-Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the player).
+Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (its shots), `hp.rs` (the player).
 
 ## Rules
 
@@ -24,6 +24,8 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `hp.rs` (the p
 | b12 | **The fireball blast deals less than a direct hit.** | 2026-11-13 | `b12_the_fireball_blast_deals_less_than_a_direct_hit` in `weapons/values.rs` |
 | b13 | **A direct fireball hit does not kill every enemy kind.** | 2026-11-13 | By hand: check it when a new enemy kind is added (the ghost is the only enemy now) |
 | b14 | **The enemy a fireball hits directly takes only the direct hit, never the blast as well.** | 2026-11-13 | `the_blast_hits_every_other_living_enemy_within_its_radius_and_no_one_else` and `an_enemy_in_the_way_takes_the_direct_hit_and_the_target_near_it_the_blast` in `weapons/fireball.rs` |
+| b15 | **The player has no invincibility frames.** Every hit takes its HP, also two in the same frame (`adr-lw42`). | 2026-11-23 | `a_shot_that_touches_the_player_takes_1_hp_and_goes_and_two_take_2` in `volcano.rs`; `a_damage_message_takes_points_and_at_zero_the_player_is_hurt_no_more` in `hp.rs` |
+| b16 | **No friendly fire: an enemy's attack never hurts another enemy, and the player's weapons do not hit enemy shots** (`adr-lw42`). | 2026-11-23 | `a_volcano_launches_at_frames_7_and_9_from_the_mouth_of_that_frame_each_in_a_random_direction` in `volcano.rs` (its shots skip targets); by hand: check it when a new enemy attack is added |
 
 ## b1. The fire ring always kills a ghost
 

@@ -24,7 +24,8 @@ use game_kit::depth::DepthSort;
 use game_kit::fx::{EffectLibrary, Follows, Fx, FxLooks};
 use game_kit::hitbox::HitBox;
 use game_kit::projectile::{
-    HitCause, Projectile, ProjectileHit, ProjectilePlugin, ProjectileSprite, ProjectileTarget,
+    HitCause, Projectile, ProjectileHit, ProjectilePlugin, ProjectileSet, ProjectileSprite,
+    ProjectileTarget,
 };
 
 use super::values::{Damage, FIREBALL, values};
@@ -61,8 +62,10 @@ pub struct FireballPlugin;
 
 impl Plugin for FireballPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(ProjectilePlugin)
-            .add_message::<Exploded>()
+        if !app.is_plugin_added::<ProjectilePlugin>() {
+            app.add_plugins(ProjectilePlugin);
+        }
+        app.add_message::<Exploded>()
             .add_systems(Startup, load_look)
             .add_systems(
                 Update,
@@ -70,7 +73,7 @@ impl Plugin for FireballPlugin {
                     mark_targets,
                     cast_fireballs,
                     steer,
-                    explode_on_hits,
+                    explode_on_hits.after(ProjectileSet),
                     explode,
                 )
                     .chain()
@@ -302,12 +305,21 @@ fn steer(
     }
 }
 
-/// A projectile that the kit stopped is a fireball (the only projectile in Long Way): it explodes there.
-fn explode_on_hits(mut hits: MessageReader<ProjectileHit>, mut exploded: MessageWriter<Exploded>) {
+/// A fireball that the kit stopped explodes there. Other projectiles (the volcano's) are not fireballs. Runs after
+/// `ProjectileSet`, while the stopped projectile still exists.
+fn explode_on_hits(
+    mut hits: MessageReader<ProjectileHit>,
+    fireballs: Query<(), With<Fireball>>,
+    mut exploded: MessageWriter<Exploded>,
+) {
     for hit in hits.read() {
+        if !fireballs.contains(hit.projectile) {
+            continue;
+        }
         let (direct, why) = match hit.cause {
             HitCause::Target(enemy) => (Some(enemy), Why::Enemy),
             HitCause::Blocked => (None, Why::Blocked),
+            HitCause::PathEnd => (None, Why::Range),
             HitCause::MapEdge => (None, Why::MapEdge),
         };
         exploded.write(Exploded {
@@ -519,7 +531,7 @@ mod tests {
                     mark_targets,
                     cast_fireballs,
                     steer,
-                    explode_on_hits,
+                    explode_on_hits.after(ProjectileSet),
                     explode,
                     collect,
                 )
