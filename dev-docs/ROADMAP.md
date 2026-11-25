@@ -103,6 +103,18 @@ Open (ask the user what each screen shows before inventing it):
 - **The overlay mode:** the HUD over a full-window game view. It is computed and tested but not used; its transparent root and picking need a try. A `ViewportNode` spike if one UI tree for all modes is wanted (not checked on wasm).
 - Mouse to world must use the game viewport in every mode.
 
+### rm102. Kit module structure (priority 80)
+
+Goal: each kit helper lives next to its job, so Claude finds it and no module writes it again. From the kit review of 2026-11 (item 19, not part of its five steps), checked against the code on 2026-11-25:
+- Rect helpers are written again in several modules. A small `geom` module would hold them, with `area::closest_point` and `distance_to_rect`.
+- `debug.rs` imports `rects_overlap` from `map_transition`.
+- `ease_out` is in `area.rs`, and the Long Way weapon menu now uses it too.
+- `map.rs` and `map_edge.rs` depend on each other, and so do `hud.rs` and `screen.rs`.
+- `animation.rs` has three nearly identical "wait for the asset" systems.
+- Low: a few `let Ok(..) = q.single() else { return }` could be `Single`.
+
+Considerations: pure moves with `pub use` at the old paths, so the games do not change. Do it when a kit change touches these modules anyway. Large file sizes are partly tests (760 of the 1,219 lines in `collision.rs` were tests), so size alone is no reason to split.
+
 ### rm90. Further disk savings for `target/` (priority 90)
 
 `target/` is 2.9 GB after a clean build of all games and 4.3 GB with `lint`, `test` and `web` (5.2 GB after the first `run`; it was 25 GB before debug info was removed and 13 GB with stale and duplicate builds, `adr-e8`). `cargo-sweep` is still not installed. Only look at more savings if `target/` grows past the limit in `CLAUDE.md` ("Disk use") even with the routine. Options, each to be measured before it is kept: `split-debuginfo = "unpacked"` for `[profile.dev]` (macOS only), no incremental builds for dependencies, one shared `CARGO_TARGET_DIR` for all projects (saves space when they share a Bevy version, but all builds lock one folder), and `cargo-sweep` (`cargo install cargo-sweep`, then test that `--time` removes the right files on macOS; `rust.sh prune` already runs it when installed). Install `cargo-sweep` earlier if the project starts to use several Bevy versions or toolchains, or a shared target folder. Do not make `bevy/dynamic_linking` a default: it makes a second full set of outputs. Known learning: each game binary stays about 140 MB because Bevy is built at `opt-level = 3`. The savings came from `target/debug/deps`.

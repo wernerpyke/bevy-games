@@ -56,3 +56,4 @@ Decisions: `adr-x3`, `adr-x6`, `adr-x9`, `adr-x12`, `adr-x14`, `adr-x28`.
 - The overlay is static. Areas added after `PostStartup` are not shown.
 - Remove the tools or gate them behind a debug feature before a release build.
 - With a bottom left origin the column 0 label and the top row label used to overlap; the row label on a map's top edge is now skipped.
+- The grid, the collision overlay and the movement overlay each draw their own lines. Only one constant is shared and the drawing code differs, so a shared line helper was considered and rejected (kit review, 2026-11).
