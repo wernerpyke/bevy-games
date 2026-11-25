@@ -5,6 +5,9 @@
 use bevy::prelude::*;
 
 use crate::map::Params;
+use crate::map_transition::MapId;
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 
 pub struct SpawnerPlugin;
 
@@ -90,9 +93,23 @@ impl Spawner {
     }
 }
 
-/// Add this to every entity that a spawner asked for.
+/// Add this to every entity that a spawner asked for. It also takes the spawner's `MapId`, unless it is spawned with
+/// one, so it goes with the spawner's map (adr-x60).
 #[derive(Component, Clone, Copy, Debug)]
+#[component(on_insert = take_spawner_map)]
 pub struct SpawnedBy(pub Entity);
+
+fn take_spawner_map(mut world: DeferredWorld, context: HookContext) {
+    let Some(by) = world.get::<SpawnedBy>(context.entity).map(|by| by.0) else {
+        return;
+    };
+    if world.get::<MapId>(context.entity).is_some() {
+        return;
+    }
+    if let Some(map) = world.get::<MapId>(by).cloned() {
+        world.commands().entity(context.entity).insert(map);
+    }
+}
 
 /// A spawner is due. The game spawns the entity at `position`.
 #[derive(Message, Clone, Debug)]
@@ -202,6 +219,24 @@ mod tests {
         // 225 frames of 16 ms are 3.58 s: spawns at 0, 1, 2 and 3 seconds.
         assert_eq!(seen.len(), 4);
         assert_eq!(seen[0].position, Vec2::new(40.0, 80.0));
+    }
+
+    #[test]
+    fn a_spawned_entity_takes_the_map_of_its_spawner_unless_it_has_one() {
+        let mut app = App::new();
+        let spawner = app.world_mut().spawn(MapId("east".into())).id();
+        let unmapped = app.world_mut().spawn_empty().id();
+        let plain = app.world_mut().spawn(SpawnedBy(spawner)).id();
+        let own = app
+            .world_mut()
+            .spawn((MapId("west".into()), SpawnedBy(spawner)))
+            .id();
+        let orphan = app.world_mut().spawn(SpawnedBy(unmapped)).id();
+        app.world_mut().flush();
+        let map = |entity| app.world().get::<MapId>(entity).map(|id| id.0.as_str());
+        assert_eq!(map(plain), Some("east"));
+        assert_eq!(map(own), Some("west"));
+        assert_eq!(map(orphan), None);
     }
 
     #[test]

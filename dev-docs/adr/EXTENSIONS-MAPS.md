@@ -118,11 +118,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 ## adr-x58. The kit puts everything a map's `load` hook spawns under a map root (2026-11-25)
 
-**Decision.** Before the `load` hook runs, the kit spawns a `MapRoot` entity with the map's `MapId` and passes it in `MapLoad::root`. After the hook, every new top-level entity (not a Bevy system or observer) becomes a child of that root and gets the map's `MapId`. Removing a map despawns its root and so everything in it. The game no longer tags its map objects. It adds `MapId` by hand only to an entity it spawns later, outside the hook, that should go with the map.
+**Decision.** Before the `load` hook runs, the kit spawns a `MapRoot` entity with the map's `MapId` and passes it in `MapLoad::root`. After the hook, every new top-level entity (not a Bevy system or observer) becomes a child of that root and gets the map's `MapId`. Removing a map despawns its root and so everything in it. The game no longer tags its map objects. An entity spawned later, outside the hook, gets its `MapId` as `adr-x60` says.
 
 **Rationale.** Each spawn site had to remember `MapId(load.id.clone())`, about twelve sites in Long Way, and a forgotten tag left an object in the world after its map was gone, with no warning (`adr-x56`). The kit knows when the hook runs, so it can tag by construction. Keeping `MapId` on each child means the code that reads it (collectables, exit triggers, the volcano) works unchanged. Adopting what the hook spawns, rather than asking the game to spawn under the root, also needs nothing at the spawn sites. The root sits at the world origin, so a child's `Transform` is still its world position.
 
-**How to apply.** Spawn map objects in the `load` hook with no `MapId`. Anything spawned there belongs to the map: spawn persistent entities (the player, the camera) elsewhere. An entity spawned later that should go with a map (a shot from a volcano, a weapon effect) still needs a `MapId`. A test that calls a spawn function directly gets no adoption: check the objects, not their `MapId` (`test_util::map_load` in Long Way).
+**How to apply.** Spawn map objects in the `load` hook with no `MapId`. Anything spawned there belongs to the map: spawn persistent entities (the player, the camera) elsewhere. An entity spawned later that should go with a map gets its `MapId` as `adr-x60` says. A test that calls a spawn function directly gets no adoption: check the objects, not their `MapId` (`test_util::map_load` in Long Way).
 
 ## adr-x59. The map lifecycle is a plugin of its own, and R-Town uses it (2026-11-25)
 
@@ -130,4 +130,12 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **Rationale.** The plugin was all or nothing, so R-Town (one map, no exits) wrote its own lifecycle: its own `MapEntity` tag, its own reload, and a second spawn list that every new kind had to be added to. One lifecycle means the map root, the adoption of what the load hook spawns (`adr-x58`) and the collision rebuild work the same in both games. The split also gives each module one job.
 
-**How to apply.** A game with one map adds `MapLifecyclePlugin` and inserts `MapHooks` with `arrive: None`. Its `load` hook spawns everything the map needs, the player too when F1 should reset it (R-Town). An entity spawned later that should go with the map gets `MapId(active.current.clone())`. A game with exits adds `MapTransitionPlugin` only.
+**How to apply.** A game with one map adds `MapLifecyclePlugin` and inserts `MapHooks` with `arrive: None`. Its `load` hook spawns everything the map needs, the player too when F1 should reset it (R-Town). An entity spawned later that should go with the map gets its `MapId` as `adr-x60` says. A game with exits adds `MapTransitionPlugin` only.
+
+## adr-x60. The kit gives a `MapId` to entities spawned during play (2026-11-25)
+
+**Decision.** Two kinds of entity are spawned during play, after the `load` hook. What the player causes (a weapon, a shot) belongs to the map the player is in: its type requires the kit's `OnCurrentMap`, and a kit observer (installed by `MapLifecyclePlugin`) gives it `MapId(ActiveMaps::current)`. What a map object spawns belongs to that object's map. For a spawner the kit does it: `SpawnedBy` copies the spawner's `MapId`. Other map objects copy their own `MapId` (the Long Way volcano copies it to its shots). A `MapId` an entity is spawned with always wins. An `OnCurrentMap` entity spawned inside a `load` hook gets the map being loaded.
+
+**Rationale.** The review of 2026-11 first left this binding in Long Way, because R-Town did not use `MapId`. Since `adr-x59` R-Town does, and it wrote `MapId(active.current.clone())` by hand at two spawn sites, while Long Way kept its own marker and observer. A forgotten tag leaves an entity in the world after a map change or F1, with no warning (`adr-x56`). "The current map" is wrong for what a map object spawns: with seamless joins the object can be in a neighbour map, so the two kinds need two rules.
+
+**How to apply.** Give a type spawned by the player's actions `#[require(OnCurrentMap)]`, or add the marker at the spawn site when the type is a kit type (R-Town's shot is a kit `Projectile`). Add `SpawnedBy` to what a spawner asks for, as before. Copy the object's `MapId` for anything else a map object spawns. Long Way also gives `OnCurrentMap` to every particle emitter, since only it uses `Fx`.

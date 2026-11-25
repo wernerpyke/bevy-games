@@ -105,4 +105,4 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 **Rationale.** A full reset is simple and safe: no old path, shot or enemy outlives its map, and F1 is also the way back after a death. Hit points and a death screen come later and will need a game state.
 
-**How to apply.** Spawn a new kind of map object in `load_hook` (`src/map.rs`); the kit gives it the `MapId`. Give an object spawned later (an enemy, a projectile) `MapId(active.current.clone())` so the reset removes it. Systems that need the player use `Single`, so they skip their work when it is gone (`dev-docs/bevy/notes.md`).
+**How to apply.** Spawn a new kind of map object in `load_hook` (`src/map.rs`); the kit gives it the `MapId`. An object spawned later goes with the reset by itself: an enemy takes its spawner's `MapId` through `SpawnedBy`, and a projectile has the kit's `OnCurrentMap` (`adr-x60`). Systems that need the player use `Single`, so they skip their work when it is gone (`dev-docs/bevy/notes.md`).

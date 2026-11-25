@@ -20,7 +20,7 @@ use bevy::prelude::*;
 use game_kit::Controlled;
 use game_kit::fx::{FxFollowSet, ParticleEffectHandle};
 use game_kit::hitbox::HitBox;
-use game_kit::map_transition::{ActiveMaps, MapId};
+use game_kit::map_transition::OnCurrentMap;
 use game_kit::movement::{FollowSet, MoveState, Mover};
 
 use crate::enemy_hp::EnemyHp;
@@ -56,33 +56,21 @@ impl Plugin for WeaponPlugin {
     }
 }
 
-/// Gives every weapon entity the `MapId` of the map the player is in when it appears, so the kit removes it with
-/// that map: a weapon cast before a map change does not go on in the next map (the user, 2026-11-14). It covers
-/// every entity with `OnCurrentMap` (required by the gameplay roots `Ring`, `Tornado` and `Fireball`, and by the
-/// edge dots) and every particle emitter (`ParticleEffectHandle`, on all `game_kit::fx` emitters). A child, such as
-/// the fireball head, goes with its parent.
+/// Every weapon entity belongs to the map the player is in when it appears, so the kit removes it with that map: a
+/// weapon cast before a map change does not go on in the next map (the user, 2026-11-14). The gameplay roots (`Ring`,
+/// `Tornado`, `Fireball`) and the edge dots require the kit's `OnCurrentMap` (adr-x60). This plugin gives it to every
+/// particle emitter too (`ParticleEffectHandle`, on all `game_kit::fx` emitters). A child, such as the fireball head,
+/// goes with its parent.
 struct MapBindingPlugin;
 
 impl Plugin for MapBindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(bind_to_map::<OnCurrentMap>)
-            .add_observer(bind_to_map::<ParticleEffectHandle>);
+        app.add_observer(emitters_on_current_map);
     }
 }
 
-/// A weapon entity that belongs to the map the player is in when it appears (`MapBindingPlugin`). A weapon type
-/// requires it, so a new weapon is bound without a change here.
-#[derive(Component, Default)]
-pub struct OnCurrentMap;
-
-fn bind_to_map<C: Component>(
-    add: On<Add<C>>,
-    maps: Option<Res<ActiveMaps>>,
-    mut commands: Commands,
-) {
-    if let Some(map) = maps.as_deref().and_then(ActiveMaps::current_map) {
-        commands.entity(add.entity).insert(MapId(map.id.clone()));
-    }
+fn emitters_on_current_map(add: On<Add<ParticleEffectHandle>>, mut commands: Commands) {
+    commands.entity(add.entity).insert(OnCurrentMap);
 }
 
 /// The body of an enemy as a weapon sees it. `living_rect` is `None` for a dead enemy, which keeps its `HitBox`
@@ -402,24 +390,12 @@ mod tests {
 #[cfg(test)]
 mod map_tests {
     use super::*;
-    use game_kit::map_transition::ActiveMap;
 
-    /// Two maps in the world, the player in `b`.
     fn app() -> App {
-        let map = |id: &str| ActiveMap {
-            id: id.to_string(),
-            origin: Vec2::ZERO,
-            rect: Rect::new(0.0, 0.0, 640.0, 640.0),
-        };
         let mut app = crate::test_util::timed_app(20);
         app.add_message::<CastWeapon>()
             .init_resource::<game_kit::collision::CollisionWorld>()
             .insert_resource(game_kit::rng::GameRng::seeded(1))
-            .insert_resource(ActiveMaps {
-                current: "b".to_string(),
-                maps: vec![map("a"), map("b")],
-                doorways: Vec::new(),
-            })
             .add_plugins(MapBindingPlugin)
             .add_systems(
                 Update,
@@ -435,16 +411,16 @@ mod map_tests {
         app
     }
 
-    fn maps_of<C: Component>(app: &mut App) -> Vec<Option<String>> {
+    /// For each entity with `C`: whether it has the kit's `OnCurrentMap`, which gives it the player's map.
+    fn bound<C: Component>(app: &mut App) -> Vec<bool> {
         app.world_mut()
-            .query_filtered::<Option<&MapId>, With<C>>()
+            .query_filtered::<Has<OnCurrentMap>, With<C>>()
             .iter(app.world())
-            .map(|map| map.map(|map| map.0.clone()))
             .collect()
     }
 
     #[test]
-    fn every_weapon_entity_belongs_to_the_map_the_player_is_in() {
+    fn every_weapon_entity_and_emitter_belongs_to_the_map_the_player_is_in() {
         let mut app = app();
         for weapon in [
             WeaponKind::FireRing,
@@ -463,13 +439,11 @@ mod map_tests {
             .spawn(ParticleEffectHandle(Handle::default()));
         app.update();
         app.update();
-        let b = Some("b".to_string());
-        assert_eq!(maps_of::<ring::Ring>(&mut app), vec![b.clone(), b.clone()]);
-        assert_eq!(maps_of::<tornado::Tornado>(&mut app), vec![b.clone()]);
-        assert_eq!(maps_of::<fireball::Fireball>(&mut app), vec![b.clone()]);
-        let dots = maps_of::<tornado::EdgeDot>(&mut app);
-        assert!(!dots.is_empty());
-        assert!(dots.iter().all(|map| *map == b), "{dots:?}");
-        assert_eq!(maps_of::<ParticleEffectHandle>(&mut app), vec![b]);
+        assert_eq!(bound::<ring::Ring>(&mut app), [true, true]);
+        assert_eq!(bound::<tornado::Tornado>(&mut app), [true]);
+        assert_eq!(bound::<fireball::Fireball>(&mut app), [true]);
+        let dots = bound::<tornado::EdgeDot>(&mut app);
+        assert!(!dots.is_empty() && dots.iter().all(|&has| has), "{dots:?}");
+        assert_eq!(bound::<ParticleEffectHandle>(&mut app), [true]);
     }
 }

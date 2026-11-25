@@ -20,7 +20,6 @@ use crate::collision::FEET_HALF_WIDTH;
 use crate::map::MapSpawners;
 use crate::player::WALK_SPEED;
 use crate::walk_animation::{WalkAnimation, WalkSprite, WalkStateSet};
-use game_kit::map_transition::{ActiveMaps, MapId};
 
 /// Height of the canvas of `monsters.aseprite` (13 wide, 11 high).
 const CANVAS_HEIGHT: f32 = 11.0;
@@ -137,7 +136,6 @@ pub fn spawn_spawners(mut commands: Commands, spawners: Res<MapSpawners>) {
 fn spawn_enemies(
     mut commands: Commands,
     server: Res<AssetServer>,
-    active: Res<ActiveMaps>,
     mut requests: MessageReader<SpawnRequest>,
     kinds: Query<&EnemyKind, Without<Enemy>>,
 ) {
@@ -155,8 +153,6 @@ fn spawn_enemies(
         let mut enemy = commands.spawn((
             Enemy,
             kind,
-            // Spawned after the load, so the kit does not adopt it: it goes with the map on F1 by its `MapId`.
-            MapId(active.current.clone()),
             SpawnedBy(request.spawner),
             Mover::new(kind.speed()).with_edge_margin(FEET_HALF_WIDTH),
             WalkAnimation::default(),

@@ -137,6 +137,7 @@ The player keeps their position along the strip. The offset is measured in world
    - To use exit objects, add `ExitTrigger` to the entities of objects whose `exit_to` is set (Long Way: `markers.rs`).
 3. Keep the player inside `ActiveMaps::walkable(margin_min, margin_max)` with `clamp_to_union` (one map is the same as a clamp to its rectangle). Read `MapTransition::locks_input()` to stop the player during a fade.
 4. F1: call `reload_current_map(world)` from the `ReloadMap` handler.
+5. An entity spawned during play that should go with a map (`adr-x60`): what the player causes requires `OnCurrentMap` and gets the current map's `MapId`; what a spawner asks for gets the spawner's `MapId` from `SpawnedBy`; anything else a map object spawns copies that object's `MapId`. A `MapId` set at the spawn wins.
 
 Long Way: `games/long-way/src/map.rs` (hooks, registration), `game_kit::collision::rebuild_blockers` (rebuild), `player.rs` (`arrive_player`).
 

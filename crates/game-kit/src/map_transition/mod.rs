@@ -489,6 +489,61 @@ mod tests {
         assert_eq!(app.world().resource::<LastLoad>().0, "2");
     }
 
+    /// The `MapId` of every entity with `OnCurrentMap`, sorted.
+    fn on_current_map(app: &mut App) -> Vec<String> {
+        let mut ids: Vec<String> = app
+            .world_mut()
+            .query_filtered::<&MapId, With<OnCurrentMap>>()
+            .iter(app.world())
+            .map(|id| id.0.clone())
+            .collect();
+        ids.sort();
+        ids
+    }
+
+    #[test]
+    fn an_entity_spawned_during_play_belongs_to_the_current_map_and_goes_with_it() {
+        let mut app = app_with_two_maps();
+        app.update();
+        put_player(&mut app, ORIGIN + Vec2::new(300.0, 300.0));
+        app.world_mut().spawn(OnCurrentMap);
+        // A `MapId` it is spawned with wins.
+        app.world_mut().spawn((OnCurrentMap, MapId("2".into())));
+        app.update();
+        assert_eq!(on_current_map(&mut app), ["1", "2"]);
+        // Into the exit to map 2. A scene transition unloads every map, so both go, and a new one belongs to map 2.
+        set_feet(&mut app, ORIGIN + Vec2::new(250.0, 600.0));
+        update_until(&mut app, |world| {
+            world.resource::<ActiveMaps>().current == "2"
+        });
+        assert_eq!(on_current_map(&mut app), Vec::<String>::new());
+        app.world_mut().spawn(OnCurrentMap);
+        app.update();
+        assert_eq!(on_current_map(&mut app), ["2"]);
+    }
+
+    #[test]
+    fn an_on_current_map_entity_that_a_load_hook_spawns_belongs_to_the_map_being_loaded() {
+        // A seamless neighbour loads while the player is still in map 1, so the observer gives the entity map 1
+        // first; the adoption gives it the map that is loading.
+        let mut app = app_with_two_maps();
+        app.update();
+        let root = app.world_mut().spawn(MapRoot).id();
+        let before: HashSet<Entity> = app
+            .world_mut()
+            .query::<Entity>()
+            .iter(app.world())
+            .collect();
+        let spawned = app.world_mut().spawn(OnCurrentMap).id();
+        assert_eq!(app.world().get::<MapId>(spawned), Some(&MapId("1".into())));
+        adopt_new_entities(app.world_mut(), root, "2", &before);
+        assert_eq!(app.world().get::<MapId>(spawned), Some(&MapId("2".into())));
+        assert_eq!(
+            app.world().get::<ChildOf>(spawned).map(ChildOf::parent),
+            Some(root)
+        );
+    }
+
     #[test]
     fn the_exit_does_not_fire_again_while_the_player_stands_in_it() {
         let mut app = app_with_two_maps();

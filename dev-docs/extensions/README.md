@@ -37,7 +37,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | A thrown shot sorts wrongly | `ProjectilePath` + `DepthSort` |
 | A `ProjectileHit` handler cannot find the projectile | Order it after `ProjectileSet` (`adr-x55`) |
 | A pickup is not collected, or is collected twice | `Collectable` + `MapId` |
-| An object stays after its map unloads | Spawn it in the `load` hook (the kit adopts it into the `MapRoot`, `adr-x58`), or add `MapId` to an entity spawned later |
+| An object stays after its map unloads or F1 | Spawn it in the `load` hook (the kit adopts it into the `MapRoot`, `adr-x58`). Spawned later: `#[require(OnCurrentMap)]` for what the player causes, `SpawnedBy` for a spawner's entity, or copy the spawning object's `MapId` (`adr-x60`) |
 | Enemies do not appear again | `Spawner`, `SpawnRequest`, `SpawnedBy` |
 | Many sprites animate in step | `RandomStartFrame::for_cell` |
 | The animation speed is wrong | Frame durations in the `.aseprite` file (`adr-a6`) |

@@ -7,7 +7,7 @@ use game_kit::projectile::{Projectile, ProjectileSprite};
 
 use crate::input::{InputSet, PlayerInput};
 use crate::player::{Player, WALK_SPEED};
-use game_kit::map_transition::{ActiveMaps, MapId};
+use game_kit::map_transition::OnCurrentMap;
 
 /// Projectile speed in art pixels per second: twice the walk speed.
 const PROJECTILE_SPEED: f32 = 2.0 * WALK_SPEED;
@@ -27,7 +27,6 @@ impl Plugin for WeaponPlugin {
 fn fire(
     mut commands: Commands,
     server: Res<AssetServer>,
-    active: Res<ActiveMaps>,
     input: Res<PlayerInput>,
     player: Single<(&Transform, &Player)>,
 ) {
@@ -38,8 +37,8 @@ fn fire(
     commands
         .spawn((
             Projectile::new(player.facing, PROJECTILE_SPEED).at_height(PROJECTILE_HEIGHT),
-            // It goes with the map on F1.
-            MapId(active.current.clone()),
+            // It goes with the map on F1 (adr-x60).
+            OnCurrentMap,
             Transform::from_translation(transform.translation.truncate().extend(0.0)),
             Visibility::default(),
         ))

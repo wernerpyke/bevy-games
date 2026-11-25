@@ -89,3 +89,4 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x57 | `DepthSort` owns the feet offset | EXTENSIONS.md |
 | x58 | The kit puts everything a map's `load` hook spawns under a map root | EXTENSIONS-MAPS.md |
 | x59 | The map lifecycle is a plugin of its own, and R-Town uses it | EXTENSIONS-MAPS.md |
+| x60 | The kit gives a `MapId` to entities spawned during play | EXTENSIONS-MAPS.md |

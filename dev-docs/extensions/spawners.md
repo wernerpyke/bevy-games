@@ -27,7 +27,7 @@ A spawner is an entity that asks the game for a new entity every so many seconds
 1. A legend entry is `"S": spawn_skeleton every=10 strategy=patrol radius=120`. The first word is the kind. Each following word is `key=value`: the key has letters, digits and `_`, and a key is not given twice. A bad entry stops the load with the file and the legend line (`map-files.md`).
 2. The parser does not know what a parameter means. The game checks the keys it needs when it loads the map (`Spawner::from_params`, `RandomPatrol::from_params`) and reports errors with the file and line.
 3. The spawner entity stands at the position of the spawn (R-Town: the middle of its cell). `SpawnerPlugin` sends the first request at once and the next ones every `every` seconds. A long frame gives one request, not a burst.
-4. The game reads `SpawnRequest`, spawns the entity at `position` and adds `SpawnedBy(spawner)`. With `max`, the spawner counts the entities with its `SpawnedBy`. When the limit is reached the spawn stays due and happens as soon as one dies.
+4. The game reads `SpawnRequest`, spawns the entity at `position` and adds `SpawnedBy(spawner)`, which also gives it the spawner's `MapId` (`adr-x60`), so it goes with the spawner's map. With `max`, the spawner counts the entities with its `SpawnedBy`. When the limit is reached the spawn stays due and happens as soon as one dies.
 5. The legend parameters go in every request, so the game can choose the strategy and values per spawner.
 
 ## Usage

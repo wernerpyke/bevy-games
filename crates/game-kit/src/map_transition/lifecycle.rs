@@ -96,11 +96,33 @@ impl ActiveMaps {
 }
 
 /// The map an entity belongs to. The kit removes every entity with a `MapId` when that map goes. Everything the `load`
-/// hook spawns gets it from the kit (`MapRoot`). A game adds it by hand only to an entity it spawns later, outside the
-/// hook, that should go with the map (a shot from a volcano). The controlled entity does not have it: it stays through
-/// a transition.
+/// hook spawns gets it from the kit (`MapRoot`). An entity spawned later, during play, gets it in one of two ways
+/// (adr-x60): what the player causes (a weapon, a shot) requires
+/// `OnCurrentMap`; what a map object spawns copies that object's `MapId` (`SpawnedBy` does it for a spawner, the Long Way
+/// volcano by hand for its shots), because with seamless
+/// joins the object can be in a neighbour map. The controlled entity does not have it: it stays through a transition.
 #[derive(Component, Clone, Debug, PartialEq, Eq)]
 pub struct MapId(pub String);
+
+/// An entity that belongs to the map the player is in when it appears: the kit gives it that map's `MapId`
+/// (`ActiveMaps::current`), so a map change or F1 removes it with the map. Require it on a type that is spawned during
+/// play (`#[require(OnCurrentMap)]`). A `MapId` the entity is spawned with wins.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct OnCurrentMap;
+
+/// Gives a new `OnCurrentMap` entity the current map's `MapId`, unless it already has one.
+fn bind_to_current_map(
+    add: On<Add<OnCurrentMap>>,
+    maps: Res<ActiveMaps>,
+    has_map: Query<(), With<MapId>>,
+    mut commands: Commands,
+) {
+    if !has_map.contains(add.entity) {
+        commands
+            .entity(add.entity)
+            .insert(MapId(maps.current.clone()));
+    }
+}
 
 /// The root of one loaded map, with the map's `MapId`. The kit spawns it before the `load` hook runs, then makes every
 /// top-level entity the hook spawned its child and gives it the same `MapId` (adr-x58). Removing the map despawns the
@@ -182,7 +204,8 @@ impl Plugin for MapLifecyclePlugin {
 /// The systems of the lifecycle, for `MapLifecyclePlugin` and for tests that insert the resources themselves.
 pub(super) fn install_lifecycle(app: &mut App) {
     app.add_systems(PostStartup, load_start.after(rebuild_blockers))
-        .add_systems(Update, (sync_debug_grids, show_map_id));
+        .add_systems(Update, (sync_debug_grids, show_map_id))
+        .add_observer(bind_to_current_map);
 }
 
 /// Removes every entity with a `MapId`.
@@ -257,7 +280,9 @@ pub(super) fn adopt_new_entities(
         .collect();
     for entity in new {
         let mut adopted = world.entity_mut(entity);
-        if !adopted.contains::<MapId>() {
+        // An `OnCurrentMap` entity spawned by the hook took the current map from its observer; it belongs to the
+        // map being loaded, which differs from the current one when a seamless neighbour loads.
+        if !adopted.contains::<MapId>() || adopted.contains::<OnCurrentMap>() {
             adopted.insert(MapId(id.to_string()));
         }
         world.entity_mut(root).add_child(entity);

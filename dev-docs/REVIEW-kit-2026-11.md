@@ -194,7 +194,7 @@ Progress: step 1 done (2026-11-25). Step 2 done (2026-11-25): `DepthSet` in `Pos
 
 ## Rejected findings
 
-- Weapons bind themselves to the map with a game observer, and the kit should own this. Rejected: R-Town does not use `MapId` or Fx, so this would move game code into the kit before a second game needs it.
+- Weapons bind themselves to the map with a game observer, and the kit should own this. First rejected: R-Town did not use `MapId`. Reconsidered and done on 2026-11-25 (`adr-x60`): since step 4 R-Town uses `MapId` and wrote it by hand at two spawn sites. The kit now owns `OnCurrentMap`, and `SpawnedBy` copies the spawner's map.
 - Debug line drawing is written three times. Rejected: only one constant is shared; the drawing code differs.
 - `SortAtBlocker` should derive `TieBreakX`. Rejected: the blocker centre is not the footprint middle for grouped or lone scenery.
 
