@@ -15,17 +15,16 @@ use std::collections::HashMap;
 use std::f32::consts::TAU;
 
 use bevy::prelude::*;
+use game_kit::area::{away_from, distance_to_rect};
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionWorld, ray_distance};
-use game_kit::hitbox::HitBox;
-use game_kit::movement::{Mover, Stunned};
+use game_kit::movement::Stunned;
 use game_kit::outline::Edge;
 
-use super::WeaponHit;
 use super::damage::pushed_feet;
 use super::ring::Ring;
 use super::values::{Damage, ICE_RAYS};
-use crate::enemy_hp::EnemyHp;
+use super::{EnemyBody, WeaponHit, log_ended};
 
 /// A move that ends this many pixels short of what was asked was stopped by a feature or the map edge.
 const PIN_TOLERANCE: f32 = 0.5;
@@ -105,11 +104,10 @@ fn distance_to_leave(from: Vec2, dir: Vec2, rect: Rect) -> f32 {
 }
 
 /// Pushes, holds back and stuns the enemies of each ice ring. It runs after the kit has moved the enemies, so a step
-/// into the ring is undone in the same frame. A dead enemy is skipped (`weapons.md`, "Dead enemies").
-#[allow(clippy::type_complexity)]
+/// into the ring is undone in the same frame. A dead enemy is skipped (`EnemyBody::living_rect`).
 pub(super) fn update_ice_rings(
     mut rings: Query<(&Ring, &mut IceRing)>,
-    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp, Option<&Mover>)>,
+    enemies: Query<EnemyBody>,
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
     mut hits: MessageWriter<WeaponHit>,
@@ -121,17 +119,14 @@ pub(super) fn update_ice_rings(
             continue;
         };
         let growing = ring.age < ring.shape.grow_secs;
-        for (target, transform, hit_box, hp, mover) in &enemies {
-            if hp.is_dead() {
+        for enemy in &enemies {
+            let Some(rect) = enemy.living_rect() else {
                 continue;
-            }
-            let rect = hit_box.rect_at(transform.translation.truncate());
-            let away = (rect.center() - ring.centre)
-                .try_normalize()
-                .unwrap_or(Vec2::X);
+            };
+            let target = enemy.entity;
+            let away = away_from(ring.centre, rect);
             let front = ring.radius.min(ice.limit_at(away.to_angle()));
-            let near = ring.centre.clamp(rect.min, rect.max).distance(ring.centre);
-            let inside = front - near;
+            let inside = front - distance_to_rect(ring.centre, rect);
             if inside <= EDGE_TOLERANCE {
                 continue;
             }
@@ -140,9 +135,8 @@ pub(super) fn update_ice_rings(
                 continue;
             }
             let wanted = away * inside;
-            let feet = transform.translation.truncate();
-            let margin = mover.map_or(0.0, |mover| mover.edge_margin);
-            let moved = pushed_feet(feet, wanted, &world, bounds, margin) - feet;
+            let feet = enemy.feet();
+            let moved = pushed_feet(feet, wanted, &world, bounds, enemy.edge_margin()) - feet;
             body.pushed += moved.length();
 
             let mut amount = 0.0;
@@ -177,10 +171,10 @@ pub(super) fn update_ice_rings(
 /// When an ice ring goes, the enemies it stunned walk again, and the log says what it did.
 pub(super) fn release_stunned(
     remove: On<Remove<IceRing>>,
-    rings: Query<&IceRing>,
+    rings: Query<(&IceRing, &Ring)>,
     mut commands: Commands,
 ) {
-    let Ok(ice) = rings.get(remove.entity) else {
+    let Ok((ice, ring)) = rings.get(remove.entity) else {
         return;
     };
     let mut report = Vec::new();
@@ -200,22 +194,19 @@ pub(super) fn release_stunned(
             if body.stunned { ", stunned" } else { "" },
         ));
     }
-    info!(
-        "ice ring: ended, touched {}: [{}]",
-        report.len(),
-        report.join("; ")
-    );
+    log_ended("ice ring", ring.age, report);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enemy_hp::DamageEnemy;
+    use crate::enemy_hp::{DamageEnemy, EnemyHp};
     use crate::weapon_menu::WeaponKind;
     use crate::weapons::CastWeapon;
     use crate::weapons::damage::apply_hits;
     use crate::weapons::ring::{cast_rings, update_rings};
     use crate::weapons::values::ICE_RING;
+    use game_kit::hitbox::HitBox;
 
     const DT_MS: u64 = 16;
     /// The ring has grown and the barrier holds.

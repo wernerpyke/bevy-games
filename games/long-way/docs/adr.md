@@ -203,7 +203,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** The developer chose click to go only, the nearest reachable point, and removing the arrow keys (2026-11-09). One movement path is less code than two, and the nearest point means a click near a tree always does something. Hold-to-follow can be added later by sending the goal again while the button is down. `Player` keeps the animation state (`walking`, `facing`, `hurt`) and reads it from `MoveState`, so the art and `Hurt` are unchanged.
 
-**How to apply.** Code: `player.rs` (`set_goal`, `limit_player`, `facing_of`). Values: speed `WALK_SPEED` (300 px/s). `NavInset` is set from `PLAYER_HALF_WIDTH` and `PLAYER_BODY_HEIGHT` (`collision.rs`), so the ghosts, which share the grid, also do not path into those margins.
+**How to apply.** Code: `player.rs` (`set_goal`, `limit_player`; the facing is the kit `animation::view_of`). Values: speed `WALK_SPEED` (300 px/s). `NavInset` is set from `PLAYER_HALF_WIDTH` and `PLAYER_BODY_HEIGHT` (`collision.rs`), so the ghosts, which share the grid, also do not path into those margins.
 
 ## adr-lw31. The HUD bar is below the game, and an energy icon opens a weapon drawer over the game area (2026-11-11, amended by adr-lw34: a gauge opens it, and a drawer button loads the weapon, it does not cast)
 

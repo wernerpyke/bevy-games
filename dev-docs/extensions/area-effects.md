@@ -10,7 +10,7 @@
 
 | Part | Code today | Shared? |
 |---|---|---|
-| `ease_out`, `ring_radius`, `circle_hits_rect`, `rect_overlaps_band`, `push_delta` | `crates/game-kit/src/area.rs` | Shared. No game values. |
+| `ease_out`, `ring_radius`, `circle_hits_rect`, `rect_overlaps_band`, `push_delta`, `away_from`, `closest_point`, `distance_to_rect` | `crates/game-kit/src/area.rs` | Shared. No game values. |
 | Temporary blocked area | `crates/game-kit/src/collision.rs` | Shared. |
 | Weapons that use it | `games/long-way/src/weapons/ring.rs` (the rings). The walls will use the temporary blocked area (`dev-docs/PLAN-walls.md`). | No. Game specific. |
 
@@ -31,7 +31,8 @@ The centre, the radii, the grow time, the speed of a push, and the body rectangl
 3. `circle_hits_rect` is true when the circle touches or overlaps the rectangle. The nearest point of the rectangle is the test, so a corner counts as a distance.
 4. `rect_overlaps_band(centre, inner, outer, rect)` is true when the nearest point of the rectangle is within `outer` and its farthest corner is at least `inner` away. It is exact for any rectangle, large or small.
 5. A moving ring hit test uses a band that reaches back in time: the inner radius is the radius `trail` seconds ago. Consecutive frames must overlap (`ring_radius(now - trail) <= ring_radius(previous frame)`), or a body can be skipped between two frames. The test in `area.rs` checks this down to 20 frames per second.
-6. `push_delta(centre, radius, rect, speed, dt)` is the move of one frame straight away from the centre, at `speed`, while any part of the body is inside `radius`. A body exactly on the centre is pushed along +X. The game moves the body with `collision::move_feet`, so blocked areas stop the push.
+6. `push_delta(centre, radius, rect, speed, dt)` is the move of one frame straight away from the centre, at `speed`, while any part of the body is inside `radius`. The direction is `away_from(centre, rect)`: from the centre to the middle of the body, and +X for a body exactly on the centre.
+7. `closest_point(rect, p)` and `distance_to_rect(p, rect)` give the nearest point of a body and its distance (0 inside). Use them for a blast radius or for how deep a body is in a disc. The game moves the body with `collision::move_feet`, so blocked areas stop the push.
 
 ## Usage
 

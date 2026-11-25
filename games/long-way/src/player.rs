@@ -4,7 +4,7 @@ use bevy_aseprite_ultra::prelude::*;
 use crate::camera::MAP_ORIGIN;
 use crate::collision::{PLAYER_BODY_HEIGHT, PLAYER_FEET_OFFSET, PLAYER_HALF_WIDTH};
 use crate::hp::{Hp, PlayerHurt};
-use game_kit::animation::play_if_changed;
+use game_kit::animation::{View, play_if_changed, view_of};
 use game_kit::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
@@ -54,16 +54,9 @@ impl Plugin for PlayerPlugin {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Facing {
-    Up,
-    Down,
-    Side,
-}
-
 #[derive(Component)]
 pub struct Player {
-    facing: Facing,
+    facing: View,
     walking: bool,
     /// The `Hurt` animation is playing. It plays once and takes over from walking and idle.
     hurt: bool,
@@ -109,7 +102,7 @@ pub fn spawn_player(
         Hp::default(),
         HIT_BOX,
         Player {
-            facing: Facing::Down,
+            facing: View::Down,
             walking: false,
             hurt: false,
         },
@@ -257,18 +250,6 @@ fn set_goal(
     }
 }
 
-/// The animation facing for a direction of walking. Sideways wins when it is as strong as the vertical part, so the
-/// sideways walk plays on a diagonal.
-fn facing_of(direction: Vec2) -> Facing {
-    if direction.x.abs() >= direction.y.abs() {
-        Facing::Side
-    } else if direction.y > 0.0 {
-        Facing::Up
-    } else {
-        Facing::Down
-    }
-}
-
 pub fn feet_of(transform: &Transform) -> Vec2 {
     transform.translation.truncate() - Vec2::new(0.0, PLAYER_FEET_OFFSET)
 }
@@ -335,8 +316,8 @@ fn limit_one(
     transform.translation.x = limited.x;
     transform.translation.y = limited.y + PLAYER_FEET_OFFSET;
 
-    player.facing = facing_of(state.facing);
-    if player.facing == Facing::Side {
+    player.facing = view_of(state.facing).0;
+    if player.facing == View::Side {
         let faces_right = state.facing.x > 0.0;
         transform.scale.x = if faces_right == WALK_ART_FACES_RIGHT {
             1.0
@@ -353,9 +334,9 @@ fn animate_player(mut query: Query<(&mut AseAnimation, &Player)>) {
         }
         let tag = match (player.walking, player.facing) {
             (false, _) => "Idle",
-            (true, Facing::Side) => "Run",
-            (true, Facing::Up) => "Up",
-            (true, Facing::Down) => "Down",
+            (true, View::Side) => "Run",
+            (true, View::Up) => "Up",
+            (true, View::Down) => "Down",
         };
         let speed = if player.walking {
             WALK_ANIMATION_SPEED
@@ -413,10 +394,10 @@ pub fn arrive_player(
         player.walking = false;
         let (facing, faces_right) = match arrival.facing {
             None => continue,
-            Some(EntryFacing::Up) => (Facing::Up, None),
-            Some(EntryFacing::Down) => (Facing::Down, None),
-            Some(EntryFacing::Left) => (Facing::Side, Some(false)),
-            Some(EntryFacing::Right) => (Facing::Side, Some(true)),
+            Some(EntryFacing::Up) => (View::Up, None),
+            Some(EntryFacing::Down) => (View::Down, None),
+            Some(EntryFacing::Left) => (View::Side, Some(false)),
+            Some(EntryFacing::Right) => (View::Side, Some(true)),
         };
         player.facing = facing;
         if let Some(right) = faces_right {
@@ -442,7 +423,7 @@ mod tests {
             .world_mut()
             .spawn((
                 Player {
-                    facing: Facing::Down,
+                    facing: View::Down,
                     walking: false,
                     hurt: false,
                 },
@@ -461,14 +442,6 @@ mod tests {
             .clone()
     }
 
-    #[test]
-    fn the_facing_follows_the_direction_of_walking() {
-        assert_eq!(facing_of(Vec2::new(1.0, 0.2)), Facing::Side);
-        assert_eq!(facing_of(Vec2::new(-0.7, 0.7)), Facing::Side);
-        assert_eq!(facing_of(Vec2::new(0.2, 1.0)), Facing::Up);
-        assert_eq!(facing_of(Vec2::new(0.2, -1.0)), Facing::Down);
-    }
-
     /// The scale x of the sprite when the player looks right, and left.
     fn right_and_left() -> (f32, f32) {
         let right = if WALK_ART_FACES_RIGHT { 1.0 } else { -1.0 };
@@ -480,7 +453,7 @@ mod tests {
         let transform = Transform::from_xyz(feet.x, feet.y + PLAYER_FEET_OFFSET, 0.0)
             .with_scale(Vec3::new(0.5, 1.0, 1.0));
         let player = Player {
-            facing: Facing::Down,
+            facing: View::Down,
             walking: false,
             hurt: false,
         };
@@ -496,10 +469,10 @@ mod tests {
     fn a_walking_player_is_kept_in_the_walkable_area_and_faces_the_way_it_walks() {
         let (right, left) = right_and_left();
         for (direction, facing, scale) in [
-            (Vec2::X, Facing::Side, right),
-            (Vec2::NEG_X, Facing::Side, left),
-            (Vec2::Y, Facing::Up, 0.5),
-            (Vec2::NEG_Y, Facing::Down, 0.5),
+            (Vec2::X, View::Side, right),
+            (Vec2::NEG_X, View::Side, left),
+            (Vec2::Y, View::Up, 0.5),
+            (Vec2::NEG_Y, View::Down, 0.5),
         ] {
             let (mut transform, mut player) = player_at(Vec2::new(350.0, 100.0));
             let state = MoveState {
@@ -552,7 +525,7 @@ mod tests {
                 &mut SlideAssist::default(),
             );
             assert_eq!(transform, before, "locked {locked}");
-            assert_eq!((player.walking, player.facing), (false, Facing::Down));
+            assert_eq!((player.walking, player.facing), (false, View::Down));
             let kept = if locked {
                 None
             } else {
@@ -705,11 +678,11 @@ mod tests {
         use bevy::ecs::system::RunSystemOnce;
         let (right, left) = right_and_left();
         for (entry, facing, scale) in [
-            (None, Facing::Down, 0.5),
-            (Some(EntryFacing::Up), Facing::Up, 0.5),
-            (Some(EntryFacing::Down), Facing::Down, 0.5),
-            (Some(EntryFacing::Left), Facing::Side, left),
-            (Some(EntryFacing::Right), Facing::Side, right),
+            (None, View::Down, 0.5),
+            (Some(EntryFacing::Up), View::Up, 0.5),
+            (Some(EntryFacing::Down), View::Down, 0.5),
+            (Some(EntryFacing::Left), View::Side, left),
+            (Some(EntryFacing::Right), View::Side, right),
         ] {
             let mut app = App::new();
             app.insert_resource(ActiveMaps {

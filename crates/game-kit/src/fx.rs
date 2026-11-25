@@ -24,8 +24,12 @@ pub use bevy_enoki::prelude::{
 };
 
 /// Adds Enoki, the two additive materials, the `EffectLibrary` and the system that moves `Follows` emitters.
-/// Run the follow system `.after` your own movement, or let it lag one frame: it reads the owner's `Transform`.
+/// Order `FxFollowSet` after the systems that move the owners, or the emitters lag one frame behind them.
 pub struct FxPlugin;
+
+/// The system that moves `Follows` emitters to their owners and ends the emitters of owners that are gone (`Update`).
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone, Copy)]
+pub struct FxFollowSet;
 
 impl Plugin for FxPlugin {
     fn build(&self, app: &mut App) {
@@ -37,7 +41,13 @@ impl Plugin for FxPlugin {
         .init_resource::<EffectLibrary>()
         .init_resource::<FxLooks>()
         .add_systems(Startup, setup_materials)
-        .add_systems(Update, (emitters_follow, crate::fx_strip::build_looks));
+        .add_systems(
+            Update,
+            (
+                emitters_follow.in_set(FxFollowSet),
+                crate::fx_strip::build_looks,
+            ),
+        );
     }
 }
 

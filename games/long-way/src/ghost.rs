@@ -17,7 +17,7 @@ use game_kit::hitbox::HitBox;
 use game_kit::map::Map;
 use game_kit::map_transition::MapLoad;
 use game_kit::movement::{Mover, Stunned};
-use game_kit::strategies::{Pursue, RandomPatrol, Sentry, Strategy};
+use game_kit::strategies::{Strategy, StrategyComponents};
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
 
 use crate::enemy_hp::{EnemyDied, EnemyHp, EnemyHurt, HurtFrames};
@@ -138,7 +138,7 @@ fn start_attack(
         };
         commands
             .entity(touch.by)
-            .remove::<(Touchable, Mover, RandomPatrol, Pursue, Sentry)>();
+            .remove::<(Touchable, Mover, StrategyComponents)>();
         for child in children {
             commands
                 .entity(*child)
@@ -189,15 +189,9 @@ fn die_when_killed(
         let Ok(children) = ghosts.get(*entity) else {
             continue;
         };
-        commands.entity(*entity).remove::<(
-            Touchable,
-            Mover,
-            RandomPatrol,
-            Pursue,
-            Sentry,
-            HitBox,
-            Stunned,
-        )>();
+        commands
+            .entity(*entity)
+            .remove::<(Touchable, Mover, StrategyComponents, HitBox, Stunned)>();
         for child in children {
             commands
                 .entity(*child)
@@ -260,6 +254,7 @@ fn finish_animations(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use game_kit::strategies::{Pursue, Sentry};
 
     fn app() -> App {
         let mut app = App::new();

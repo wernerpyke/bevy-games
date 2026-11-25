@@ -86,6 +86,10 @@ pub fn pushed_feet(
     }
 }
 
+/// Turns each hit into damage and moves the enemy by its push. This is the one real move. The ice ring and the
+/// tornado also call `pushed_feet`, but only as a forecast, to know whether a push pins an enemy or how deep it stays.
+/// Moving here, one hit after another, keeps two pushes on one enemy in one frame from passing a wall (kit review,
+/// item 18, kept on 2026-11-25).
 pub(crate) fn apply_hits(
     mut hits: MessageReader<WeaponHit>,
     mut damage: MessageWriter<DamageEnemy>,

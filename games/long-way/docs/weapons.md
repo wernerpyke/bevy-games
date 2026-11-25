@@ -8,7 +8,7 @@ Design: the user (2026-11-11). Decisions: `adr-lw32` to `adr-lw37`. Balance: `ba
 2. A click on the active weapon button, or its key (Z, X, C, V), sends `ActiveWeaponClicked`. `weapons/mod.rs` takes the weapon's cost from the energy of its slot and turns the click into `CastWeapon { weapon, origin, facing }`: the player's feet and the direction the player last moved in. With too little energy nothing is cast. The button is then disabled (flat, no click, no key) and the icon is greyed from the top by the missing share of the cost (`adr-lw39`). The player starts with no energy, so the first cast needs a pickup.
 3. The weapon's gameplay system reads `CastWeapon`, owns the weapon's state and sends `WeaponHit { target, weapon, amount, push }` for each enemy it touches. Its visuals read the same state.
 4. `weapons/damage.rs` turns a hit into `DamageEnemy` (`enemy_hp.rs`) and moves the enemy by `push` through the collision world, inside the map.
-5. A weapon belongs to the map the player is in when it is cast. Every weapon entity gets that map's `MapId` when it appears (`MapBindingPlugin` in `weapons/mod.rs`), so a map change removes it with the map's other entities: a ring, tornado or fireball does not go on in the next map (the user, 2026-11-14).
+5. A weapon belongs to the map the player is in when it is cast. Every weapon entity gets that map's `MapId` when it appears (`MapBindingPlugin` in `weapons/mod.rs`; a new weapon type requires `OnCurrentMap`, and particle emitters are bound by their `ParticleEffectHandle`), so a map change removes it with the map's other entities: a ring, tornado or fireball does not go on in the next map (the user, 2026-11-14).
 6. At 0 hit points an enemy sends `EnemyDied`. The ghost plays `Die` and is removed, and does not hurt the player.
 
 ## Values
@@ -27,7 +27,7 @@ All in `weapons/values.rs`, one row per weapon. **The numbers are placeholders u
 - **Cost** is energy per cast, taken from the energy of the weapon's drawer (`cost` in `values.rs`, the user's values of 2026-11-14, `adr-lw39`). The walls get theirs when they are built.
 - **Damage per second** is dealt in ticks. The first frame in the effect hits at once, then one tick every `tick` seconds, each `dps * tick`, so the damage averages `dps`.
 - **Long frame** (the user, 2026-11-11): a frame longer than the tick deals one tick, and the rhythm starts again from it. Missed ticks are not dealt later.
-- **Dead enemies** (the user, 2026-11-11): every weapon skips an enemy whose `EnemyHp` is 0, in its own query or filter, even while it plays `Die` and still has its `HitBox`. A weapon must not rely on the enemy's plugin removing the `HitBox`. Each weapon has a test for it.
+- **Dead enemies** (the user, 2026-11-11): every weapon skips an enemy whose `EnemyHp` is 0, even while it plays `Die` and still has its `HitBox`: it reads enemies through the `EnemyBody` query (`weapons/mod.rs`), whose `living_rect` is `None` for a dead enemy. A weapon must not rely on the enemy's plugin removing the `HitBox`. Each weapon has a test for it.
 - **Pushback:** `Pixels(n)` moves a target at most `n` pixels in all per cast, away from the centre. `ToEdge` carries it to the weapon's final radius or distance. A tree, a rock, a wall or the map edge stops a push, and the target keeps taking damage there.
 - **Enemy hit points:** ghost 100 (`ghost.rs`, `HIT_POINTS`).
 - **Hurt look:** an enemy that has its own hurt frames (`HurtFrames`, the ghost's `Hurt` tag) plays them once when it survives a hit. Any other enemy is tinted `#993D41` for 0.12 s.
@@ -142,11 +142,11 @@ The lines (all `info`, one per event, `adr-lw32`):
 | `enemy: <id> died` and `ghost: <id> was killed, plays Die` | HP reached 0 and `Die` starts |
 | `ghost: <id> removed after Die` | `Die` ended and the ghost is gone. **A `died` without a `removed` is a bug** |
 | `ghost: <id> touched the player and attacks` and `ghost: <id> attack landed ...` | The ghost reached the player |
-| `ring: Fire ring ended at age 2.77 s, touched 1: [<id> 5 ticks, pushed 62 px]` | The fire ring is over: ticks dealt and pixels pushed per enemy |
+| `fire ring: ended at age 2.77 s, touched 1: [<id> 5 ticks, pushed 62 px]` | The fire ring is over: ticks dealt and pixels pushed per enemy |
 | `ice ring: <id> pushed, 50 damage` and `ice ring: <id> walked into the ring, 10 damage` | The ice ring's two kinds of damage, each once per enemy per cast |
 | `ice ring: <id> pinned at (x, y), stunned until the ring goes` | A push was stopped by a feature or the map edge |
 | `tornado: started at (x, y), edge 64 to 96 in 1.3 s, lasts d s` and `tornado: ended at age 5.55 s, touched 1: [<id> 6 ticks, pushed 125 px]` | The tornado: ticks dealt and pixels pushed per enemy. Each tick is also an `enemy:` line |
-| `ring: Ice ring ended at age 2.77 s` and `ice ring: ended, touched 2: [<id> pushed 114 px, push damage, stunned; ...]` | The ice ring is over, and what it did to each enemy. Stunned enemies walk again |
+| `ice ring: ended at age 2.77 s, touched 2: [<id> pushed 114 px, push damage, stunned; ...]` | The ice ring is over, and what it did to each enemy. Stunned enemies walk again |
 | `fireball: cast at (x, y) at <id>, 146 px away, on screen` or `... with no enemy on the map, towards (x, y)` | The fireball left the muzzle, and what it goes for |
 | `fireball: target <id> is gone, flies on to (x, y)` | The target died or vanished in flight. The fireball explodes at its last place |
 | `fireball: exploded at (x, y) (Enemy), direct Some(<id>), blast 1: [<id>]` | Why it exploded (`Enemy`, `Blocked`, `MapEdge`, `Range`, `Lost`), who took the direct hit and who took the blast |

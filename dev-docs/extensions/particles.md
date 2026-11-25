@@ -10,7 +10,7 @@
 
 | Part | Code today | Shared? |
 |---|---|---|
-| `FxPlugin`, `Fx` (system parameter), `Follows`, `EffectLibrary`, `Look`, `SpriteLook`, `AdditiveSprite`, `AdditiveColor` | `crates/game-kit/src/fx.rs` | Shared. Used by Long Way only. |
+| `FxPlugin`, `Fx` (system parameter), `Follows`, `FxFollowSet`, `EffectLibrary`, `Look`, `SpriteLook`, `AdditiveSprite`, `AdditiveColor` | `crates/game-kit/src/fx.rs` | Shared. Used by Long Way only. |
 | `FxLooks`, `strip_from_atlas` (particle sprite strips cut from an `.aseprite` tag at run time) | `crates/game-kit/src/fx_strip.rs` | Shared. |
 | Patched Enoki (`blend_state()` on `Particle2dMaterial`, about 10 lines) | `vendor/bevy_enoki`, root `[patch.crates-io]` | Workspace. |
 | Effect files, sprite sheets, weapons | `games/long-way/` (`games/long-way/docs/weapons.md`) | No. |
@@ -56,7 +56,7 @@ Effect files (`*.particle.ron`), the `.aseprite` file and tag of each particle s
 2. `Fx` is a system parameter. `fx.emitter(file, transform, &look, glow)`, `fx.one_shot(...)` and `fx.following(owner, ...)` spawn emitters and return the entity. `glow` and `look` are chosen per call, so one weapon can glow and another not.
 2b. `game_kit::fx` re-exports the Enoki types a game needs, so a game does not depend on Enoki itself (G1 of the weapons plan): `OneShot`, `Particle2dEffect`, `ParticleEffectHandle`, `ParticleSpawnerState`, and for per-emitter changes `ParticleEffectInstance` and `Attractor`. An emitter's `ParticleEffectInstance` holds its own copy of the effect once loaded; set its `attractors` there (Long Way's tornado, `weapons/tornado.rs`).
 3. `Look::Squares` draws flat colour squares. `Look::Sprites(SpriteLook)` draws a sprite strip, made once as a normal and an additive material.
-4. `Follows { owner, offset, rotation }` moves an emitter with its owner: the owner's x and y plus `offset`, and the owner's rotation turned by `rotation`. It never writes z. When the owner is gone, the emitter stops spawning, loses `Follows` and gets `OneShot::Despawn`.
+4. `Follows { owner, offset, rotation }` moves an emitter with its owner: the owner's x and y plus `offset`, and the owner's rotation turned by `rotation`. It never writes z. When the owner is gone, the emitter stops spawning, loses `Follows` and gets `OneShot::Despawn`. So a game never writes its own "move my emitters, end them with their owner" systems: it gives the owner a `Transform` and spawns the emitters with `Fx::following`. The follow system runs in `FxFollowSet`; order that set after the systems that move the owners.
 5. `EffectLibrary::keep(&server, file)` keeps a file loaded. Without it a file is dropped when its last emitter dies.
 6. `FxLooks::request(&server, name, file, tag, square)` (in `Startup`) asks for a look made from the frames of a tag. When the file has loaded, a system copies the frames out of the Aseprite atlas into one row of equal cells, cropped to the union of the visible pixels of the tag, padded to square cells when `square` is set (Enoki draws every particle as a square quad). `FxLooks::get(name)` returns the `Look`, or `None` until it is ready, so a caller uses `unwrap_or_default()` (flat squares) for the first frames. A failed look (no such tag, no visible pixel) logs an error and is never ready. The spike's exported sheets and these strips have the same cell sizes. The frames of the tag are the particle's life, in order.
 7. Effect files are not reloaded while the game runs (no file watcher, G3 in "Build guard"). Restart the game to see a change.

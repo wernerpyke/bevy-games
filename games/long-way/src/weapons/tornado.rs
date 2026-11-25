@@ -23,19 +23,18 @@ use std::f32::consts::{FRAC_PI_2, TAU};
 
 use bevy::prelude::*;
 use game_kit::Controlled;
+use game_kit::area::{away_from, distance_to_rect};
 use game_kit::camera::CameraBounds;
 use game_kit::collision::CollisionWorld;
 use game_kit::depth::DepthSort;
-use game_kit::fx::{
-    Attractor, EffectLibrary, Fx, Look, OneShot, ParticleEffectInstance, ParticleSpawnerState,
-};
+use game_kit::fx::{Attractor, EffectLibrary, Follows, Fx, Look, ParticleEffectInstance};
 use game_kit::hitbox::HitBox;
-use game_kit::movement::Mover;
 
 use super::damage::{Contact, pushed_feet};
 use super::values::{Pushback, TORNADO, WeaponValues, values};
-use super::{CastWeapon, WeaponHit, WeaponSystems};
-use crate::enemy_hp::EnemyHp;
+use super::{
+    CastWeapon, EnemyBody, OnCurrentMap, WeaponHit, WeaponSystems, contact_line, log_ended,
+};
 use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const EFFECT: &str = "effects/tornado_orbit.particle.ron";
@@ -71,9 +70,7 @@ impl Plugin for TornadoPlugin {
                 Update,
                 (
                     spawn_emitters,
-                    place_emitters,
                     set_attractors,
-                    end_emitters,
                     spawn_edge_dots,
                     place_edge_dots,
                 )
@@ -83,10 +80,11 @@ impl Plugin for TornadoPlugin {
     }
 }
 
-/// A tornado in the world. `bodies` remembers each enemy it has seen.
+/// A tornado in the world. Its `Transform` is its centre, on the middle of the player's body, and its emitters follow
+/// it (`Follows`). `bodies` remembers each enemy it has seen.
 #[derive(Component)]
+#[require(OnCurrentMap)]
 pub struct Tornado {
-    centre: Vec2,
     age: f32,
     values: WeaponValues,
     bodies: HashMap<Entity, Body>,
@@ -112,15 +110,15 @@ impl Tornado {
     }
 }
 
-/// An emitter of a tornado at `slot` on its circle. When the tornado is gone it stops and removes itself.
+/// An emitter of a tornado at `slot` on its circle. It follows its tornado (`Follows`).
 #[derive(Component)]
 struct TornadoEmitter {
-    owner: Entity,
     slot: usize,
 }
 
 /// Dot `slot` of the push edge of a tornado.
 #[derive(Component)]
+#[require(OnCurrentMap)]
 pub(super) struct EdgeDot {
     owner: Entity,
     slot: usize,
@@ -133,7 +131,7 @@ fn player_centre(transform: &Transform, hit_box: &HitBox) -> Vec2 {
 
 /// How deep a body is in a disc: the radius less the distance from the centre to the nearest point of the body.
 fn depth_in(centre: Vec2, radius: f32, body: Rect) -> f32 {
-    radius - centre.clamp(body.min, body.max).distance(centre)
+    radius - distance_to_rect(centre, body)
 }
 
 pub(super) fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: Commands) {
@@ -150,23 +148,25 @@ pub(super) fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: 
             TORNADO.grow_secs,
             TORNADO.duration
         );
-        commands.spawn(Tornado {
-            centre: order.centre,
-            age: 0.0,
-            values: values(WeaponKind::Tornado),
-            bodies: HashMap::new(),
-        });
+        commands.spawn((
+            Tornado {
+                age: 0.0,
+                values: values(WeaponKind::Tornado),
+                bodies: HashMap::new(),
+            },
+            Transform::from_translation(order.centre.extend(0.0)),
+        ));
     }
 }
 
 /// Moves each tornado with the player, hurts and pushes the enemies in it, and ends it after its duration. A dead
-/// enemy is skipped (`weapons.md`, "Dead enemies").
+/// enemy is skipped (`EnemyBody::living_rect`).
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn update_tornadoes(
     time: Res<Time>,
-    player: Query<(&Transform, &HitBox), With<Controlled>>,
-    mut tornadoes: Query<(Entity, &mut Tornado)>,
-    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp, Option<&Mover>), Without<Controlled>>,
+    player: Query<(&Transform, &HitBox), (With<Controlled>, Without<Tornado>)>,
+    mut tornadoes: Query<(Entity, &mut Tornado, &mut Transform)>,
+    enemies: Query<EnemyBody, (Without<Controlled>, Without<Tornado>)>,
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
     mut hits: MessageWriter<WeaponHit>,
@@ -174,48 +174,39 @@ fn update_tornadoes(
 ) {
     let dt = time.delta_secs();
     let bounds = bounds.map(|bounds| bounds.0);
-    for (entity, mut tornado) in &mut tornadoes {
+    for (entity, mut tornado, mut transform) in &mut tornadoes {
         tornado.age += dt;
         if tornado.age >= TORNADO.duration {
-            let touched: Vec<String> = tornado
+            let touched = tornado
                 .bodies
                 .iter()
                 .filter(|(_, body)| body.contact.ticks() > 0 || body.pushed > 0.0)
-                .map(|(target, body)| {
-                    format!(
-                        "{target:?} {} ticks, pushed {:.0} px",
-                        body.contact.ticks(),
-                        body.pushed
-                    )
-                })
+                .map(|(target, body)| contact_line(*target, body.contact.ticks(), body.pushed))
                 .collect();
-            info!(
-                "tornado: ended at age {:.2} s, touched {}: [{}]",
-                tornado.age,
-                touched.len(),
-                touched.join("; ")
-            );
+            log_ended("tornado", tornado.age, touched);
             commands.entity(entity).despawn();
             continue;
         }
-        if let Ok((transform, hit_box)) = player.single() {
-            tornado.centre = player_centre(transform, hit_box);
+        if let Ok((player, hit_box)) = player.single() {
+            let centre = player_centre(player, hit_box);
+            transform.translation.x = centre.x;
+            transform.translation.y = centre.y;
         }
         let Pushback::Outward(push_speed) = tornado.values.pushback else {
             continue;
         };
-        let (centre, values, edge) = (tornado.centre, tornado.values, tornado.edge());
-        for (target, transform, hit_box, hp, mover) in &enemies {
-            if hp.is_dead() {
+        let centre = transform.translation.truncate();
+        let (values, edge) = (tornado.values, tornado.edge());
+        for enemy in &enemies {
+            let Some(rect) = enemy.living_rect() else {
                 continue;
-            }
-            let feet = transform.translation.truncate();
-            let rect = hit_box.rect_at(feet);
+            };
+            let (target, feet, hit_box) = (enemy.entity, enemy.feet(), enemy.hit_box);
             let depth = depth_in(centre, edge, rect);
             let body = tornado.bodies.entry(target).or_default();
             // The first time the tornado sees a body, it takes the body where it is.
             let previous = body.feet.map_or(depth.max(0.0), |_| body.depth);
-            let away = (rect.center() - centre).try_normalize().unwrap_or(Vec2::X);
+            let away = away_from(centre, rect);
             let own_step = body.feet.map_or(0.0, |before| (before - feet).dot(away));
 
             let mut amount = None;
@@ -236,8 +227,7 @@ fn update_tornadoes(
             let mut after = feet;
             if out > 0.0 {
                 push = away * out;
-                let margin = mover.map_or(0.0, |mover| mover.edge_margin);
-                after = pushed_feet(feet, push, &world, bounds, margin);
+                after = pushed_feet(feet, push, &world, bounds, enemy.edge_margin());
                 body.pushed += after.distance(feet);
             }
             body.feet = Some(after);
@@ -260,40 +250,29 @@ fn load_effect(server: Res<AssetServer>, mut library: ResMut<EffectLibrary>) {
 }
 
 /// Where emitter `slot` sits around the centre: on the circle of `ORBIT_RADIUS`, turned so that it sends its droplets
-/// clockwise along the tangent.
-fn emitter_transform(centre: Vec2, slot: usize) -> Transform {
+/// clockwise along the tangent. It follows its tornado (and so the player) at this offset and turn.
+fn emitter_follows(owner: Entity, slot: usize) -> Follows {
     let angle = TAU * slot as f32 / EMITTERS as f32;
-    Transform::from_translation((centre + Vec2::from_angle(angle) * ORBIT_RADIUS).extend(0.0))
+    Follows::new(owner)
+        .with_offset(Vec2::from_angle(angle) * ORBIT_RADIUS)
         .with_rotation(Quat::from_rotation_z(angle - FRAC_PI_2))
 }
 
-fn spawn_emitters(new: Query<(Entity, &Tornado), Added<Tornado>>, mut fx: Fx) {
-    for (owner, tornado) in &new {
+fn spawn_emitters(new: Query<(Entity, &Tornado, &Transform), Added<Tornado>>, mut fx: Fx) {
+    for (owner, tornado, transform) in &new {
         for slot in 0..EMITTERS {
-            let emitter = fx.emitter(
+            let follows = emitter_follows(owner, slot);
+            let at = transform.translation.truncate() + follows.offset;
+            let emitter = fx.following(
+                owner,
                 EFFECT,
-                emitter_transform(tornado.centre, slot),
+                Transform::from_translation(at.extend(0.0)).with_rotation(follows.rotation),
                 &Look::Squares,
                 tornado.values.glow,
             );
             fx.commands
                 .entity(emitter)
-                .insert(TornadoEmitter { owner, slot });
-        }
-    }
-}
-
-/// The emitters follow their tornado (and so the player).
-fn place_emitters(
-    tornadoes: Query<&Tornado>,
-    mut emitters: Query<(&TornadoEmitter, &mut Transform)>,
-) {
-    for (emitter, mut transform) in &mut emitters {
-        if let Ok(tornado) = tornadoes.get(emitter.owner) {
-            let placed = emitter_transform(tornado.centre, emitter.slot);
-            transform.translation.x = placed.translation.x;
-            transform.translation.y = placed.translation.y;
-            transform.rotation = placed.rotation;
+                .insert((follows, TornadoEmitter { slot }));
         }
     }
 }
@@ -315,22 +294,6 @@ fn set_attractors(mut emitters: Query<(&TornadoEmitter, &mut ParticleEffectInsta
     }
 }
 
-fn end_emitters(
-    tornadoes: Query<(), With<Tornado>>,
-    mut emitters: Query<(Entity, &TornadoEmitter, &mut ParticleSpawnerState)>,
-    mut commands: Commands,
-) {
-    for (entity, emitter, mut state) in &mut emitters {
-        if !tornadoes.contains(emitter.owner) {
-            state.active = false;
-            commands
-                .entity(entity)
-                .remove::<TornadoEmitter>()
-                .insert(OneShot::Despawn);
-        }
-    }
-}
-
 /// Where dot `slot` of the push edge is when the tornado is `age` seconds old: on the edge, turned clockwise.
 fn edge_dot_at(centre: Vec2, age: f32, slot: usize) -> Vec2 {
     let angle = TAU * slot as f32 / EDGE_DOTS as f32 - EDGE_SPIN * age;
@@ -338,12 +301,12 @@ fn edge_dot_at(centre: Vec2, age: f32, slot: usize) -> Vec2 {
 }
 
 pub(super) fn spawn_edge_dots(
-    new: Query<(Entity, &Tornado), Added<Tornado>>,
+    new: Query<(Entity, &Tornado, &Transform), Added<Tornado>>,
     mut commands: Commands,
 ) {
-    for (owner, tornado) in &new {
+    for (owner, tornado, transform) in &new {
         for slot in 0..EDGE_DOTS {
-            let at = edge_dot_at(tornado.centre, tornado.age, slot);
+            let at = edge_dot_at(transform.translation.truncate(), tornado.age, slot);
             commands.spawn((
                 EdgeDot { owner, slot },
                 Sprite::from_color(EDGE_COLOR, Vec2::ONE),
@@ -356,16 +319,16 @@ pub(super) fn spawn_edge_dots(
 
 /// The dots follow their tornado and turn. When the tornado is gone they go too.
 fn place_edge_dots(
-    tornadoes: Query<&Tornado>,
+    tornadoes: Query<(&Tornado, &Transform), Without<EdgeDot>>,
     mut dots: Query<(Entity, &EdgeDot, &mut Transform)>,
     mut commands: Commands,
 ) {
     for (entity, dot, mut transform) in &mut dots {
-        let Ok(tornado) = tornadoes.get(dot.owner) else {
+        let Ok((tornado, centre)) = tornadoes.get(dot.owner) else {
             commands.entity(entity).despawn();
             continue;
         };
-        let at = edge_dot_at(tornado.centre, tornado.age, dot.slot);
+        let at = edge_dot_at(centre.translation.truncate(), tornado.age, dot.slot);
         transform.translation.x = at.x;
         transform.translation.y = at.y;
     }
@@ -374,7 +337,7 @@ fn place_edge_dots(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enemy_hp::DamageEnemy;
+    use crate::enemy_hp::{DamageEnemy, EnemyHp};
     use crate::weapons::damage::apply_hits;
     use crate::weapons::values::Damage;
     use game_kit::movement::Stunned;
@@ -669,9 +632,9 @@ mod tests {
         cast(&mut app);
         let centre = |app: &mut App| {
             app.world_mut()
-                .query::<&Tornado>()
+                .query_filtered::<&Transform, With<Tornado>>()
                 .iter(app.world())
-                .map(|tornado| tornado.centre)
+                .map(|transform| transform.translation.truncate())
                 .collect::<Vec<_>>()
         };
         run(&mut app, 1.0);
@@ -702,9 +665,9 @@ mod tests {
         let dots = |app: &mut App| {
             let centre = app
                 .world_mut()
-                .query::<&Tornado>()
+                .query::<(&Tornado, &Transform)>()
                 .iter(app.world())
-                .map(|tornado| (tornado.centre, tornado.edge()))
+                .map(|(tornado, transform)| (transform.translation.truncate(), tornado.edge()))
                 .next();
             let mut dots: Vec<(usize, Vec2)> = app
                 .world_mut()

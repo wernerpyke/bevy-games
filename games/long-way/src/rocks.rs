@@ -11,6 +11,7 @@ use game_kit::collision::{Blocker, grow_sideways};
 use game_kit::depth::SortAtBlocker;
 use game_kit::groups::group_or_alone;
 use game_kit::map::{Map, MapObject};
+use game_kit::map_background::cell_dice;
 use game_kit::map_transition::MapLoad;
 
 /// Footprint of a rock in cells, in x and y.
@@ -66,7 +67,7 @@ fn draw_size(map: &Map) -> f32 {
 
 /// World position of the bottom left corner of the footprint.
 pub fn footprint_corner(object: &MapObject, map: &Map, origin: Vec2) -> Vec2 {
-    origin + object.cell.as_vec2() * map.cell_size + jitter_offset(object, map.jitter)
+    origin + object.cell.as_vec2() * map.cell_size + jitter_offset(&map.name, object, map.jitter)
 }
 
 /// The area the player's feet may not enter for an object in a group: the footprint inset by `INSET_FRACTION` on the left, right
@@ -100,24 +101,18 @@ fn blocked_area(object: &MapObject, map: &Map, origin: Vec2, group: Group) -> Re
     group_or_alone(group.size, full, band)
 }
 
-/// A fixed offset in `-jitter..=jitter` on each axis, taken from the cell number, so a map always looks
+/// A fixed offset in `-jitter..jitter` on each axis, from the dice of the cell (`cell_dice`), so a map always looks
 /// the same and every copy of a cluster at a different place looks slightly different.
-fn jitter_offset(object: &MapObject, jitter: f32) -> Vec2 {
+fn jitter_offset(map_name: &str, object: &MapObject, jitter: f32) -> Vec2 {
     if jitter == 0.0 {
         return Vec2::ZERO;
     }
-    let unit = |salt: u32| {
-        let mut h = (object.cell.x as u32)
-            .wrapping_mul(0x9E37_79B1)
-            .wrapping_add((object.cell.y as u32).wrapping_mul(0x85EB_CA77))
-            .wrapping_add(salt.wrapping_mul(0xC2B2_AE3D));
-        h ^= h >> 15;
-        h = h.wrapping_mul(0x2C1B_3C6D);
-        h ^= h >> 12;
-        h as f32 / u32::MAX as f32 * 2.0 - 1.0
-    };
-    Vec2::new(unit(1), unit(2)) * jitter
+    let mut dice = cell_dice(map_name, JITTER_SALT, object.cell);
+    Vec2::new(dice.range(-jitter, jitter), dice.range(-jitter, jitter))
 }
+
+/// The salt of the rock jitter in `cell_dice`, so it does not repeat the numbers of other per-cell rolls.
+const JITTER_SALT: u64 = 0x524F_434B;
 
 /// Spawns the rocks of one map. The kit adds their blocked areas to the collision world after the load
 /// (`rebuild_blockers`).
@@ -239,7 +234,7 @@ mod tests {
     #[test]
     fn the_jitter_stays_in_its_range_and_differs_between_neighbour_cells() {
         let jitter = 6.0;
-        let offset = |x, y| jitter_offset(&object("rock_0", x, y, &[]), jitter);
+        let offset = |x, y| jitter_offset("m", &object("rock_0", x, y, &[]), jitter);
         let mut seen = Vec::new();
         for x in -3..12 {
             for y in -3..12 {
@@ -258,6 +253,14 @@ mod tests {
         assert_ne!(offset(3, 5), offset(4, 5));
         assert_ne!(offset(3, 5), offset(3, 6));
         assert_ne!(offset(3, 5).x, offset(3, 5).y);
-        assert_eq!(jitter_offset(&object("rock_0", 3, 5, &[]), 0.0), Vec2::ZERO);
+        assert_eq!(
+            jitter_offset("m", &object("rock_0", 3, 5, &[]), 0.0),
+            Vec2::ZERO
+        );
+        // Another map places the same cell elsewhere.
+        assert_ne!(
+            jitter_offset("n", &object("rock_0", 3, 5, &[]), jitter),
+            offset(3, 5)
+        );
     }
 }

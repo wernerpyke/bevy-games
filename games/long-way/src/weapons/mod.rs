@@ -15,13 +15,15 @@ pub mod tornado;
 #[allow(dead_code, reason = "used by the weapon steps, W1 onwards")]
 pub mod values;
 
+use bevy::ecs::query::QueryData;
 use bevy::prelude::*;
 use game_kit::Controlled;
-use game_kit::fx::ParticleEffectHandle;
+use game_kit::fx::{FxFollowSet, ParticleEffectHandle};
 use game_kit::hitbox::HitBox;
 use game_kit::map_transition::{ActiveMaps, MapId};
-use game_kit::movement::{FollowSet, MoveState};
+use game_kit::movement::{FollowSet, MoveState, Mover};
 
+use crate::enemy_hp::EnemyHp;
 use crate::inventory::Inventory;
 use crate::player::feet_of;
 use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, BuiltWeapons, WeaponKind};
@@ -41,6 +43,8 @@ impl Plugin for WeaponPlugin {
                 )
                     .chain(),
             )
+            // Emitters that follow a ring or a tornado move after it this frame.
+            .configure_sets(Update, FxFollowSet.after(WeaponSystems::Effect))
             .add_plugins((
                 ring::RingPlugin,
                 tornado::TornadoPlugin,
@@ -53,20 +57,23 @@ impl Plugin for WeaponPlugin {
 }
 
 /// Gives every weapon entity the `MapId` of the map the player is in when it appears, so the kit removes it with
-/// that map: a weapon cast before a map change does not go on in the next map (the user, 2026-11-14). It covers the
-/// gameplay roots (`Ring`, `Tornado`, `Fireball`), the edge dots and every particle emitter (`ParticleEffectHandle`,
-/// on all `game_kit::fx` emitters). A child, such as the fireball head, goes with its parent.
+/// that map: a weapon cast before a map change does not go on in the next map (the user, 2026-11-14). It covers
+/// every entity with `OnCurrentMap` (required by the gameplay roots `Ring`, `Tornado` and `Fireball`, and by the
+/// edge dots) and every particle emitter (`ParticleEffectHandle`, on all `game_kit::fx` emitters). A child, such as
+/// the fireball head, goes with its parent.
 struct MapBindingPlugin;
 
 impl Plugin for MapBindingPlugin {
     fn build(&self, app: &mut App) {
-        app.add_observer(bind_to_map::<ring::Ring>)
-            .add_observer(bind_to_map::<tornado::Tornado>)
-            .add_observer(bind_to_map::<tornado::EdgeDot>)
-            .add_observer(bind_to_map::<fireball::Fireball>)
+        app.add_observer(bind_to_map::<OnCurrentMap>)
             .add_observer(bind_to_map::<ParticleEffectHandle>);
     }
 }
+
+/// A weapon entity that belongs to the map the player is in when it appears (`MapBindingPlugin`). A weapon type
+/// requires it, so a new weapon is bound without a change here.
+#[derive(Component, Default)]
+pub struct OnCurrentMap;
 
 fn bind_to_map<C: Component>(
     add: On<Add<C>>,
@@ -76,6 +83,47 @@ fn bind_to_map<C: Component>(
     if let Some(map) = maps.as_deref().and_then(ActiveMaps::current_map) {
         commands.entity(add.entity).insert(MapId(map.id.clone()));
     }
+}
+
+/// The body of an enemy as a weapon sees it. `living_rect` is `None` for a dead enemy, which keeps its `HitBox`
+/// while it plays `Die` (`weapons.md`, "Dead enemies"), so no weapon hits or pushes it.
+#[derive(QueryData)]
+pub struct EnemyBody {
+    pub entity: Entity,
+    pub transform: &'static Transform,
+    pub hit_box: &'static HitBox,
+    pub hp: &'static EnemyHp,
+    pub mover: Option<&'static Mover>,
+}
+
+impl EnemyBodyItem<'_, '_> {
+    pub fn feet(&self) -> Vec2 {
+        self.transform.translation.truncate()
+    }
+
+    /// The body's rectangle, or `None` when the enemy is dead.
+    pub fn living_rect(&self) -> Option<Rect> {
+        (!self.hp.is_dead()).then(|| self.hit_box.rect_at(self.feet()))
+    }
+
+    /// How far from the map edge a push must leave the feet: the enemy's `Mover::edge_margin`, 0 without a `Mover`.
+    pub fn edge_margin(&self) -> f32 {
+        self.mover.map_or(0.0, |mover| mover.edge_margin)
+    }
+}
+
+/// The log line of a weapon that has ended: `"<what>: ended at age <age> s, touched <n>: [<lines>]"`.
+pub(crate) fn log_ended(what: &str, age: f32, touched: Vec<String>) {
+    info!(
+        "{what}: ended at age {age:.2} s, touched {}: [{}]",
+        touched.len(),
+        touched.join("; ")
+    );
+}
+
+/// One enemy in `log_ended` for a weapon that ticks and pushes.
+pub(crate) fn contact_line(target: Entity, ticks: u32, pushed: f32) -> String {
+    format!("{target:?} {ticks} ticks, pushed {pushed:.0} px")
 }
 
 /// The order of the weapon systems in a frame. `Effect` (the weapons' gameplay) runs after the kit has moved the
@@ -366,6 +414,7 @@ mod map_tests {
         let mut app = crate::test_util::timed_app(20);
         app.add_message::<CastWeapon>()
             .init_resource::<game_kit::collision::CollisionWorld>()
+            .insert_resource(game_kit::rng::GameRng::seeded(1))
             .insert_resource(ActiveMaps {
                 current: "b".to_string(),
                 maps: vec![map("a"), map("b")],

@@ -19,6 +19,7 @@ use std::f32::consts::{PI, TAU};
 use bevy::prelude::*;
 use bevy::sprite::Anchor;
 use bevy_aseprite_ultra::prelude::*;
+use game_kit::area::distance_to_rect;
 use game_kit::camera::{GameCamera, visible_rect};
 use game_kit::depth::DepthSort;
 use game_kit::fx::{EffectLibrary, Follows, Fx, FxLooks};
@@ -27,9 +28,10 @@ use game_kit::projectile::{
     HitCause, Projectile, ProjectileHit, ProjectilePlugin, ProjectileSet, ProjectileSprite,
     ProjectileTarget,
 };
+use game_kit::rng::GameRng;
 
 use super::values::{Damage, FIREBALL, values};
-use super::{CastWeapon, WeaponHit, WeaponSystems};
+use super::{CastWeapon, EnemyBody, OnCurrentMap, WeaponHit, WeaponSystems};
 use crate::enemy_hp::EnemyHp;
 use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
@@ -89,6 +91,7 @@ impl Plugin for FireballPlugin {
 
 /// A fireball in flight, on the entity of its `Projectile`.
 #[derive(Component, Debug)]
+#[require(OnCurrentMap)]
 pub struct Fireball {
     /// The enemy it goes for. `None` when it was cast with no enemy on the map.
     target: Option<Entity>,
@@ -141,16 +144,6 @@ fn choose_target(from: Vec2, view: Option<Rect>, enemies: &[(Entity, Vec2)]) -> 
     closest(true).or_else(|| closest(false))
 }
 
-/// A direction from a seed, spread evenly around the circle. No random crate needed.
-fn random_direction(seed: u64) -> Vec2 {
-    // splitmix64
-    let mut x = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
-    x = (x ^ (x >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
-    x = (x ^ (x >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
-    x ^= x >> 31;
-    Vec2::from_angle((x >> 40) as f32 / (1u64 << 24) as f32 * TAU)
-}
-
 /// The ground point to steer to, so the ball (at its flight height) meets the middle of `body`.
 fn aim_at(body: Rect) -> Vec2 {
     body.center() - Vec2::new(0.0, FIREBALL.height)
@@ -162,7 +155,7 @@ fn blast_centre(ground: Vec2) -> Vec2 {
 }
 
 fn in_blast(centre: Vec2, body: Rect) -> bool {
-    centre.clamp(body.min, body.max).distance(centre) < FIREBALL.blast_radius
+    distance_to_rect(centre, body) < FIREBALL.blast_radius
 }
 
 /// Living enemies are projectile targets. A dead one is not, so a dying ghost does not stop a shot (`weapons.md`, "Dead enemies").
@@ -181,22 +174,18 @@ fn mark_targets(
 
 pub(super) fn cast_fireballs(
     mut cast: MessageReader<CastWeapon>,
-    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp)>,
+    enemies: Query<EnemyBody>,
     camera: Query<(&GlobalTransform, &Projection), With<GameCamera>>,
-    time: Res<Time>,
+    mut rng: ResMut<GameRng>,
     mut commands: Commands,
 ) {
-    for (index, order) in cast
+    for order in cast
         .read()
         .filter(|order| order.weapon == WeaponKind::Fireball)
-        .enumerate()
     {
         let bodies: Vec<(Entity, Rect)> = enemies
             .iter()
-            .filter(|(.., hp)| !hp.is_dead())
-            .map(|(entity, transform, hit_box, _)| {
-                (entity, hit_box.rect_at(transform.translation.truncate()))
-            })
+            .filter_map(|enemy| Some((enemy.entity, enemy.living_rect()?)))
             .collect();
         let centres: Vec<(Entity, Vec2)> = bodies
             .iter()
@@ -215,8 +204,8 @@ pub(super) fn cast_fireballs(
                 (direction, aim)
             }
             None => {
-                let seed = time.elapsed().as_nanos() as u64 ^ index as u64;
-                let direction = random_direction(seed);
+                // From the game's seeded numbers, so a scripted run with a seed flies the same way.
+                let direction = Vec2::from_angle(rng.range(0.0, TAU));
                 (direction, order.origin + direction * FIREBALL.range)
             }
         };
@@ -258,7 +247,7 @@ pub(super) fn cast_fireballs(
 fn steer(
     time: Res<Time>,
     mut balls: Query<(Entity, &mut Fireball, &mut Projectile, &Transform)>,
-    enemies: Query<(&Transform, &HitBox, &EnemyHp), Without<Fireball>>,
+    enemies: Query<EnemyBody, Without<Fireball>>,
     mut exploded: MessageWriter<Exploded>,
     mut commands: Commands,
 ) {
@@ -270,11 +259,13 @@ fn steer(
         if let Some(target) = ball.target
             && !ball.lost
         {
-            match enemies.get(target) {
-                Ok((transform, hit_box, hp)) if !hp.is_dead() => {
-                    ball.aim = aim_at(hit_box.rect_at(transform.translation.truncate()));
-                }
-                _ => {
+            match enemies
+                .get(target)
+                .ok()
+                .and_then(|enemy| enemy.living_rect())
+            {
+                Some(body) => ball.aim = aim_at(body),
+                None => {
                     ball.lost = true;
                     info!(
                         "fireball: target {target:?} is gone, flies on to ({:.0}, {:.0})",
@@ -333,7 +324,7 @@ fn explode_on_hits(
 /// The enemy hit takes the direct damage, every other living enemy in the blast takes the blast damage.
 fn explode(
     mut exploded: MessageReader<Exploded>,
-    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp)>,
+    enemies: Query<EnemyBody>,
     mut hits: MessageWriter<WeaponHit>,
 ) {
     let Damage::Impact { direct, blast } = values(WeaponKind::Fireball).damage else {
@@ -350,15 +341,15 @@ fn explode(
             });
         };
         let mut caught = Vec::new();
-        for (entity, transform, hit_box, hp) in &enemies {
-            if hp.is_dead() {
+        for enemy in &enemies {
+            let Some(body) = enemy.living_rect() else {
                 continue;
-            }
-            if Some(entity) == boom.direct {
-                hit(entity, direct);
-            } else if in_blast(centre, hit_box.rect_at(transform.translation.truncate())) {
-                hit(entity, blast);
-                caught.push(entity);
+            };
+            if Some(enemy.entity) == boom.direct {
+                hit(enemy.entity, direct);
+            } else if in_blast(centre, body) {
+                hit(enemy.entity, blast);
+                caught.push(enemy.entity);
             }
         }
         info!(
@@ -488,6 +479,7 @@ mod tests {
     use game_kit::collision::CollisionWorld;
 
     const DT_MS: u64 = 16;
+    const SEED: u64 = 7;
 
     #[derive(Resource, Default)]
     struct Log {
@@ -523,6 +515,7 @@ mod tests {
             .add_message::<WeaponHit>()
             .add_message::<Exploded>()
             .insert_resource(world)
+            .insert_resource(GameRng::seeded(SEED))
             .init_resource::<Log>()
             .add_systems(
                 Update,
@@ -630,17 +623,6 @@ mod tests {
     }
 
     #[test]
-    fn random_directions_are_unit_vectors_spread_around_the_circle() {
-        let mut quadrants = [0; 4];
-        for seed in 0..64 {
-            let direction = random_direction(seed * 16_000_000);
-            assert!((direction.length() - 1.0).abs() < 1e-4, "{direction}");
-            quadrants[(direction.x >= 0.0) as usize * 2 + (direction.y >= 0.0) as usize] += 1;
-        }
-        assert!(quadrants.iter().all(|&n| n >= 8), "{quadrants:?}");
-    }
-
-    #[test]
     fn a_fireball_hits_its_moving_target_and_passes_a_dead_enemy() {
         let mut app = app(&[], None);
         // A dead enemy, closer and in the line at the cast: not the target and not hit.
@@ -724,12 +706,18 @@ mod tests {
     }
 
     #[test]
-    fn with_no_enemy_it_flies_its_range_in_some_direction_and_explodes() {
+    fn with_no_enemy_it_flies_its_range_in_the_seeded_direction_and_explodes() {
         let mut app = app(&[], None);
         cast(&mut app);
         run_until_exploded(&mut app);
         let boom = booms(&app)[0];
         assert_eq!((boom.why, boom.direct), (Why::Range, None));
+        // The direction is the first number of the game's seeded generator, so a scripted run repeats it.
+        let expected = Vec2::from_angle(game_kit::rng::Rng::new(SEED).range(0.0, TAU));
+        assert!(
+            boom.at.normalize().distance(expected) < 1e-4,
+            "{boom:?}, expected {expected}"
+        );
         let flown = boom.at.length() - FIREBALL.muzzle;
         let step = FIREBALL.speed * DT_MS as f32 / 1000.0;
         assert!(

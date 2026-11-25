@@ -149,7 +149,7 @@ impl Strategy {
         }
     }
 
-    /// Adds the strategy component to the entity.
+    /// Adds the strategy component to the entity. `remove::<StrategyComponents>()` takes it off again.
     pub fn insert(self, entity: &mut EntityCommands) {
         match self {
             Strategy::Patrol(patrol) => entity.insert(patrol),
@@ -158,6 +158,10 @@ impl Strategy {
         };
     }
 }
+
+/// Every strategy component, so a game removes whichever one an enemy has (for example when it dies) without listing
+/// them. A new strategy is added here and in `Strategy`.
+pub type StrategyComponents = (RandomPatrol, Pursue, Sentry);
 
 /// A random point within `radius` of `from` that is inside `bounds` (when there are some) and that `reachable`
 /// accepts. Tries a few times, then gives up.
@@ -533,7 +537,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_adds_the_component_of_the_strategy() {
+    fn insert_adds_the_component_of_the_strategy_and_strategy_components_removes_each() {
         let mut app = App::new();
         let entity = app.world_mut().spawn_empty().id();
         let strategy = Strategy::Sentry(Sentry::new(30.0, 90.0));
@@ -542,6 +546,38 @@ mod tests {
         app.world_mut().flush();
         assert!(app.world().get::<Sentry>(entity).is_some());
         assert!(app.world().get::<RandomPatrol>(entity).is_none());
+
+        let params = |pairs: &[(&str, &str)]| Params::from_pairs(pairs);
+        for strategy in [
+            Strategy::from_params(&params(&[("strategy", "patrol"), ("radius", "30")])),
+            Strategy::from_params(&params(&[("strategy", "pursue")])),
+            Strategy::from_params(&params(&[
+                ("strategy", "sentry"),
+                ("radius", "30"),
+                ("sight", "90"),
+            ])),
+        ] {
+            let entity = app.world_mut().spawn_empty().id();
+            let mut commands = app.world_mut().commands();
+            strategy.unwrap().insert(&mut commands.entity(entity));
+            app.world_mut().flush();
+            let strategies = |app: &App| {
+                let entity = app.world().entity(entity);
+                [
+                    entity.contains::<RandomPatrol>(),
+                    entity.contains::<Pursue>(),
+                    entity.contains::<Sentry>(),
+                ]
+                .into_iter()
+                .filter(|has| *has)
+                .count()
+            };
+            assert_eq!(strategies(&app), 1);
+            app.world_mut()
+                .entity_mut(entity)
+                .remove::<StrategyComponents>();
+            assert_eq!(strategies(&app), 0);
+        }
     }
 
     #[test]

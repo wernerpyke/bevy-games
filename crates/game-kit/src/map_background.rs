@@ -34,6 +34,12 @@ pub(crate) fn hash_name(name: &str) -> u64 {
     hash
 }
 
+/// The dice of one cell of the map called `map_name`, for anything a map places per cell (a jitter, a start frame).
+/// The same name, `salt` and cell always give the same numbers. Give each use its own `salt`.
+pub fn cell_dice(map_name: &str, salt: u64, cell: IVec2) -> Rng {
+    cell_rng(hash_name(map_name), salt, cell)
+}
+
 /// The dice of one cell.
 pub(crate) fn cell_rng(name_hash: u64, seed: u64, cell: IVec2) -> Rng {
     let packed = ((cell.x as u32 as u64) << 32) | cell.y as u32 as u64;

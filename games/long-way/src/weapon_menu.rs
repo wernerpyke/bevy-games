@@ -10,6 +10,7 @@
 
 use bevy::prelude::*;
 use game_kit::animation::{StaticFrame, all_frames_animation, tag_animation};
+use game_kit::area::ease_out;
 use game_kit::hud::label;
 use game_kit::layers::UI_Z_INDEX;
 use game_kit::pointer::{BlocksWorldClick, WorldClick};
@@ -244,12 +245,6 @@ fn next_open(current: Option<Energy>, clicked: Energy) -> Option<Energy> {
     }
 }
 
-/// How far up the drawer is, from 0 to 1, for a progress from 0 to 1: it starts fast and slows down.
-fn slide_value(progress: f32) -> f32 {
-    let remaining = 1.0 - progress.clamp(0.0, 1.0);
-    1.0 - remaining * remaining
-}
-
 /// The new progress after `delta` seconds, going up while `open` and down otherwise.
 fn step_slide(slide: f32, open: bool, delta: f32) -> f32 {
     let step = if open {
@@ -462,7 +457,7 @@ fn slide_drawer(
     } else {
         Display::None
     };
-    drawer.bottom = px(-DRAWER_HEIGHT * (1.0 - slide_value(slide)));
+    drawer.bottom = px(-DRAWER_HEIGHT * (1.0 - ease_out(slide)));
 }
 
 #[cfg(test)]
@@ -477,18 +472,6 @@ mod tests {
             next_open(Some(Energy::Red), Energy::Blue),
             Some(Energy::Blue)
         );
-    }
-
-    #[test]
-    fn the_slide_goes_from_hidden_to_up_without_overshoot() {
-        assert_eq!(slide_value(0.0), 0.0);
-        assert_eq!(slide_value(1.0), 1.0);
-        assert_eq!(slide_value(-3.0), 0.0);
-        assert_eq!(slide_value(7.0), 1.0);
-        let values: Vec<f32> = (0..=10).map(|i| slide_value(i as f32 / 10.0)).collect();
-        assert!(values.windows(2).all(|pair| pair[0] < pair[1]));
-        // It starts fast: a quarter of the time covers more than a quarter of the way.
-        assert!(slide_value(0.25) > 0.25);
     }
 
     #[test]

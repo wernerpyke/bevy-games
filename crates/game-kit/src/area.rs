@@ -3,9 +3,20 @@
 
 use bevy::math::{Rect, Vec2};
 
-/// The point of `rect` that is nearest to `p`.
-fn closest_point(rect: Rect, p: Vec2) -> Vec2 {
+/// The point of `rect` that is nearest to `p`. `p` itself when it is inside.
+pub fn closest_point(rect: Rect, p: Vec2) -> Vec2 {
     p.clamp(rect.min, rect.max)
+}
+
+/// How far `p` is from the nearest point of `rect`. 0 when `p` is inside.
+pub fn distance_to_rect(p: Vec2, rect: Rect) -> f32 {
+    closest_point(rect, p).distance(p)
+}
+
+/// The unit direction from `centre` to the middle of `rect`: the way an effect at `centre` pushes the body. A body
+/// whose middle is exactly on the centre is pushed along +X.
+pub fn away_from(centre: Vec2, rect: Rect) -> Vec2 {
+    (rect.center() - centre).try_normalize().unwrap_or(Vec2::X)
 }
 
 /// The distance from `p` to the corner of `rect` that is farthest away.
@@ -48,7 +59,7 @@ pub fn push_delta(centre: Vec2, radius: f32, rect: Rect, speed: f32, dt: f32) ->
     if !circle_hits_rect(centre, radius, rect) {
         return Vec2::ZERO;
     }
-    (rect.center() - centre).try_normalize().unwrap_or(Vec2::X) * speed * dt
+    away_from(centre, rect) * speed * dt
 }
 
 #[cfg(test)]
@@ -65,6 +76,10 @@ mod tests {
 
     #[test]
     fn ease_out_is_fast_first_and_never_goes_back() {
+        assert_eq!((ease_out(0.0), ease_out(1.0)), (0.0, 1.0));
+        // The input is clamped.
+        assert_eq!((ease_out(-3.0), ease_out(7.0)), (0.0, 1.0));
+        assert_eq!(ease_out(0.5), 0.75);
         assert!(ease_out(0.1) > 0.15);
         let mut last = 0.0;
         for i in 0..=100 {
@@ -169,6 +184,28 @@ mod tests {
         // The nearest edge of this body is at y = 130, outside a radius of 110.
         let clear = rect(Vec2::new(0.0, 154.0), Vec2::new(40.0, 48.0));
         assert_eq!(push_delta(Vec2::ZERO, 110.0, clear, 200.0, 0.1), Vec2::ZERO);
+    }
+
+    #[test]
+    fn the_distance_to_a_rectangle_is_to_its_nearest_point_and_zero_inside() {
+        let rect = Rect::new(-3.0, 5.0, 9.0, 11.0);
+        // Beside an edge, beyond a corner (3-4-5), and inside.
+        assert_eq!(distance_to_rect(Vec2::new(14.0, 7.0), rect), 5.0);
+        assert_eq!(distance_to_rect(Vec2::new(-6.0, 15.0), rect), 5.0);
+        assert_eq!(distance_to_rect(Vec2::new(0.0, 8.0), rect), 0.0);
+        assert_eq!(
+            closest_point(rect, Vec2::new(-6.0, 15.0)),
+            Vec2::new(-3.0, 11.0)
+        );
+    }
+
+    #[test]
+    fn away_points_from_the_centre_to_the_middle_of_the_body() {
+        let body = rect(Vec2::new(-30.0, 40.0), Vec2::new(6.0, 20.0));
+        let diagonal = away_from(Vec2::ZERO, body);
+        assert!(diagonal.distance(Vec2::new(-0.6, 0.8)) < 1e-6, "{diagonal}");
+        assert_eq!(away_from(Vec2::new(-30.0, 10.0), body), Vec2::Y);
+        assert_eq!(away_from(Vec2::new(-30.0, 40.0), body), Vec2::X);
     }
 
     #[test]

@@ -269,6 +269,10 @@ Bevy marks a UI widget that cannot be used with the component `InteractionDisabl
 
 A system with `Single<...>` runs only while exactly one entity matches. Otherwise Bevy skips it without a warning. R-Town relies on this: when the player is removed, the camera, the weapon and the info box simply stop (`games/r-town/src/weapon.rs`). A system that must act when the entity is missing uses a `Query` and handles the empty case (`strategies.rs`, `pursue`).
 
+## Named queries
+
+When several systems query the same set of components, a struct with `#[derive(QueryData)]` (`bevy::ecs::query::QueryData`) names that set once. Each field is one query item (`Entity`, `&'static Transform`, `Option<&'static Mover>`), and a system takes `Query<EnemyBody>`. The derive makes an item type, `EnemyBodyItem<'w, 's>`, with one field per field of the struct. Methods go on that item type. Long Way's weapons read enemies this way, and the shared rule "a dead enemy is not hit" is the method `living_rect` (`games/long-way/src/weapons/mod.rs`). Add `#[query_data(mutable)]` for a struct with `&'static mut` fields.
+
 ## Events and messages
 
 Bevy lets systems talk without calling each other: one system writes a message, others read it. In 0.20 these are called messages. Define one with `#[derive(Message)]`, register it with `app.add_message::<T>()`, send with `MessageWriter<T>::write` and read with `MessageReader<T>::read`. The kit sends `ProjectileHit` when a projectile is removed (`crates/game-kit/src/projectile.rs`), and the game can read it for effects or damage. The Aseprite plugin also sends `AnimationEvents::Finished`. Use messages for game events such as "enemy died" and for passing actions between plugins.

@@ -4,7 +4,7 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 
-use crate::map_background::{cell_rng, hash_name};
+use crate::map_background::cell_dice;
 use crate::movement::{FollowSet, MoveState, Stunned};
 use crate::rng::Rng;
 
@@ -21,7 +21,7 @@ impl RandomStartFrame {
     /// when the map is entered again.
     pub fn for_cell(map_name: &str, cell: IVec2) -> Self {
         Self {
-            seed: cell_rng(hash_name(map_name), 0, cell).next_u64(),
+            seed: cell_dice(map_name, 0, cell).next_u64(),
         }
     }
 }

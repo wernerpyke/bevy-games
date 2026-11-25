@@ -19,17 +19,18 @@ use std::f32::consts::TAU;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use game_kit::area::{rect_overlaps_band, ring_radius};
+use game_kit::area::{away_from, rect_overlaps_band, ring_radius};
 use game_kit::camera::CameraBounds;
 use game_kit::collision::CollisionWorld;
-use game_kit::fx::{EffectLibrary, Fx, FxLooks, Look, OneShot, ParticleSpawnerState};
-use game_kit::hitbox::HitBox;
+use game_kit::fx::{EffectLibrary, Follows, Fx, FxLooks, Look, OneShot, ParticleSpawnerState};
+use game_kit::rng::{GameRng, Rng};
 
 use super::damage::Contact;
 use super::ice_ring::{self, IceRing};
 use super::values::{RingShape, WeaponValues, ring_shape, values};
-use super::{CastWeapon, WeaponHit, WeaponSystems};
-use crate::enemy_hp::EnemyHp;
+use super::{
+    CastWeapon, EnemyBody, OnCurrentMap, WeaponHit, WeaponSystems, contact_line, log_ended,
+};
 use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const ART: &str = "art/weapons/fireball_and_rings.aseprite";
@@ -96,7 +97,7 @@ impl Plugin for RingPlugin {
             )
             .add_systems(
                 Update,
-                (spawn_front, spawn_burners, move_front, end_burners)
+                (spawn_front, spawn_burners, move_front)
                     .chain()
                     .after(WeaponSystems::Effect),
             )
@@ -104,8 +105,10 @@ impl Plugin for RingPlugin {
     }
 }
 
-/// A ring in the world. `contacts` remembers what a fire ring has done to each enemy it touched.
+/// A ring in the world, with its `Transform` on `centre`, which its emitters follow (`Follows`). `contacts`
+/// remembers what a fire ring has done to each enemy it touched.
 #[derive(Component)]
+#[require(OnCurrentMap)]
 pub struct Ring {
     pub(super) weapon: WeaponKind,
     pub(super) centre: Vec2,
@@ -122,16 +125,12 @@ pub struct Ring {
 #[derive(Component)]
 struct Burning;
 
-/// An emitter on the growing front, at `angle` on the circle.
+/// An emitter on the growing front, at `angle` on the circle. It follows its ring (`Follows`), and `move_front` moves
+/// its offset out with the radius.
 #[derive(Component)]
 struct Front {
-    owner: Entity,
     angle: f32,
 }
-
-/// An emitter on the burning ring. When the ring is gone it stops and removes itself.
-#[derive(Component)]
-struct Burner(Entity);
 
 /// The fire ring's damaging band: inner and outer radius. While the front grows it reaches from the radius
 /// `trail_secs` ago to the radius now, and while the ring burns it is the band of the burners.
@@ -166,17 +165,20 @@ pub(super) fn cast_rings(
             order.centre.y,
             shape.max_radius
         );
-        let mut ring = commands.spawn(Ring {
-            weapon: order.weapon,
-            centre: order.centre,
-            radius: 0.0,
-            age: 0.0,
-            shape,
-            values: values(order.weapon),
-            art,
-            contacts: HashMap::new(),
-            burn: None,
-        });
+        let mut ring = commands.spawn((
+            Ring {
+                weapon: order.weapon,
+                centre: order.centre,
+                radius: 0.0,
+                age: 0.0,
+                shape,
+                values: values(order.weapon),
+                art,
+                contacts: HashMap::new(),
+                burn: None,
+            },
+            Transform::from_translation(order.centre.extend(0.0)),
+        ));
         if order.weapon == WeaponKind::IceRing {
             ring.insert(IceRing::new(
                 order.centre,
@@ -189,11 +191,11 @@ pub(super) fn cast_rings(
 }
 
 /// Grows every ring and ends it when its time at full size is over. For the fire ring it also hurts and pushes the
-/// enemies in its band. A dead enemy is skipped, even while it still has its `HitBox` (`weapons.md`, "Dead enemies").
+/// enemies in its band. A dead enemy is skipped (`EnemyBody::living_rect`).
 pub(super) fn update_rings(
     time: Res<Time>,
     mut rings: Query<(Entity, &mut Ring)>,
-    enemies: Query<(Entity, &Transform, &HitBox, &EnemyHp)>,
+    enemies: Query<EnemyBody>,
     mut hits: MessageWriter<WeaponHit>,
     mut commands: Commands,
 ) {
@@ -213,21 +215,19 @@ pub(super) fn update_rings(
         if ring.weapon == WeaponKind::FireRing {
             let (inner, outer) = band(&shape, ring.age, ring.radius);
             let (centre, values, weapon) = (ring.centre, ring.values, ring.weapon);
-            for (target, transform, hit_box, hp) in &enemies {
-                if hp.is_dead() {
+            for enemy in &enemies {
+                let Some(rect) = enemy.living_rect() else {
                     continue;
-                }
-                let rect = hit_box.rect_at(transform.translation.truncate());
+                };
                 if !rect_overlaps_band(centre, inner, outer, rect) {
                     continue;
                 }
-                let contact = ring.contacts.entry(target).or_default();
+                let contact = ring.contacts.entry(enemy.entity).or_default();
                 let amount = contact.damage(&values, dt);
-                let away = (rect.center() - centre).try_normalize().unwrap_or(Vec2::X);
-                let push = contact.push(values.pushback, away * advance);
+                let push = contact.push(values.pushback, away_from(centre, rect) * advance);
                 if amount.is_some() || push != Vec2::ZERO {
                     hits.write(WeaponHit {
-                        target,
+                        target: enemy.entity,
                         weapon,
                         amount: amount.unwrap_or(0.0),
                         push,
@@ -241,32 +241,16 @@ pub(super) fn update_rings(
             && let Some(burn) = ring.burn.as_mut()
             && burn.tick(time.delta()).is_finished()
         {
-            let touched: Vec<String> = ring
-                .contacts
-                .iter()
-                .map(|(target, contact)| {
-                    format!(
-                        "{target:?} {} ticks, pushed {:.0} px",
-                        contact.ticks(),
-                        contact.pushed()
-                    )
-                })
-                .collect();
-            // The ice ring reports its bodies when its `IceRing` is removed (`ice_ring::release_stunned`).
+            // The ice ring reports when its `IceRing` is removed (`ice_ring::release_stunned`).
             if ring.weapon == WeaponKind::FireRing {
-                info!(
-                    "ring: {} ended at age {:.2} s, touched {}: [{}]",
-                    ring.weapon.label(),
-                    ring.age,
-                    touched.len(),
-                    touched.join("; ")
-                );
-            } else {
-                info!(
-                    "ring: {} ended at age {:.2} s",
-                    ring.weapon.label(),
-                    ring.age
-                );
+                let touched = ring
+                    .contacts
+                    .iter()
+                    .map(|(target, contact)| {
+                        contact_line(*target, contact.ticks(), contact.pushed())
+                    })
+                    .collect();
+                log_ended("fire ring", ring.age, touched);
             }
             commands.entity(entity).despawn();
         }
@@ -287,29 +271,23 @@ fn load_looks(
     }
 }
 
-/// A scrambled number for position `index` of `owner`. `salt` gives each use its own number. No random crate needed.
-fn roll(owner: Entity, index: usize, salt: u32) -> u32 {
-    let mut x = (owner.to_bits() as u32 ^ (index as u32 + 1).wrapping_mul(0x9E37_79B1))
-        .wrapping_add(salt.wrapping_mul(0x85EB_CA6B));
-    x ^= x >> 15;
-    x = x.wrapping_mul(0x2C1B_3C6D);
-    x ^= x >> 12;
-    x = x.wrapping_mul(0x297A_2D39);
-    x ^ (x >> 15)
+/// The indices into `art.looks` of the `art.per_position` emitters at one position: a random first look, then steps
+/// of a random size, so the emitters of a position differ while there are enough looks.
+fn pick(art: &RingArt, rng: &mut Rng) -> Vec<usize> {
+    let count = art.looks.len() as u64;
+    let (first, step) = if count == 1 {
+        (0, 0)
+    } else {
+        (rng.next_u64() % count, 1 + rng.next_u64() % (count - 1))
+    };
+    (0..art.per_position as u64)
+        .map(|k| ((first + k * step) % count) as usize)
+        .collect()
 }
 
-/// The look of emitter `k` at position `index`: one of the ring's looks, a different one for each emitter of a
-/// position. The sprite strip, or flat squares until it has loaded.
-fn pick(art: &RingArt, looks: &FxLooks, owner: Entity, index: usize, salt: u32, k: usize) -> Look {
-    let count = art.looks.len() as u32;
-    let chosen = if count == 1 {
-        0
-    } else {
-        let first = roll(owner, index, salt);
-        let step = 1 + roll(owner, index, salt + 10) % (count - 1);
-        (first.wrapping_add(k as u32 * step) % count) as usize
-    };
-    looks.get(art.looks[chosen]).cloned().unwrap_or_default()
+/// A look of the ring: the sprite strip, or flat squares until it has loaded.
+fn look(art: &RingArt, looks: &FxLooks, index: usize) -> Look {
+    looks.get(art.looks[index]).cloned().unwrap_or_default()
 }
 
 /// The spawn state of emitter `k` of `count` at one position: its timer starts at its share of the spawn period.
@@ -326,93 +304,97 @@ fn reach(ring: &Ring, ice: Option<&IceRing>, angle: f32) -> f32 {
     ice.map_or(ring.shape.max_radius, |ice| ice.limit_at(angle))
 }
 
+/// Spawns the emitters of one position of a ring, all following the ring at `offset` from its centre.
+fn spawn_position(
+    fx: &mut Fx,
+    owner: Entity,
+    ring: &Ring,
+    looks: &FxLooks,
+    rng: &mut Rng,
+    (file, rate): (&str, f32),
+    offset: Vec2,
+) -> Vec<Entity> {
+    let art = ring.art;
+    let transform = Transform::from_translation((ring.centre + offset).extend(0.0));
+    pick(art, rng)
+        .into_iter()
+        .enumerate()
+        .map(|(k, index)| {
+            let emitter = fx.following(
+                owner,
+                file,
+                transform,
+                &look(art, looks, index),
+                ring.values.glow,
+            );
+            fx.commands.entity(emitter).insert((
+                Follows::new(owner).with_offset(offset),
+                stagger(k, art.per_position, rate),
+            ));
+            emitter
+        })
+        .collect()
+}
+
 /// Places the front emitters of a new ring on the circle (at radius 0, so all at the centre).
-fn spawn_front(new: Query<(Entity, &Ring), Added<Ring>>, looks: Res<FxLooks>, mut fx: Fx) {
+fn spawn_front(
+    new: Query<(Entity, &Ring), Added<Ring>>,
+    looks: Res<FxLooks>,
+    mut rng: ResMut<GameRng>,
+    mut fx: Fx,
+) {
     for (owner, ring) in &new {
         let art = ring.art;
         for i in 0..ring.shape.front_emitters {
             let angle = TAU * i as f32 / ring.shape.front_emitters as f32;
-            for k in 0..art.per_position {
-                let look = pick(art, &looks, owner, i, 1, k);
-                let emitter = fx.emitter(
-                    art.front,
-                    Transform::from_translation(ring.centre.extend(0.0)),
-                    &look,
-                    ring.values.glow,
-                );
-                fx.commands.entity(emitter).insert((
-                    Front { owner, angle },
-                    stagger(k, art.per_position, art.front_rate),
-                ));
+            let file = (art.front, art.front_rate);
+            for emitter in spawn_position(&mut fx, owner, ring, &looks, &mut rng, file, Vec2::ZERO)
+            {
+                fx.commands.entity(emitter).insert(Front { angle });
             }
         }
     }
 }
 
-/// Places the burners on the circle when the ring starts to burn, each at the reach of its direction.
+/// Places the burners on the circle when the ring starts to burn, each at the reach of its direction. They follow
+/// the ring, so they go with it (`Follows`).
 fn spawn_burners(
     new: Query<(Entity, &Ring, Option<&IceRing>), Added<Burning>>,
     looks: Res<FxLooks>,
+    mut rng: ResMut<GameRng>,
     mut fx: Fx,
 ) {
     for (owner, ring, ice) in &new {
         let art = ring.art;
         for i in 0..ring.shape.burners {
             let angle = TAU * i as f32 / ring.shape.burners as f32;
-            let at = ring.centre + Vec2::from_angle(angle) * reach(ring, ice, angle);
-            for k in 0..art.per_position {
-                let look = pick(art, &looks, owner, i, 2, k);
-                let emitter = fx.emitter(
-                    art.burn,
-                    Transform::from_translation(at.extend(0.0)),
-                    &look,
-                    ring.values.glow,
-                );
-                fx.commands
-                    .entity(emitter)
-                    .insert((Burner(owner), stagger(k, art.per_position, art.burn_rate)));
-            }
+            let offset = Vec2::from_angle(angle) * reach(ring, ice, angle);
+            let file = (art.burn, art.burn_rate);
+            spawn_position(&mut fx, owner, ring, &looks, &mut rng, file, offset);
         }
     }
 }
 
-/// Moves each front emitter to the radius of its ring, or to the reach of its direction when that is shorter. When the
-/// ring has grown (or is gone) the emitter stops and removes itself once its last particle is gone.
+/// Moves each front emitter out to the radius of its ring, or to the reach of its direction when that is shorter.
+/// When the ring has grown the emitter stops and removes itself once its last particle is gone. When the ring is gone
+/// the kit does the same (`Follows`).
 fn move_front(
     rings: Query<(&Ring, Option<&IceRing>)>,
-    mut emitters: Query<(Entity, &Front, &mut Transform, &mut ParticleSpawnerState)>,
+    mut emitters: Query<(Entity, &Front, &mut Follows, &mut ParticleSpawnerState)>,
     mut commands: Commands,
 ) {
-    for (entity, front, mut transform, mut state) in &mut emitters {
-        match rings.get(front.owner) {
-            Ok((ring, ice)) if ring.age < ring.shape.grow_secs => {
-                let radius = ring.radius.min(reach(ring, ice, front.angle));
-                let at = ring.centre + Vec2::from_angle(front.angle) * radius;
-                transform.translation.x = at.x;
-                transform.translation.y = at.y;
-            }
-            _ => {
-                state.active = false;
-                commands
-                    .entity(entity)
-                    .remove::<Front>()
-                    .insert(OneShot::Despawn);
-            }
-        }
-    }
-}
-
-fn end_burners(
-    rings: Query<(), With<Ring>>,
-    mut burners: Query<(Entity, &Burner, &mut ParticleSpawnerState)>,
-    mut commands: Commands,
-) {
-    for (entity, burner, mut state) in &mut burners {
-        if !rings.contains(burner.0) {
+    for (entity, front, mut follows, mut state) in &mut emitters {
+        let Ok((ring, ice)) = rings.get(follows.owner) else {
+            continue;
+        };
+        if ring.age < ring.shape.grow_secs {
+            let radius = ring.radius.min(reach(ring, ice, front.angle));
+            follows.offset = Vec2::from_angle(front.angle) * radius;
+        } else {
             state.active = false;
             commands
                 .entity(entity)
-                .remove::<Burner>()
+                .remove::<(Front, Follows)>()
                 .insert(OneShot::Despawn);
         }
     }
@@ -421,7 +403,9 @@ fn end_burners(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::enemy_hp::EnemyHp;
     use crate::weapons::values::{FIRE_RING, ICE_RING};
+    use game_kit::hitbox::HitBox;
 
     #[derive(Resource, Default)]
     struct Log(Vec<(f32, WeaponHit)>);
