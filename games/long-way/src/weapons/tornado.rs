@@ -160,7 +160,7 @@ pub(super) fn cast_tornadoes(mut cast: MessageReader<CastWeapon>, mut commands: 
 }
 
 /// Moves each tornado with the player, hurts and pushes the enemies in it, and ends it after its duration. A dead
-/// enemy is skipped (`EnemyBody::living_rect`).
+/// enemy, or one that blue passes through, is skipped (`EnemyBody::hit_by`).
 #[allow(clippy::too_many_arguments, clippy::type_complexity)]
 fn update_tornadoes(
     time: Res<Time>,
@@ -198,7 +198,7 @@ fn update_tornadoes(
         let centre = transform.translation.truncate();
         let (values, edge) = (tornado.values, tornado.edge());
         for enemy in &enemies {
-            let Some(rect) = enemy.living_rect() else {
+            let Some((rect, reaction)) = enemy.hit_by(WeaponKind::Tornado.energy()) else {
                 continue;
             };
             let (target, feet, hit_box) = (enemy.entity, enemy.feet(), enemy.hit_box);
@@ -226,7 +226,7 @@ fn update_tornadoes(
             let mut push = Vec2::ZERO;
             let mut after = feet;
             if out > 0.0 {
-                push = away * out;
+                push = away * out * reaction.push;
                 after = pushed_feet(feet, push, &world, bounds, enemy.edge_margin());
                 body.pushed += after.distance(feet);
             }
@@ -377,6 +377,7 @@ mod tests {
         app.add_message::<CastWeapon>()
             .add_message::<WeaponHit>()
             .add_message::<DamageEnemy>()
+            .add_message::<crate::reactions::EnemyInterrupted>()
             .insert_resource(world)
             .init_resource::<Log>()
             .add_systems(
@@ -482,6 +483,27 @@ mod tests {
             .filter(|(_, hit)| hit.target == target && hit.amount > 0.0)
             .map(|(at, _)| *at)
             .collect()
+    }
+
+    #[test]
+    fn an_enemy_that_blue_does_not_push_stays_put_and_keeps_taking_ticks() {
+        use crate::reactions::{Hit, Reaction, Reactions};
+        let mut app = app(&[]);
+        let anchored = enemy(&mut app, Vec2::new(20.0, 10.0));
+        app.world_mut().entity_mut(anchored).insert(Reactions {
+            blue: Reaction::Hit(Hit {
+                push: 0.0,
+                ..Hit::FULL
+            }),
+            ..Reactions::FULL
+        });
+        cast(&mut app);
+        // Long enough for the growth, the push and a bump on the second tick.
+        run(&mut app, 1.2);
+        assert_eq!(feet(&app, anchored), Vec2::new(20.0, 10.0));
+        assert_eq!(ticks(&app, anchored).len(), 3);
+        let log = &app.world().resource::<Log>().0;
+        assert!(log.iter().all(|(_, hit)| hit.push == Vec2::ZERO));
     }
 
     #[test]

@@ -11,6 +11,7 @@ mod map;
 mod markers;
 mod pickups;
 mod player;
+mod reactions;
 mod rocks;
 mod scenery;
 mod trees;

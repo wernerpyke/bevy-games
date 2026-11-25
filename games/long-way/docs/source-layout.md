@@ -22,6 +22,7 @@ games/long-way/
     ├── inventory.rs    `Inventory` (energy counts, at most `MAX_ENERGY` each; `try_spend` and `cost_share` for the cost of a cast), `InventoryPlugin`: fills it from `Collected`
     ├── hp.rs           `Hp` (the player's hit points), `DamagePlayer` message, `HpPlugin` (`adr-lw28`)
     ├── enemy_hp.rs     `EnemyHp`, the `DamageEnemy` and `EnemyDied` messages, `EnemyHpPlugin`: damage, the hurt flash (`adr-lw32`)
+    ├── reactions.rs    `Reactions`: how an enemy reacts to each weapon energy, the `EnemyInterrupted` message (`adr-lw43`)
     ├── weapons/        `WeaponPlugin`: `CastWeapon` (from `ActiveWeaponClicked`) and `WeaponHit` messages, `values.rs` (every weapon number), `damage.rs` (hit points and push), `ring.rs` (both rings: growth, look, the fire ring's hits, `adr-lw33`), `ice_ring.rs` (the ice ring's reach, push, barrier and stun, `adr-lw35`), `tornado.rs` (the tornado, `adr-lw36`), `fireball.rs` (the fireball, `adr-lw37`) (`adr-lw32`)
     ├── ghost.rs        `spawn_ghosts` (from `spawn_ghost` markers, called by the load hook), `GhostPlugin`: the touch (1 HP, then dies) and the removal after `Die` (`adr-lw29`)
     ├── volcano.rs      `spawn_volcanoes` (from `spawn_volcano` markers, called by the load hook): a still enemy that loops `Attack`. `VolcanoPlugin` launches its shots at frames 7 and 9 on the kit `ProjectilePath` and takes 1 HP from the player they touch (`adr-lw41`); hit points are still to come
@@ -47,7 +48,7 @@ games/long-way/
 | [Screen layout](../../../dev-docs/extensions/screen-layout.md) | `camera.rs`, `hud.rs`, `main.rs` (plus `screen.rs`, `hud.rs`, `app_state.rs` in `crates/game-kit`) |
 | [Pixel art](../../../dev-docs/extensions/pixel-art.md) | `camera.rs`, `player.rs` (plus `camera.rs` in `crates/game-kit`) |
 
-Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `scenery.rs`, `background.rs`, `edges.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`, `hp.rs`, `enemy_hp.rs`, `weapons/`, `ghost.rs`, `volcano.rs`.
+Game specific files: `main.rs`, `player.rs`, `trees.rs`, `rocks.rs`, `scenery.rs`, `background.rs`, `edges.rs`, `markers.rs`, `pickups.rs`, `inventory.rs`, `hp.rs`, `enemy_hp.rs`, `reactions.rs`, `weapons/`, `ghost.rs`, `volcano.rs`.
 
 ## Long Way values for the pixel art extension
 

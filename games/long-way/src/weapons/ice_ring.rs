@@ -104,7 +104,7 @@ fn distance_to_leave(from: Vec2, dir: Vec2, rect: Rect) -> f32 {
 }
 
 /// Pushes, holds back and stuns the enemies of each ice ring. It runs after the kit has moved the enemies, so a step
-/// into the ring is undone in the same frame. A dead enemy is skipped (`EnemyBody::living_rect`).
+/// into the ring is undone in the same frame. A dead enemy, or one that the energy passes through, is skipped (`EnemyBody::hit_by`).
 pub(super) fn update_ice_rings(
     mut rings: Query<(&Ring, &mut IceRing)>,
     enemies: Query<EnemyBody>,
@@ -120,7 +120,7 @@ pub(super) fn update_ice_rings(
         };
         let growing = ring.age < ring.shape.grow_secs;
         for enemy in &enemies {
-            let Some(rect) = enemy.living_rect() else {
+            let Some((rect, reaction)) = enemy.hit_by(ring.weapon.energy()) else {
                 continue;
             };
             let target = enemy.entity;
@@ -134,7 +134,7 @@ pub(super) fn update_ice_rings(
             if body.stunned {
                 continue;
             }
-            let wanted = away * inside;
+            let wanted = away * inside * reaction.push;
             let feet = enemy.feet();
             let moved = pushed_feet(feet, wanted, &world, bounds, enemy.edge_margin()) - feet;
             body.pushed += moved.length();
@@ -238,6 +238,7 @@ mod tests {
         app.add_message::<CastWeapon>()
             .add_message::<WeaponHit>()
             .add_message::<DamageEnemy>()
+            .add_message::<crate::reactions::EnemyInterrupted>()
             .insert_resource(world)
             .init_resource::<Log>()
             .add_observer(release_stunned)
@@ -351,6 +352,35 @@ mod tests {
         );
         assert!(!stunned(&app, body));
         assert_eq!(damage(&app, body), [50.0]);
+    }
+
+    #[test]
+    fn a_body_that_blue_does_not_push_stays_unstunned_and_one_that_blue_passes_through_is_not_hit()
+    {
+        use crate::reactions::{Hit, Reaction, Reactions};
+        let mut app = app(&[], None);
+        let unmoved = enemy(&mut app, 50.0);
+        app.world_mut().entity_mut(unmoved).insert(Reactions {
+            blue: Reaction::Hit(Hit {
+                push: 0.0,
+                ..Hit::FULL
+            }),
+            ..Reactions::FULL
+        });
+        let passed = enemy(&mut app, -60.0);
+        app.world_mut().entity_mut(passed).insert(Reactions {
+            blue: Reaction::PassThrough,
+            ..Reactions::FULL
+        });
+        cast(&mut app);
+        run_until(&mut app, FULL + 0.5);
+        // Not pushed, so never pinned: it stays inside and takes the push and then the touch.
+        assert_eq!(x(&app, unmoved), 50.0);
+        assert!(!stunned(&app, unmoved));
+        assert_eq!(damage(&app, unmoved), [50.0, 10.0]);
+        assert_eq!(x(&app, passed), -60.0);
+        let log = &app.world().resource::<Log>().0;
+        assert!(log.iter().all(|hit| hit.target != passed));
     }
 
     #[test]

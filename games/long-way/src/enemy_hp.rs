@@ -8,6 +8,8 @@
 
 use bevy::prelude::*;
 
+use crate::reactions::{EnemyInterrupted, Reactions};
+
 /// The tint of a hurt enemy, `#993D41`.
 pub const HURT_COLOUR: Color = Color::srgb(0.6, 61.0 / 255.0, 65.0 / 255.0);
 /// Seconds that the tint stays after a hit.
@@ -20,12 +22,15 @@ impl Plugin for EnemyHpPlugin {
         app.add_message::<DamageEnemy>()
             .add_message::<EnemyHurt>()
             .add_message::<EnemyDied>()
+            .add_message::<EnemyInterrupted>()
             .add_systems(Update, (apply_damage, flash_hurt).chain());
     }
 }
 
-/// Current and maximum hit points. A float, because weapons deal damage per second.
+/// Current and maximum hit points. A float, because weapons deal damage per second. Every enemy has its reactions to
+/// the weapon energies, the full table unless it is spawned with its own (`adr-lw43`).
 #[derive(Component, Clone, Copy, Debug, PartialEq)]
+#[require(Reactions)]
 pub struct EnemyHp {
     pub current: f32,
     pub max: f32,

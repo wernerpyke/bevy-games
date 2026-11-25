@@ -31,8 +31,9 @@ use game_kit::projectile::{
 use game_kit::rng::GameRng;
 
 use super::values::{Damage, FIREBALL, values};
-use super::{CastWeapon, EnemyBody, OnCurrentMap, WeaponHit, WeaponSystems};
+use super::{CastWeapon, EnemyBody, EnemyBodyItem, OnCurrentMap, WeaponHit, WeaponSystems};
 use crate::enemy_hp::EnemyHp;
+use crate::reactions::Reactions;
 use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const ART: &str = "art/weapons/fireball_and_rings.aseprite";
@@ -158,15 +159,24 @@ fn in_blast(centre: Vec2, body: Rect) -> bool {
     distance_to_rect(centre, body) < FIREBALL.blast_radius
 }
 
-/// Living enemies are projectile targets. A dead one is not, so a dying ghost does not stop a shot (`weapons.md`, "Dead enemies").
+/// The body of an enemy the fireball can touch: living, and not one that red passes through (`adr-lw43`).
+fn body_for_fireball(enemy: &EnemyBodyItem) -> Option<Rect> {
+    enemy
+        .hit_by(WeaponKind::Fireball.energy())
+        .map(|(body, _)| body)
+}
+
+/// Living enemies that red does not pass through are projectile targets. A dead one is not, so a dying ghost does not
+/// stop a shot (`weapons.md`, "Dead enemies").
 fn mark_targets(
-    enemies: Query<(Entity, &EnemyHp, Has<ProjectileTarget>), With<HitBox>>,
+    enemies: Query<(Entity, &EnemyHp, &Reactions, Has<ProjectileTarget>), With<HitBox>>,
     mut commands: Commands,
 ) {
-    for (entity, hp, marked) in &enemies {
-        if hp.is_dead() && marked {
+    for (entity, hp, reactions, marked) in &enemies {
+        let target = !hp.is_dead() && reactions.hit(WeaponKind::Fireball.energy()).is_some();
+        if marked && !target {
             commands.entity(entity).remove::<ProjectileTarget>();
-        } else if !hp.is_dead() && !marked {
+        } else if target && !marked {
             commands.entity(entity).insert(ProjectileTarget);
         }
     }
@@ -185,7 +195,7 @@ pub(super) fn cast_fireballs(
     {
         let bodies: Vec<(Entity, Rect)> = enemies
             .iter()
-            .filter_map(|enemy| Some((enemy.entity, enemy.living_rect()?)))
+            .filter_map(|enemy| Some((enemy.entity, body_for_fireball(&enemy)?)))
             .collect();
         let centres: Vec<(Entity, Vec2)> = bodies
             .iter()
@@ -262,7 +272,7 @@ fn steer(
             match enemies
                 .get(target)
                 .ok()
-                .and_then(|enemy| enemy.living_rect())
+                .and_then(|enemy| body_for_fireball(&enemy))
             {
                 Some(body) => ball.aim = aim_at(body),
                 None => {
@@ -342,7 +352,7 @@ fn explode(
         };
         let mut caught = Vec::new();
         for enemy in &enemies {
-            let Some(body) = enemy.living_rect() else {
+            let Some(body) = body_for_fireball(&enemy) else {
                 continue;
             };
             if Some(enemy.entity) == boom.direct {
@@ -623,11 +633,19 @@ mod tests {
     }
 
     #[test]
-    fn a_fireball_hits_its_moving_target_and_passes_a_dead_enemy() {
+    fn a_fireball_hits_its_moving_target_and_passes_a_dead_enemy_and_one_that_red_passes_through() {
         let mut app = app(&[], None);
         // A dead enemy, closer and in the line at the cast: not the target and not hit.
         let dead = enemy(&mut app, Vec2::new(60.0, -2.0));
         app.world_mut().get_mut::<EnemyHp>(dead).unwrap().current = 0.0;
+        // The same for a living enemy that red passes through.
+        let passed = enemy(&mut app, Vec2::new(110.0, 3.0));
+        app.world_mut()
+            .entity_mut(passed)
+            .insert(crate::reactions::Reactions {
+                red: crate::reactions::Reaction::PassThrough,
+                ..crate::reactions::Reactions::FULL
+            });
         // The target walks across the line at a ghost's speed; a shot aimed where it was would pass under it.
         let target = enemy(&mut app, Vec2::new(220.0, 0.0));
         app.world_mut()
@@ -640,6 +658,7 @@ mod tests {
         assert_eq!(booms(&app)[0].direct, Some(target));
         assert_eq!(taken(&app, target), vec![damage().0]);
         assert!(taken(&app, dead).is_empty());
+        assert!(taken(&app, passed).is_empty());
     }
 
     #[test]
@@ -771,11 +790,24 @@ mod tests {
     }
 
     #[test]
-    fn living_enemies_are_projectile_targets_and_dead_ones_are_not() {
+    fn living_enemies_are_projectile_targets_and_dead_ones_and_ones_red_passes_through_are_not() {
+        use crate::reactions::{Reaction, Reactions};
         let mut app = app(&[], None);
         let ghost = enemy(&mut app, Vec2::ZERO);
+        let red_passes = enemy(&mut app, Vec2::new(300.0, 0.0));
+        app.world_mut().entity_mut(red_passes).insert(Reactions {
+            red: Reaction::PassThrough,
+            ..Reactions::FULL
+        });
+        let blue_passes = enemy(&mut app, Vec2::new(-300.0, 0.0));
+        app.world_mut().entity_mut(blue_passes).insert(Reactions {
+            blue: Reaction::PassThrough,
+            ..Reactions::FULL
+        });
         app.update();
         assert!(app.world().get::<ProjectileTarget>(ghost).is_some());
+        assert!(app.world().get::<ProjectileTarget>(red_passes).is_none());
+        assert!(app.world().get::<ProjectileTarget>(blue_passes).is_some());
         app.world_mut().get_mut::<EnemyHp>(ghost).unwrap().current = 0.0;
         app.update();
         assert!(app.world().get::<ProjectileTarget>(ghost).is_none());

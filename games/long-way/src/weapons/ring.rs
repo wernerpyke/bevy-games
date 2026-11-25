@@ -191,7 +191,7 @@ pub(super) fn cast_rings(
 }
 
 /// Grows every ring and ends it when its time at full size is over. For the fire ring it also hurts and pushes the
-/// enemies in its band. A dead enemy is skipped (`EnemyBody::living_rect`).
+/// enemies in its band. A dead enemy, or one that the energy passes through, is skipped (`EnemyBody::hit_by`).
 pub(super) fn update_rings(
     time: Res<Time>,
     mut rings: Query<(Entity, &mut Ring)>,
@@ -216,7 +216,7 @@ pub(super) fn update_rings(
             let (inner, outer) = band(&shape, ring.age, ring.radius);
             let (centre, values, weapon) = (ring.centre, ring.values, ring.weapon);
             for enemy in &enemies {
-                let Some(rect) = enemy.living_rect() else {
+                let Some((rect, reaction)) = enemy.hit_by(weapon.energy()) else {
                     continue;
                 };
                 if !rect_overlaps_band(centre, inner, outer, rect) {
@@ -224,7 +224,8 @@ pub(super) fn update_rings(
                 }
                 let contact = ring.contacts.entry(enemy.entity).or_default();
                 let amount = contact.damage(&values, dt);
-                let push = contact.push(values.pushback, away_from(centre, rect) * advance);
+                let wanted = away_from(centre, rect) * advance * reaction.push;
+                let push = contact.push(values.pushback, wanted);
                 if amount.is_some() || push != Vec2::ZERO {
                     hits.write(WeaponHit {
                         target: enemy.entity,
@@ -641,6 +642,27 @@ mod tests {
         run(&mut app, 4.0, 16);
         assert_eq!(damage_hits(&hits_on(&app, living)).len(), 1);
         assert!(hits_on(&app, dead).is_empty());
+    }
+
+    #[test]
+    fn the_fire_ring_passes_through_an_enemy_that_red_passes_through_and_hits_one_that_only_blue_does()
+     {
+        use crate::reactions::{Reaction, Reactions};
+        let mut app = app(16);
+        let red_passes = enemy(&mut app, FRONT_ONLY);
+        app.world_mut().entity_mut(red_passes).insert(Reactions {
+            red: Reaction::PassThrough,
+            ..Reactions::FULL
+        });
+        let blue_passes = enemy(&mut app, -FRONT_ONLY);
+        app.world_mut().entity_mut(blue_passes).insert(Reactions {
+            blue: Reaction::PassThrough,
+            ..Reactions::FULL
+        });
+        cast(&mut app, WeaponKind::FireRing, Vec2::ZERO);
+        run(&mut app, 4.0, 16);
+        assert!(hits_on(&app, red_passes).is_empty());
+        assert_eq!(damage_hits(&hits_on(&app, blue_passes)).len(), 1);
     }
 
     #[test]

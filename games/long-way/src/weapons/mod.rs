@@ -24,8 +24,9 @@ use game_kit::map_transition::OnCurrentMap;
 use game_kit::movement::{FollowSet, MoveState, Mover};
 
 use crate::enemy_hp::EnemyHp;
-use crate::inventory::Inventory;
+use crate::inventory::{Energy, Inventory};
 use crate::player::feet_of;
+use crate::reactions::{Hit, Reactions};
 use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, BuiltWeapons, WeaponKind};
 
 pub struct WeaponPlugin;
@@ -73,14 +74,16 @@ fn emitters_on_current_map(add: On<Add<ParticleEffectHandle>>, mut commands: Com
     commands.entity(add.entity).insert(OnCurrentMap);
 }
 
-/// The body of an enemy as a weapon sees it. `living_rect` is `None` for a dead enemy, which keeps its `HitBox`
-/// while it plays `Die` (`weapons.md`, "Dead enemies"), so no weapon hits or pushes it.
+/// The body of an enemy as a weapon sees it. `hit_by` is `None` for a dead enemy, which keeps its `HitBox` while it
+/// plays `Die` (`weapons.md`, "Dead enemies"), and for one that the weapon's energy passes through (`adr-lw43`), so
+/// no weapon hits or pushes it.
 #[derive(QueryData)]
 pub struct EnemyBody {
     pub entity: Entity,
     pub transform: &'static Transform,
     pub hit_box: &'static HitBox,
     pub hp: &'static EnemyHp,
+    pub reactions: &'static Reactions,
     pub mover: Option<&'static Mover>,
 }
 
@@ -89,9 +92,15 @@ impl EnemyBodyItem<'_, '_> {
         self.transform.translation.truncate()
     }
 
-    /// The body's rectangle, or `None` when the enemy is dead.
-    pub fn living_rect(&self) -> Option<Rect> {
-        (!self.hp.is_dead()).then(|| self.hit_box.rect_at(self.feet()))
+    /// The body's rectangle and its reaction to `energy`, or `None` when the enemy is dead or `energy` passes
+    /// through it. A weapon scales its push by the `Hit`'s `push` before it forecasts the push. `apply_hits` scales the
+    /// damage.
+    pub fn hit_by(&self, energy: Energy) -> Option<(Rect, Hit)> {
+        if self.hp.is_dead() {
+            return None;
+        }
+        let hit = self.reactions.hit(energy)?;
+        Some((self.hit_box.rect_at(self.feet()), hit))
     }
 
     /// How far from the map edge a push must leave the feet: the enemy's `Mover::edge_margin`, 0 without a `Mover`.

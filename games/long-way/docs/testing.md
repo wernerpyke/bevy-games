@@ -8,11 +8,12 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 
 | File | What it tests |
 |---|---|
-| `weapons/damage.rs` | `Contact`: damage ticks, the first tick at once, a long frame deals one tick with no burst (D14), pushback limits. `pushed_feet` stops at a blocked area and the map edge. `apply_hits` sends `DamageEnemy` and moves the enemy |
-| `weapons/ring.rs` | The fire ring: a cast makes a ring, the front hurts once, the burn hurts every tick until the ring ends, no body is skipped at a low frame rate, the pushback limit, the burn starts at the lead radius, the damaging band. A body without `EnemyHp` and a dead enemy with a `HitBox` are not hit (D15) |
+| `weapons/damage.rs` | `Contact`: damage ticks, the first tick at once, a long frame deals one tick with no burst (D14), pushback limits. `pushed_feet` stops at a blocked area and the map edge. `apply_hits` sends `DamageEnemy` and moves the enemy, scales the damage by the reaction, sends `EnemyInterrupted`, ignores a hit from an energy that passes through |
+| `weapons/ring.rs` | The fire ring: a cast makes a ring, the front hurts once, the burn hurts every tick until the ring ends, no body is skipped at a low frame rate, the pushback limit, the burn starts at the lead radius, the damaging band. A body without `EnemyHp` and a dead enemy with a `HitBox` are not hit (D15), nor one that red passes through |
 | `weapons/values.rs` | Data rules across all weapons. The ring size is a compile-time assert |
 | `weapons/mod.rs` | The active weapon is cast from the player's feet with the player's facing, a blank slot casts nothing; no player, no cast |
 | `weapon_menu.rs` | Which gauge opens or closes the drawer, the slide, one drawer per weapon and the label length, the default weapons and only built weapons active. Systems: a gauge, a click in the world and an active button click, the buttons or the "no weapons" text, only a primary click on a built weapon loads it into its own slot, the drawer is hidden at slide 0. The drawer sizes are compile-time asserts |
+| `reactions.rs` | Each energy reads its own reaction (`adr-lw43`). Weapon tests check that each weapon skips a body its energy passes through and scales its push by the reaction (ring, ice ring, tornado, fireball) |
 | `enemy_hp.rs` | `EnemyHp::lose`, the hurt colour hex, the tint and its end, one `EnemyDied`, hurt frames instead of the tint, a target without HP is left alone |
 | `hp.rs` | The player's points stop at 0, and no `PlayerHurt` is sent at 0 |
 | `ghost.rs` | Attack, death and hurt: which animation wins and when the player loses HP. The ghost's systems run before the kit's facing tags. A marker puts the ghost's feet at the cell centre; a bad strategy is skipped |

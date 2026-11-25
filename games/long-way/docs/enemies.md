@@ -8,10 +8,11 @@ These rules apply to every enemy.
 
 1. **Placed by a map marker.** A legend kind `spawn_<enemy>` puts one enemy in its cell when the map loads (`adr-lw29`). There is no spawner and no respawn. The enemy belongs to the map: it goes when the map unloads and comes back when the map loads again. No state is saved.
 2. **Legend character.** A special character, not a letter, digit, `@`, `.`, `|` or `"` (`adr-x37`, "Legend conventions" in `dev-docs/extensions/map-files.md`).
-3. **Hit points.** An enemy that weapons can hit has `EnemyHp { current, max }` (floats, `adr-lw32`). Weapons send `DamageEnemy`. They never change `EnemyHp` directly. At 0 the enemy sends `EnemyDied` once, and its own plugin plays its death and removes it. Weapons only look for entities with `EnemyHp`, so an enemy without it cannot be hit.
-4. **Hurt.** An enemy with its own hurt frames carries `HurtFrames` and plays its `Hurt` tag. Every other enemy flashes `#993D41` for 0.12 s (`HURT_COLOUR`, `HURT_FLASH_SECS` in `enemy_hp.rs`).
-5. **Damage to the player.** An enemy sends `DamagePlayer { amount }` (`hp.rs`). The player has no invincibility frames: every hit counts, also two in the same frame (b15).
-6. **No friendly fire.** An enemy attack hits only the player. The player's weapons do not hit enemy shots (b16, `adr-lw42`). An enemy shot uses `Projectile::without_targets()`. A reader of `ControlledTouched` filters on its own marker (`With<Ghost>`, `With<VolcanoShot>`).
+3. **Hit points.** An enemy that weapons can hit has `EnemyHp { current, max }` (floats, `adr-lw32`). Weapons send `DamageEnemy`. They never change `EnemyHp` directly. At 0 the enemy sends `EnemyDied` once, and its own plugin plays its death and removes it. Weapons only look for entities with `EnemyHp`, so an enemy without it cannot be hit. Every enemy has `EnemyHp`, also one that no current weapon can hurt.
+4. **Reactions.** Each enemy has a `Reactions` table: how it reacts to each weapon energy (see "Reactions to weapon energy", `adr-lw43`).
+5. **Hurt.** An enemy with its own hurt frames carries `HurtFrames` and plays its `Hurt` tag. Every other enemy flashes `#993D41` for 0.12 s (`HURT_COLOUR`, `HURT_FLASH_SECS` in `enemy_hp.rs`).
+6. **Damage to the player.** An enemy sends `DamagePlayer { amount }` (`hp.rs`). The player has no invincibility frames: every hit counts, also two in the same frame (b15).
+7. **No friendly fire.** An enemy attack hits only the player. The player's weapons do not hit enemy shots (b16, `adr-lw42`). An enemy shot uses `Projectile::without_targets()`. A reader of `ControlledTouched` filters on its own marker (`With<Ghost>`, `With<VolcanoShot>`).
 
 ## Values
 
@@ -59,6 +60,46 @@ These rules apply to every enemy.
 
 **Open.** Hit points, how it shows a hit (no `Hurt` tag yet, so the colour flash) and how it dies. When it gets `EnemyHp`, check b2 and b13 (`balance.md`), and fill in its row in "Against each weapon".
 
+## Reactions to weapon energy
+
+Each enemy kind reacts to each weapon energy in its own way (`adr-lw43`). The energy decides, not the weapon: every red weapon is treated the same, and so is every blue weapon.
+
+| Reaction | Effect |
+|---|---|
+| `PassThrough` | The weapons of that energy do not see the enemy. No contact, no damage, no push. A fireball does not target it and does not explode on it |
+| `Hit { damage, push, interrupt }` | The weapon touches the enemy. `damage` and `push` are shares of the weapon's own damage and push: `1.0` is all of it, `0.0` none, more than `1.0` is stronger. `interrupt` sends `EnemyInterrupted` on every hit of that energy, and the enemy's plugin decides what that does |
+
+A `Hit` with damage 0, push 0 and no interrupt still touches: a fireball explodes on it, with no effect on that enemy.
+
+How often an enemy is interrupted, and how far it is pushed, follow from the weapon's ticks and pushes and from the shares. They are tuning values, not rules.
+
+| Enemy | Red | Blue | Violet | Black | Status |
+|---|---|---|---|---|---|
+| Ghost | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | In the game |
+| Volcano | Hit: damage 0, push 0 (touched, no effect) | Hit: damage 0, push 0, **interrupt** (`Hurt`, then `Attack` from frame 1) | Hit: damage 1, push 0 (placeholder) | Hit: damage 1, push 0 (placeholder) | Planned (`dev-docs/PLAN-energy-reactions.md`) |
+| Volcano shot | `PassThrough` | Hit: damage 0, push tuned (strong) | Hit: damage 1, push 1 (placeholder) | Hit: damage 1, push 1 (placeholder) | Planned |
+
+**Tuning target, volcano shot:** under the tornado, the shot holds at the outer rim while the player stands still (some jitter is fine), and the tornado carries it while the player walks.
+
+**Code.** Each enemy's table is the constant `REACTIONS` in its own file, next to its hit points. An enemy spawned without a table reacts in full to every energy (`Reactions::FULL`).
+
+## Stun and interrupt
+
+Two different things. Do not use one for the other.
+
+| | Stun | Interrupt |
+|---|---|---|
+| **Type** | `Stunned`, a component in the kit (`game_kit::movement`) | `EnemyInterrupted`, a message in Long Way (`reactions.rs`). The kit has no interrupt |
+| **What it is** | A state that lasts | One event for each hit |
+| **Length** | Until the code that added it removes it | None |
+| **Effect** | Set by the kit: the entity does not walk, and its sprite animation stops on its current frame. It keeps its goal and walks on when the stun ends. The ghost also does not attack while stunned | None of its own. The enemy's plugin decides what it does. The volcano will play `Hurt`, then start `Attack` again from frame 1 |
+| **Cause** | A rule of one weapon: the ice ring stuns an enemy that its push pins against a feature or the map edge, until the ring ends (`adr-lw35`, `weapons.md`) | The enemy's reaction table: every hit from an energy with `interrupt` (`adr-lw43`) |
+| **Who chooses it** | The weapon | The enemy kind |
+
+- An interrupt cannot be built from a stun: a stun freezes the animation, and an interrupt usually plays one.
+- An interrupt handler may add a stun as part of its effect, for an enemy that should stop walking when it is hit.
+- An enemy whose push share is 0 is never stunned by the ice ring, because the ring never pushes it and so never pins it.
+
 ## Against each weapon
 
 Weapon values are in `weapons.md`. The balance rules in brackets keep these results true.
@@ -75,8 +116,9 @@ Weapon values are in `weapons.md`. The balance rules in brackets keep these resu
 1. Ask the user for the design: movement, attack, damage, HP, how it shows a hit and how it dies.
 2. Add `Kind::Spawn<Enemy>` and the kind name in `map.rs`, and a legend character from the enemy set (`adr-x37`). Write the key in quotes.
 3. Spawn it from the map load hook. Do not add a `MapId` by hand (`adr-x58`).
-4. Give it `EnemyHp::full(<its own HP>)` if weapons can hit it. Do not change the ghost's HP or a weapon's damage to suit it (b1, b2).
-5. Hurt: add `HurtFrames` and a `Hurt` tag, or use the colour flash.
-6. Its attacks hit only the player (b16): shots use `Projectile::without_targets()`, and touch readers filter on its own marker.
-7. Check the "by hand" rules in `balance.md`: b2 (fire ring), b13 (fireball direct hit) and b16 (friendly fire).
-8. Add a row to "Values" and a column to "Against each weapon" here, its marker to `maps.md` and its tags to `art-tags.md`.
+4. Give it `EnemyHp::full(<its own HP>)`, also when no current weapon can hurt it, so a later weapon can. Do not change the ghost's HP or a weapon's damage to suit it (b1, b2).
+5. Write its `REACTIONS` table, one reaction per energy, and add its row to "Reactions to weapon energy". If it interrupts, handle `EnemyInterrupted` in its plugin.
+6. Hurt: add `HurtFrames` and a `Hurt` tag, or use the colour flash.
+7. Its attacks hit only the player (b16): shots use `Projectile::without_targets()`, and touch readers filter on its own marker.
+8. Check the "by hand" rules in `balance.md`: b2 (fire ring), b13 (fireball direct hit) and b16 (friendly fire).
+9. Add a row to "Values" and a column to "Against each weapon" here, its marker to `maps.md` and its tags to `art-tags.md`.

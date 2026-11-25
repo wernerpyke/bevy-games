@@ -103,6 +103,15 @@ impl WeaponKind {
             WeaponKind::Tornado => "tornado",
         }
     }
+
+    /// The energy it is cast with, and so its archetype: the enemies react to the energy, not the weapon (`adr-lw43`).
+    /// It is the drawer the weapon is in (`weapons_for`).
+    pub fn energy(self) -> Energy {
+        match self {
+            WeaponKind::Fireball | WeaponKind::FireRing | WeaponKind::FireWall => Energy::Red,
+            WeaponKind::Tornado | WeaponKind::IceRing | WeaponKind::IceWall => Energy::Blue,
+        }
+    }
 }
 
 /// The weapons that work: a weapon is built when the plugin that casts it has registered it (`BuiltWeapons::register`).
@@ -484,13 +493,13 @@ mod tests {
     }
 
     #[test]
-    fn every_weapon_is_in_exactly_one_drawer_and_fits_a_button() {
+    fn every_weapon_is_in_exactly_one_drawer_its_energy_and_fits_a_button() {
         for weapon in WeaponKind::ALL {
-            let drawers = Energy::ALL
-                .iter()
-                .filter(|energy| weapons_for(**energy).contains(&weapon))
-                .count();
-            assert_eq!(drawers, 1, "{weapon:?}");
+            let drawers: Vec<Energy> = Energy::ALL
+                .into_iter()
+                .filter(|energy| weapons_for(*energy).contains(&weapon))
+                .collect();
+            assert_eq!(drawers, vec![weapon.energy()], "{weapon:?}");
             assert!(!weapon.label().is_empty());
             assert!(weapon.label().chars().count() <= MAX_LABEL, "{weapon:?}");
             assert!(!weapon.icon_tag().is_empty());

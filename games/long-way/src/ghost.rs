@@ -24,6 +24,7 @@ use crate::enemy_hp::{EnemyDied, EnemyHp, EnemyHurt, HurtFrames};
 use crate::hp::DamagePlayer;
 use crate::map::Kind;
 use crate::player::WALK_SPEED;
+use crate::reactions::Reactions;
 
 const ART: &str = "art/characters/ghost.aseprite";
 /// Walk speed as a share of the player's. The ghost is slow.
@@ -47,6 +48,8 @@ const HIT_BOX: HitBox = HitBox {
 const DAMAGE: u32 = 1;
 /// Hit points of a ghost. Balance rule b1 (`docs/balance.md`) ties the fire ring damage to it.
 pub(crate) const HIT_POINTS: f32 = 100.0;
+/// How a ghost reacts to each weapon energy (`adr-lw43`): in full to all of them.
+const REACTIONS: Reactions = Reactions::FULL;
 
 pub struct GhostPlugin;
 
@@ -104,6 +107,7 @@ pub fn spawn_ghosts(commands: &mut Commands, server: &AssetServer, map: &Map, lo
             Mover::new(SPEED).with_edge_margin(EDGE_MARGIN),
             HIT_BOX,
             EnemyHp::full(HIT_POINTS),
+            REACTIONS,
             HurtFrames,
             Touchable,
             DepthSort { feet_offset: 0.0 },

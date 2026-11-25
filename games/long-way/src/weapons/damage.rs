@@ -9,6 +9,7 @@ use game_kit::movement::Mover;
 use super::WeaponHit;
 use super::values::{Damage, Pushback, WeaponValues};
 use crate::enemy_hp::{DamageEnemy, EnemyHp};
+use crate::reactions::{EnemyInterrupted, Reactions};
 
 /// What one cast has done to one target so far. A weapon keeps one per target it touches.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -90,22 +91,33 @@ pub fn pushed_feet(
 /// tornado also call `pushed_feet`, but only as a forecast, to know whether a push pins an enemy or how deep it stays.
 /// Moving here, one hit after another, keeps two pushes on one enemy in one frame from passing a wall (kit review,
 /// item 18, kept on 2026-11-25).
+///
+/// The enemy's reaction to the weapon's energy scales the damage and may interrupt it (`adr-lw43`). The weapon has
+/// already scaled the push, because it forecasts it. A hit from an energy that passes through is ignored.
 pub(crate) fn apply_hits(
     mut hits: MessageReader<WeaponHit>,
     mut damage: MessageWriter<DamageEnemy>,
-    mut enemies: Query<(&mut Transform, Option<&Mover>), With<EnemyHp>>,
+    mut interrupted: MessageWriter<EnemyInterrupted>,
+    mut enemies: Query<(&mut Transform, &Reactions, Option<&Mover>), With<EnemyHp>>,
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
 ) {
     for hit in hits.read() {
-        let Ok((mut transform, mover)) = enemies.get_mut(hit.target) else {
+        let Ok((mut transform, reactions, mover)) = enemies.get_mut(hit.target) else {
             continue;
         };
-        if hit.amount > 0.0 {
+        let Some(reaction) = reactions.hit(hit.weapon.energy()) else {
+            continue;
+        };
+        let amount = hit.amount * reaction.damage;
+        if amount > 0.0 {
             damage.write(DamageEnemy {
                 target: hit.target,
-                amount: hit.amount,
+                amount,
             });
+        }
+        if reaction.interrupt {
+            interrupted.write(EnemyInterrupted(hit.target));
         }
         if hit.push != Vec2::ZERO {
             let feet = transform.translation.truncate();
@@ -249,6 +261,7 @@ mod tests {
         let mut app = App::new();
         app.add_message::<WeaponHit>()
             .add_message::<DamageEnemy>()
+            .add_message::<crate::reactions::EnemyInterrupted>()
             .init_resource::<CollisionWorld>()
             .add_systems(Update, apply_hits);
         let enemy = app
@@ -298,6 +311,71 @@ mod tests {
             app.world().get::<Transform>(enemy).unwrap().translation.x,
             55.0
         );
+    }
+
+    #[test]
+    fn the_reaction_to_the_weapons_energy_scales_the_damage_interrupts_or_ignores_the_hit() {
+        use crate::reactions::{EnemyInterrupted, Hit, Reaction, Reactions};
+        let (mut app, _) = app();
+        let hit = |damage, interrupt| {
+            Reaction::Hit(Hit {
+                damage,
+                push: 1.0,
+                interrupt,
+            })
+        };
+        // Red deals a quarter, blue deals nothing but interrupts.
+        let shared = Reactions {
+            red: hit(0.25, false),
+            blue: hit(0.0, true),
+            ..Reactions::FULL
+        };
+        let hurt = app
+            .world_mut()
+            .spawn((
+                EnemyHp::full(100.0),
+                shared,
+                Transform::from_xyz(10.0, 20.0, 0.0),
+            ))
+            .id();
+        let passed = app
+            .world_mut()
+            .spawn((
+                EnemyHp::full(100.0),
+                Reactions {
+                    red: Reaction::PassThrough,
+                    ..Reactions::FULL
+                },
+                Transform::from_xyz(-30.0, 40.0, 0.0),
+            ))
+            .id();
+        for (target, weapon, amount, push) in [
+            (hurt, WeaponKind::FireRing, 20.0, Vec2::new(0.0, 6.0)),
+            (hurt, WeaponKind::Tornado, 40.0, Vec2::ZERO),
+            (passed, WeaponKind::Fireball, 150.0, Vec2::new(4.0, 0.0)),
+        ] {
+            app.world_mut().write_message(WeaponHit {
+                target,
+                weapon,
+                amount,
+                push,
+            });
+        }
+        app.update();
+        assert_eq!(
+            damage_messages(&app),
+            vec![DamageEnemy {
+                target: hurt,
+                amount: 5.0
+            }]
+        );
+        let interrupts: Vec<EnemyInterrupted> = crate::test_util::messages(&app);
+        assert_eq!(interrupts, vec![EnemyInterrupted(hurt)]);
+        // The weapon has scaled the push already, so it is applied as sent.
+        let at = app.world().get::<Transform>(hurt).unwrap().translation;
+        assert_eq!((at.x, at.y), (10.0, 26.0));
+        let at = app.world().get::<Transform>(passed).unwrap().translation;
+        assert_eq!((at.x, at.y), (-30.0, 40.0));
     }
 
     #[test]
