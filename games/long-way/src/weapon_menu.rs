@@ -53,7 +53,7 @@ const BORDER_HEIGHT: f32 = 2.0;
 const BUTTON_NORMAL: Color = Color::srgb(0.1373, 0.1843, 0.3137);
 const BUTTON_HOVER: Color = Color::srgb(0.2549, 0.3569, 0.5804);
 const BUTTON_PRESSED: Color = Color::srgb(0.1216, 0.0980, 0.1961);
-/// The opacity of the button, icon and label of a weapon that is not built yet (`WeaponKind::is_built`).
+/// The opacity of the button, icon and label of a weapon that is not built yet (`BuiltWeapons`).
 const DIM_ALPHA: f32 = 0.35;
 
 /// The weapons the player can choose. The label is the text of the button, at most `MAX_LABEL` characters.
@@ -71,7 +71,6 @@ pub enum WeaponKind {
 const MAX_LABEL: usize = 10;
 
 impl WeaponKind {
-    #[cfg(test)]
     pub const ALL: [WeaponKind; 6] = [
         WeaponKind::Fireball,
         WeaponKind::FireRing,
@@ -103,14 +102,26 @@ impl WeaponKind {
             WeaponKind::Tornado => "tornado",
         }
     }
+}
 
-    /// Whether the weapon works yet. Each weapon is added here when it is built (`weapons.md`). A weapon
-    /// that is not built is dimmed in the drawer and cannot be loaded, and an active button that holds it is blank.
-    pub fn is_built(self) -> bool {
-        matches!(
-            self,
-            WeaponKind::FireRing | WeaponKind::IceRing | WeaponKind::Tornado | WeaponKind::Fireball
-        )
+/// The weapons that work: a weapon is built when the plugin that casts it has registered it (`BuiltWeapons::register`).
+/// A weapon that is not built is dimmed in the drawer and cannot be loaded, an active button that holds it is blank,
+/// and a click on it takes no energy.
+#[derive(Resource, Default, Debug)]
+pub struct BuiltWeapons(Vec<WeaponKind>);
+
+impl BuiltWeapons {
+    /// Called by the plugin that adds the system casting `weapons`, in its `build`.
+    pub fn register(app: &mut App, weapons: impl IntoIterator<Item = WeaponKind>) {
+        app.init_resource::<BuiltWeapons>();
+        app.world_mut()
+            .resource_mut::<BuiltWeapons>()
+            .0
+            .extend(weapons);
+    }
+
+    pub fn contains(&self, weapon: WeaponKind) -> bool {
+        self.0.contains(&weapon)
     }
 }
 
@@ -137,8 +148,8 @@ impl Default for ActiveWeapons {
 
 impl ActiveWeapons {
     /// The weapon that the active button of `energy` shows and casts: the loaded weapon, if it is built.
-    pub fn get(&self, energy: Energy) -> Option<WeaponKind> {
-        self.0[energy.index()].filter(|weapon| weapon.is_built())
+    pub fn get(&self, energy: Energy, built: &BuiltWeapons) -> Option<WeaponKind> {
+        self.0[energy.index()].filter(|&weapon| built.contains(weapon))
     }
 
     fn load(&mut self, energy: Energy, weapon: WeaponKind) {
@@ -206,6 +217,7 @@ impl Plugin for WeaponMenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DrawerState>()
             .init_resource::<ActiveWeapons>()
+            .init_resource::<BuiltWeapons>()
             .add_message::<GaugeClicked>()
             .add_message::<ActiveWeaponClicked>()
             .add_systems(Startup, spawn_drawer)
@@ -321,6 +333,7 @@ fn rebuild_buttons(
     mut state: ResMut<DrawerState>,
     row: Single<Entity, With<ButtonRow>>,
     server: Res<AssetServer>,
+    built: Res<BuiltWeapons>,
     mut commands: Commands,
 ) {
     let Some(energy) = state.open else {
@@ -341,7 +354,11 @@ fn rebuild_buttons(
             }
             for &weapon in weapons {
                 // A weapon that is not built is dimmed and takes no clicks.
-                let alpha = if weapon.is_built() { 1.0 } else { DIM_ALPHA };
+                let alpha = if built.contains(weapon) {
+                    1.0
+                } else {
+                    DIM_ALPHA
+                };
                 let mut button = row.spawn((
                     WeaponButton { energy, weapon },
                     Node {
@@ -355,7 +372,7 @@ fn rebuild_buttons(
                     },
                     BackgroundColor(BUTTON_NORMAL.with_alpha(alpha)),
                 ));
-                if weapon.is_built() {
+                if built.contains(weapon) {
                     button
                         .observe(set_colour::<PointerEnter>(BUTTON_HOVER))
                         .observe(set_colour::<PointerLeave>(BUTTON_NORMAL))
@@ -508,10 +525,19 @@ mod tests {
             None,
         ];
         assert_eq!(active.0, defaults);
-        assert_eq!(Energy::ALL.map(|energy| active.get(energy)), defaults);
-        // A weapon that is not built is held but not active.
+        let built = BuiltWeapons(vec![WeaponKind::FireRing, WeaponKind::Tornado]);
+        assert_eq!(
+            Energy::ALL.map(|energy| active.get(energy, &built)),
+            defaults
+        );
+        // A weapon that is not built is held but not active, until its plugin registers it.
         active.set_for_test(Energy::Violet, Some(WeaponKind::IceWall));
-        assert_eq!(active.get(Energy::Violet), None);
+        assert_eq!(active.get(Energy::Violet, &built), None);
+        let with_wall = BuiltWeapons(vec![WeaponKind::IceWall]);
+        assert_eq!(
+            active.get(Energy::Violet, &with_wall),
+            Some(WeaponKind::IceWall)
+        );
         for energy in Energy::ALL {
             if let Some(weapon) = default_weapon(energy) {
                 assert!(weapons_for(energy).contains(&weapon), "{energy:?}");
@@ -529,6 +555,7 @@ mod tests {
 
     fn app() -> App {
         let mut app = crate::test_util::asset_app(50);
+        crate::test_util::register_built_weapons(&mut app);
         app.add_message::<WorldClick>()
             .add_plugins(WeaponMenuPlugin);
         app.update();

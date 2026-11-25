@@ -26,7 +26,7 @@ Decisions: `adr-x2`, `adr-x53` (sort at the blocked area), `adr-x9`, and `adr-lw
 3. `Z_PER_Y` is 0.001. `Z_PER_X` is 1e-8. The x term only breaks ties between equal feet y, the one further right in front. It is far too small to override a difference in y.
 3b. The x of the tie break is the middle of the footprint. A sprite whose `Transform` is not there (anchored at a corner) adds `TieBreakX(offset)`, the distance from its x to the footprint middle. Otherwise two objects can tie exactly and swap order from frame to frame (`adr-x2`).
 4. z stays inside `WORLD_HALF_BAND` (100), checked by `debug_assert`. That allows feet y up to about 100000.
-5. The sort runs in `Update` with no ordering against movement, so z can lag one frame.
+5. The sort runs in `PostUpdate` in `DepthSet`, before `TransformSystems::Propagate`, so a sprite moved or spawned in `Update` is drawn at its new depth in the same frame. A `PostUpdate` system that moves a sorted sprite runs `.before(DepthSet)`. z is written only when it changes, so a still sprite is not propagated again each frame.
 6. An object that blocks (`Blocker`) gets `SortAtBlocker`: the kit sorts it at the bottom of its blocked area plus `BLOCKER_SORT_BIAS` (1), so a character standing at it is drawn in front and one above that line behind (`adr-x53`). Debug builds warn once (`depth:` in the log) about an object with a `Blocker` and a hand-set `DepthSort` at or below that bottom. An object whose blocked area is not a `Blocker` (Long Way's rocks) adds the bias itself.
 
 ### Layers
@@ -65,7 +65,6 @@ A game uses one of the two edge layers. Half-size edge pieces add `EDGE_HALF_Z_O
 ## Limits
 
 - Sorting by one point per sprite. A long object that a character can pass in the middle needs a different sort point.
-- The z lag of one frame can show for a frame when two sprites swap order.
 - Gizmos cannot be placed in a layer.
 
 ## Tests

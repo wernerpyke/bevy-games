@@ -2,14 +2,14 @@
 //! the map. See `dev-docs/extensions/projectiles.md`.
 //!
 //! A projectile is a point on the ground, like the feet of a character, and uses the same collision edges
-//! (`collision::resolve`). `step` and `PathShape` are plain Rust with no Bevy world, so they are unit tested without
+//! (`collision::segment_hit`). `step` and `PathShape` are plain Rust with no Bevy world, so they are unit tested without
 //! a running app.
 
 use bevy::prelude::*;
 
 use crate::area::ease_out;
 use crate::camera::CameraBounds;
-use crate::collision::{CollisionWorld, resolve};
+use crate::collision::{CollisionWorld, segment_hit};
 use crate::depth::DepthSort;
 use crate::hitbox::HitBox;
 use crate::outline::Edge;
@@ -414,13 +414,13 @@ pub enum Step {
     LeftMap(Vec2),
 }
 
-/// Moves a projectile from `old` by `velocity * dt` and says what happened. `resolve` stops a move when it
-/// crosses an edge, so a long step cannot jump over a thin blocked band. A blocked move wins over leaving the map.
+/// Moves a projectile from `old` by `velocity * dt` and says what happened. `segment_hit` follows the straight line
+/// of the move, so a long step cannot jump over a thin blocked band and a diagonal step cannot cut a corner. A blocked
+/// move wins over leaving the map.
 pub fn step(old: Vec2, velocity: Vec2, dt: f32, edges: &[Edge], bounds: Rect) -> Step {
     let new = old + velocity * dt;
-    let moved = resolve(old, new, edges);
-    if moved.blocked_x.is_some() || moved.blocked_y.is_some() {
-        return Step::HitBlocked(moved.feet);
+    if let Some(hit) = segment_hit(old, new, edges) {
+        return Step::HitBlocked(hit.point);
     }
     if !bounds.contains(new) {
         return Step::LeftMap(new.clamp(bounds.min, bounds.max));
@@ -443,26 +443,10 @@ pub fn step_ignoring(
     };
     let mut kept = edges.to_vec();
     loop {
-        let moved = resolve(old, old + velocity * dt, &kept);
-        // Where each edge stops the move: a vertical edge at the start height, a horizontal one at the x reached.
-        let stops = [
-            moved
-                .blocked_x
-                .map(|edge| (edge, Vec2::new(edge.at, old.y))),
-            moved
-                .blocked_y
-                .map(|edge| (edge, Vec2::new(moved.feet.x, edge.at))),
-        ];
-        let passed: Vec<Edge> = stops
-            .into_iter()
-            .flatten()
-            .filter(|(_, at)| area.contains(*at))
-            .map(|(edge, _)| edge)
-            .collect();
-        if passed.is_empty() {
-            return step(old, velocity, dt, &kept, bounds);
+        match segment_hit(old, old + velocity * dt, &kept) {
+            Some(hit) if area.contains(hit.point) => kept.retain(|edge| *edge != hit.edge),
+            _ => return step(old, velocity, dt, &kept, bounds),
         }
-        kept.retain(|edge| !passed.contains(edge));
     }
 }
 
@@ -685,24 +669,45 @@ mod tests {
     }
 
     #[test]
-    fn diagonal_into_a_face_is_a_hit() {
-        let velocity = Vec2::new(1.0, 1.0).normalize() * SPEED;
-        let result = step(
-            Vec2::new(99.5, 51.0),
-            velocity,
-            DT,
-            &band_edges(),
-            map_rect(),
-        );
-        let Step::HitBlocked(point) = result else {
-            panic!("expected HitBlocked, got {result:?}");
-        };
-        // Stopped on the face at x 100, the y move goes on. 1e-4 is f32 rounding of the diagonal step.
-        assert_eq!(point.x, 100.0);
-        assert!(
-            (point.y - (51.0 + velocity.y * DT)).abs() < 1e-4,
-            "{point:?}"
-        );
+    fn a_diagonal_step_stops_where_its_line_meets_the_band_even_across_a_corner() {
+        // The band is x 100 to 120, y 50 to 54. Each step is 6 by 6 in one second. The corner cases pass only a
+        // corner of the band, outside the path that moves along x first and then along y.
+        let cases = [
+            // Across the bottom right, bottom left, top right and top left corners.
+            (
+                Vec2::new(116.0, 48.0),
+                Vec2::new(6.0, 6.0),
+                Vec2::new(118.0, 50.0),
+            ),
+            (
+                Vec2::new(104.0, 48.0),
+                Vec2::new(-6.0, 6.0),
+                Vec2::new(102.0, 50.0),
+            ),
+            (
+                Vec2::new(116.0, 56.0),
+                Vec2::new(6.0, -6.0),
+                Vec2::new(118.0, 54.0),
+            ),
+            (
+                Vec2::new(104.0, 56.0),
+                Vec2::new(-6.0, -6.0),
+                Vec2::new(102.0, 54.0),
+            ),
+            // Into the left face, stopped where the line meets it.
+            (
+                Vec2::new(97.0, 50.5),
+                Vec2::new(6.0, 6.0),
+                Vec2::new(100.0, 53.5),
+            ),
+        ];
+        for (old, velocity, expected) in cases {
+            assert_eq!(
+                step(old, velocity, 1.0, &band_edges(), map_rect()),
+                Step::HitBlocked(expected),
+                "{old:?} by {velocity:?}"
+            );
+        }
     }
 
     #[test]

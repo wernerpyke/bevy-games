@@ -6,7 +6,7 @@ use game_kit::collision::{Blocker, CollisionWorld};
 use game_kit::debug::DebugSettings;
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::layers::BACKGROUND_Z;
-use game_kit::map::{Map, MapObject, Origin, parse};
+use game_kit::map::{Map, MapObject, Origin, PLAYER_START, parse, start_feet};
 use game_kit::map_transition::game_folder;
 use game_kit::reload::ReloadMap;
 
@@ -19,9 +19,6 @@ use crate::water::Part;
 const MAP_NAME: &str = "assets/maps/test.txt";
 /// Environment variable with the path of a map file to load instead (`rust.sh run r-town <map>`).
 const MAP_VARIABLE: &str = "R_TOWN_MAP";
-
-/// The legend name of the marker that sets where the player starts. It has no art.
-const PLAYER_START: &str = "player_start";
 
 /// The legend names of the enemy spawners (`enemy.rs`). They are markers: the objects are removed from the map
 /// and become `MapSpawners`.
@@ -95,18 +92,23 @@ fn read_source() -> Result<(String, String), String> {
         .map_err(|error| format!("{name}: {error}"))
 }
 
-/// A parsed map: the objects without the markers, the cell of the start marker and the checked spawners.
+/// A parsed map: the objects without the markers, the player's start feet and the checked spawners.
 pub struct Loaded {
     map: Map,
-    start: IVec2,
+    start: Vec2,
     spawners: Vec<SpawnerDef>,
 }
 
 /// Parses a map. The markers (the start and the spawners) are taken out of the object list.
 fn parse_map(name: &str, source: &str) -> Result<Loaded, String> {
     let mut map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
-    let mut starts = map.objects.iter().filter(|o| o.kind == PLAYER_START);
-    let (Some(start), None) = (starts.next().map(|o| o.cell), starts.next()) else {
+    let starts = map
+        .objects
+        .iter()
+        .filter(|o| o.kind == PLAYER_START)
+        .count();
+    // Cell (0, 0) has its bottom left corner at the world origin (`CurrentMap::rect`).
+    let (1, Some(start)) = (starts, start_feet(&map, Vec2::ZERO)) else {
         return Err(format!(
             "{name}: the grid needs exactly one `{PLAYER_START}` cell"
         ));
@@ -226,9 +228,9 @@ impl CurrentMap {
 #[derive(Resource)]
 pub struct MapSpawners(pub Vec<SpawnerDef>);
 
-/// The cell where the player starts, from the `player_start` marker in the map file.
+/// Where the player's feet start: the centre of the `player_start` cell in the map file (`map::start_feet`).
 #[derive(Resource)]
-pub struct PlayerStart(pub IVec2);
+pub struct PlayerStart(pub Vec2);
 
 /// What an object is. Art, footprint and collision rule for each kind are set in code.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -308,13 +310,16 @@ mod tests {
     }
 
     #[test]
-    fn the_player_starts_inside_the_map_and_the_marker_has_no_art() {
+    fn the_player_starts_in_the_middle_of_a_cell_inside_the_map_and_the_marker_has_no_art() {
         let Loaded { map, start, .. } = parse_map(MAP_NAME, &source()).unwrap();
-        assert!(
-            inside(&map, start),
-            "player start {start} is outside the map"
-        );
         assert!(map.objects.iter().all(|o| o.kind != PLAYER_START));
+        let area = CurrentMap(map).rect();
+        assert!(
+            area.contains(start),
+            "player start {start} is outside {area:?}"
+        );
+        // Not on a cell corner, where a blocker in the cell to the left reaches into the start.
+        assert_eq!(start % CELL_SIZE, Vec2::splat(CELL_SIZE / 2.0));
     }
 
     #[test]

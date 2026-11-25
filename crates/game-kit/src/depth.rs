@@ -10,6 +10,7 @@
 //! - A sprite not anchored at the middle of its footprint adds `TieBreakX`, or neighbours in a row can swap order.
 
 use bevy::prelude::*;
+use bevy::transform::TransformSystems;
 
 use crate::collision::Blocker;
 use crate::layers::WORLD_HALF_BAND;
@@ -44,11 +45,21 @@ impl Plugin for DepthPlugin {
         app.insert_resource(DepthSettings {
             world_half_band: self.world_half_band,
         })
-        .add_systems(Update, (sort_at_blocker, sort_by_feet).chain());
+        .configure_sets(PostUpdate, DepthSet.before(TransformSystems::Propagate))
+        .add_systems(
+            PostUpdate,
+            (sort_at_blocker, sort_by_feet).chain().in_set(DepthSet),
+        );
         #[cfg(debug_assertions)]
-        app.add_systems(Update, warn_sort_below_blocker);
+        app.add_systems(PostUpdate, warn_sort_below_blocker.in_set(DepthSet));
     }
 }
+
+/// The depth sort. It runs in `PostUpdate`, after everything in `Update` has moved and spawned, and before the
+/// transforms are propagated, so z is never a frame old. A `PostUpdate` system that moves a sorted sprite runs
+/// `.before(DepthSet)`.
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
+pub struct DepthSet;
 
 /// How far above the bottom of its blocked area an object sorts. A character's feet stop exactly on that bottom, so
 /// without the bias the two would tie and the character could be drawn behind the object it stands in front of.
@@ -66,7 +77,13 @@ pub fn sort_line(blocked: Rect) -> f32 {
     blocked.min.y + BLOCKER_SORT_BIAS
 }
 
-fn sort_at_blocker(mut query: Query<(&Transform, &Blocker, &mut DepthSort), With<SortAtBlocker>>) {
+/// A static object whose position or blocked area changed, or that just got `SortAtBlocker`.
+type BlockerMoved = (
+    With<SortAtBlocker>,
+    Or<(Changed<Transform>, Changed<Blocker>, Added<SortAtBlocker>)>,
+);
+
+fn sort_at_blocker(mut query: Query<(&Transform, &Blocker, &mut DepthSort), BlockerMoved>) {
     for (transform, blocker, mut sort) in &mut query {
         let feet_offset = transform.translation.y - sort_line(blocker.0);
         if sort.feet_offset != feet_offset {
@@ -141,7 +158,10 @@ fn sort_by_feet(
             z.abs() < settings.world_half_band,
             "feet at y {feet_y} are outside the world layer, see layers.rs"
         );
-        transform.translation.z = z;
+        // Writing only on a change keeps static sprites out of the transform propagation.
+        if transform.translation.z != z {
+            transform.translation.z = z;
+        }
     }
 }
 
@@ -228,6 +248,101 @@ mod tests {
             sort_below_blocker(-20.0, blocked).is_some_and(|m| m.starts_with("sorts at y -20,"))
         );
         assert_eq!(sort_below_blocker(-15.5, blocked), None);
+    }
+
+    #[derive(Component)]
+    struct Walks;
+
+    fn walk_and_spawn(mut commands: Commands, mut walkers: Query<&mut Transform, With<Walks>>) {
+        for mut transform in &mut walkers {
+            transform.translation.y -= 40.0;
+        }
+        commands.spawn((
+            DepthSort { feet_offset: 6.0 },
+            Transform::from_xyz(30.0, 70.0, 0.0),
+        ));
+    }
+
+    #[test]
+    fn a_sprite_moved_or_spawned_in_update_is_drawn_at_its_new_depth_in_the_same_frame() {
+        let mut app = App::new();
+        app.add_plugins((TransformPlugin, DepthPlugin::default()))
+            .add_systems(Update, walk_and_spawn);
+        let walker = app
+            .world_mut()
+            .spawn((
+                Walks,
+                DepthSort { feet_offset: 10.0 },
+                Transform::from_xyz(-15.0, 25.0, 0.0),
+            ))
+            .id();
+        app.update();
+        let drawn_z = |app: &mut App, entity| {
+            app.world()
+                .get::<GlobalTransform>(entity)
+                .unwrap()
+                .translation()
+                .z
+        };
+        // Moved 40 down in Update: drawn at the new feet (y -25), not the old ones (y 15).
+        assert_eq!(drawn_z(&mut app, walker), depth_z(-15.0, -25.0));
+        let spawned = app
+            .world_mut()
+            .query_filtered::<Entity, (With<DepthSort>, Without<Walks>)>()
+            .single(app.world())
+            .unwrap();
+        // Spawned by a command in Update: sorted in its first frame, not left at z 0.
+        assert_eq!(drawn_z(&mut app, spawned), depth_z(30.0, 64.0));
+    }
+
+    #[test]
+    fn a_sprite_that_does_not_move_is_not_marked_changed_again() {
+        let mut app = App::new();
+        app.add_plugins(DepthPlugin::default());
+        let still = app
+            .world_mut()
+            .spawn((
+                DepthSort { feet_offset: 8.0 },
+                Transform::from_xyz(5.0, -12.0, 0.0),
+            ))
+            .id();
+        let object = app
+            .world_mut()
+            .spawn((
+                SortAtBlocker,
+                Blocker(Rect::new(-30.0, -50.0, 10.0, -20.0)),
+                Transform::from_xyz(-10.0, -18.0, 0.0),
+            ))
+            .id();
+        app.update();
+        let changed = |app: &App| {
+            let world = app.world();
+            (
+                world
+                    .entity(still)
+                    .get_ref::<Transform>()
+                    .unwrap()
+                    .last_changed(),
+                world
+                    .entity(object)
+                    .get_ref::<Transform>()
+                    .unwrap()
+                    .last_changed(),
+                world
+                    .entity(object)
+                    .get_ref::<DepthSort>()
+                    .unwrap()
+                    .last_changed(),
+            )
+        };
+        let after_first = changed(&app);
+        app.update();
+        app.update();
+        assert_eq!(changed(&app), after_first);
+        assert_eq!(
+            app.world().get::<Transform>(object).unwrap().translation.z,
+            depth_z(-10.0, -49.0)
+        );
     }
 
     #[test]

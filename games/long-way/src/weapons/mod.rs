@@ -24,7 +24,7 @@ use game_kit::movement::{FollowSet, MoveState};
 
 use crate::inventory::Inventory;
 use crate::player::feet_of;
-use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, WeaponKind};
+use crate::weapon_menu::{ActiveWeaponClicked, ActiveWeapons, BuiltWeapons, WeaponKind};
 
 pub struct WeaponPlugin;
 
@@ -116,12 +116,13 @@ pub struct WeaponHit {
 fn cast_active(
     mut clicks: MessageReader<ActiveWeaponClicked>,
     active: Res<ActiveWeapons>,
+    built: Res<BuiltWeapons>,
     mut inventory: ResMut<Inventory>,
     player: Query<(&Transform, &MoveState, &HitBox), With<Controlled>>,
     mut cast: MessageWriter<CastWeapon>,
 ) {
     for click in clicks.read() {
-        let Some(weapon) = active.get(click.0) else {
+        let Some(weapon) = active.get(click.0, &built) else {
             continue;
         };
         let Ok((transform, state, hit_box)) = player.single() else {
@@ -167,7 +168,27 @@ mod tests {
             .init_resource::<ActiveWeapons>()
             .init_resource::<Inventory>()
             .add_systems(Update, cast_active);
+        crate::test_util::register_built_weapons(&mut app);
         app
+    }
+
+    #[test]
+    fn each_weapon_plugin_registers_the_weapons_it_casts_and_no_others() {
+        let mut app = App::new();
+        app.add_plugins(WeaponPlugin);
+        let built: Vec<WeaponKind> = WeaponKind::ALL
+            .into_iter()
+            .filter(|&weapon| app.world().resource::<BuiltWeapons>().contains(weapon))
+            .collect();
+        assert_eq!(
+            built,
+            [
+                WeaponKind::Fireball,
+                WeaponKind::FireRing,
+                WeaponKind::IceRing,
+                WeaponKind::Tornado
+            ]
+        );
     }
 
     fn spawn_player(app: &mut App) {

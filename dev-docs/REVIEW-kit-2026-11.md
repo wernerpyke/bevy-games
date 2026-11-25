@@ -184,6 +184,8 @@ Few problems. State cleanup already uses `DespawnOnExit`, plugins are split by f
 
 ## Recommended order
 
+Progress: step 1 done (2026-11-25). Step 2 done (2026-11-25): `DepthSet` in `PostUpdate` with change-only writes; one `collision::segment_hit` for projectiles, `ray_distance` and `nav`; patrol and sentry use `Mover::feet` (who owns the feet offset is still open, step 3); R-Town starts at `start_feet`; Long Way `BuiltWeapons` registry and exhaustive ring art.
+
 1. **Discoverability (docs only, low risk).** Symptom index in the extensions README, a CLAUDE.md pointer, a `lib.rs` module table, `//!` docs on `depth.rs` and `collision.rs`, fix `draw-order.md`. An ADR for the "kit derives, requires or warns" principle.
 2. **Bugs.** Depth sort in `PostUpdate` with change detection (8, 11); projectile corner (7); patrol and sentry feet (2); R-Town start (9); ring art arm (10). Reproduce each with a script first, as the working rules require.
 3. **Spawn-site rules.** One feet source (2); rocks and pickups on the kit sort (1); `#[require(DepthSort)]` on projectiles and emitters (4); `MapId` by construction (3); one lone or grouped blocker rect (6).

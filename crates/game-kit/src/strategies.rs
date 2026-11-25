@@ -17,7 +17,7 @@ use crate::camera::CameraBounds;
 use crate::collision::CollisionWorld;
 use crate::depth::DepthSort;
 use crate::map::Params;
-use crate::movement::{MoveGoal, MoveState, StrategySet};
+use crate::movement::{MoveGoal, MoveState, Mover, StrategySet};
 use crate::nav::{NavGrid, segment_blocked};
 use crate::outline::Edge;
 use crate::rng::{GameRng, Rng};
@@ -186,15 +186,21 @@ fn patrol(
     nav: Res<NavGrid>,
     bounds: Option<Res<CameraBounds>>,
     rng: Option<ResMut<GameRng>>,
-    mut patrols: Query<(&Transform, &mut RandomPatrol, &mut MoveGoal, &MoveState)>,
+    mut patrols: Query<(
+        &Transform,
+        &Mover,
+        &mut RandomPatrol,
+        &mut MoveGoal,
+        &MoveState,
+    )>,
 ) {
     let Some(mut rng) = rng else {
         return;
     };
     let dt = time.delta_secs();
     let bounds = bounds.map(|b| b.0);
-    for (transform, mut patrol, mut goal, state) in &mut patrols {
-        let feet = transform.translation.truncate();
+    for (transform, mover, mut patrol, mut goal, state) in &mut patrols {
+        let feet = mover.feet(transform);
         patrol_step(
             &mut patrol,
             dt,
@@ -276,7 +282,7 @@ fn sentry(
     bounds: Option<Res<CameraBounds>>,
     rng: Option<ResMut<GameRng>>,
     player: Query<(&Transform, Option<&DepthSort>), With<Controlled>>,
-    mut sentries: Query<(&Transform, &mut Sentry, &mut MoveGoal, &MoveState)>,
+    mut sentries: Query<(&Transform, &Mover, &mut Sentry, &mut MoveGoal, &MoveState)>,
 ) {
     let Some(mut rng) = rng else {
         return;
@@ -287,8 +293,8 @@ fn sentry(
         .single()
         .ok()
         .map(|(transform, sort)| ground_point(transform, sort));
-    for (transform, mut sentry, mut goal, state) in &mut sentries {
-        let feet = transform.translation.truncate();
+    for (transform, mover, mut sentry, mut goal, state) in &mut sentries {
+        let feet = mover.feet(transform);
         let home = *sentry.home.get_or_insert(feet);
         if !sentry.alerted
             && player.is_some_and(|at| can_see(feet, at, sentry.sight, world.edges()))
@@ -317,7 +323,6 @@ fn sentry(
 mod tests {
     use super::*;
     use crate::collision::CollisionWorld;
-    use crate::movement::Mover;
     use crate::test_util::{edges_of, movement_app};
 
     #[test]
@@ -615,6 +620,42 @@ mod tests {
     }
 
     #[test]
+    fn a_patrol_and_a_sentry_with_a_feet_offset_look_and_patrol_from_their_feet() {
+        // Feet 30 below the Transform. A wall at x 150 to 170 reaches up to y 175: it hides the player at y 160 from
+        // the sentry's feet (y 160) but not from the centre of its sprite (y 190).
+        let mut app = app();
+        app.world_mut()
+            .resource_mut::<CollisionWorld>()
+            .add_blocked(&[Rect::new(150.0, 100.0, 170.0, 175.0)]);
+        let sentry = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(100.0, 190.0, 0.0),
+                Mover::new(10.0).with_feet_offset(30.0),
+                Sentry::new(10.0, 400.0),
+            ))
+            .id();
+        let patrol = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(300.0, 330.0, 0.0),
+                Mover::new(10.0).with_feet_offset(30.0),
+                RandomPatrol::new(10.0),
+            ))
+            .id();
+        spawn_player(&mut app, Vec2::new(250.0, 160.0));
+        run(&mut app, 2);
+        let watch = app.world().get::<Sentry>(sentry).unwrap();
+        assert!(!watch.alerted());
+        assert_eq!(watch.home, Some(Vec2::new(100.0, 160.0)));
+        let goal = app.world().get::<MoveGoal>(patrol).unwrap().0.unwrap();
+        assert!(
+            goal.distance(Vec2::new(300.0, 300.0)) <= 10.0 + 1e-3,
+            "{goal}"
+        );
+    }
+
+    #[test]
     fn a_sentry_patrols_while_the_player_is_out_of_range_or_hidden() {
         let home = Vec2::new(100.0, 200.0);
         let patrols = |app: &App, sentry: Entity| {
@@ -683,8 +724,8 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::from_translation(at.extend(0.0)),
+                Mover::new(80.0),
                 RandomPatrol::new(10.0),
-                MoveState::default(),
             ))
             .id();
         app.update();

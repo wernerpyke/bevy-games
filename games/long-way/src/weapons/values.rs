@@ -279,7 +279,6 @@ mod tests {
             (WeaponKind::Tornado, 1),
             (WeaponKind::IceRing, 2),
         ] {
-            assert!(weapon.is_built(), "{weapon:?}");
             assert_eq!(values(weapon).cost, cost, "{weapon:?}");
         }
     }

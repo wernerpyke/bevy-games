@@ -29,14 +29,14 @@ A projectile flies in a straight line over the ground, or along a thrown path wi
 ## Specification
 
 1. `ProjectilePlugin` moves every `Projectile` each frame by `velocity * dt`. It needs `CollisionPlugin`. The map rectangle is the `CameraBounds` resource. Without it a projectile never leaves the map.
-2. The move uses `collision::resolve`, which stops a move when it crosses an edge. A long step cannot jump over a thin blocked band. A diagonal move that touches an edge on either axis is a hit.
+2. The move uses `collision::segment_hit`, which follows the straight line of the move and stops it where it first crosses an edge from the free side. A long step cannot jump over a thin blocked band, and a diagonal step cannot cut the corner of a blocked area. The hit point is where the line meets the edge.
 3. A hit wins over leaving the map. The hit point is on the edge, or on the map boundary for `MapEdge`.
 4. On a hit the kit sends `ProjectileHit { projectile, position, cause }` and logs a `debug!` line. The projectile stops moving and is despawned in `PostUpdate`, with its sprite child, so a reader `.after(ProjectileSet)` can still query it (`adr-x55`). A game that despawns a projectile itself uses `try_despawn`.
 5. The game spawns the entity with `Projectile::new(direction, speed)`, `DepthSort { feet_offset: 0.0 }`, a `Transform` at the ground point and `Visibility`. It adds the sprite as a child with `ProjectileSprite`. The projectile is in the world layer, so it passes behind trees like a character does (`draw-order.md`).
 6. The kit turns the `ProjectileSprite` child to point along the velocity. The art must point along +x. Only the child turns, so its lift above the ground does not change.
 7. A `ProjectileTarget` entity with a `HitBox` is hit when the projectile hits targets (not `without_targets()`) and the path of the shot, lifted by `Projectile::height`, enters the box. The path is cut at the point where a blocked area stops the shot, so a target behind a tree is safe. The first target on the path is hit. The hit is `HitCause::Target(entity)` and the game removes the target (`adr-x27`). A path that only touches an edge or a corner of the box (a graze) is not a hit, the same rule as `hitbox::overlaps`.
 8. Spawn the projectile at the shooter's feet, which are never inside a blocked area. A spawn point inside a blocked area is not a hit, because only crossing an edge counts: a projectile leaves a blocked area freely.
-9. `Projectile::ignoring(rect)`: an edge that would stop the move at a point of `rect` (its border included) does not stop it, and the move is resolved again without it (`step_ignoring`). Use it for the base of what throws the projectile.
+9. `Projectile::ignoring(rect)`: an edge that would stop the move at a point of `rect` (its border included) does not stop it, and the move is checked again without it (`step_ignoring`). Use it for the base of what throws the projectile.
 
 ## Thrown projectiles
 

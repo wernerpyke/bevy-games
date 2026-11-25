@@ -53,7 +53,7 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt7. R-Town map: top-left grid, size and player start in the file (2026-11-02)
 
-**Decision.** `assets/maps/test.txt` uses `origin: top-left`, so row labels count down the page from 0, like rows of text. The file holds the map size (`size: 60x60`) and the player start, a legend marker `"@": player_start` at file cell (10, 2). The code has no `MAP_CELLS` constant, and the player spawns at the marker cell. The F3 grid numbers rows from the top to match the file (`DebugSettings::rows_from_top`).
+**Decision.** `assets/maps/test.txt` uses `origin: top-left`, so row labels count down the page from 0, like rows of text. The file holds the map size (`size: 60x60`) and the player start, a legend marker `"@": player_start` at file cell (10, 2). The code has no `MAP_CELLS` constant, and the player's feet spawn at the centre of the marker cell (the kit's `map::start_feet`). The F3 grid numbers rows from the top to match the file (`DebugSettings::rows_from_top`).
 
 **Rationale.** The developer wanted to read the map like a page, with cell (0, 0) at the top left. The size and the start belong to the map, so they live in the file. The parser still returns cells numbered from the bottom left with y up, so collision, camera and spawn code did not change.
 

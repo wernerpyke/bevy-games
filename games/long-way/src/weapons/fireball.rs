@@ -31,7 +31,7 @@ use game_kit::projectile::{
 use super::values::{Damage, FIREBALL, values};
 use super::{CastWeapon, WeaponHit, WeaponSystems};
 use crate::enemy_hp::EnemyHp;
-use crate::weapon_menu::WeaponKind;
+use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const ART: &str = "art/weapons/fireball_and_rings.aseprite";
 const HEAD_TAG: &str = "head";
@@ -62,6 +62,7 @@ pub struct FireballPlugin;
 
 impl Plugin for FireballPlugin {
     fn build(&self, app: &mut App) {
+        BuiltWeapons::register(app, [WeaponKind::Fireball]);
         if !app.is_plugin_added::<ProjectilePlugin>() {
             app.add_plugins(ProjectilePlugin);
         }

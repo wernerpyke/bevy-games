@@ -96,3 +96,18 @@ pub fn click(app: &mut App, entity: Entity, button: PointerButton) {
         count: 1,
     });
 }
+
+/// Registers the weapons that the game's weapon plugins cast, for a test app without those plugins. The list is
+/// checked against the plugins in `weapons::tests`.
+pub fn register_built_weapons(app: &mut App) {
+    use crate::weapon_menu::{BuiltWeapons, WeaponKind};
+    BuiltWeapons::register(
+        app,
+        [
+            WeaponKind::Fireball,
+            WeaponKind::FireRing,
+            WeaponKind::IceRing,
+            WeaponKind::Tornado,
+        ],
+    );
+}

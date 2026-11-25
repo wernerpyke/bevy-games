@@ -7,7 +7,7 @@ use crate::camera::VIEW_HEIGHT;
 use crate::hp::Hp;
 use crate::inventory::{Energy, Inventory};
 use crate::weapon_menu::{
-    ActiveWeaponClicked, ActiveWeapons, GaugeClicked, ICON_SIZE, weapon_icon,
+    ActiveWeaponClicked, ActiveWeapons, BuiltWeapons, GaugeClicked, ICON_SIZE, weapon_icon,
 };
 use crate::weapons::values::values;
 
@@ -257,15 +257,16 @@ fn update_active_buttons(
     mut commands: Commands,
     server: Res<AssetServer>,
     active: Res<ActiveWeapons>,
+    built: Res<BuiltWeapons>,
     buttons: Query<(Entity, &ActiveButton, &ShownShare)>,
 ) {
-    if !active.is_changed() {
+    if !active.is_changed() && !built.is_changed() {
         return;
     }
     for (entity, button, shown) in &buttons {
         let mut button_commands = commands.entity(entity);
         button_commands.despawn_children();
-        let Some(weapon) = active.get(button.0) else {
+        let Some(weapon) = active.get(button.0, &built) else {
             continue;
         };
         let energy = button.0;
@@ -291,9 +292,14 @@ fn update_active_buttons(
 
 /// The share of the cost of the weapon in the slot of `energy` that the player has, from 0 to 1. `None` for a blank
 /// slot.
-fn cost_share(active: &ActiveWeapons, inventory: &Inventory, energy: Energy) -> Option<f32> {
+fn cost_share(
+    active: &ActiveWeapons,
+    built: &BuiltWeapons,
+    inventory: &Inventory,
+    energy: Energy,
+) -> Option<f32> {
     active
-        .get(energy)
+        .get(energy, built)
         .map(|weapon| inventory.cost_share(energy, values(weapon).cost))
 }
 
@@ -307,13 +313,14 @@ fn overlay_height(shown_share: f32) -> f32 {
 fn update_cost_overlays(
     time: Res<Time>,
     active: Res<ActiveWeapons>,
+    built: Res<BuiltWeapons>,
     inventory: Res<Inventory>,
     mut buttons: Query<(&ActiveButton, &mut ShownShare)>,
     mut overlays: Query<(&CostOverlay, &mut Node)>,
 ) {
     let mut shown = [1.0; 4];
     for (button, mut share) in &mut buttons {
-        let target = cost_share(&active, &inventory, button.0).unwrap_or(1.0);
+        let target = cost_share(&active, &built, &inventory, button.0).unwrap_or(1.0);
         let next = approach(share.0, target, time.delta_secs() / FILL_SECS);
         if next != share.0 {
             share.0 = next;
@@ -333,11 +340,13 @@ fn update_cost_overlays(
 fn disable_unaffordable(
     mut commands: Commands,
     active: Res<ActiveWeapons>,
+    built: Res<BuiltWeapons>,
     inventory: Res<Inventory>,
     buttons: Query<(Entity, &ActiveButton, Has<InteractionDisabled>)>,
 ) {
     for (entity, button, disabled) in &buttons {
-        let short = cost_share(&active, &inventory, button.0).is_some_and(|share| share < 1.0);
+        let short =
+            cost_share(&active, &built, &inventory, button.0).is_some_and(|share| share < 1.0);
         if short && !disabled {
             commands.entity(entity).insert(InteractionDisabled);
         } else if !short && disabled {
@@ -399,6 +408,7 @@ mod tests {
     /// An app with the HUD content spawned in a `Hud` root.
     fn app() -> App {
         let mut app = crate::test_util::asset_app(16);
+        crate::test_util::register_built_weapons(&mut app);
         app.init_resource::<Inventory>()
             .init_resource::<ActiveWeapons>()
             .add_message::<ActiveWeaponClicked>()

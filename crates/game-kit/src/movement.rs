@@ -95,6 +95,14 @@ impl Mover {
         self
     }
 
+    /// The feet of an entity with this `Transform`. Every system that walks, aims or looks from a mover uses this.
+    pub fn feet(&self, transform: &Transform) -> Vec2 {
+        Vec2::new(
+            transform.translation.x,
+            transform.translation.y - self.feet_offset,
+        )
+    }
+
     pub fn with_feet_offset(mut self, offset: f32) -> Self {
         self.feet_offset = offset;
         self
@@ -186,10 +194,7 @@ fn follow_goals(
             continue;
         }
         follower.since_search += dt;
-        let feet = Vec2::new(
-            transform.translation.x,
-            transform.translation.y - mover.feet_offset,
-        );
+        let feet = mover.feet(&transform);
         state.walking = false;
         let Some(goal) = goal.0 else {
             follower.clear();

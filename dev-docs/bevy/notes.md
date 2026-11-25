@@ -25,6 +25,8 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - `Query<Entity, Added<T>>` finds entities that got `T` since the last run of the system. Use it to attach helper entities to new spawns.
 - Let chains work in this edition: `else if cond && let Some(x) = value { .. }`.
 - Exiting from a system: `MessageWriter<AppExit>` then `exit.write(AppExit::Success)`.
+- A system that must see every move and spawn of `Update` in the same frame (depth sort, camera follow): `PostUpdate` with `.before(TransformSystems::Propagate)` (`use bevy::transform::TransformSystems`). Commands from `Update` are applied before `PostUpdate`. Verified in `depth.rs` with `TransformPlugin` and `GlobalTransform`.
+- `&mut T` in a query marks `T` changed only when written through `DerefMut`. Compare before you write (`if t.z != z { t.z = z }`) to keep still entities out of change detection. In a test, compare `world.entity(e).get_ref::<T>().unwrap().last_changed()` across updates.
 
 - Messages between systems (`examples/ecs/message.rs`): `#[derive(Message)] struct Hit { .. }`, `app.add_message::<Hit>()`, send with `MessageWriter<Hit>` and `.write(Hit { .. })`, read with `MessageReader<Hit>` and `.read()`.
 - One keypress: `input.just_pressed(KeyCode::KeyX)`. System set: `#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)] struct MySet;`, then `app.configure_sets(Update, MySet)` and `.in_set(MySet)` / `.after(MySet)` (`examples/ecs/ecs_guide.rs`).
@@ -35,6 +37,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 ## Pitfalls
 
 - `Vec2::normalize` can return 0.99999994 or 1.0 for the same direction depending on the length, so comparing normalised vectors between frames fires randomly. Compare signs or an enum.
+- In a test, `query_filtered::<Entity, Without<X>>()` also matches internal entities (systems and observers are entities). Filter by a component of your own.
 - Stored and recomputed positions drift by millionths (for example 76.8 comes back as 76.800003). Do not test exact equality against a coordinate. Use a tolerance.
 
 ## Observers

@@ -97,7 +97,7 @@ Cost of one add or remove with 1000 blocked areas on a 1600 by 1000 map, measure
 
 ## Ray test
 
-`ray_distance(from, dir, max, edges)` gives how far a ray from `from` in the unit direction `dir` goes before it meets an edge from its free side, at most `max` (`adr-x46`). It follows the rules of `resolve`: an edge stops only a ray that moves towards its blocked side, and the ends of an edge count as in `Edge::covers`, so a ray that starts on an edge and leaves it is not stopped. Use it for the reach of an effect that stops at the first tree or rock. Long Way's ice ring casts 64 of them at the cast (`games/long-way/src/weapons/ice_ring.rs`). The map edge is not an outline edge: clip with the map rectangle yourself.
+`ray_distance(from, dir, max, edges)` gives how far a ray from `from` in the unit direction `dir` goes before it meets an edge from its free side, at most `max` (`adr-x46`). It uses `segment_hit`, which follows the rules of `resolve` along a straight line: an edge stops only a ray that moves towards its blocked side, and the ends of an edge count as in `Edge::covers`, so a ray that starts on an edge and leaves it is not stopped. Use it for the reach of an effect that stops at the first tree or rock. Long Way's ice ring casts 64 of them at the cast (`games/long-way/src/weapons/ice_ring.rs`). The map edge is not an outline edge: clip with the map rectangle yourself.
 
 ## Groups
 

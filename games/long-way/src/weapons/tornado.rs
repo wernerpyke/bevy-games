@@ -36,7 +36,7 @@ use super::damage::{Contact, pushed_feet};
 use super::values::{Pushback, TORNADO, WeaponValues, values};
 use super::{CastWeapon, WeaponHit, WeaponSystems};
 use crate::enemy_hp::EnemyHp;
-use crate::weapon_menu::WeaponKind;
+use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const EFFECT: &str = "effects/tornado_orbit.particle.ron";
 /// Emitters on a circle of `ORBIT_RADIUS` around the centre (the spike's variant B).
@@ -59,6 +59,7 @@ pub struct TornadoPlugin;
 
 impl Plugin for TornadoPlugin {
     fn build(&self, app: &mut App) {
+        BuiltWeapons::register(app, [WeaponKind::Tornado]);
         app.add_systems(Startup, load_effect)
             .add_systems(
                 Update,

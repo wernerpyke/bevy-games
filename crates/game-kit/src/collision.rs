@@ -269,38 +269,72 @@ fn crosses(blocked_positive: bool, old: f32, new: f32, at: f32) -> bool {
     }
 }
 
-/// How far a ray from `from` in the unit direction `dir` goes before it reaches an outline edge from the edge's free
-/// side, at most `max`. It follows the rules of `resolve`: an edge stops only a ray that moves towards its blocked
-/// side, and the ends of an edge count as in `Edge::covers`. A ray that starts on an edge and leaves it is not stopped.
-/// For example the reach of a spell that stops at the first tree or rock.
-pub fn ray_distance(from: Vec2, dir: Vec2, max: f32, edges: &[Edge]) -> f32 {
-    let mut nearest = max;
+/// Where a straight move first reaches an outline edge (`segment_hit`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SegmentHit {
+    /// How far along the move, from 0 at its start to 1 at its end.
+    pub fraction: f32,
+    /// The point on the edge line where the move stops.
+    pub point: Vec2,
+    pub edge: Edge,
+}
+
+/// The first outline edge that the straight move from `a` to `b` reaches from its free side. The rule of `resolve`
+/// (an edge stops only a move from its free side, a start within `TOLERANCE` on the blocked side counts as on the
+/// edge, and the ends of an edge count as in `Edge::covers`), applied to the straight line instead of one axis at a
+/// time, so a diagonal move cannot cut the corner of a shape. A move that ends exactly on an edge is not stopped.
+/// Projectiles, `ray_distance` and path finding (`nav::segment_blocked`) use it.
+pub fn segment_hit(a: Vec2, b: Vec2, edges: &[Edge]) -> Option<SegmentHit> {
+    let mut first: Option<SegmentHit> = None;
     for edge in edges {
-        let (start, step) = match edge.orientation {
-            Orientation::Vertical => (from.x, dir.x),
-            Orientation::Horizontal => (from.y, dir.y),
-        };
-        let towards_blocked = if edge.blocked_positive {
-            step > 0.0
-        } else {
-            step < 0.0
-        };
-        if !towards_blocked {
+        let Some(fraction) = crossing(a, b, edge) else {
             continue;
-        }
-        let distance = (edge.at - start) / step;
-        if distance < 0.0 || distance >= nearest {
-            continue;
-        }
-        let along = match edge.orientation {
-            Orientation::Vertical => from.y + dir.y * distance,
-            Orientation::Horizontal => from.x + dir.x * distance,
         };
-        if edge.covers(along) {
-            nearest = distance;
+        if first.is_none_or(|hit| fraction < hit.fraction) {
+            let point = match edge.orientation {
+                Orientation::Vertical => Vec2::new(edge.at, a.y + (b.y - a.y) * fraction),
+                Orientation::Horizontal => Vec2::new(a.x + (b.x - a.x) * fraction, edge.at),
+            };
+            first = Some(SegmentHit {
+                fraction,
+                point,
+                edge: *edge,
+            });
         }
     }
-    nearest
+    first
+}
+
+/// The fraction of the move from `a` to `b` at which it reaches `edge` from its free side, if it does.
+fn crossing(a: Vec2, b: Vec2, edge: &Edge) -> Option<f32> {
+    let (from, to, along_from, along_to) = match edge.orientation {
+        Orientation::Vertical => (a.x, b.x, a.y, b.y),
+        Orientation::Horizontal => (a.y, b.y, a.x, b.x),
+    };
+    if !crosses(edge.blocked_positive, from, to, edge.at) {
+        return None;
+    }
+    let fraction = ((edge.at - from) / (to - from)).clamp(0.0, 1.0);
+    let along_change = along_to - along_from;
+    if edge.covers(along_from + fraction * along_change) {
+        return Some(fraction);
+    }
+    // A move that starts on the edge line at a convex end passes the end itself, but not when it heads on into the
+    // shape: look a little way along it (`resolve` stops that move).
+    if (from - edge.at).abs() <= TOLERANCE {
+        let ahead = (2.0 * TOLERANCE / along_change.abs().max(f32::EPSILON)).min(1.0);
+        if edge.covers(along_from + ahead * along_change) {
+            return Some(fraction);
+        }
+    }
+    None
+}
+
+/// How far a ray from `from` in the unit direction `dir` goes before it reaches an outline edge from the edge's free
+/// side, at most `max` (`segment_hit`). A ray that starts on an edge and leaves it is not stopped. For example the
+/// reach of a spell that stops at the first tree or rock.
+pub fn ray_distance(from: Vec2, dir: Vec2, max: f32, edges: &[Edge]) -> f32 {
+    segment_hit(from, from + dir * max, edges).map_or(max, |hit| hit.fraction * max)
 }
 
 /// Moves the player's feet by `step` for one frame of `dt` seconds, applying the sliding setting.

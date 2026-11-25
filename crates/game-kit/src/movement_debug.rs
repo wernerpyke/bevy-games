@@ -58,10 +58,7 @@ fn draw(
         .despawn_children()
         .with_children(|parent| {
             for (transform, mover, goal, follower) in &movers {
-                let mut from = Vec2::new(
-                    transform.translation.x,
-                    transform.translation.y - mover.feet_offset,
-                );
+                let mut from = mover.feet(transform);
                 for to in follower.points() {
                     let (centre, length, angle) = line_between(from, to);
                     parent.spawn((

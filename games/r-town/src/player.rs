@@ -59,7 +59,7 @@ pub(crate) fn spawn_player(
     server: Res<AssetServer>,
     player_start: Res<PlayerStart>,
 ) {
-    let start = player_start.0.as_vec2() * crate::camera::CELL_SIZE;
+    let start = player_start.0;
     commands
         .spawn((
             Controlled,

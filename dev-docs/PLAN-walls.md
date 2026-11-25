@@ -8,7 +8,7 @@ Not started. Next: W5 (fire wall), design questions first.
 
 ## What is already in place
 
-- **Weapons:** the drawer and the active weapon buttons cast through `CastWeapon`, and weapons hit through `WeaponHit` (`games/long-way/docs/weapons.md`, "How a weapon works", `adr-lw32`, `adr-lw34`). Shared code: `weapons/values.rs` (every number), `weapons/damage.rs` (`Contact`, `pushed_feet`). `WeaponKind::FireWall` and `IceWall` exist with placeholder rows in `values.rs` (40 and 20 per second, no pushback) and are not built (`WeaponKind::is_built`).
+- **Weapons:** the drawer and the active weapon buttons cast through `CastWeapon`, and weapons hit through `WeaponHit` (`games/long-way/docs/weapons.md`, "How a weapon works", `adr-lw32`, `adr-lw34`). Shared code: `weapons/values.rs` (every number), `weapons/damage.rs` (`Contact`, `pushed_feet`). `WeaponKind::FireWall` and `IceWall` exist with placeholder rows in `values.rs` (40 and 20 per second, no pushback) and are not built (no plugin registers them in `BuiltWeapons`).
 - **How to add a weapon:** the checklist in `weapons.md`, "Adding a weapon". Every step ends with the user's play test, and a commit only when the user says so.
 - **Rules every weapon keeps:** dead enemies are skipped, a long frame deals one tick (`weapons.md`, "Values"), the balance rules in `balance.md`.
 - **Kit:** the temporary blocked area (`CollisionWorld::add_temporary`, `remove_temporary`, `adr-x48`, `dev-docs/extensions/collision.md`), built for the walls and not used yet. Particles: `game_kit::fx` and `FxLooks` (`adr-x47`, `dev-docs/extensions/particles.md`). The build gates after any `Cargo.toml` change are in `particles.md`, "Build guard".

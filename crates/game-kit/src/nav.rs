@@ -11,41 +11,12 @@ use bevy::prelude::*;
 use pathfinding::prelude::astar;
 
 use crate::camera::CameraBounds;
-use crate::collision::CollisionWorld;
-use crate::outline::{Edge, Orientation, TOLERANCE};
+use crate::collision::{CollisionWorld, segment_hit};
+use crate::outline::{Edge, Orientation};
 
-/// Whether the segment from `a` to `b` crosses an edge from its free side. The same rule as `collision::resolve`
-/// (an edge only stops a move that comes from the free side, and its ends at convex corners are not part of it),
-/// but for the straight line instead of one axis at a time.
+/// Whether the segment from `a` to `b` crosses an edge from its free side (`collision::segment_hit`).
 pub fn segment_blocked(a: Vec2, b: Vec2, edges: &[Edge]) -> bool {
-    edges.iter().any(|edge| crosses_edge(a, b, edge))
-}
-
-fn crosses_edge(a: Vec2, b: Vec2, edge: &Edge) -> bool {
-    let (from, to, along_from, along_to) = match edge.orientation {
-        Orientation::Vertical => (a.x, b.x, a.y, b.y),
-        Orientation::Horizontal => (a.y, b.y, a.x, b.x),
-    };
-    let reaches = if edge.blocked_positive {
-        from <= edge.at + TOLERANCE && to > edge.at
-    } else {
-        from >= edge.at - TOLERANCE && to < edge.at
-    };
-    if !reaches {
-        return false;
-    }
-    let t = ((edge.at - from) / (to - from)).clamp(0.0, 1.0);
-    let along_change = along_to - along_from;
-    if edge.covers(along_from + t * along_change) {
-        return true;
-    }
-    // A segment that starts on the edge line at a convex end passes the end itself, but not when it heads on into the
-    // shape: look a little way along it (`collision::resolve` stops that move).
-    if (from - edge.at).abs() <= TOLERANCE {
-        let s = (2.0 * TOLERANCE / along_change.abs().max(f32::EPSILON)).min(1.0);
-        return edge.covers(along_from + s * along_change);
-    }
-    false
+    segment_hit(a, b, edges).is_some()
 }
 
 /// The 8 neighbours: east, north, west, south, then the four diagonals.

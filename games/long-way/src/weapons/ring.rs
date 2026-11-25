@@ -31,7 +31,7 @@ use super::ice_ring::{self, IceRing};
 use super::values::{RingShape, WeaponValues, ring_shape, values};
 use super::{CastWeapon, WeaponHit, WeaponSystems};
 use crate::enemy_hp::EnemyHp;
-use crate::weapon_menu::WeaponKind;
+use crate::weapon_menu::{BuiltWeapons, WeaponKind};
 
 const ART: &str = "art/weapons/fireball_and_rings.aseprite";
 
@@ -66,10 +66,14 @@ const ICE_ART: RingArt = RingArt {
     burn_rate: 0.2,
 };
 
-fn art(weapon: WeaponKind) -> &'static RingArt {
+/// The art of a ring weapon. A new ring kind gets its own art here: with no art it is not built (`RingPlugin`).
+fn art(weapon: WeaponKind) -> Option<&'static RingArt> {
     match weapon {
-        WeaponKind::IceRing => &ICE_ART,
-        _ => &FIRE_ART,
+        WeaponKind::FireRing => Some(&FIRE_ART),
+        WeaponKind::IceRing => Some(&ICE_ART),
+        WeaponKind::Fireball | WeaponKind::FireWall | WeaponKind::IceWall | WeaponKind::Tornado => {
+            None
+        }
     }
 }
 
@@ -77,6 +81,13 @@ pub struct RingPlugin;
 
 impl Plugin for RingPlugin {
     fn build(&self, app: &mut App) {
+        // A ring kind works when it has a shape and art.
+        BuiltWeapons::register(
+            app,
+            WeaponKind::ALL
+                .into_iter()
+                .filter(|&weapon| ring_shape(weapon).is_some() && art(weapon).is_some()),
+        );
         app.add_systems(Startup, load_looks)
             .add_systems(
                 Update,
@@ -103,6 +114,7 @@ pub struct Ring {
     pub(super) age: f32,
     pub(super) shape: RingShape,
     pub(super) values: WeaponValues,
+    art: &'static RingArt,
     contacts: HashMap<Entity, Contact>,
     burn: Option<Timer>,
 }
@@ -145,7 +157,7 @@ pub(super) fn cast_rings(
     mut commands: Commands,
 ) {
     for order in cast.read() {
-        let Some(shape) = ring_shape(order.weapon) else {
+        let (Some(shape), Some(art)) = (ring_shape(order.weapon), art(order.weapon)) else {
             continue;
         };
         info!(
@@ -162,6 +174,7 @@ pub(super) fn cast_rings(
             age: 0.0,
             shape,
             values: values(order.weapon),
+            art,
             contacts: HashMap::new(),
             burn: None,
         });
@@ -317,7 +330,7 @@ fn reach(ring: &Ring, ice: Option<&IceRing>, angle: f32) -> f32 {
 /// Places the front emitters of a new ring on the circle (at radius 0, so all at the centre).
 fn spawn_front(new: Query<(Entity, &Ring), Added<Ring>>, looks: Res<FxLooks>, mut fx: Fx) {
     for (owner, ring) in &new {
-        let art = art(ring.weapon);
+        let art = ring.art;
         for i in 0..ring.shape.front_emitters {
             let angle = TAU * i as f32 / ring.shape.front_emitters as f32;
             for k in 0..art.per_position {
@@ -345,7 +358,7 @@ fn spawn_burners(
     mut fx: Fx,
 ) {
     for (owner, ring, ice) in &new {
-        let art = art(ring.weapon);
+        let art = ring.art;
         for i in 0..ring.shape.burners {
             let angle = TAU * i as f32 / ring.shape.burners as f32;
             let at = ring.centre + Vec2::from_angle(angle) * reach(ring, ice, angle);
