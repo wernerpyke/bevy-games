@@ -8,7 +8,7 @@ Each item has a stable ID (`rm<n>`) that is assigned once and never reused or re
 
 ### rm1. Art pipeline (priority 1)
 
-Done: the palette is chosen and grows by appending colours (`adr-a4`, `adr-a5`, `adr-a8`, `adr-a10`); the map cell is 64 px and art is drawn at 1x or at a whole-number scale; the player is the Hunter, built from a sprite pack (`adr-lw15`, `games/long-way/docs/player-sprites.md`), with `Up` and `Down` drawn by the user and `Hurt` played when the player loses HP (`adr-lw28`); `Guy.aseprite` is deleted and the unused `Block` tag is gone. Existing assets in `~/Dark/graveyard_shift/diodrama-assets/` are still copied one file at a time on request (`adr-a3`).
+Done: the palette is chosen and grows by appending colours (`adr-a4`, `adr-a5`, `adr-a8`, `adr-a10`); the map cell is 64 px and art is drawn at 1x or at a whole-number scale; the player is the Hunter, built from a sprite pack (`adr-lw15`, `games/long-way/docs/player.md`), with `Up` and `Down` drawn by the user and `Hurt` played when the player loses HP (`adr-lw28`); `Guy.aseprite` is deleted and the unused `Block` tag is gone. Existing assets in `~/Dark/graveyard_shift/diodrama-assets/` are still copied one file at a time on request (`adr-a3`).
 
 Open:
 - Decide whether the sprite sizes need one grid rule (now: Hunter 128x128 at 1x, trees 128x128, rocks 32x32 at 4x).

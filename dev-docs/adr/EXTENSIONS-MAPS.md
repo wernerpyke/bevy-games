@@ -78,11 +78,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 
 **How to apply.** Rule 25 of `dev-docs/extensions/map-files.md`. A game loads the block in its map load hook, calls `place_tiles` with the drawn size of one image (art size times `scale`), checks the tile names at start and draws the result. Values for Long Way: `games/long-way/docs/adr.md` `adr-lw26`.
 
-## adr-x37. Map legend characters follow a fixed convention (2026-11-08)
+## adr-x37. Map legend characters follow a fixed convention (2026-11-08, enemy set widened 2026-11-25)
 
-**Decision.** In a map legend, the player is `@`, features are letters (upper and lower case separate variants of one family, for example `G` and `g`), enemies are special characters (`! # $ % & * +`) and pickups are digits. `.`, `|` and a space stay reserved. The parser does not enforce this. Long Way rocks moved from `0` and `1` to `O` and `o` so that digits are free for pickups.
+**Decision.** In a map legend, the player is `@`, features are letters (upper and lower case separate variants of one family, for example `G` and `g`), enemies are special characters and pickups are digits. The enemy set is every ASCII punctuation character that is not reserved: `! # $ % & ' ( ) * + , - / : ; < = > ? [ \ ] ^ _ ` { } ~`. `.`, `|`, `"` and a space stay reserved: `"` cannot be a legend key, because the parser reads it as the start of a quoted key. The parser does not enforce the groups. Long Way rocks moved from `0` and `1` to `O` and `o` so that digits are free for pickups.
 
-**Rationale.** A reader can tell the group of an object from its character alone, so a large map is easier to read. Pickups are the group that grows with the game design, and ten digits are enough for their kinds. Enforcing the groups in the parser would tie the kit to game concepts (`adr-x13`).
+**Rationale.** A reader can tell the group of an object from its character alone, so a large map is easier to read. Pickups are the group that grows with the game design, and ten digits are enough for their kinds. The first enemy set had only 7 characters. The user widened it (2026-11-25) when the volcano took `^`, so that a character can suggest its enemy (`^` for a cone) and the set does not run out. Enforcing the groups in the parser would tie the kit to game concepts (`adr-x13`).
 
 **How to apply.** `dev-docs/extensions/map-files.md`, "Legend conventions". Use these characters when a new kind is added to any legend. R-Town keeps its legend until the user asks.
 

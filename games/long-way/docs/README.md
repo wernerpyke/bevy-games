@@ -9,6 +9,8 @@ Documentation for this game only. General rules that other games may reuse are e
 | [maps.md](maps.md) | How to write a map file for Long Way |
 | [art-tags.md](art-tags.md) | Aseprite tags and map kinds |
 | [weapons.md](weapons.md) | How weapons work, their values, aim rules and tuning |
+| [player.md](player.md) | The player's values, controls, animation, hit points and open questions |
+| [enemies.md](enemies.md) | How enemies work, each enemy's values, how each weapon affects it, adding a new enemy |
 | [balance.md](balance.md) | Balance rules between the player, the enemies and the weapons |
 | [adr.md](adr.md) | Decisions that apply to Long Way only |
 | [testing.md](testing.md) | Where the tests are and how to run them |

@@ -91,7 +91,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 **Rationale.** The pack art was 22x25 px, too small next to the trees and rocks at 1x. Doubling it in the `.aseprite` file, not in the game, gives the developer more pixels to draw on and keeps the game scale at 1x. The cloak is about 20 px wide (the hat 30) after doubling, so a body-width half width would be 10. The half width is 14 because it must stay above 12.8, half of the 25.6 px gap between rocks two cells apart (`adr-x20`). A smaller value would let the player walk between rocks that the map reads as one cluster.
 
-**How to apply.** Values and numbers are in `collision.md`. Art details are in `player-sprites.md`. Keep the half width above 12.8. If the sprite size changes again, `PLAYER_FEET_OFFSET`, `PLAYER_BODY_HEIGHT` and the half width change with it.
+**How to apply.** Values and numbers are in `collision.md`. Art details are in `art-pipeline.md`, game values in `player.md`. Keep the half width above 12.8. If the sprite size changes again, `PLAYER_FEET_OFFSET`, `PLAYER_BODY_HEIGHT` and the half width change with it.
 
 ## adr-lw16. The camera follows the player and stops at the map edge (2026-11-05)
 

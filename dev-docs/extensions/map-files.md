@@ -238,10 +238,11 @@ Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow
 |---|---|---|
 | Player | `@` | `"@": player_start` |
 | Features (rocks, trees, shrubs, lanterns, markers) | Letters. Upper and lower case tell variants of the same family apart | `"G": green_tree`, `"g": green_tree_medium`, `"O": rock_0`, `"o": rock_1` |
-| Enemies | Special characters, for example `! # $ % & * +` | none yet |
+| Enemies | Special characters: any ASCII punctuation that is not reserved, `! # $ % & ' ( ) * + , - / : ; < = > ? [ \ ] ^ _ ` { } ~` | `"!": spawn_ghost`, `"^": spawn_volcano` |
 | Pickups | Digits | `"1": energy_blue` |
 
-- `.`, `|` and a space stay reserved (rule 3). `.` is `empty` or `edge`.
+- `.`, `|` and a space stay reserved (rule 3). `.` is `empty` or `edge`. `"` cannot be a key: the parser reads it as the start of a quoted key.
+- Write special characters in quotes. `#` and `:` must be quoted: unquoted, `#` starts a comment and `:` splits the key from the kind.
 - R-Town keeps its older legend (digits for water) until the user asks for a change.
 
 ## Usage

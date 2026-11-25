@@ -20,7 +20,7 @@ User context: knows common game engine architecture and mechanics, so do not exp
 
 - **Git:** Do NOT commit unless the human confirms. Include commits as steps in plans, but ask first. Remote is `https://github.com/wernerpyke/bevy-games.git`, branch `main`. Do not push unless asked.
 - **Languages:** Rust (game), Lua (Aseprite scripts), shell (launchers). No Python and no `uv`. Ask before adding any other language (`dev-docs/adr/WORKSPACE.md` adr-w2).
-- **Map legends** (`adr-x37`, `dev-docs/extensions/map-files.md`): the player is `@`. Features are letters, with upper and lower case for variants (`G` and `g`). Enemies are special characters (`! # $ % & * +`). Pickups are digits. Use this for every new legend entry.
+- **Map legends** (`adr-x37`, `dev-docs/extensions/map-files.md`): the player is `@`. Features are letters, with upper and lower case for variants (`G` and `g`). Enemies are special characters (any ASCII punctuation except the reserved `. | "`, for example `! # $ % & * + ^ ~`). Pickups are digits. Use this for every new legend entry.
 - **Diagrams:** Mermaid only. Rules and sequence diagram template in `dev-docs/diagrams.md`. Read it before writing a diagram.
 - **Decision records:** Add an entry in `dev-docs/adr/<TOPIC>.md` for every architectural decision the user makes. Record why, not implementation details. Format in `dev-docs/adr/README.md`.
 
