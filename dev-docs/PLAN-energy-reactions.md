@@ -24,7 +24,12 @@ The user's decisions (2026-11-25):
 - The ghost spawns with `Reactions::FULL`. Play does not change: b1 to b14 still pass.
 - Tests: the reaction lookup, `apply_hits` scaling and the interrupt message, a pass-through body is not hit by a ring, the push share reaches the push.
 
-## Step 3. The volcano
+## Step 3. The volcano (done 2026-11-25)
+
+Done: `EnemyHp` 300 (placeholder), `REACTIONS`, a `HIT_BOX` over the cone and the base with a 2 px margin (the ice ring stops at the base), `Hurt` on an interrupt then `Attack` from frame 0. The fireball does not choose a target that red does not damage (Claude's default, to confirm with the user). Fixed in the real game: the animation crate moves to the new tag one frame late, so both shots launched when `Attack` started again; `finish_hurt` now sets frame 0. Scripted run in map 3: the tornado interrupts the volcano on every tick and it launches nothing for the tornado's 5.5 s; the fire ring touches it 6 times with no effect. Not seen: the ice ring and the fireball on the volcano (they need a click in the drawer, which the script cannot do). Still open: its death.
+
+The plan as written:
+
 
 - `EnemyHp` (placeholder value), a `HitBox` on the cone, `HurtFrames`.
 - Reactions: red `Hit { damage: 0, push: 0, interrupt: false }` (touched, no effect: a fireball explodes on it), blue `Hit { damage: 0, push: 0, interrupt: true }`, violet and black `FULL`.
@@ -39,6 +44,9 @@ The user's decisions (2026-11-25):
 - `EnemyHp` (placeholder), its `HitBox` is the ball.
 - Reactions: red `PassThrough`, blue `Hit { damage: 0, push: <tuned>, interrupt: false }`, violet and black `FULL`.
 - A push moves the shot through the collision world. Its path goes on from the new place (the kit path moves by the change of the path in each frame).
+- **Glance off** (the user, 2026-11-25). A pushed shot also turns: its path direction becomes the direction of its own step this frame plus the push. When the push cancels the step (the sum is zero or points back), the direction stays, so a shot that meets the tornado head on holds at the rim and jitters. While it touches the rim it turns a little each frame, and it leaves along the tangent. A `Deflects` marker on the shot asks for this in `apply_hits`. The tornado's code does not change. Rejected: flow around (the shot keeps its first direction, so the tornado seems to do nothing) and bounce (a reflection that fights the head-on hold).
+- **Collision in the air** (the user, 2026-11-25): the shot collides with weapons where it is drawn, also during its arc (`adr-x54`). A high shot can pass over the tornado's edge or meet it late. This is accepted.
+- No physics crate (`adr-e10`): one body against one circle is a collision response, like the player's sliding. The shot's bounce is a fixed height curve of the kit path, not physics.
 - Change b16 with the user: blue weapons push enemy shots.
 - Tuning target: the shot holds at the tornado's rim when the player stands still and is carried when the player walks.
 

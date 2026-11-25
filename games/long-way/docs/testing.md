@@ -17,6 +17,7 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 | `enemy_hp.rs` | `EnemyHp::lose`, the hurt colour hex, the tint and its end, one `EnemyDied`, hurt frames instead of the tint, a target without HP is left alone |
 | `hp.rs` | The player's points stop at 0, and no `PlayerHurt` is sent at 0 |
 | `ghost.rs` | Attack, death and hurt: which animation wins and when the player loses HP. The ghost's systems run before the kit's facing tags. A marker puts the ghost's feet at the cell centre; a bad strategy is skipped |
+| `volcano.rs` | A launch frame is reached once per loop, the shot start at the mouth, two shots a loop in random directions, a shot takes 1 HP and goes. An interrupt plays `Hurt` to its end with no shots, then `Attack` from frame 0 with no stray shot. A marker puts the volcano, its blocked base, its hit box, hit points and reactions |
 | `player.rs` | Facing from the walk direction, the sideways flip, no walking while a transition locks the player, the facing after an arrival, the `Hurt` animation |
 | `map.rs` | Every legend name has its own `Kind` and the energy names give every `Energy`. `blocking_groups`: group sizes and `neighbour_above`. `touches_top` |
 | `rocks.rs` | Placement (whole scale, the sort line), the blocked area in a group (with and without an open top) and alone, the jitter range |

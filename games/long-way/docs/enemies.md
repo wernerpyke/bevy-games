@@ -21,7 +21,7 @@ These rules apply to every enemy.
 | Enemy | Legend | HP | Moves | Attack | Damage to the player | Hurt | Status |
 |---|---|---|---|---|---|---|---|
 | Ghost | `!` | 100 (`HIT_POINTS`) | 90 px/s (0.3 × the player), kit strategy from the legend | Touch: plays `Attack`, then dies | 1 HP per touch, once | Own `Hurt` frames | In the game since 2026-11-09 |
-| Volcano | `^` | None yet: cannot be hit | Does not move | Two rolling shots per `Attack` loop | 1 HP per shot that touches | None yet | Shots in the game since 2026-11-23. Hit points to come |
+| Volcano | `^` | 300 (`HIT_POINTS`, placeholder: no weapon damages it yet) | Does not move | Two rolling shots per `Attack` loop | 1 HP per shot that touches | Own `Hurt` frames, played on an interrupt | Shots since 2026-11-23, weapon reactions since 2026-11-25 |
 
 ## Ghost
 
@@ -58,7 +58,13 @@ These rules apply to every enemy.
 
 **Placement.** Give it about 5 cells of open ground. Blocked areas and the map edge band remove shots early. The bottom rows of a map can be under the HUD.
 
-**Open.** Hit points, how it shows a hit (no `Hurt` tag yet, so the colour flash) and how it dies. When it gets `EnemyHp`, check b2 and b13 (`balance.md`), and fill in its row in "Against each weapon".
+**Weapons** (`adr-lw43`). Red touches it with no effect: the fire ring touches it, and a fireball that meets it on its way explodes on it, but deals nothing. A fireball never chooses it as its target, because red does not damage it. Blue interrupts it on every hit: it plays `Hurt` once (4 frames of 100 ms), then `Attack` from frame 1, and it launches nothing while `Hurt` plays. An interrupt while `Hurt` plays does not start `Hurt` again. Nothing pushes it.
+
+**Hit box** (`HIT_BOX`). The drawn cone (top at art row 20) and the blocked base, 2 px further all round. The ice ring stops at the base, so the hit box reaches past it, and the ring touches the volcano from every side.
+
+**Tuning note** (2026-11-25, scripted run in map 3, tornado cast next to the cone). The tornado hits every 0.5 s and `Hurt` lasts about 0.4 s, so `Attack` never gets back to frame 7: the volcano launches nothing for the whole 5.5 s of the tornado. The values give this, not a rule. Tune in step 5 of `dev-docs/PLAN-energy-reactions.md`.
+
+**Open.** How it dies (no `Die` tag yet, and no current weapon can kill it). How a damaging hit from a later violet or black weapon shows: it has no `HurtFrames`, so such a hit flashes the colour.
 
 ## Reactions to weapon energy
 
@@ -76,8 +82,8 @@ How often an enemy is interrupted, and how far it is pushed, follow from the wea
 | Enemy | Red | Blue | Violet | Black | Status |
 |---|---|---|---|---|---|
 | Ghost | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | In the game |
-| Volcano | Hit: damage 0, push 0 (touched, no effect) | Hit: damage 0, push 0, **interrupt** (`Hurt`, then `Attack` from frame 1) | Hit: damage 1, push 0 (placeholder) | Hit: damage 1, push 0 (placeholder) | Planned (`dev-docs/PLAN-energy-reactions.md`) |
-| Volcano shot | `PassThrough` | Hit: damage 0, push tuned (strong) | Hit: damage 1, push 1 (placeholder) | Hit: damage 1, push 1 (placeholder) | Planned |
+| Volcano | Hit: damage 0, push 0 (touched, no effect) | Hit: damage 0, push 0, **interrupt** (`Hurt`, then `Attack` from frame 1) | Hit: damage 1, push 0 (placeholder) | Hit: damage 1, push 0 (placeholder) | In the game |
+| Volcano shot | `PassThrough` | Hit: damage 0, push tuned (strong) | Hit: damage 1, push 1 (placeholder) | Hit: damage 1, push 1 (placeholder) | Planned (`dev-docs/PLAN-energy-reactions.md`) |
 
 **Tuning target, volcano shot:** under the tornado, the shot holds at the outer rim while the player stands still (some jitter is fine), and the tornado carries it while the player walks.
 
@@ -92,7 +98,7 @@ Two different things. Do not use one for the other.
 | **Type** | `Stunned`, a component in the kit (`game_kit::movement`) | `EnemyInterrupted`, a message in Long Way (`reactions.rs`). The kit has no interrupt |
 | **What it is** | A state that lasts | One event for each hit |
 | **Length** | Until the code that added it removes it | None |
-| **Effect** | Set by the kit: the entity does not walk, and its sprite animation stops on its current frame. It keeps its goal and walks on when the stun ends. The ghost also does not attack while stunned | None of its own. The enemy's plugin decides what it does. The volcano will play `Hurt`, then start `Attack` again from frame 1 |
+| **Effect** | Set by the kit: the entity does not walk, and its sprite animation stops on its current frame. It keeps its goal and walks on when the stun ends. The ghost also does not attack while stunned | None of its own. The enemy's plugin decides what it does. The volcano plays `Hurt`, then starts `Attack` again from frame 1 |
 | **Cause** | A rule of one weapon: the ice ring stuns an enemy that its push pins against a feature or the map edge, until the ring ends (`adr-lw35`, `weapons.md`) | The enemy's reaction table: every hit from an energy with `interrupt` (`adr-lw43`) |
 | **Who chooses it** | The weapon | The enemy kind |
 
@@ -106,10 +112,10 @@ Weapon values are in `weapons.md`. The balance rules in brackets keep these resu
 
 | Weapon | Ghost (100 HP) | Volcano |
 |---|---|---|
-| Fire ring | Dies on the first tick, 100 (b1) | Not hit |
-| Ice ring | Pushed to the edge for 50, 10 more if it walks in. One ring never kills (b3). A pinned ghost is stunned | Not hit |
-| Tornado | 13 per tick, bumped back 40 px on every second tick. Dies after more than 60 % of the tornado's time in contact (b5). Gets through to a player who stands still (b7, b9) | Not hit |
-| Fireball | A direct hit (150) kills (b10). The blast (100) kills (b11) | Not hit, and not a target |
+| Fire ring | Dies on the first tick, 100 (b1) | Touched, no effect |
+| Ice ring | Pushed to the edge for 50, 10 more if it walks in. One ring never kills (b3). A pinned ghost is stunned | Not moved and never stunned. Interrupted on every hit |
+| Tornado | 13 per tick, bumped back 40 px on every second tick. Dies after more than 60 % of the tornado's time in contact (b5). Gets through to a player who stands still (b7, b9) | Not moved. Interrupted on every tick |
+| Fireball | A direct hit (150) kills (b10). The blast (100) kills (b11) | Never the target. Explodes on it when it is in the way, with no effect |
 
 ## Add a new enemy kind
 

@@ -11,7 +11,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 | ID | Rule | Since | Enforced by |
 |---|---|---|---|
 | b1 | **The fire ring always kills a ghost it touches.** Where the ghost stands at the cast, how far it is pushed and whether it walks out of the ring make no difference. | 2026-11-13 | `b1_the_first_tick_of_the_fire_ring_kills_a_ghost` in `weapons/values.rs` |
-| b2 | **The fire ring does not promise a one-hit kill on any enemy other than the ghost.** Such an enemy can die if it stays in the burn band for enough ticks, but that is not guaranteed. | 2026-11-13 | By hand: check it when a new enemy kind is added. Not checked for the volcano yet: it has no hit points |
+| b2 | **The fire ring does not promise a one-hit kill on any enemy other than the ghost.** Such an enemy can die if it stays in the burn band for enough ticks, but that is not guaranteed. | 2026-11-13 | By hand: check it when a new enemy kind is added. Volcano (2026-11-25): red deals it no damage (`adr-lw43`), so the fire ring never kills it |
 | b3 | **One ice ring on its own never kills a ghost. A second ice ring can.** | 2026-11-13 | `b3_one_ice_ring_never_kills_a_ghost` in `weapons/values.rs` (`push + touch < ghost HP`) |
 | b4 | **The tornado lasts twice as long as the ice ring** (its growth plus its hold). | 2026-11-13 | `b4_the_tornado_lasts_twice_as_long_as_the_ice_ring` in `weapons/values.rs` |
 | b5 | **A ghost dies from one tornado only once its total contact passes 60% of the tornado's duration.** | 2026-11-13 | `b5_a_ghost_dies_from_one_tornado_only_after_60_percent_contact` in `weapons/values.rs`; total contact: `contact_is_counted_in_total_across_a_break` in `weapons/tornado.rs` |
@@ -22,7 +22,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 | b10 | **A direct fireball hit kills a ghost.** | 2026-11-13 | `b10_a_direct_fireball_hit_kills_a_ghost` in `weapons/values.rs` |
 | b11 | **The fireball blast alone kills a ghost.** | 2026-11-13 | `b11_the_fireball_blast_alone_kills_a_ghost` in `weapons/values.rs` |
 | b12 | **The fireball blast deals less than a direct hit.** | 2026-11-13 | `b12_the_fireball_blast_deals_less_than_a_direct_hit` in `weapons/values.rs` |
-| b13 | **A direct fireball hit does not kill every enemy kind.** | 2026-11-13 | By hand: check it when a new enemy kind is added. Not checked for the volcano yet: it has no hit points |
+| b13 | **A direct fireball hit does not kill every enemy kind.** | 2026-11-13 | By hand: check it when a new enemy kind is added. Met by the volcano (2026-11-25): red deals it no damage (`adr-lw43`) |
 | b14 | **The enemy a fireball hits directly takes only the direct hit, never the blast as well.** | 2026-11-13 | `the_blast_hits_every_other_living_enemy_within_its_radius_and_no_one_else` and `an_enemy_in_the_way_takes_the_direct_hit_and_the_target_near_it_the_blast` in `weapons/fireball.rs` |
 | b15 | **The player has no invincibility frames.** Every hit takes its HP, also two in the same frame (`adr-lw42`). | 2026-11-23 | `a_shot_that_touches_the_player_takes_1_hp_and_goes_and_two_take_2` in `volcano.rs`; `a_damage_message_takes_points_and_at_zero_the_player_is_hurt_no_more` in `hp.rs` |
 | b16 | **No friendly fire: an enemy's attack never hurts another enemy, and the player's weapons do not hit enemy shots** (`adr-lw42`). | 2026-11-23 | `a_volcano_launches_at_frames_7_and_9_from_the_mouth_of_that_frame_each_in_a_random_direction` in `volcano.rs` (its shots skip targets); by hand: check it when a new enemy attack is added |
@@ -42,7 +42,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 
 ## b2. The fire ring is not a one-hit kill for other enemies
 
-**Rule.** Only the ghost is sure to die from the fire ring (b1). Another enemy kind can have more HP than one tick deals (100). It dies only if it stays in the burn band for enough ticks, and nothing makes sure that it does. The ghost is the only enemy that weapons can hit now. The volcano has no hit points yet (`enemies.md`).
+**Rule.** Only the ghost is sure to die from the fire ring (b1). Another enemy kind can have more HP than one tick deals (100). It dies only if it stays in the burn band for enough ticks, and nothing makes sure that it does. The ghost is the only enemy that the fire ring can hurt now. The volcano has hit points, but its reaction to red has a damage share of 0 (`adr-lw43`, `enemies.md`).
 
 **When a new enemy kind is added:**
 - Do not raise the fire ring damage to one-hit kill it. That needs a new rule from the user.
@@ -75,5 +75,5 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 - b10: direct 150 against a ghost's 100.
 - b11: blast 100 against a ghost's 100, so a ghost anywhere in the blast (1.25 cells from the explosion to the nearest side of its body) dies.
 - b12: 100 < 150.
-- b13: no test yet. When an enemy kind with more than 150 HP exists, or the direct hit grows, check that at least one kind survives a direct hit.
+- b13: no test yet. The volcano survives a direct hit, because its reaction to red has a damage share of 0 (`adr-lw43`). Check again when its reaction changes, when a new enemy kind is added, or when the direct hit grows.
 - b14: the explosion deals the direct hit to the enemy touched and the blast only to the others (`explode` in `weapons/fireball.rs`).

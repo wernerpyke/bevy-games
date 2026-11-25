@@ -1,7 +1,10 @@
 //! The volcano: an enemy that stands still where a `spawn_volcano` marker of a map puts it (legend entry such as
 //! `"^": spawn_volcano`) and attacks until it is killed. It loops its `Attack` tag (`characters/volcano.aseprite`,
 //! durations set in the file). Its base blocks the player, who can walk up to it and behind it: only its shots hurt.
-//! It cannot be hit yet.
+//!
+//! **Weapons** (`adr-lw43`, `REACTIONS`). It has hit points, but no current weapon damages it, and nothing pushes it.
+//! Red touches it with no effect. Blue interrupts it: it plays `Hurt` once, then `Attack` from the first frame. It
+//! launches nothing while `Hurt` plays.
 //!
 //! **Shots.** Each time `Attack` reaches frame 7 and frame 9 the volcano launches a shot from its mouth in a random
 //! direction. The
@@ -25,8 +28,10 @@ use game_kit::rng::GameRng;
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
 
 use crate::collision::PLAYER_HALF_WIDTH;
+use crate::enemy_hp::EnemyHp;
 use crate::hp::DamagePlayer;
 use crate::map::Kind;
+use crate::reactions::{EnemyInterrupted, Hit, Reaction, Reactions};
 
 const ART: &str = "art/characters/volcano.aseprite";
 /// The layers drawn in the game. The file also has `test_bg`, a backdrop for drawing that is never drawn in the game,
@@ -63,6 +68,53 @@ const SHOT_HIT_BOX: HitBox = HitBox {
     half_size: Vec2::new(BALL_HALF, BALL_HALF),
 };
 const SHOT_DAMAGE: u32 = 1;
+/// Hit points of a volcano. A placeholder: no weapon damages it yet (`docs/enemies.md`).
+const HIT_POINTS: f32 = 300.0;
+/// How a volcano reacts to each weapon energy (`adr-lw43`, the user, 2026-11-25). It never moves. Red touches it with
+/// no effect (a fireball explodes on it). Blue interrupts it. Violet and black damage it: placeholders, as neither has
+/// a weapon yet.
+const REACTIONS: Reactions = Reactions {
+    red: Reaction::Hit(Hit {
+        damage: 0.0,
+        push: 0.0,
+        interrupt: false,
+    }),
+    blue: Reaction::Hit(Hit {
+        damage: 0.0,
+        push: 0.0,
+        interrupt: true,
+    }),
+    violet: Reaction::Hit(Hit {
+        damage: 1.0,
+        push: 0.0,
+        interrupt: false,
+    }),
+    black: Reaction::Hit(Hit {
+        damage: 1.0,
+        push: 0.0,
+        interrupt: false,
+    }),
+};
+/// The top of the cone at rest, in art pixels from the top of the canvas (frames 3 to 5 of `Attack`).
+const CONE_TOP_PX: f32 = 20.0;
+/// How far the hit box reaches past the cone and the blocked base. The ice ring stops at the base (`adr-lw35`), so a
+/// body that ends exactly on its edge would not be reached; this margin is above the ring's edge tolerance (0.5 px).
+const HIT_MARGIN: f32 = 2.0;
+/// The part of a volcano that weapons touch, from its centre: the drawn cone and the blocked base around it (which
+/// is wider by half the player's width), with `HIT_MARGIN` all round. x from 11 - 14/2 art px to 54 + 14/2, y from
+/// the bottom of the base (row 63) to `CONE_TOP_PX`.
+const HIT_BOX: HitBox = {
+    let left = (BASE_LEFT_PX - CANVAS_HALF_PX) * SCALE - PLAYER_HALF_WIDTH - HIT_MARGIN;
+    let right = (BASE_RIGHT_PX - CANVAS_HALF_PX) * SCALE + PLAYER_HALF_WIDTH + HIT_MARGIN;
+    let bottom = -FEET_BELOW_CENTRE - HIT_MARGIN;
+    let top = (CANVAS_HALF_PX - CONE_TOP_PX) * SCALE + HIT_MARGIN;
+    HitBox {
+        offset: Vec2::new((left + right) / 2.0, (bottom + top) / 2.0),
+        half_size: Vec2::new((right - left) / 2.0, (top - bottom) / 2.0),
+    }
+};
+const HURT_TAG: &str = "Hurt";
+const ATTACK_TAG: &str = "Attack";
 /// 5 cells of 64 px in 2.5 s. The ball starts with its centre at the mouth, reaches 96 px above the ground, bounces
 /// twice at half height and rolls for the last 30 % of the time (`PathShape`). `start_height` is set per volcano.
 const SHOT_PATH: PathShape = PathShape {
@@ -82,9 +134,24 @@ impl Plugin for VolcanoPlugin {
         if !app.is_plugin_added::<ProjectilePlugin>() {
             app.add_plugins(ProjectilePlugin);
         }
-        app.add_systems(Update, (launch_shots, hit_player.after(TouchSet)));
+        app.add_systems(
+            Update,
+            (
+                (interrupt, finish_hurt, launch_shots).chain(),
+                hit_player.after(TouchSet),
+            ),
+        );
     }
 }
+
+/// On a volcano that plays `Hurt` after an interrupt. It launches nothing until `Attack` starts again.
+#[derive(Component)]
+struct Hurting;
+
+/// A volcano that plays `Attack` and can be interrupted.
+type Attacking = (With<Volcano>, Without<Hurting>);
+/// A volcano that plays `Hurt`.
+type Hurt = (With<Volcano>, With<Hurting>);
 
 /// The root of a volcano. Its `Transform` is the centre of the sprite.
 #[derive(Component)]
@@ -123,6 +190,48 @@ fn shot_start(feet: Vec2, mouth_row: f32) -> (Vec2, f32) {
     (mouth, mouth.y - ground - BALL_HALF)
 }
 
+/// An interrupted volcano (`EnemyInterrupted`, from a weapon whose energy interrupts it) plays `Hurt` once. An
+/// interrupt while `Hurt` plays does not start it again: `Hurt` plays to its end (`docs/enemies.md`, "Stun and
+/// interrupt").
+fn interrupt(
+    mut commands: Commands,
+    mut interrupted: MessageReader<EnemyInterrupted>,
+    mut volcanoes: Query<&mut AseAnimation, Attacking>,
+) {
+    for EnemyInterrupted(entity) in interrupted.read() {
+        let Ok(mut ase) = volcanoes.get_mut(*entity) else {
+            continue;
+        };
+        ase.animation.play(HURT_TAG, AnimationRepeat::Count(0));
+        commands.entity(*entity).insert(Hurting);
+        info!("volcano: {entity:?} interrupted, plays Hurt");
+    }
+}
+
+/// When `Hurt` ends, the volcano starts `Attack` again from its first frame, so its next shot is a whole wind-up away.
+/// The animation crate moves to frame 0 of `Attack` only in its next update, so for one frame the state still holds
+/// `Hurt`'s frame. The launcher would read the jump from it to 0 as a loop that passed the launch frames, so the frame
+/// is set to 0 here and the launcher forgets the frame it saw before.
+fn finish_hurt(
+    mut commands: Commands,
+    mut events: MessageReader<AnimationEvents>,
+    mut volcanoes: Query<(&mut AseAnimation, &mut AnimationState, &mut Launcher), Hurt>,
+) {
+    for event in events.read() {
+        let AnimationEvents::Finished(entity) = event else {
+            continue;
+        };
+        let Ok((mut ase, mut state, mut launcher)) = volcanoes.get_mut(*entity) else {
+            continue;
+        };
+        ase.animation.play_loop(ATTACK_TAG);
+        state.relative_frame = 0;
+        launcher.last_frame = None;
+        commands.entity(*entity).remove::<Hurting>();
+        info!("volcano: {entity:?} attacks again from the start");
+    }
+}
+
 fn launch_shots(
     mut commands: Commands,
     mut rng: ResMut<GameRng>,
@@ -134,7 +243,7 @@ fn launch_shots(
             &MapId,
             &mut Launcher,
         ),
-        With<Volcano>,
+        Attacking,
     >,
 ) {
     for (transform, state, ase, map_id, mut launcher) in &mut volcanoes {
@@ -231,6 +340,9 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
         let centre = feet + Vec2::Y * FEET_BELOW_CENTRE;
         commands.spawn((
             Volcano,
+            EnemyHp::full(HIT_POINTS),
+            REACTIONS,
+            HIT_BOX,
             Blocker(blocked_area(feet)),
             SortAtBlocker,
             AseAnimation {
@@ -241,7 +353,7 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
                             LayerSelectionSetting::Mask(LAYERS.map(String::from).to_vec());
                     })
                     .load(ART),
-                animation: Animation::tag("Attack").with_repeat(AnimationRepeat::Loop),
+                animation: Animation::tag(ATTACK_TAG).with_repeat(AnimationRepeat::Loop),
             },
             Sprite::default(),
             Transform::from_translation(centre.extend(0.0))
@@ -448,5 +560,111 @@ mod tests {
                 true
             )]
         );
+        // What weapons touch: the blocked area and the cone (top at row 20, 12 art px x 2 above the centre), 2 px
+        // further all round, so the ice ring, which stops at the blocked area, still reaches it from every side.
+        let bodies: Vec<(Rect, EnemyHp, Reactions)> = app
+            .world_mut()
+            .query_filtered::<(&Transform, &HitBox, &EnemyHp, &Reactions), With<Volcano>>()
+            .iter(app.world())
+            .map(|(transform, hit_box, hp, reactions)| {
+                (
+                    hit_box.rect_at(transform.translation.truncate()),
+                    *hp,
+                    *reactions,
+                )
+            })
+            .collect();
+        assert_eq!(
+            bodies,
+            vec![(
+                Rect::new(72.0, 162.0, 190.0, 252.0),
+                EnemyHp::full(HIT_POINTS),
+                REACTIONS
+            )]
+        );
+    }
+
+    /// An app that runs the interrupt systems and `launch_shots` on one volcano playing `Attack`.
+    fn interrupt_app() -> (App, Entity) {
+        let (mut app, volcano) = launch_app();
+        app.add_message::<EnemyInterrupted>()
+            .add_message::<AnimationEvents>()
+            .add_systems(Update, (interrupt, finish_hurt).before(launch_shots));
+        app.world_mut()
+            .get_mut::<AseAnimation>(volcano)
+            .unwrap()
+            .animation
+            .play_loop(ATTACK_TAG);
+        (app, volcano)
+    }
+
+    fn set_frame(app: &mut App, volcano: Entity, frame: u16) {
+        app.world_mut()
+            .get_mut::<AnimationState>(volcano)
+            .unwrap()
+            .relative_frame = frame;
+    }
+
+    fn tag(app: &App, volcano: Entity) -> Option<&str> {
+        app.world()
+            .get::<AseAnimation>(volcano)
+            .unwrap()
+            .animation
+            .tag
+            .as_deref()
+    }
+
+    fn shots(app: &mut App) -> usize {
+        app.world_mut()
+            .query_filtered::<(), With<VolcanoShot>>()
+            .iter(app.world())
+            .count()
+    }
+
+    #[test]
+    fn an_interrupt_plays_hurt_to_its_end_without_shots_then_attack_starts_again_from_its_first_frame()
+     {
+        let (mut app, volcano) = interrupt_app();
+        // Up to frame 5, one before the first launch frame.
+        for frame in 0..6 {
+            set_frame(&mut app, volcano, frame);
+            app.update();
+        }
+        app.world_mut().write_message(EnemyInterrupted(volcano));
+        app.update();
+        assert_eq!(tag(&app, volcano), Some(HURT_TAG));
+        assert!(app.world().get::<Hurting>(volcano).is_some());
+        // A second interrupt while `Hurt` plays does not start it again.
+        app.world_mut()
+            .get_mut::<AseAnimation>(volcano)
+            .unwrap()
+            .animation
+            .tag = Some("still hurt".into());
+        app.world_mut().write_message(EnemyInterrupted(volcano));
+        app.update();
+        assert_eq!(tag(&app, volcano), Some("still hurt"));
+        // No shot while hurt, even when the frame number passes the launch frames.
+        for frame in [6, 7, 8, 9] {
+            set_frame(&mut app, volcano, frame);
+            app.update();
+        }
+        assert_eq!(shots(&mut app), 0);
+        // `Hurt` ends on its last frame, 3. The animation crate moves to frame 0 of `Attack` only one frame later.
+        set_frame(&mut app, volcano, 3);
+        app.update();
+        app.world_mut()
+            .write_message(AnimationEvents::Finished(volcano));
+        app.update();
+        assert_eq!(tag(&app, volcano), Some(ATTACK_TAG));
+        assert!(app.world().get::<Hurting>(volcano).is_none());
+        // Attack starts from frame 0: the jump from frame 9 back to 0 is no wrap through a launch frame.
+        set_frame(&mut app, volcano, 0);
+        app.update();
+        assert_eq!(shots(&mut app), 0);
+        for frame in 1..7 {
+            set_frame(&mut app, volcano, frame);
+            app.update();
+        }
+        assert_eq!(shots(&mut app), 1);
     }
 }
