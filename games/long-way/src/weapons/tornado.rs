@@ -213,7 +213,10 @@ fn update_tornadoes(
             let mut out = 0.0;
             if depth > 0.0 {
                 amount = body.contact.damage(&values, dt);
-                if amount.is_some() && body.contact.ticks() % TORNADO.bump_every == 0 {
+                // The bump is the knock-back of a hurt: a body the tick does not damage is not bumped (the user,
+                // 2026-11-25), so only the steady push acts on it.
+                let hurts = reaction.damage > 0.0;
+                if amount.is_some() && hurts && body.contact.ticks() % TORNADO.bump_every == 0 {
                     body.bump_left = TORNADO.bump;
                 }
                 let allowed = (previous + own_step - push_speed * dt).max(0.0);
@@ -535,15 +538,26 @@ mod tests {
     }
 
     #[test]
-    fn a_standing_enemy_inside_is_pushed_out_by_the_push_and_the_growth_then_bumped_and_left_outside()
+    fn a_standing_enemy_inside_is_pushed_out_by_the_push_and_the_growth_then_bumped_only_if_the_tick_hurts_it()
      {
+        use crate::reactions::{Hit, Reaction, Reactions};
         let mut app = app(&[]);
         let player = player(&mut app, Vec2::ZERO);
         let ghost = enemy(&mut app, Vec2::new(20.0, 0.0));
+        // On the other side, pushed in full but not hurt by blue: no bump (the user, 2026-11-25).
+        let unhurt = enemy(&mut app, Vec2::new(-20.0, 0.0));
+        app.world_mut().entity_mut(unhurt).insert(Reactions {
+            blue: Reaction::Hit(Hit {
+                damage: 0.0,
+                ..Hit::FULL
+            }),
+            ..Reactions::FULL
+        });
         cast(&mut app);
         run(&mut app, 0.05);
         // Before its second tick (0.5 s) there is no bump: only the steady push and the growing edge.
         let start = feet(&app, ghost).x;
+        let unhurt_start = feet(&app, unhurt).x;
         run(&mut app, 0.3);
         let moved = feet(&app, ghost).x - start;
         let expected = (push_speed() + growth()) * 0.3;
@@ -553,6 +567,13 @@ mod tests {
             feet(&app, ghost).x - start > expected + TORNADO.bump * 0.9,
             "not bumped on the second tick: {}",
             feet(&app, ghost).x
+        );
+        // The same steady push and growth for 0.6 s, and no bump. 3 px: the tolerance above, twice.
+        let unhurt_moved = unhurt_start - feet(&app, unhurt).x;
+        let steady = (push_speed() + growth()) * 0.6;
+        assert!(
+            (unhurt_moved - steady).abs() < 3.0,
+            "moved {unhurt_moved} in 0.6 s, the steady push gives {steady}"
         );
         run(&mut app, 3.0);
         let near = feet(&app, ghost).x - 5.0;

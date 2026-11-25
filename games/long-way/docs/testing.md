@@ -8,7 +8,7 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 
 | File | What it tests |
 |---|---|
-| `weapons/damage.rs` | `Contact`: damage ticks, the first tick at once, a long frame deals one tick with no burst (D14), pushback limits. `pushed_feet` stops at a blocked area and the map edge. `apply_hits` sends `DamageEnemy` and moves the enemy, scales the damage by the reaction, sends `EnemyInterrupted`, ignores a hit from an energy that passes through |
+| `weapons/damage.rs` | `Contact`: damage ticks, the first tick at once, a long frame deals one tick with no burst (D14), pushback limits. `pushed_feet` stops at a blocked area and the map edge. `apply_hits` sends `DamageEnemy` and moves the enemy, scales the damage by the reaction, sends `EnemyInterrupted`, ignores a hit from an energy that passes through, turns a pushed path projectile that `Deflects` and no other. `deflected`: a push across the way turns, one that cancels or throws back does not |
 | `weapons/ring.rs` | The fire ring: a cast makes a ring, the front hurts once, the burn hurts every tick until the ring ends, no body is skipped at a low frame rate, the pushback limit, the burn starts at the lead radius, the damaging band. A body without `EnemyHp` and a dead enemy with a `HitBox` are not hit (D15), nor one that red passes through |
 | `weapons/values.rs` | Data rules across all weapons. The ring size is a compile-time assert |
 | `weapons/mod.rs` | The active weapon is cast from the player's feet with the player's facing, a blank slot casts nothing; no player, no cast |
@@ -17,7 +17,7 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 | `enemy_hp.rs` | `EnemyHp::lose`, the hurt colour hex, the tint and its end, one `EnemyDied`, hurt frames instead of the tint, a target without HP is left alone |
 | `hp.rs` | The player's points stop at 0, and no `PlayerHurt` is sent at 0 |
 | `ghost.rs` | Attack, death and hurt: which animation wins and when the player loses HP. The ghost's systems run before the kit's facing tags. A marker puts the ghost's feet at the cell centre; a bad strategy is skipped |
-| `volcano.rs` | A launch frame is reached once per loop, the shot start at the mouth, two shots a loop in random directions, a shot takes 1 HP and goes. An interrupt plays `Hurt` to its end with no shots, then `Attack` from frame 0 with no stray shot. A marker puts the volcano, its blocked base, its hit box, hit points and reactions |
+| `volcano.rs` | A launch frame is reached once per loop, the shot start at the mouth, two shots a loop in random directions, a shot takes 1 HP and goes. An interrupt plays `Hurt` to its end with no shots, then `Attack` from frame 0 with no stray shot. A marker puts the volcano, its blocked base, its hit box, hit points and reactions. Each shot has its hit points, reactions and `Deflects` |
 | `player.rs` | Facing from the walk direction, the sideways flip, no walking while a transition locks the player, the facing after an arrival, the `Hurt` animation |
 | `map.rs` | Every legend name has its own `Kind` and the energy names give every `Energy`. `blocking_groups`: group sizes and `neighbour_above`. `touches_top` |
 | `rocks.rs` | Placement (whole scale, the sort line), the blocked area in a group (with and without an open top) and alone, the jitter range |

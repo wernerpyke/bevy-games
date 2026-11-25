@@ -39,7 +39,12 @@ The plan as written:
 - Open: should the fireball choose the volcano as its target, when red does no damage to it? Ask the user.
 - `art-tags.md`: the `Hurt` tag.
 
-## Step 4. The volcano shot
+## Step 4. The volcano shot (done 2026-11-25)
+
+Built: `EnemyHp` 50 (placeholder), `SHOT_REACTIONS` (red passes through, blue push 8, `SHOT_BLUE_PUSH`), `Deflects` and `deflected` in `apply_hits`, b16 and `adr-lw42` changed. Scripted runs in map 3 (seed 7, player north of the volcano, a shot head on): the tornado's bump is multiplied by the push share too (40 px to 320 px) and threw the shot 404 px back. In an experiment with no bump for a body the tick does not damage, the shot held at the rim until its path ended. The user chose: only a tick that damages bumps. Then, standing: the head-on shot held at the rim until its path ended; walking towards it for 0.4 s: the tornado carried it 226 px. Not seen: the ice ring on a shot (needs a click in the drawer), and a glance at a wide angle (seed 7 gave only a slight one).
+
+The plan as written:
+
 
 - `EnemyHp` (placeholder), its `HitBox` is the ball.
 - Reactions: red `PassThrough`, blue `Hit { damage: 0, push: <tuned>, interrupt: false }`, violet and black `FULL`.

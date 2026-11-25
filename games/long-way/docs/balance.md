@@ -25,7 +25,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 | b13 | **A direct fireball hit does not kill every enemy kind.** | 2026-11-13 | By hand: check it when a new enemy kind is added. Met by the volcano (2026-11-25): red deals it no damage (`adr-lw43`) |
 | b14 | **The enemy a fireball hits directly takes only the direct hit, never the blast as well.** | 2026-11-13 | `the_blast_hits_every_other_living_enemy_within_its_radius_and_no_one_else` and `an_enemy_in_the_way_takes_the_direct_hit_and_the_target_near_it_the_blast` in `weapons/fireball.rs` |
 | b15 | **The player has no invincibility frames.** Every hit takes its HP, also two in the same frame (`adr-lw42`). | 2026-11-23 | `a_shot_that_touches_the_player_takes_1_hp_and_goes_and_two_take_2` in `volcano.rs`; `a_damage_message_takes_points_and_at_zero_the_player_is_hurt_no_more` in `hp.rs` |
-| b16 | **No friendly fire: an enemy's attack never hurts another enemy, and the player's weapons do not hit enemy shots** (`adr-lw42`). | 2026-11-23 | `a_volcano_launches_at_frames_7_and_9_from_the_mouth_of_that_frame_each_in_a_random_direction` in `volcano.rs` (its shots skip targets); by hand: check it when a new enemy attack is added |
+| b16 | **No friendly fire: an enemy's attack never hurts another enemy.** The player's weapons affect an enemy shot only as the shot's reaction table says (`adr-lw42`, `adr-lw43`): the volcano shot lets red pass through and is pushed, not hurt, by blue. | 2026-11-23, shots and weapons changed 2026-11-25 | `a_volcano_launches_at_frames_7_and_9_from_the_mouth_of_that_frame_each_in_a_random_direction` in `volcano.rs` (its shots skip targets); by hand: check it when a new enemy attack is added |
 
 ## b1. The fire ring always kills a ghost
 
@@ -65,7 +65,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 - b6: at most 12 ticks in 5.53 s, so 156 per cast. The ice ring deals at most 60 (push plus touch).
 - b7: the steady push (20 px/s) is slower than the ghost (90 px/s), so between bumps a ghost walking in gets closer at 70 px/s. A bump takes back 40 px on every second tick (b9). The test walks a ghost across the whole radius (96 px) in contact time: it takes about 2.4 s and 5 ticks (65 of 100), so the ghost survives and arrives before the tornado ends. The real crossing ends at the player's body, which is shorter. In the game the ghost reaches the player, attacks and dies as usual.
 - b8: the depth of an enemy in the tornado may only grow by its own steps, less the push. The player's movement adds nothing, so the edge shoves an enemy ahead of the player. The player walks at 300 px/s and a ghost at 90 px/s, so a moving player leaves ghosts behind. A bump only moves an enemy outward. Accepted gap (the user): walking straight at one ghost lets it through, in about the time of b7 (about 2.3 s of contact).
-- b9: on the way in of b7, bumps land on the 2nd and 4th ticks (at 0.5 s and 1.5 s of contact). The test counts them in the same walk. In the game a bump is a 40 px shove over 0.1 s, so it reads as a knock back, together with the ghost's hurt animation.
+- b9: on the way in of b7, bumps land on the 2nd and 4th ticks (at 0.5 s and 1.5 s of contact). Only a tick that damages bumps (2026-11-25), so b9 holds for the ghost, which every tick damages. The test counts them in the same walk. In the game a bump is a 40 px shove over 0.1 s, so it reads as a knock back, together with the ghost's hurt animation.
 
 ## b10 to b14. The fireball
 

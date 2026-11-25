@@ -9,13 +9,6 @@ use crate::inventory::Energy;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Reaction {
     /// The weapons of this energy do not see the enemy: no contact, no target, no explosion on it.
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the volcano shot passes red through (dev-docs/PLAN-energy-reactions.md, step 4)"
-        )
-    )]
     PassThrough,
     /// The weapon touches the enemy.
     Hit(Hit),
@@ -78,6 +71,11 @@ impl Default for Reactions {
         Self::FULL
     }
 }
+
+/// On an enemy that follows a kit path (`ProjectilePath`, the volcano shot): a push also turns it, so it glances off
+/// the weapon (`weapons::damage::deflected`). Without it a push only moves the enemy.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct Deflects;
 
 /// Sent for every weapon hit of an energy whose reaction interrupts. The enemy's own plugin decides what it does. Not the
 /// kit's `Stunned`, a lasting state that a weapon adds and removes (`docs/enemies.md`, "Stun and interrupt").

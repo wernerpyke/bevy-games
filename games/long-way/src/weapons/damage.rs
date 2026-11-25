@@ -5,11 +5,12 @@ use bevy::prelude::*;
 use game_kit::camera::CameraBounds;
 use game_kit::collision::{CollisionWorld, resolve};
 use game_kit::movement::Mover;
+use game_kit::projectile::ProjectilePath;
 
 use super::WeaponHit;
 use super::values::{Damage, Pushback, WeaponValues};
 use crate::enemy_hp::{DamageEnemy, EnemyHp};
-use crate::reactions::{EnemyInterrupted, Reactions};
+use crate::reactions::{Deflects, EnemyInterrupted, Reactions};
 
 /// What one cast has done to one target so far. A weapon keeps one per target it touches.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -94,16 +95,20 @@ pub fn pushed_feet(
 ///
 /// The enemy's reaction to the weapon's energy scales the damage and may interrupt it (`adr-lw43`). The weapon has
 /// already scaled the push, because it forecasts it. A hit from an energy that passes through is ignored.
+///
+/// A pushed enemy with `Deflects` that follows a kit path also turns (`deflected`): it glances off the weapon.
 pub(crate) fn apply_hits(
+    time: Res<Time>,
     mut hits: MessageReader<WeaponHit>,
     mut damage: MessageWriter<DamageEnemy>,
     mut interrupted: MessageWriter<EnemyInterrupted>,
-    mut enemies: Query<(&mut Transform, &Reactions, Option<&Mover>), With<EnemyHp>>,
+    mut enemies: Query<HitTarget, With<EnemyHp>>,
     world: Res<CollisionWorld>,
     bounds: Option<Res<CameraBounds>>,
 ) {
     for hit in hits.read() {
-        let Ok((mut transform, reactions, mover)) = enemies.get_mut(hit.target) else {
+        let Ok((mut transform, reactions, mover, path, deflects)) = enemies.get_mut(hit.target)
+        else {
             continue;
         };
         let Some(reaction) = reactions.hit(hit.weapon.energy()) else {
@@ -125,8 +130,36 @@ pub(crate) fn apply_hits(
             let to = pushed_feet(feet, hit.push, &world, bounds.as_ref().map(|b| b.0), margin);
             transform.translation.x = to.x;
             transform.translation.y = to.y;
+            if deflects && let Some(mut path) = path {
+                let dt = time.delta_secs();
+                let shape = path.shape;
+                let own_step = shape.ground_distance(path.elapsed)
+                    - shape.ground_distance((path.elapsed - dt).max(0.0));
+                path.direction = deflected(path.direction, own_step, to - feet);
+            }
         }
     }
+}
+
+/// What `apply_hits` reads and changes on a target.
+type HitTarget = (
+    &'static mut Transform,
+    &'static Reactions,
+    Option<&'static Mover>,
+    Option<&'static mut ProjectilePath>,
+    Has<Deflects>,
+);
+
+/// The direction of a projectile that moved `own_step` along `direction` this frame and was pushed by `moved`: the
+/// direction of the two together, so a push across its way turns it (it glances off). When the push cancels its step
+/// or throws it back (the sum has no forward part), it keeps its direction: it holds against the push, or is carried
+/// back by it, and goes on the same way once the push stops.
+pub fn deflected(direction: Vec2, own_step: f32, moved: Vec2) -> Vec2 {
+    let sum = direction * own_step + moved;
+    if sum.dot(direction) <= 0.0 {
+        return direction;
+    }
+    sum.normalize_or(direction)
 }
 
 #[cfg(test)]
@@ -262,6 +295,7 @@ mod tests {
         app.add_message::<WeaponHit>()
             .add_message::<DamageEnemy>()
             .add_message::<crate::reactions::EnemyInterrupted>()
+            .init_resource::<Time>()
             .init_resource::<CollisionWorld>()
             .add_systems(Update, apply_hits);
         let enemy = app
@@ -376,6 +410,103 @@ mod tests {
         assert_eq!((at.x, at.y), (10.0, 26.0));
         let at = app.world().get::<Transform>(passed).unwrap().translation;
         assert_eq!((at.x, at.y), (-30.0, 40.0));
+    }
+
+    #[test]
+    fn a_push_across_the_way_turns_a_projectile_and_one_that_cancels_or_throws_it_back_does_not() {
+        let down_right = Vec2::new(3.0, -4.0) / 5.0;
+        let cases = [
+            // Across its way: the step and the push together.
+            (
+                Vec2::X,
+                2.0,
+                Vec2::new(0.0, 2.0),
+                Vec2::new(1.0, 1.0).normalize(),
+            ),
+            (
+                down_right,
+                5.0,
+                Vec2::new(4.0, 3.0),
+                Vec2::new(7.0, -1.0).normalize(),
+            ),
+            // The push cancels the step, throws it back, or is not there.
+            (Vec2::X, 2.0, Vec2::new(-2.0, 0.0), Vec2::X),
+            (down_right, 1.5, Vec2::new(-6.0, 8.0), down_right),
+            (down_right, 1.5, Vec2::ZERO, down_right),
+        ];
+        for (direction, own_step, moved, expected) in cases {
+            let turned = deflected(direction, own_step, moved);
+            // 1e-6: a normalised vector.
+            assert!(
+                turned.distance(expected) < 1e-6,
+                "{direction} {own_step} {moved}: {turned} vs {expected}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pushed_path_projectile_turns_only_when_it_deflects() {
+        use crate::reactions::Deflects;
+        use game_kit::projectile::{PathShape, ProjectilePath};
+        let shape = PathShape {
+            distance: 300.0,
+            duration: 2.0,
+            start_height: 0.0,
+            peak: 0.0,
+            bounces: 0,
+            bounce_ratio: 0.0,
+            roll_share: 1.0,
+        };
+        let (mut app, _) = app();
+        let up_right = Vec2::new(1.0, 1.0).normalize();
+        let shot = |app: &mut App, deflects: bool| {
+            let mut entity = app.world_mut().spawn((
+                EnemyHp::full(10.0),
+                ProjectilePath::new(shape, up_right, 0.0),
+                Transform::from_xyz(-40.0, 30.0, 0.0),
+            ));
+            if deflects {
+                entity.insert(Deflects);
+            }
+            entity.id()
+        };
+        let deflecting = shot(&mut app, true);
+        let plain = shot(&mut app, false);
+        // 1 s into its path, and a frame of 0.1 s: its own step is the ground it covered from 0.9 s to 1 s.
+        for entity in [deflecting, plain] {
+            app.world_mut()
+                .get_mut::<ProjectilePath>(entity)
+                .unwrap()
+                .elapsed = 1.0;
+        }
+        app.world_mut()
+            .resource_mut::<Time>()
+            .advance_by(std::time::Duration::from_millis(100));
+        let own_step = shape.ground_distance(1.0) - shape.ground_distance(0.9);
+        for target in [deflecting, plain] {
+            app.world_mut().write_message(WeaponHit {
+                target,
+                weapon: WeaponKind::Tornado,
+                amount: 0.0,
+                push: Vec2::new(0.0, 4.0),
+            });
+        }
+        app.update();
+        let direction =
+            |app: &App, entity| app.world().get::<ProjectilePath>(entity).unwrap().direction;
+        let expected = (up_right * own_step + Vec2::new(0.0, 4.0)).normalize();
+        // 1e-5: normalised vectors, and the step is a difference of two distances near 100.
+        assert!(
+            direction(&app, deflecting).distance(expected) < 1e-5,
+            "{} vs {expected}",
+            direction(&app, deflecting)
+        );
+        // 1e-6: `ProjectilePath::new` normalises the unit vector again.
+        assert!(direction(&app, plain).distance(up_right) < 1e-6);
+        for entity in [deflecting, plain] {
+            let at = app.world().get::<Transform>(entity).unwrap().translation;
+            assert_eq!((at.x, at.y), (-40.0, 34.0));
+        }
     }
 
     #[test]

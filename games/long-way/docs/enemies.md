@@ -12,7 +12,7 @@ These rules apply to every enemy.
 4. **Reactions.** Each enemy has a `Reactions` table: how it reacts to each weapon energy (see "Reactions to weapon energy", `adr-lw43`).
 5. **Hurt.** An enemy with its own hurt frames carries `HurtFrames` and plays its `Hurt` tag. Every other enemy flashes `#993D41` for 0.12 s (`HURT_COLOUR`, `HURT_FLASH_SECS` in `enemy_hp.rs`).
 6. **Damage to the player.** An enemy sends `DamagePlayer { amount }` (`hp.rs`). The player has no invincibility frames: every hit counts, also two in the same frame (b15).
-7. **No friendly fire.** An enemy attack hits only the player. The player's weapons do not hit enemy shots (b16, `adr-lw42`). An enemy shot uses `Projectile::without_targets()`. A reader of `ControlledTouched` filters on its own marker (`With<Ghost>`, `With<VolcanoShot>`).
+7. **No friendly fire.** An enemy attack hits only the player (b16, `adr-lw42`). The player's weapons affect an enemy shot only as its reaction table says (`adr-lw43`). An enemy shot uses `Projectile::without_targets()`. A reader of `ControlledTouched` filters on its own marker (`With<Ghost>`, `With<VolcanoShot>`).
 
 ## Values
 
@@ -53,6 +53,7 @@ These rules apply to every enemy.
 - A shot follows the kit `ProjectilePath` (`adr-x54`): 5 cells in 2.5 s, a first arc to 96 px, 2 bounces at half height, then a roll for the last 30 % of the time (`SHOT_PATH`). Then it is removed.
 - A shot collides where the ball is drawn (`SHOT_HIT_BOX`). A blocked area or the map edge removes it. Its own volcano's base does not (`Projectile::ignoring`). A touch on the player takes 1 HP (`SHOT_DAMAGE`) and removes the shot.
 - No limit on shots in flight. No shadow.
+- Weapons see a shot where it is drawn, also in the air (`adr-x54`), so a high shot can pass over a weapon's edge. A shot has 50 hit points (`SHOT_HIT_POINTS`, placeholder). Red passes through it. Blue pushes it 8 times as far as the weapon pushes (`SHOT_BLUE_PUSH`) and does not hurt it. The push also turns it (`Deflects`, `weapons::damage::deflected`): its new direction is its own step plus the push, so a shot that meets a weapon at an angle glances off along its edge, and one that meets it head on keeps its direction and holds, or is carried back.
 
 **Body.** Drawn at 2x (128x128, `adr-a11`): about 2 cells wide, and it reaches into the row above. The base of the cone (art rows 50 to 62, x 11 to 53, grown sideways by the player's half width) is a `Blocker`. The player walks up to it and behind it. Only the layers `base`, `rim` and `lava` are drawn (`LAYERS`). `test_bg` is never drawn.
 
@@ -83,9 +84,11 @@ How often an enemy is interrupted, and how far it is pushed, follow from the wea
 |---|---|---|---|---|---|
 | Ghost | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | Hit: damage 1, push 1 | In the game |
 | Volcano | Hit: damage 0, push 0 (touched, no effect) | Hit: damage 0, push 0, **interrupt** (`Hurt`, then `Attack` from frame 1) | Hit: damage 1, push 0 (placeholder) | Hit: damage 1, push 0 (placeholder) | In the game |
-| Volcano shot | `PassThrough` | Hit: damage 0, push tuned (strong) | Hit: damage 1, push 1 (placeholder) | Hit: damage 1, push 1 (placeholder) | Planned (`dev-docs/PLAN-energy-reactions.md`) |
+| Volcano shot | `PassThrough` | Hit: damage 0, push 8 (`SHOT_BLUE_PUSH`, a tuning value); a push also turns it, so it glances off (`Deflects`) | Hit: damage 1, push 1 (placeholder) | Hit: damage 1, push 1 (placeholder) | In the game |
 
 **Tuning target, volcano shot:** under the tornado, the shot holds at the outer rim while the player stands still (some jitter is fine), and the tornado carries it while the player walks.
+
+**Tuning note** (2026-11-25, scripted runs in map 3, seed 7, the player standing north of the volcano, a shot coming head on). With `SHOT_BLUE_PUSH` 8, the tornado's bump is also multiplied: 40 px becomes 320 px, and it threw the shot 404 px back past the volcano. In an experiment with no bump on a body the tick does not damage, the same shot held at the rim until its path ended (pushed 172 px, it stopped 8 px outside the rim and glanced a little east). Decided by the user the same day: only a tick that damages bumps (`weapons.md`, "Tornado"). With that, the head-on shot held at the rim of a standing player until its path ended, and when the player walked towards it for 0.4 s the tornado carried it 226 px. The tuning target is met at 8.
 
 **Code.** Each enemy's table is the constant `REACTIONS` in its own file, next to its hit points. An enemy spawned without a table reacts in full to every energy (`Reactions::FULL`).
 

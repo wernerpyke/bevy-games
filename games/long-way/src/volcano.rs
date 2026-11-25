@@ -11,8 +11,9 @@
 //! kit `ProjectilePath` moves it: an arc to the ground, 2 bounces, then a roll that slows to a stop after 5 cells, and
 //! there it is removed. It collides where the ball is drawn (the user, 2026-11-23): a blocked area or the map edge
 //! that the ball reaches on screen removes it, and a ball that touches the player's body takes 1 HP and is removed.
-//! It flies through its own volcano's base (`Projectile::ignoring`). It does not hurt enemies and weapons do not hit
-//! it. The player has no invincibility frames.
+//! It flies through its own volcano's base (`Projectile::ignoring`). It does not hurt enemies. The player has no
+//! invincibility frames. Weapons (`SHOT_REACTIONS`): red passes through it, blue pushes it strongly and does not hurt
+//! it, and the push turns it, so it glances off (`Deflects`). Weapons see it where it is drawn, also in the air.
 
 use std::f32::consts::TAU;
 
@@ -31,7 +32,7 @@ use crate::collision::PLAYER_HALF_WIDTH;
 use crate::enemy_hp::EnemyHp;
 use crate::hp::DamagePlayer;
 use crate::map::Kind;
-use crate::reactions::{EnemyInterrupted, Hit, Reaction, Reactions};
+use crate::reactions::{Deflects, EnemyInterrupted, Hit, Reaction, Reactions};
 
 const ART: &str = "art/characters/volcano.aseprite";
 /// The layers drawn in the game. The file also has `test_bg`, a backdrop for drawing that is never drawn in the game,
@@ -94,6 +95,24 @@ const REACTIONS: Reactions = Reactions {
         push: 0.0,
         interrupt: false,
     }),
+};
+/// Hit points of a shot. A placeholder: no weapon damages it yet.
+const SHOT_HIT_POINTS: f32 = 50.0;
+/// How far blue pushes a shot, as a share of the weapon's push. A tuning value (`docs/enemies.md`, tuning target): the
+/// tornado's steady push is 20 px/s and a shot rolls at up to 256 px/s and slows down, so at 8 the tornado holds a shot
+/// from about the middle of its path at the rim of a player who stands still.
+const SHOT_BLUE_PUSH: f32 = 8.0;
+/// How a shot reacts to each weapon energy (`adr-lw43`, the user, 2026-11-25). Red passes through it. Blue pushes it
+/// strongly and does not hurt it; the push also turns it (`Deflects`). Violet and black: placeholders.
+const SHOT_REACTIONS: Reactions = Reactions {
+    red: Reaction::PassThrough,
+    blue: Reaction::Hit(Hit {
+        damage: 0.0,
+        push: SHOT_BLUE_PUSH,
+        interrupt: false,
+    }),
+    violet: Reaction::Hit(Hit::FULL),
+    black: Reaction::Hit(Hit::FULL),
 };
 /// The top of the cone at rest, in art pixels from the top of the canvas (frames 3 to 5 of `Attack`).
 const CONE_TOP_PX: f32 = 20.0;
@@ -272,6 +291,9 @@ fn launch_shots(
                     ProjectilePath::new(path, direction, BALL_HALF),
                     Touchable,
                     SHOT_HIT_BOX,
+                    EnemyHp::full(SHOT_HIT_POINTS),
+                    SHOT_REACTIONS,
+                    Deflects,
                     Transform::from_translation(mouth.extend(0.0)),
                     Visibility::default(),
                 ))
@@ -490,6 +512,17 @@ mod tests {
             // 1e-6: `ProjectilePath::new` normalises the unit vector again.
             assert!(shot.0.distance(direction) < 1e-6, "{shot:?} vs {direction}");
         }
+        // Weapons see each shot: its hit points, its reactions, and a push turns it.
+        let bodies: Vec<(EnemyHp, Reactions, bool)> = app
+            .world_mut()
+            .query_filtered::<(&EnemyHp, &Reactions, Has<Deflects>), With<VolcanoShot>>()
+            .iter(app.world())
+            .map(|(hp, reactions, deflects)| (*hp, *reactions, deflects))
+            .collect();
+        assert_eq!(
+            bodies,
+            vec![(EnemyHp::full(SHOT_HIT_POINTS), SHOT_REACTIONS, true); 4]
+        );
     }
 
     #[test]
