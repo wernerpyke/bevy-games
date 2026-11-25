@@ -1,12 +1,12 @@
 //! Collision of a feet point against static blocked areas (`dev-docs/extensions/collision.md`, adr-x4, adr-x10,
 //! adr-x16).
 //!
-//! - A static object that blocks gets `Blocker(rect)`: the area its feet may not enter, already grown by the actor's
-//!   half width. Give it `SortAtBlocker` too, so it is drawn on the same line (`depth.rs`, adr-x53).
-//! - `CollisionWorld` merges all blocked areas into clusters with one outline (`outline.rs`). `register_blockers`
-//!   adds every `Blocker` once, at `PostStartup`. A game that loads maps clears the world and adds the new blockers
-//!   in its `MapHooks.rebuild` (`map_transition.rs`); without that the player walks through objects or hits invisible
-//!   walls after a map change. Short-lived walls use `add_temporary`.
+//! - A static object that blocks gets `Blocker(rect)`: the area its feet may not enter, grown by the actor's half
+//!   width (`grow_sideways`). Give it `SortAtBlocker` too, so it is drawn on the same line (`depth.rs`, adr-x53).
+//! - `CollisionWorld` merges all blocked areas into clusters with one outline (`outline.rs`). `rebuild_blockers`
+//!   clears it and adds every `Blocker`: the kit runs it at `PostStartup`, and a game that loads maps uses it as its
+//!   `MapHooks.rebuild` (`map_transition.rs`) or after its own reload. Without a rebuild the player walks through
+//!   objects or hits invisible walls after a map change. Short-lived walls use `add_temporary`.
 //! - A moving body calls `move_feet` with `SlideAssist`. With `CollisionPlugin { allow_sliding: true }` it slides
 //!   along faces and is slid past near corners (`SlideTuning`). `resolve` is the plain stop-at-the-first-edge move,
 //!   and `ray_distance` measures how far a ray goes.
@@ -68,13 +68,13 @@ impl Plugin for CollisionPlugin {
                 allow_sliding: self.allow_sliding,
                 slide: SlideTuning::for_cell_size(self.cell_size),
             })
-            .add_systems(PostStartup, register_blockers);
+            .add_systems(PostStartup, rebuild_blockers);
     }
 }
 
-/// Every static blocked area the actor collides with, merged into clusters with one outline. Plugins add their blocked
-/// areas at startup with `add_blocked` (rocks) and this plugin adds the trunks, so a trunk that overlaps a rock
-/// joins the same cluster. `resolve` and `move_feet` take its `edges`.
+/// Every static blocked area the actor collides with, merged into clusters with one outline, so blockers that
+/// overlap or touch block as one shape. `rebuild_blockers` fills it from the `Blocker` components; `add_temporary`
+/// adds a short-lived wall. `resolve` and `move_feet` take its `edges`.
 #[derive(Resource, Default)]
 pub struct CollisionWorld {
     areas: Vec<Rect>,
@@ -169,7 +169,7 @@ impl CollisionWorld {
 }
 
 /// A static area the actor's feet may not enter, as a world rectangle. The game grows it by the actor's size
-/// (`grow_sideways`) before it adds this component. `register_blockers` adds every `Blocker` to the `CollisionWorld`.
+/// (`grow_sideways`) before it adds this component. `rebuild_blockers` adds every `Blocker` to the `CollisionWorld`.
 #[derive(Component, Clone, Copy)]
 pub struct Blocker(pub Rect);
 
@@ -185,9 +185,13 @@ pub fn grow_sideways(area: Rect, half_width: f32) -> Rect {
     )
 }
 
-/// Blockers are spawned in `Startup`, so they can be read after it. Runs before anything that reads the clusters.
-pub fn register_blockers(blockers: Query<&Blocker>, mut world: ResMut<CollisionWorld>) {
+/// Fills the collision world from the `Blocker`s that exist now: it clears the world (temporary areas too) and adds
+/// every blocker, so a blocker that is gone no longer blocks and a new one does. The kit runs it in `PostStartup`,
+/// after the `Startup` spawns. A game that loads maps uses it as its rebuild after every load and unload
+/// (`MapHooks::rebuild`, or a reload of its own).
+pub fn rebuild_blockers(blockers: Query<&Blocker>, mut world: ResMut<CollisionWorld>) {
     let areas: Vec<Rect> = blockers.iter().map(|blocker| blocker.0).collect();
+    world.clear();
     world.add_blocked(&areas);
 }
 
@@ -1034,6 +1038,43 @@ mod tests {
         ]);
         let end = simulate_edges(Vec2::new(10.0, -10.0), Vec2::new(0.0, STEP), 120, &edges);
         assert!(end.x >= -0.2, "ended inside the shape at {end}");
+    }
+
+    #[test]
+    fn a_rebuild_keeps_only_the_blockers_that_exist_now() {
+        use bevy::ecs::system::RunSystemOnce;
+        let mut app = App::new();
+        app.add_plugins(CollisionPlugin {
+            allow_sliding: false,
+            cell_size: 32.0,
+        });
+        let old = app
+            .world_mut()
+            .spawn(Blocker(Rect::new(0.0, 0.0, 16.0, 16.0)))
+            .id();
+        // `PostStartup` adds the first blocker.
+        app.update();
+        assert_eq!(app.world().resource::<CollisionWorld>().clusters().len(), 1);
+        // A map change: the old blocker goes, two new ones come, and a spell's wall from before is dropped.
+        app.world_mut().despawn(old);
+        app.world_mut()
+            .resource_mut::<CollisionWorld>()
+            .add_temporary(Rect::new(100.0, 0.0, 110.0, 40.0));
+        app.world_mut()
+            .spawn(Blocker(Rect::new(-50.0, 20.0, -30.0, 28.0)));
+        app.world_mut()
+            .spawn(Blocker(Rect::new(60.0, -10.0, 70.0, 30.0)));
+        app.world_mut().run_system_once(rebuild_blockers).unwrap();
+        let world = app.world().resource::<CollisionWorld>();
+        let mut bounds: Vec<Rect> = world.clusters().iter().map(|c| c.bounds).collect();
+        bounds.sort_by(|a, b| a.min.x.total_cmp(&b.min.x));
+        assert_eq!(
+            bounds,
+            vec![
+                Rect::new(-50.0, 20.0, -30.0, 28.0),
+                Rect::new(60.0, -10.0, 70.0, 30.0)
+            ]
+        );
     }
 
     #[test]

@@ -7,9 +7,9 @@ How a game moves the player from one map to another. The format of the exits and
 | Part | Code | State |
 |---|---|---|
 | Exits, entries, links between maps | `game-kit` `map_areas.rs`, `map_links.rs` | Built (`adr-x30`) |
-| Registry, lifecycle, fade (scene transition) | `game-kit` `map_transition.rs` | Built (`adr-x31`) |
-| Seamless transition, doorways, eased camera bounds, grid per active map | `game-kit` `map_transition.rs`, `camera.rs`, `debug.rs` | Built (`adr-x32`) |
-| Exit objects (`exit_to`), arrival at `player_start` | `game-kit` `map.rs`, `map_links.rs`, `map_transition.rs` | Built (`adr-x33`) |
+| Registry, lifecycle (`MapLifecyclePlugin`), fade (scene transition) | `game-kit` `map_transition/` (`registry.rs`, `lifecycle.rs`, `transition.rs`) | Built (`adr-x31`, `adr-x59`) |
+| Seamless transition, doorways, eased camera bounds, grid per active map | `game-kit` `map_transition/seamless.rs`, `camera.rs`, `debug.rs` | Built (`adr-x32`) |
+| Exit objects (`exit_to`), arrival at `player_start` | `game-kit` `map.rs`, `map_links.rs`, `map_transition/transition.rs` | Built (`adr-x33`) |
 
 ## How a scene transition runs
 
@@ -129,16 +129,16 @@ The player keeps their position along the strip. The offset is measured in world
 
 ## What a game does
 
-1. Add `MapTransitionPlugin { sources, kinds, start, origin, fade, camera_ease_secs }`. `sources` are the map files with their ids, `kinds` the legend names, `origin` the world position of cell (0,0) of a scene transition map.
+1. Add `MapTransitionPlugin { sources, kinds, start, origin, fade, camera_ease_secs }`. `sources` are the map files with their ids, `kinds` the legend names, `origin` the world position of cell (0,0) of a scene transition map (`MapOrigin`). A game with one map and no exits adds `MapLifecyclePlugin { sources, kinds, start, origin }` instead: the same registry, load, root, rebuild and F1 reload, with no exits, fades or seamless joins (R-Town, `adr-x59`).
 2. Insert `MapHooks`, made with `world.register_system`:
    - `load`: `In<MapLoad>`. Spawn the objects of the map at `origin`. Do not add `MapId`: the kit spawns a `MapRoot` (`MapLoad::root`) before the hook and afterwards makes every new top-level entity its child with the map's `MapId` (`adr-x58`). Spawn nothing here that must outlive the map.
-   - `rebuild`: clear `CollisionWorld` and add the blocked areas of the entities that exist. Runs after every load.
-   - `arrive`: `In<Arrival>`. Move the player to `arrival.feet` and set the facing. The player has no `MapId`.
+   - `rebuild`: clear `CollisionWorld` and add the blocked areas of the entities that exist. Runs after every load. `collision::rebuild_blockers` does this.
+   - `arrive`: `Option`, `In<Arrival>`. Move the player to `arrival.feet` and set the facing. The player has no `MapId`. `None` for a game with no scene transitions.
    - To use exit objects, add `ExitTrigger` to the entities of objects whose `exit_to` is set (Long Way: `markers.rs`).
 3. Keep the player inside `ActiveMaps::walkable(margin_min, margin_max)` with `clamp_to_union` (one map is the same as a clamp to its rectangle). Read `MapTransition::locks_input()` to stop the player during a fade.
 4. F1: call `reload_current_map(world)` from the `ReloadMap` handler.
 
-Long Way: `games/long-way/src/map.rs` (hooks, registration), `rocks.rs` (`rebuild_collision`), `player.rs` (`arrive_player`).
+Long Way: `games/long-way/src/map.rs` (hooks, registration), `game_kit::collision::rebuild_blockers` (rebuild), `player.rs` (`arrive_player`).
 
 ## Running a transition in a scripted run
 

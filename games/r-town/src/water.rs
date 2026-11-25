@@ -8,18 +8,10 @@ use game_kit::layers::BACKGROUND_Z;
 
 use crate::camera::CELL_SIZE;
 use crate::collision::cell_area;
-use crate::map::{CurrentMap, Kind, MapEntity};
+use crate::map::{CurrentMap, Kind};
 
 /// Water draws just above the ground colour. It is R-Town's own sublayer of the background (`adr-x14`).
 const WATER_Z: f32 = BACKGROUND_Z + 1.0;
-
-pub struct WaterPlugin;
-
-impl Plugin for WaterPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_water);
-    }
-}
 
 /// The nine tiles of a pond: the outer ring is the edge, the middle is open water.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -71,7 +63,6 @@ pub fn spawn_water(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
         };
         let centre = (object.cell.as_vec2() + Vec2::splat(0.5)) * CELL_SIZE;
         commands.spawn((
-            MapEntity,
             Blocker(cell_area(object.cell)),
             tag_sprite(&server, "art/features/water.aseprite", part.name()),
             Transform::from_translation(centre.extend(WATER_Z)),

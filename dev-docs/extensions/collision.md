@@ -83,7 +83,7 @@ Values are for a cell size of 64. `SlideTuning::for_cell_size` scales speed, ran
 app.add_plugins(CollisionPlugin { allow_sliding: true });
 ```
 
-- Register blocked areas with `CollisionWorld::add_blocked(&[Rect])` after the obstacles exist (Long Way does it in `Startup` and `PostStartup`).
+- Spawn each obstacle with a `Blocker(Rect)`. The kit fills the world with `rebuild_blockers` in `PostStartup`; a game that loads maps runs it again after every load and unload (Long Way: `MapHooks.rebuild`; R-Town: after its F1 reload). Use `CollisionWorld::add_blocked(&[Rect])` directly only in tests.
 - Give every entity that moves with `move_feet` a `SlideAssist` component.
 - Move with `move_feet(&settings, &mut assist, old_feet, step, dt, world.edges())`.
 - Call `assist.reset()` on frames where the entity does not try to move.

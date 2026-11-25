@@ -42,7 +42,7 @@ fn placement(corner: Vec2) -> (Vec2, Trunk) {
     )
 }
 
-/// Spawns the trees of one map. Their trunks are blockers, which `rebuild_collision` adds to the collision world.
+/// Spawns the trees of one map. Their trunks are blockers, which `rebuild_blockers` (the kit) adds to the collision world.
 pub fn spawn_trees(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
         let Some(path) = art_path(Kind::of(object)) else {

@@ -16,7 +16,7 @@ games/long-way/
     ├── weapon_menu.rs  WeaponMenuPlugin: the weapon drawer that slides up over the game area from an energy gauge, `WeaponKind`, `BuiltWeapons` (the weapons whose plugin casts them), `weapons_for` (energy to weapons), `ActiveWeapons` (the loaded weapon per energy), the messages `GaugeClicked` and `ActiveWeaponClicked` (`adr-lw31`, `adr-lw34`)
     ├── player.rs       PlayerPlugin: player spawn, click to walk (goal, limits), arrow keys walk, animation
     ├── trees.rs        `spawn_trees`: trees and their trunks of one map
-    ├── rocks.rs        `spawn_rocks`, `rebuild_collision`: rocks and the collision world of the loaded maps
+    ├── rocks.rs        `spawn_rocks`: the rocks of a loaded map (the kit's `rebuild_blockers` fills the collision world)
     ├── markers.rs      `spawn_markers`: lanterns, markers and their blockers of one map
     ├── pickups.rs      `spawn_pickups`: energy pickups of one map, each with a `Collectable`
     ├── inventory.rs    `Inventory` (energy counts, at most `MAX_ENERGY` each; `try_spend` and `cost_share` for the cost of a cast), `InventoryPlugin`: fills it from `Collected`

@@ -218,7 +218,7 @@ fn blocked_area(feet: Vec2) -> Rect {
 }
 
 /// Spawns the volcanoes of one map with the bottom of the body on the bottom middle of their cells. They carry the map
-/// id, so the kit removes them with the map. Their bases are blockers, which `rebuild_collision` adds to the collision
+/// id, so the kit removes them with the map. Their bases are blockers, which `rebuild_blockers` (the kit) adds to the collision
 /// world.
 pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for object in &map.objects {

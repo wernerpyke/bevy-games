@@ -1,13 +1,14 @@
 //! R-Town's map: loads the map file, names the object kinds and draws the ground. The parser is `game_kit::map`.
 
 use bevy::prelude::*;
-use game_kit::camera::CameraBounds;
-use game_kit::collision::{Blocker, CollisionWorld};
+use game_kit::collision::rebuild_blockers;
 use game_kit::debug::DebugSettings;
 use game_kit::groups::{Adjacency, group_sizes, neighbour_groups};
 use game_kit::layers::BACKGROUND_Z;
 use game_kit::map::{Map, MapObject, Origin, PLAYER_START, parse, start_feet};
-use game_kit::map_transition::game_folder;
+use game_kit::map_transition::{
+    MapHooks, MapLifecyclePlugin, MapLoad, MapRegistry, MapSource, game_folder, reload_current_map,
+};
 use game_kit::reload::ReloadMap;
 
 use crate::camera::CELL_SIZE;
@@ -49,47 +50,88 @@ const KIND_NAMES: &[&str] = &[
 /// Placeholder ground colour, `#548058`, until tiled backgrounds exist (`rm5`).
 const GROUND_COLOR: Color = Color::srgb_u8(0x54, 0x80, 0x58);
 
+/// The id of R-Town's one map in the kit's registry.
+const MAP_ID: &str = "town";
+
+/// The kit's map lifecycle runs R-Town's map (`adr-x58`, `MapLifecyclePlugin`): it loads the map in `PostStartup`,
+/// runs `load_hook`, adopts everything the hook spawns into the map root, rebuilds the collision world and sets the camera
+/// limits. F1 removes the map, with the player, the enemies and the projectiles in flight (they carry its `MapId`), and
+/// loads it again, so the game starts over.
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        let Loaded {
-            map,
-            start,
-            spawners,
-        } = load_map().unwrap_or_else(|error| panic!("{error}"));
-        info!(
-            "map: {} cell {} size {} {} objects, player start {}",
-            map.name,
-            map.cell_size,
-            map.size,
-            map.objects.len(),
-            start
-        );
-        let current = CurrentMap(map);
-        app.insert_resource(CameraBounds(current.rect()))
-            .insert_resource(current)
-            .insert_resource(PlayerStart(start))
-            .insert_resource(MapSpawners(spawners))
-            .add_systems(Startup, (spawn_ground, number_rows_like_the_file))
+        // The spawners are checked here too, so a bad file stops the start with its legend line.
+        load_map().unwrap_or_else(|error| panic!("{error}"));
+        let file: &'static str = Box::leak(map_path().into_boxed_str());
+        let sources: &'static [MapSource] = Box::leak(Box::new([MapSource { id: MAP_ID, file }]));
+        app.add_plugins(MapLifecyclePlugin {
+            sources,
+            kinds: KIND_NAMES,
+            start: MAP_ID.to_string(),
+            origin: Vec2::ZERO,
+        });
+        let hooks = MapHooks {
+            load: app.world_mut().register_system(load_hook),
+            rebuild: app.world_mut().register_system(rebuild_blockers),
+            arrive: None,
+        };
+        app.insert_resource(hooks)
             .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
 
-/// Marks everything that an F1 reload removes: the objects of the map and also the player, the projectiles in flight
-/// and the enemies. The reload creates the player and the spawners again. Putting it on a new kind of game object makes the object part of the reset.
-#[derive(Component)]
-pub struct MapEntity;
+/// The map file: the path in `R_TOWN_MAP`, else the default file in the game folder. An absolute path replaces the game
+/// folder when the kit joins them.
+fn map_path() -> String {
+    std::env::var(MAP_VARIABLE).unwrap_or_else(|_| MAP_NAME.to_string())
+}
 
-/// Reads the map file: the path in `R_TOWN_MAP`, else the default file in the game folder.
+/// Reads and checks the map file, as the kit will load it.
 fn read_source() -> Result<(String, String), String> {
-    let path = std::env::var_os(MAP_VARIABLE)
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| game_folder().join(MAP_NAME));
+    let path = game_folder().join(map_path());
     let name = path.display().to_string();
     std::fs::read_to_string(&path)
         .map(|source| (name.clone(), source))
         .map_err(|error| format!("{name}: {error}"))
+}
+
+/// The kit's `load` hook: takes the markers out of the registered map, keeps the map and its start and spawners as
+/// resources, and spawns the ground, the player, the spawners, the trees and the water. The kit adopts them all into
+/// the map root.
+fn load_hook(In(load): In<MapLoad>, world: &mut World) {
+    let Some(registered) = world.resource::<MapRegistry>().get(&load.id).cloned() else {
+        error!("map: `{}` is not registered", load.id);
+        return;
+    };
+    let Loaded {
+        map,
+        start,
+        spawners,
+    } = match split_markers(&registered.file, registered.map) {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            error!("map: {error}");
+            return;
+        }
+    };
+    info!(
+        "map: {} cell {} size {} {} objects, player start {}",
+        map.name,
+        map.cell_size,
+        map.size,
+        map.objects.len(),
+        start
+    );
+    world.insert_resource(CurrentMap(map));
+    world.insert_resource(PlayerStart(start));
+    world.insert_resource(MapSpawners(spawners));
+    let _ = world.run_system_cached(spawn_ground);
+    let _ = world.run_system_cached(number_rows_like_the_file);
+    let _ = world.run_system_cached(crate::player::spawn_player);
+    let _ = world.run_system_cached(crate::enemy::spawn_spawners);
+    let _ = world.run_system_cached(crate::trees::spawn_trees);
+    let _ = world.run_system_cached(crate::water::spawn_water);
 }
 
 /// A parsed map: the objects without the markers, the player's start feet and the checked spawners.
@@ -99,9 +141,14 @@ pub struct Loaded {
     spawners: Vec<SpawnerDef>,
 }
 
-/// Parses a map. The markers (the start and the spawners) are taken out of the object list.
+/// Parses a map and takes out its markers (`split_markers`).
 fn parse_map(name: &str, source: &str) -> Result<Loaded, String> {
-    let mut map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
+    let map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
+    split_markers(name, map)
+}
+
+/// Takes the markers (the start and the spawners) out of the object list of a parsed map, and checks them.
+fn split_markers(name: &str, mut map: Map) -> Result<Loaded, String> {
     let starts = map
         .objects
         .iter()
@@ -160,53 +207,13 @@ pub fn blocking_group_sizes(map: &Map) -> Vec<usize> {
         .collect()
 }
 
-/// Runs on `ReloadMap` (F1, sent by the kit): reads the map file again and resets the game state: the ground, trees, collision, camera limits and row numbers
-/// are rebuilt, everything marked `MapEntity` (also the player and the projectiles) is removed, and the player is
-/// created again at the start cell. A file with an error is reported and nothing changes.
+/// Runs on `ReloadMap` (F1, sent by the kit): checks the file first, then lets the kit load the map again
+/// (`reload_current_map`), which starts the game over. A file with an error is reported and nothing changes.
 fn reload_map(world: &mut World) {
-    let Loaded {
-        map,
-        start,
-        spawners,
-    } = match load_map() {
-        Ok(loaded) => loaded,
-        Err(error) => {
-            error!("map: reload failed, keeping the current map: {error}");
-            return;
-        }
-    };
-    info!(
-        "map: reloaded {} {} objects, player start {}",
-        map.name,
-        map.objects.len(),
-        start
-    );
-    let old: Vec<Entity> = world
-        .query_filtered::<Entity, With<MapEntity>>()
-        .iter(world)
-        .collect();
-    for entity in old {
-        world.despawn(entity);
+    let checked = load_map().and_then(|_| reload_current_map(world));
+    if let Err(error) = checked {
+        error!("map: reload failed, keeping the current map: {error}");
     }
-    let current = CurrentMap(map);
-    world.insert_resource(CameraBounds(current.rect()));
-    world.insert_resource(current);
-    world.insert_resource(PlayerStart(start));
-    world.insert_resource(MapSpawners(spawners));
-    let _ = world.run_system_cached(spawn_ground);
-    let _ = world.run_system_cached(crate::player::spawn_player);
-    let _ = world.run_system_cached(crate::enemy::spawn_spawners);
-    let _ = world.run_system_cached(number_rows_like_the_file);
-    let _ = world.run_system_cached(crate::trees::spawn_trees);
-    let _ = world.run_system_cached(crate::water::spawn_water);
-    let _ = world.run_system_cached(replace_collision_areas);
-}
-
-/// Replaces the collision areas with the blockers of the new map. Runs after the spawn commands are applied.
-fn replace_collision_areas(blockers: Query<&Blocker>, mut world: ResMut<CollisionWorld>) {
-    world.clear();
-    let areas: Vec<Rect> = blockers.iter().map(|blocker| blocker.0).collect();
-    world.add_blocked(&areas);
 }
 
 #[derive(Resource)]
@@ -281,7 +288,6 @@ fn number_rows_like_the_file(map: Res<CurrentMap>, debug: Option<ResMut<DebugSet
 fn spawn_ground(mut commands: Commands, map: Res<CurrentMap>) {
     let area = map.rect();
     commands.spawn((
-        MapEntity,
         Sprite::from_color(GROUND_COLOR, area.size()),
         Transform::from_translation(area.center().extend(BACKGROUND_Z)),
     ));

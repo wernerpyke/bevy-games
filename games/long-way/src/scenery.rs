@@ -151,7 +151,7 @@ fn tie_break(kind: Kind, base: Vec2, corner: Vec2, cell: f32) -> f32 {
     corner.x + kind.footprint().x as f32 * cell / 2.0 - base.x
 }
 
-/// Spawns the scenery of one map. The blocked areas are added to the collision world by `rebuild_collision`.
+/// Spawns the scenery of one map. The blocked areas are added to the collision world by `rebuild_blockers` (the kit).
 pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for (object, group) in map.objects.iter().zip(blocking_groups(map)) {
         let Some(art) = art(Kind::of(object)) else {

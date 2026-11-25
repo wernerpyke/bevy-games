@@ -57,8 +57,6 @@ fn main() {
             enemy::EnemyPlugin,
             death::DeathPlugin,
             map::MapPlugin,
-            trees::TreesPlugin,
-            water::WaterPlugin,
             player::PlayerPlugin,
             walk_animation::WalkAnimationPlugin,
             weapon::WeaponPlugin,

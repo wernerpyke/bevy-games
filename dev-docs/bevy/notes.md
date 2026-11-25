@@ -82,7 +82,7 @@ Verified patterns for the pinned version. Read before searching `bevy-src/`. Kee
 - Draw part of a frame: `Sprite { rect: Some(rect), ..default() }` next to `AseAnimation`. The plugin sets only `image` and `texture_atlas` each frame and keeps `rect`, and Bevy offsets `rect` by the corner of the atlas frame, so `rect` is in pixels of the frame with y down. Verified in the map edges (`EdgeSprite::place`, Long Way `edges.rs`, 2026-11-15).
 - Play a tag once: `ase.animation.play("Die", AnimationRepeat::Count(0))`. The message `AnimationEvents::Finished(entity)` is sent when it ends (the entity is the one with the `AseAnimation`; the enum also has `LoopCycleFinished`, so match it, do not destructure it). Used for the ghost `Attack` and `Die` (`ghost.rs`) and the player `Hurt` (`player.rs`).
 
-## One-shot systems and UI overlays (verified in `map_transition.rs`)
+## One-shot systems and UI overlays (verified in `map_transition/`)
 
 - Register a system that takes input: `let id = app.world_mut().register_system(my_system);` with `fn my_system(In(x): In<MyInput>, ..)`. Store `SystemId<In<MyInput>>` (Copy) in a resource. Run it with `world.run_system_with(id, MyInput { .. })`. Run one without input with `world.run_system(id)`. Both return a `Result`, so log the error. Commands queued by the system are applied when it returns.
 - Inside an exclusive system (`fn(world: &mut World)`) copy the ids out first (`world.resource::<Hooks>().clone()`, or `get_resource::<Hooks>().copied()`), because running a system needs `&mut World`.

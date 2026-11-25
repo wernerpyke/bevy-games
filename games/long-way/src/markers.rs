@@ -59,7 +59,7 @@ fn touch_area(blocked: Rect) -> Rect {
     Rect::from_center_size(reach.center(), reach.size() * TOUCH_SCALE)
 }
 
-/// Spawns the lanterns and markers of one map. Their areas are blockers, which `rebuild_collision` adds to the collision world.
+/// Spawns the lanterns and markers of one map. Their areas are blockers, which `rebuild_blockers` (the kit) adds to the collision world.
 pub fn spawn_markers(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     for object in &map.objects {
         let Some(tag) = tag(Kind::of(object)) else {

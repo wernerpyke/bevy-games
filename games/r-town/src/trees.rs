@@ -10,19 +10,11 @@ use game_kit::map::MapObject;
 
 use crate::camera::CELL_SIZE;
 use crate::collision::{BASE_BAND, FEET_HALF_WIDTH, cell_area};
-use crate::map::{CurrentMap, Kind, MapEntity, blocking_group_sizes};
+use crate::map::{CurrentMap, Kind, blocking_group_sizes};
 
 /// Both art files are packed with the same canvas: 30 wide and 39 high, each tree at the bottom centre
 /// (`dev-scripts/aseprite/pack_pngs.lua`).
 const CANVAS_HEIGHT: f32 = 39.0;
-pub struct TreesPlugin;
-
-impl Plugin for TreesPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_trees);
-    }
-}
-
 /// The art and the base of a tree kind.
 struct TreeArt {
     /// Aseprite tag in `art/features/background-elements.aseprite`.
@@ -94,7 +86,6 @@ pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<Cu
         let base = base_of(object);
         commands
             .spawn((
-                MapEntity,
                 Blocker(area_of(object, &art, group_size)),
                 SortAtBlocker,
                 Transform::from_translation(base.extend(0.0)),

@@ -7,7 +7,7 @@ use game_kit::animation::tag_sprite;
 
 use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::{Group, Kind, blocking_groups};
-use game_kit::collision::{Blocker, CollisionWorld, grow_sideways};
+use game_kit::collision::{Blocker, grow_sideways};
 use game_kit::depth::SortAtBlocker;
 use game_kit::groups::group_or_alone;
 use game_kit::map::{Map, MapObject};
@@ -30,15 +30,9 @@ const ALONE_BAND_FRACTION: f32 = 0.1;
 /// Drawn size of a rock in pixels when the map file has no `draw` key.
 const DEFAULT_DRAW_SIZE: f32 = 128.0;
 
-/// Marker for a rock. Its blocked area is its `Blocker`, and it sorts at that area (`SortAtBlocker`). `rebuild_collision`
-/// tells rocks from other blockers by this marker.
+/// Marker for a rock. Its blocked area is its `Blocker`, and it sorts at that area (`SortAtBlocker`).
 #[derive(Component)]
 pub struct Rock;
-
-/// Marks a rock that touches no empty space, because rocks around it fill every side (`outline::Cluster::interior`).
-/// Collision uses only the outline edges, so this costs nothing there. The debug overlay colours these rocks.
-#[derive(Component)]
-pub struct InteriorRock;
 
 /// Where and how large to draw one rock.
 #[derive(Debug, PartialEq)]
@@ -125,8 +119,8 @@ fn jitter_offset(object: &MapObject, jitter: f32) -> Vec2 {
     Vec2::new(unit(1), unit(2)) * jitter
 }
 
-/// Spawns the rocks of one map. The blocked areas are added to the collision world by `rebuild_collision`, once the
-/// trees exist too.
+/// Spawns the rocks of one map. The kit adds their blocked areas to the collision world after the load
+/// (`rebuild_blockers`).
 pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, load: &MapLoad) {
     if (draw_size(map) / ART_PIXELS).fract() != 0.0 {
         warn!(
@@ -160,37 +154,6 @@ pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, loa
                 .with_scale(Vec3::splat(placement.scale)),
         ));
     }
-}
-
-/// Fills the collision world from the entities that exist: the rock areas first, then the tree trunks, so a trunk that
-/// overlaps a rock joins its cluster. Then it marks the rocks that touch no empty space. The kit runs it after every
-/// load and unload.
-pub fn rebuild_collision(
-    mut commands: Commands,
-    mut world: ResMut<CollisionWorld>,
-    rocks: Query<(Entity, &Blocker), With<Rock>>,
-    blockers: Query<&Blocker, Without<Rock>>,
-) {
-    world.clear();
-    let rocks: Vec<(Entity, Rect)> = rocks
-        .iter()
-        .map(|(entity, blocker)| (entity, blocker.0))
-        .collect();
-    let areas: Vec<Rect> = rocks.iter().map(|(_, area)| *area).collect();
-    let first_rock = world.add_blocked(&areas);
-    let trunks: Vec<Rect> = blockers.iter().map(|blocker| blocker.0).collect();
-    world.add_blocked(&trunks);
-
-    let mut interior = 0;
-    for (index, (entity, _)) in rocks.iter().enumerate() {
-        if world.is_interior(first_rock + index) {
-            commands.entity(*entity).insert(InteriorRock);
-            interior += 1;
-        } else {
-            commands.entity(*entity).remove::<InteriorRock>();
-        }
-    }
-    info!("rocks: {} of {} rocks are interior", interior, rocks.len());
 }
 
 #[cfg(test)]

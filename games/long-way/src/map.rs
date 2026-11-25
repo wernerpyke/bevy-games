@@ -82,10 +82,11 @@ impl Plugin for MapPlugin {
             load: app.world_mut().register_system(load_hook),
             rebuild: app
                 .world_mut()
-                .register_system(crate::rocks::rebuild_collision),
-            arrive: app
-                .world_mut()
-                .register_system(crate::player::arrive_player),
+                .register_system(game_kit::collision::rebuild_blockers),
+            arrive: Some(
+                app.world_mut()
+                    .register_system(crate::player::arrive_player),
+            ),
         };
         app.insert_resource(hooks)
             .add_systems(Startup, crate::background::check_tiles)

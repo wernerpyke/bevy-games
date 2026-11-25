@@ -42,7 +42,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | Many sprites animate in step | `RandomStartFrame::for_cell` |
 | The animation speed is wrong | Frame durations in the `.aseprite` file (`adr-a6`) |
 | Pixels are blurred | The kit camera's view height (`camera.rs`) |
-| The fade or entry position is wrong at an exit | `map_transition.rs` and `MapHooks` |
+| The fade or entry position is wrong at an exit | `map_transition/transition.rs` and `MapHooks` |
 | An exit leads nowhere | `map_links.rs` |
 | Ground tiles change on reload | `map_background::place_tiles` |
 | A HUD click moves the player | `BlocksWorldClick` (`pointer.rs`) |
@@ -61,7 +61,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | [collision-research.md](collision-research.md) | Approaches compared, why outlines | none | lw1, x10 |
 | [draw-order.md](draw-order.md) | Depth sort by feet, named layers | `game-kit` `depth.rs`, `layers.rs` | x2, x9 (lw12 for Long Way) |
 | [map-files.md](map-files.md) | Text map format and parser contract, exits and entries | `game-kit` `map.rs`, `map_areas.rs`, `map_links.rs`, `map_edge.rs`, `map_background.rs` | lw8, x11, x18, x30 |
-| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition.rs`, `reload.rs` | x30, x31, x32, lw19 |
+| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition/` (`MapLifecyclePlugin`, `MapTransitionPlugin`), `reload.rs` | x30, x31, x32, lw19 |
 | [groups.md](groups.md) | Single items and neighbour groups for blocked areas | `game-kit` `groups.rs` | x20, rt9, lw14 |
 | [projectiles.md](projectiles.md) | Straight-flying projectiles that stop at blocked areas and the map edge | `game-kit` `projectile.rs` | x21, rt11 |
 | [nav.md](nav.md) | Grid path finding built from the collision outlines, nearest reachable point | `game-kit` `nav.rs` | x23, x43, rt12 |

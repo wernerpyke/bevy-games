@@ -11,7 +11,7 @@ use game_kit::hitbox::HitBox;
 
 use crate::collision::FEET_HALF_WIDTH;
 use crate::input::{InputSet, PlayerInput};
-use crate::map::{MapEntity, PlayerStart};
+use crate::map::PlayerStart;
 use crate::walk_animation::{WalkAnimation, WalkSprite, WalkStateSet};
 
 /// The body that enemies touch: 8 px wide and 12 px high, from 2 px above the feet.
@@ -29,8 +29,7 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_player)
-            .add_systems(Update, move_player.in_set(WalkStateSet).after(InputSet));
+        app.add_systems(Update, move_player.in_set(WalkStateSet).after(InputSet));
     }
 }
 
@@ -66,7 +65,6 @@ pub(crate) fn spawn_player(
             Player::default(),
             WalkAnimation::default(),
             HIT_BOX,
-            MapEntity,
             SlideAssist::default(),
             DepthSort { feet_offset: 0.0 },
             Transform::from_translation(start.extend(0.0)),

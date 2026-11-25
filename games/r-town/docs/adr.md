@@ -65,7 +65,7 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 **Rationale.** Edit the map in a text editor and see it at once, without a rebuild. This is the native half of `rm3`. 
 
-**How to apply.** Everything a map spawns has the `MapEntity` component, so a reload removes it. A new map system must tag its entities with it and be run in `reload_map` (`src/map.rs`).
+**How to apply.** The kit's `MapLifecyclePlugin` runs the map (`adr-x59`). Everything the `load_hook` in `src/map.rs` spawns is adopted into the map root with its `MapId`, so a reload removes it (`adr-x58`). A new map system is run from `load_hook`.
 
 ## adr-rt9. A lone item blocks a band, a group blocks its cells (2026-11-03)
 
@@ -101,8 +101,8 @@ Walk speed is 80 art pixels per second (5 cells per second). Houses and trees bl
 
 ## adr-rt13. F1 resets the whole game state, and death removes the player (2026-11-04)
 
-**Decision.** F1 reads the map again and resets the game: everything with `MapEntity` is removed (map objects, the player, the enemies, the spawners and the projectiles in flight), the player is created again at the start cell, and the spawners are created again. The path grid is built again because the collision areas change. This replaces "the player stays where it is" (`adr-rt8`) and "projectiles in flight are not despawned" (`adr-rt11`). When an enemy touches the player, the player entity and its sprite are removed. There is no death screen and no state yet.
+**Decision.** F1 reads the map again and resets the game: everything with the map's `MapId` is removed (map objects, the player, the enemies, the spawners and the projectiles in flight), the player is created again at the start cell, and the spawners are created again. The path grid is built again because the collision areas change. This replaces "the player stays where it is" (`adr-rt8`) and "projectiles in flight are not despawned" (`adr-rt11`). When an enemy touches the player, the player entity and its sprite are removed. There is no death screen and no state yet.
 
 **Rationale.** A full reset is simple and safe: no old path, shot or enemy outlives its map, and F1 is also the way back after a death. Hit points and a death screen come later and will need a game state.
 
-**How to apply.** Put `MapEntity` (`src/map.rs`) on every new kind of game object that the reset must remove. Systems that need the player use `Single`, so they skip their work when it is gone (`dev-docs/bevy/notes.md`).
+**How to apply.** Spawn a new kind of map object in `load_hook` (`src/map.rs`); the kit gives it the `MapId`. Give an object spawned later (an enemy, a projectile) `MapId(active.current.clone())` so the reset removes it. Systems that need the player use `Single`, so they skip their work when it is gone (`dev-docs/bevy/notes.md`).
