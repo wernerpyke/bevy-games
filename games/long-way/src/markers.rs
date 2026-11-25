@@ -10,7 +10,7 @@ use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
 use game_kit::depth::SortAtBlocker;
 use game_kit::map::{Map, MapObject};
-use game_kit::map_transition::{ExitTrigger, MapId, MapLoad};
+use game_kit::map_transition::{ExitTrigger, MapLoad};
 
 /// Size of `Markers.aseprite` in pixels. The height is 70% of `PLAYER_BODY_HEIGHT` (50), and the width keeps the aspect of the source.
 const MARKER_WIDTH: f32 = 28.0;
@@ -86,7 +86,6 @@ fn spawn_marker(
     );
     let blocked = blocked_area(corner, map.cell_size);
     let mut entity = commands.spawn((
-        MapId(load.id.clone()),
         Blocker(blocked),
         SortAtBlocker,
         tag_sprite(server, "art/features/Markers.aseprite", tag),

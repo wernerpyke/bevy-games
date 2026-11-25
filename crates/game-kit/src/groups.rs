@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use bevy::math::IVec2;
+use bevy::math::{IVec2, Rect};
 
 /// Which cells count as neighbours of a cell.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,6 +97,13 @@ pub fn group_sizes(groups: &[usize]) -> Vec<usize> {
     groups.iter().map(|group| counts[group]).collect()
 }
 
+/// The area of one item that blocks: its whole `footprint` in a group (`group_size` above 1), so neighbours block as one
+/// shape with no gap between them, and only its `alone` area (the band at its base) when it stands alone, so a body
+/// walks behind the rest of it (`dev-docs/extensions/groups.md`).
+pub fn group_or_alone(group_size: usize, footprint: Rect, alone: Rect) -> Rect {
+    if group_size > 1 { footprint } else { alone }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,6 +112,15 @@ mod tests {
 
     fn cells(list: &[(i32, i32)]) -> Vec<IVec2> {
         list.iter().map(|&(x, y)| IVec2::new(x, y)).collect()
+    }
+
+    #[test]
+    fn an_item_alone_blocks_its_band_and_one_in_a_group_of_two_or_more_its_footprint() {
+        let footprint = Rect::new(-12.0, 30.0, 20.0, 62.0);
+        let alone = Rect::new(-9.0, 30.0, 17.0, 35.0);
+        assert_eq!(group_or_alone(1, footprint, alone), alone);
+        assert_eq!(group_or_alone(2, footprint, alone), footprint);
+        assert_eq!(group_or_alone(7, footprint, alone), footprint);
     }
 
     fn sizes_of(list: &[(i32, i32)], size: IVec2, adjacency: Adjacency) -> Vec<usize> {

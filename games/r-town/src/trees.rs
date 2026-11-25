@@ -3,8 +3,9 @@
 
 use bevy::prelude::*;
 use game_kit::animation::tag_sprite;
-use game_kit::collision::Blocker;
+use game_kit::collision::{Blocker, grow_sideways};
 use game_kit::depth::SortAtBlocker;
+use game_kit::groups::group_or_alone;
 use game_kit::map::MapObject;
 
 use crate::camera::CELL_SIZE;
@@ -64,21 +65,24 @@ fn base_of(object: &MapObject) -> Vec2 {
 /// The area the player's feet may not enter for a tree that stands alone: the base of the tree grown sideways by the
 /// feet half width, 4 px deep. The player walks behind the rest (`adr-rt5`).
 fn blocked_area(base: Vec2, edges: (f32, f32)) -> Rect {
-    Rect::new(
-        base.x + edges.0 - FEET_HALF_WIDTH,
-        base.y,
-        base.x + edges.1 + FEET_HALF_WIDTH,
-        base.y + BASE_BAND,
+    grow_sideways(
+        Rect::new(
+            base.x + edges.0,
+            base.y,
+            base.x + edges.1,
+            base.y + BASE_BAND,
+        ),
+        FEET_HALF_WIDTH,
     )
 }
 
 /// The blocked area of an object: the base band when it stands alone, the whole cell when it is in a group.
 fn area_of(object: &MapObject, art: &TreeArt, group_size: usize) -> Rect {
-    if group_size > 1 {
-        cell_area(object.cell)
-    } else {
-        blocked_area(base_of(object), art.base)
-    }
+    group_or_alone(
+        group_size,
+        cell_area(object.cell),
+        blocked_area(base_of(object), art.base),
+    )
 }
 
 pub fn spawn_trees(mut commands: Commands, server: Res<AssetServer>, map: Res<CurrentMap>) {

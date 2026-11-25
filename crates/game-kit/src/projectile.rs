@@ -5,6 +5,8 @@
 //! (`collision::segment_hit`). `step` and `PathShape` are plain Rust with no Bevy world, so they are unit tested without
 //! a running app.
 
+use bevy::ecs::lifecycle::HookContext;
+use bevy::ecs::world::DeferredWorld;
 use bevy::prelude::*;
 
 use crate::area::ease_out;
@@ -37,9 +39,11 @@ impl Plugin for ProjectilePlugin {
 pub struct ProjectileSet;
 
 /// A projectile in flight. The entity's `Transform` x and y are the point that collides: its ground point, with the
-/// sprite on a child entity lifted above it, or with a `ProjectilePath` the point where it is drawn. Give the entity `DepthSort { feet_offset: 0.0 }` to draw it
-/// in the world layer (`adr-x2`). The game spawns the entity and its sprite, the kit only moves it.
+/// sprite on a child entity lifted above it, or with a `ProjectilePath` the point where it is drawn. It requires a
+/// `DepthSort`, so it is drawn in the world layer by that point (`adr-x2`, `adr-x56`). The game spawns the entity and
+/// its sprite, the kit only moves it.
 #[derive(Component, Clone, Copy, Debug)]
+#[require(DepthSort)]
 pub struct Projectile {
     /// Ground velocity in world units per second.
     pub velocity: Vec2,
@@ -155,10 +159,13 @@ impl PathShape {
 
 /// Moves a `Projectile` along a `PathShape` in `direction`. The entity's point is where the projectile is drawn and
 /// collides: the ground position along `direction` plus the height, straight up the screen. Each frame the kit sets
-/// the projectile's `velocity` so the point follows `ground_distance` and `height`. With `DepthSort` on the entity the
-/// kit keeps `feet_offset` at the height above the ground, so the projectile sorts by the ground under it. At the end
-/// of the path the kit removes it (`HitCause::PathEnd`). Blocked areas and the map edge stop it as any projectile.
+/// the projectile's `velocity` so the point follows `ground_distance` and `height`. The kit keeps the `DepthSort`
+/// `feet_offset` at the height above the ground, from the moment the path is added, so the projectile sorts by the
+/// ground under it. At the end of the path the kit removes it (`HitCause::PathEnd`). Blocked areas and the map edge
+/// stop it as any projectile.
 #[derive(Component, Clone, Copy, Debug)]
+#[require(Projectile = Projectile::new(Vec2::ZERO, 0.0))]
+#[component(on_insert = sort_at_path_start)]
 pub struct ProjectilePath {
     pub shape: PathShape,
     /// Unit direction over the ground.
@@ -186,6 +193,19 @@ impl ProjectilePath {
     }
 }
 
+/// Sets the sort of a new path projectile, so its first frame is drawn at the right depth.
+fn sort_at_path_start(mut world: DeferredWorld, context: HookContext) {
+    let Some(above) = world
+        .get::<ProjectilePath>(context.entity)
+        .map(ProjectilePath::above_ground)
+    else {
+        return;
+    };
+    if let Some(mut sort) = world.get_mut::<DepthSort>(context.entity) {
+        sort.feet_offset = above;
+    }
+}
+
 /// The move of a path point from `from` to `to` seconds: along the ground and up or down by the change of height.
 fn path_move(path: &ProjectilePath, from: f32, to: f32) -> Vec2 {
     let shape = &path.shape;
@@ -193,7 +213,7 @@ fn path_move(path: &ProjectilePath, from: f32, to: f32) -> Vec2 {
         + Vec2::Y * (shape.height(to) - shape.height(from))
 }
 
-/// The projectiles that follow a path, with their sort when they have one.
+/// The projectiles that follow a path, with their sort.
 type PathQuery<'w, 's> = Query<
     'w,
     's,
@@ -202,7 +222,7 @@ type PathQuery<'w, 's> = Query<
         &'static Transform,
         &'static mut Projectile,
         &'static mut ProjectilePath,
-        Option<&'static mut DepthSort>,
+        &'static mut DepthSort,
     ),
     Without<Spent>,
 >;
@@ -214,7 +234,7 @@ fn follow_paths(
     mut commands: Commands,
 ) {
     let dt = time.delta_secs();
-    for (entity, transform, mut projectile, mut path, sort) in &mut paths {
+    for (entity, transform, mut projectile, mut path, mut sort) in &mut paths {
         if path.elapsed >= path.shape.duration {
             let position = transform.translation.truncate();
             debug!("projectile: removed at {position:?} (PathEnd)");
@@ -234,9 +254,7 @@ fn follow_paths(
         };
         path.elapsed = next;
         // `move_projectiles` moves the point to where the path is at `next`.
-        if let Some(mut sort) = sort {
-            sort.feet_offset = path.above_ground();
-        }
+        sort.feet_offset = path.above_ground();
     }
 }
 
@@ -974,11 +992,15 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::from_xyz(from.x, from.y, 0.0),
-                Projectile::new(Vec2::X, 0.0),
                 ProjectilePath::new(shape(), direction, 5.0),
-                DepthSort { feet_offset: 0.0 },
             ))
             .id();
+        // The kit adds the projectile and its sort, at the start height (10) above the rest height (5), before any
+        // frame runs.
+        assert_eq!(
+            app.world().get::<DepthSort>(shot).unwrap().feet_offset,
+            15.0
+        );
         // The first update has no time step, then 29 frames of 16 ms: 0.464 s, in the first arc. The point is the
         // ground move plus the change of height from the start (10 px). 1e-3: the sum of f32 steps.
         for _ in 0..30 {

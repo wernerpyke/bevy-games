@@ -30,7 +30,7 @@ Trunk edges come from art pixels (`TRUNK_LEFT_PX`, `TRUNK_RIGHT_PX` in `trees.rs
 - Footprint: 2x2 cells (128 x 128).
 - Blocked area: the footprint inset by 10% on the left, right and top, and not at the bottom. That is 102.4 wide and 115.2 high. It is then grown sideways by the half width (14), giving 130.4 wide.
 - No other vertical margin. The bottom line sits on the lowest art pixel. The lowest 4 art rows are empty, so the sprite is placed with its lowest visible pixel on the footprint bottom.
-- Sort line: the bottom of the blocked area plus `SORT_BIAS` (1). The player stopped at a rock is drawn in front of it. The player above it is behind it.
+- Sort line: the bottom of the blocked area plus 1 (the kit's `SortAtBlocker`; the rock's area is its `Blocker`). The player stopped at a rock is drawn in front of it. The player above it is behind it.
 - Rock `draw` and `cell` sizes must agree, or the sprite and the blocked area drift apart.
 
 ### Clusters

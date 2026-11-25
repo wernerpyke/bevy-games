@@ -11,7 +11,7 @@ use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
 use game_kit::depth::SortAtBlocker;
 use game_kit::map::{Map, MapObject};
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 
 /// Both tree canvases are 128x128, the size of a 2x2 cell footprint at a cell size of 64.
 const TREE_SIZE: f32 = 128.0;
@@ -79,7 +79,6 @@ fn spawn_tree(
     let corner = footprint_corner(object, map, load.origin);
     let (centre, trunk) = placement(corner);
     commands.spawn((
-        MapId(load.id.clone()),
         tree_blocker(&trunk, corner, map.cell_size, group),
         SortAtBlocker,
         all_frames_animation(server, path),

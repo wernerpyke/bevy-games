@@ -17,7 +17,7 @@ use crate::rocks::footprint_corner;
 use game_kit::collision::Blocker;
 use game_kit::depth::{SortAtBlocker, TieBreakX};
 use game_kit::map::Map;
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 
 /// The foot of the object that blocks the player, as pixels from the left edge of the canvas, and the height the blocked
 /// band is taken from. A tree measures the lowest 12 rows of its trunk and the height of its canvas. A shrub has a foot
@@ -164,7 +164,6 @@ pub fn spawn_scenery(commands: &mut Commands, server: &AssetServer, map: &Map, l
             Hang::BottomMiddle { .. } => Anchor::BOTTOM_CENTER,
         };
         commands.spawn((
-            MapId(load.id.clone()),
             blocker(&art, base, canvas_left, corner, map.cell_size, group),
             SortAtBlocker,
             TieBreakX(tie_break(Kind::of(object), base, corner, map.cell_size)),

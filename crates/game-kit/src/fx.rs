@@ -15,6 +15,8 @@ use bevy::shader::ShaderRef;
 use bevy_enoki::prelude::*;
 use bevy_enoki::{PARTICLE_COLOR_FRAG, PARTICLE_SPRITE_FRAG};
 
+use crate::depth::DepthSort;
+
 pub use crate::fx_strip::FxLooks;
 pub use bevy_enoki::prelude::{
     Attractor, OneShot, Particle2dEffect, ParticleEffectHandle, ParticleEffectInstance,
@@ -170,11 +172,13 @@ pub struct Fx<'w, 's> {
 
 impl Fx<'_, '_> {
     /// Spawns an emitter from an effect file. `glow` draws its particles with additive blending. The emitter keeps
-    /// spawning until it is despawned or its `ParticleSpawnerState` is set inactive.
+    /// spawning until it is despawned or its `ParticleSpawnerState` is set inactive. It has a `DepthSort` with its feet
+    /// at its `Transform`, so it is drawn in the world layer (`adr-x56`); a game inserts its own `DepthSort` to lift it.
     pub fn emitter(&mut self, file: &str, transform: Transform, look: &Look, glow: bool) -> Entity {
         let mut entity = self.commands.spawn((
             ParticleEffectHandle(self.server.load(file.to_owned())),
             transform,
+            DepthSort::default(),
         ));
         match (look, glow) {
             (Look::Squares, true) => {
@@ -222,7 +226,7 @@ impl Fx<'_, '_> {
 }
 
 /// An emitter that moves with its `owner`: it takes the owner's x and y plus `offset`, and the owner's rotation
-/// turned by `rotation`. It leaves z alone, so a game gives the emitter its own draw order (`DepthSort`). When the
+/// turned by `rotation`. It leaves z alone: the emitter's `DepthSort` sets it. When the
 /// owner is gone the emitter stops spawning and removes itself after its last particle has died.
 #[derive(Component, Clone, Copy, Debug)]
 pub struct Follows {
@@ -328,6 +332,13 @@ mod tests {
             }));
         }
         let world = app.world();
+        // Every emitter is sorted in the world layer by its own position.
+        for &emitter in &spawned {
+            assert_eq!(
+                world.get::<DepthSort>(emitter).map(|sort| sort.feet_offset),
+                Some(0.0)
+            );
+        }
         let glow_colour = world.resource::<FxMaterials>().additive_color.clone();
         let [glow_squares, squares, glow_sprites, plain_sprites] = spawned[..] else {
             unreachable!()

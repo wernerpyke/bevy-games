@@ -2,11 +2,12 @@
 //! (`dev-docs/extensions/draw-order.md`, adr-x2). Every other z is a named constant in `layers.rs`.
 //!
 //! - A character or other moving sprite gets `DepthSort { feet_offset }`, the distance from its centre down to its
-//!   feet. Use the real feet offset, or it is not drawn behind objects it walks behind.
+//!   feet. `DepthSort` owns the feet offset (adr-x57): find the feet with `DepthSort::feet` or `feet_of`. Use the
+//!   real feet offset, or it is not drawn behind objects it walks behind.
 //! - An object that blocks gets `Blocker` and `SortAtBlocker`, and no `feet_offset`. The kit sorts it at the bottom of
-//!   its blocked area plus `BLOCKER_SORT_BIAS`, so a character standing at it is drawn in front (adr-x53). Do not
-//!   subtract the bias by hand. Debug builds log a `depth:` warning for a blocker that sorts by hand at or below
-//!   that line.
+//!   its blocked area plus a small private bias, so a character standing at it is drawn in front (adr-x53). An object
+//!   that does not block (a pickup) gets `SortAtArea(ground rect)` for the same rule. Debug builds log a `depth:`
+//!   warning for a blocker that sorts by hand at or below that line, and for `SortAtBlocker` without a `Blocker`.
 //! - A sprite not anchored at the middle of its footprint adds `TieBreakX`, or neighbours in a row can swap order.
 
 use bevy::prelude::*;
@@ -48,10 +49,19 @@ impl Plugin for DepthPlugin {
         .configure_sets(PostUpdate, DepthSet.before(TransformSystems::Propagate))
         .add_systems(
             PostUpdate,
-            (sort_at_blocker, sort_by_feet).chain().in_set(DepthSet),
+            ((sort_at_blocker, sort_at_area), sort_by_feet)
+                .chain()
+                .in_set(DepthSet),
         );
         #[cfg(debug_assertions)]
-        app.add_systems(PostUpdate, warn_sort_below_blocker.in_set(DepthSet));
+        app.add_systems(
+            PostUpdate,
+            (
+                warn_sort_below_blocker,
+                warn_sort_at_blocker_without_blocker,
+            )
+                .in_set(DepthSet),
+        );
     }
 }
 
@@ -61,20 +71,36 @@ impl Plugin for DepthPlugin {
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DepthSet;
 
-/// How far above the bottom of its blocked area an object sorts. A character's feet stop exactly on that bottom, so
-/// without the bias the two would tie and the character could be drawn behind the object it stands in front of.
-pub const BLOCKER_SORT_BIAS: f32 = 1.0;
+/// How far above the bottom of its area an object sorts. A character's feet stop exactly on that bottom, so without
+/// the bias the two would tie and the character could be drawn behind the object it stands in front of. Private: a
+/// game uses `SortAtBlocker` or `SortAtArea` and never adds it by hand (adr-x56).
+const SORT_BIAS: f32 = 1.0;
 
-/// Sorts a static object at the bottom of its `Blocker` plus `BLOCKER_SORT_BIAS`, so a character standing at it is
-/// drawn in front and one whose feet are above that line is drawn behind (`adr-x2`). The kit keeps its `DepthSort` in
-/// step with the blocker; the game sets no `feet_offset`.
+/// Sorts a static object at the bottom of its `Blocker` plus a small bias, so a character standing at it is drawn in
+/// front and one whose feet are above that line is drawn behind (`adr-x2`). The kit keeps its `DepthSort` in step with
+/// the blocker; the game sets no `feet_offset`.
 #[derive(Component, Clone, Copy, Debug, Default)]
 #[require(DepthSort)]
 pub struct SortAtBlocker;
 
-/// The draw line of an object whose feet may not enter `blocked`.
-pub fn sort_line(blocked: Rect) -> f32 {
-    blocked.min.y + BLOCKER_SORT_BIAS
+/// Sorts a static object that does not block, such as a pickup, like `SortAtBlocker`: at the bottom of this world
+/// rectangle (where the object meets the ground) plus a small bias, so a character standing on that line is drawn in
+/// front of it.
+#[derive(Component, Clone, Copy, Debug)]
+#[require(DepthSort)]
+pub struct SortAtArea(pub Rect);
+
+/// The draw line of an object whose ground area is `area`.
+fn sort_line(area: Rect) -> f32 {
+    area.min.y + SORT_BIAS
+}
+
+/// Keeps `sort` on the draw line of `area` for an entity at `transform`.
+fn sort_on_line(transform: &Transform, area: Rect, sort: &mut Mut<DepthSort>) {
+    let feet_offset = transform.translation.y - sort_line(area);
+    if sort.feet_offset != feet_offset {
+        sort.feet_offset = feet_offset;
+    }
 }
 
 /// A static object whose position or blocked area changed, or that just got `SortAtBlocker`.
@@ -85,10 +111,27 @@ type BlockerMoved = (
 
 fn sort_at_blocker(mut query: Query<(&Transform, &Blocker, &mut DepthSort), BlockerMoved>) {
     for (transform, blocker, mut sort) in &mut query {
-        let feet_offset = transform.translation.y - sort_line(blocker.0);
-        if sort.feet_offset != feet_offset {
-            sort.feet_offset = feet_offset;
-        }
+        sort_on_line(transform, blocker.0, &mut sort);
+    }
+}
+
+/// A static object whose position or ground area changed (a new `SortAtArea` counts as changed).
+type AreaMoved = Or<(Changed<Transform>, Changed<SortAtArea>)>;
+
+fn sort_at_area(mut query: Query<(&Transform, &SortAtArea, &mut DepthSort), AreaMoved>) {
+    for (transform, area, mut sort) in &mut query {
+        sort_on_line(transform, area.0, &mut sort);
+    }
+}
+
+/// Debug builds only: reports, once, a new object with `SortAtBlocker` and no `Blocker`. It would sort at its
+/// `Transform`, and nothing else would say why.
+#[cfg(debug_assertions)]
+fn warn_sort_at_blocker_without_blocker(
+    new: Query<Entity, (Added<SortAtBlocker>, Without<Blocker>)>,
+) {
+    for entity in &new {
+        warn!("depth: {entity:?} has SortAtBlocker but no Blocker, so it sorts at its Transform");
     }
 }
 
@@ -138,6 +181,22 @@ impl DepthSort {
     pub fn feet_y(&self, centre_y: f32) -> f32 {
         centre_y - self.feet_offset
     }
+
+    /// The feet of an entity with this `Transform`.
+    pub fn feet(&self, transform: &Transform) -> Vec2 {
+        Vec2::new(
+            transform.translation.x,
+            self.feet_y(transform.translation.y),
+        )
+    }
+}
+
+/// The feet of an entity: `DepthSort` owns the feet offset (adr-x57). Without one the `Transform` is the feet. Every
+/// system that walks, aims, looks or touches from an entity's feet uses this or `DepthSort::feet`.
+pub fn feet_of(transform: &Transform, sort: Option<&DepthSort>) -> Vec2 {
+    sort.map_or(transform.translation.truncate(), |sort| {
+        sort.feet(transform)
+    })
 }
 
 /// Moves the x that breaks a tie between equal feet (`depth_z`) this many world units away from the entity's x. A
@@ -233,6 +292,37 @@ mod tests {
             .insert(Blocker(Rect::new(-70.0, -8.0, 30.0, 40.0)));
         app.update();
         assert_eq!(z(&app, object), depth_z(-20.0, -7.0));
+    }
+
+    #[test]
+    fn an_object_that_does_not_block_sorts_just_above_the_bottom_of_its_area() {
+        let mut app = App::new();
+        app.add_plugins(DepthPlugin::default());
+        let pickup = app
+            .world_mut()
+            .spawn((
+                SortAtArea(Rect::new(100.0, -64.0, 116.0, -40.0)),
+                Transform::from_xyz(108.0, -52.0, 0.0),
+            ))
+            .id();
+        // A character whose feet are on the bottom of the area, right of the pickup's x.
+        let character = app
+            .world_mut()
+            .spawn((
+                DepthSort { feet_offset: 8.0 },
+                Transform::from_xyz(112.0, -56.0, 0.0),
+            ))
+            .id();
+        app.update();
+        let z = |app: &App, entity| app.world().get::<Transform>(entity).unwrap().translation.z;
+        assert_eq!(z(&app, pickup), depth_z(108.0, -63.0));
+        assert!(z(&app, character) > z(&app, pickup));
+        // A new area moves the line with it.
+        app.world_mut()
+            .entity_mut(pickup)
+            .insert(SortAtArea(Rect::new(100.0, -30.0, 116.0, -10.0)));
+        app.update();
+        assert_eq!(z(&app, pickup), depth_z(108.0, -29.0));
     }
 
     #[test]

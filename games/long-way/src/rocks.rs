@@ -7,10 +7,11 @@ use game_kit::animation::tag_sprite;
 
 use crate::collision::PLAYER_HALF_WIDTH;
 use crate::map::{Group, Kind, blocking_groups};
-use game_kit::collision::{Blocker, CollisionWorld};
-use game_kit::depth::{BLOCKER_SORT_BIAS, DepthSort};
+use game_kit::collision::{Blocker, CollisionWorld, grow_sideways};
+use game_kit::depth::SortAtBlocker;
+use game_kit::groups::group_or_alone;
 use game_kit::map::{Map, MapObject};
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 
 /// Footprint of a rock in cells, in x and y.
 pub const FOOTPRINT_CELLS: f32 = 2.0;
@@ -28,18 +29,11 @@ const BOTTOM_INSET_FRACTION: f32 = 0.0;
 const ALONE_BAND_FRACTION: f32 = 0.1;
 /// Drawn size of a rock in pixels when the map file has no `draw` key.
 const DEFAULT_DRAW_SIZE: f32 = 128.0;
-/// How far above the bottom of the blocked area a rock sorts, the kit's bias for objects that block. A rock's blocked area
-/// is a `RockArea`, not a `Blocker`, so it cannot use `SortAtBlocker`. Pickups use it too, so the player is drawn in
-/// front of a pickup it stands on.
-pub const SORT_BIAS: f32 = BLOCKER_SORT_BIAS;
 
-/// Marker for a rock. The collision code queries it.
+/// Marker for a rock. Its blocked area is its `Blocker`, and it sorts at that area (`SortAtBlocker`). `rebuild_collision`
+/// tells rocks from other blockers by this marker.
 #[derive(Component)]
 pub struct Rock;
-
-/// The area a rock blocks. `rebuild_collision` adds it to the collision world.
-#[derive(Component)]
-pub struct RockArea(Rect);
 
 /// Marks a rock that touches no empty space, because rocks around it fill every side (`outline::Cluster::interior`).
 /// Collision uses only the outline edges, so this costs nothing there. The debug overlay colours these rocks.
@@ -53,8 +47,6 @@ struct Placement {
     centre: Vec2,
     /// Whole number scale applied to the 32x32 art.
     scale: f32,
-    /// Distance from the sprite centre down to the sort line, for depth sorting.
-    feet_offset: f32,
 }
 
 fn placement(object: &MapObject, map: &Map, origin: Vec2) -> Placement {
@@ -70,8 +62,6 @@ fn placement(object: &MapObject, map: &Map, origin: Vec2) -> Placement {
             corner.y + centre_above_footprint,
         ),
         scale,
-        // The sort line is the bottom of the blocked area plus a small bias, not the bottom of the footprint.
-        feet_offset: centre_above_footprint - BOTTOM_INSET_FRACTION * footprint - SORT_BIAS,
     }
 }
 
@@ -93,28 +83,27 @@ pub fn group_area(object: &MapObject, map: &Map, origin: Vec2, open_top: bool) -
     let footprint = FOOTPRINT_CELLS * map.cell_size;
     let inset = INSET_FRACTION * footprint;
     let top_inset = if open_top { 0.0 } else { inset };
-    Rect::new(
-        corner.x + inset - PLAYER_HALF_WIDTH,
+    let inset_footprint = Rect::new(
+        corner.x + inset,
         corner.y + BOTTOM_INSET_FRACTION * footprint,
-        corner.x + footprint - inset + PLAYER_HALF_WIDTH,
+        corner.x + footprint - inset,
         corner.y + footprint - top_inset,
-    )
+    );
+    grow_sideways(inset_footprint, PLAYER_HALF_WIDTH)
 }
 
 /// The blocked area of a rock: the band at its bottom when it stands alone, the group area when it is in a group.
 fn blocked_area(object: &MapObject, map: &Map, origin: Vec2, group: Group) -> Rect {
     let full = group_area(object, map, origin, group.neighbour_above);
-    if group.is_group() {
-        return full;
-    }
     let corner = footprint_corner(object, map, origin);
     let footprint = FOOTPRINT_CELLS * map.cell_size;
-    Rect::new(
+    let band = Rect::new(
         full.min.x,
         full.min.y,
         full.max.x,
         corner.y + ALONE_BAND_FRACTION * footprint,
-    )
+    );
+    group_or_alone(group.size, full, band)
 }
 
 /// A fixed offset in `-jitter..=jitter` on each axis, taken from the cell number, so a map always looks
@@ -164,12 +153,9 @@ pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, loa
         let placement = placement(object, map, load.origin);
         commands.spawn((
             Rock,
-            MapId(load.id.clone()),
-            RockArea(blocked_area(object, map, load.origin, group)),
+            Blocker(blocked_area(object, map, load.origin, group)),
+            SortAtBlocker,
             tag_sprite(server, "art/features/Rocks.aseprite", tag),
-            DepthSort {
-                feet_offset: placement.feet_offset,
-            },
             Transform::from_translation(placement.centre.extend(0.0))
                 .with_scale(Vec3::splat(placement.scale)),
         ));
@@ -182,13 +168,13 @@ pub fn spawn_rocks(commands: &mut Commands, server: &AssetServer, map: &Map, loa
 pub fn rebuild_collision(
     mut commands: Commands,
     mut world: ResMut<CollisionWorld>,
-    rocks: Query<(Entity, &RockArea)>,
-    blockers: Query<&Blocker>,
+    rocks: Query<(Entity, &Blocker), With<Rock>>,
+    blockers: Query<&Blocker, Without<Rock>>,
 ) {
     world.clear();
     let rocks: Vec<(Entity, Rect)> = rocks
         .iter()
-        .map(|(entity, area)| (entity, area.0))
+        .map(|(entity, blocker)| (entity, blocker.0))
         .collect();
     let areas: Vec<Rect> = rocks.iter().map(|(_, area)| *area).collect();
     let first_rock = world.add_blocked(&areas);
@@ -226,7 +212,7 @@ mod tests {
     #[test]
     fn a_rock_is_drawn_at_a_whole_scale_with_its_visible_bottom_on_the_footprint() {
         // The footprint corner is (10 + 2 * 40, 20 + 1 * 40) = (90, 60). The canvas centre is 3/8 of the drawn size
-        // above it, and the sort line 1 pixel above the bottom of the footprint.
+        // above it.
         for (draw, scale) in [
             (Some(100.0), 3.0),
             (Some(112.0), 4.0),
@@ -240,7 +226,6 @@ mod tests {
                 Placement {
                     centre: Vec2::new(90.0 + 40.0, 60.0 + above),
                     scale,
-                    feet_offset: above - SORT_BIAS,
                 },
                 "{draw:?}"
             );

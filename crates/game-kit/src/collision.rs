@@ -169,9 +169,21 @@ impl CollisionWorld {
 }
 
 /// A static area the actor's feet may not enter, as a world rectangle. The game grows it by the actor's size
-/// before it adds this component. `register_blockers` adds every `Blocker` to the `CollisionWorld`.
+/// (`grow_sideways`) before it adds this component. `register_blockers` adds every `Blocker` to the `CollisionWorld`.
 #[derive(Component, Clone, Copy)]
 pub struct Blocker(pub Rect);
+
+/// `area` grown by `half_width` on the left and the right: the area a feet point may not enter so that a body
+/// `2 * half_width` wide does not overlap `area`. Only sideways: the body's depth is the feet point, and the body
+/// walks behind what is above the feet line (`adr-x16`).
+pub fn grow_sideways(area: Rect, half_width: f32) -> Rect {
+    Rect::new(
+        area.min.x - half_width,
+        area.min.y,
+        area.max.x + half_width,
+        area.max.y,
+    )
+}
 
 /// Blockers are spawned in `Startup`, so they can be read after it. Runs before anything that reads the clusters.
 pub fn register_blockers(blockers: Query<&Blocker>, mut world: ResMut<CollisionWorld>) {
@@ -1022,6 +1034,14 @@ mod tests {
         ]);
         let end = simulate_edges(Vec2::new(10.0, -10.0), Vec2::new(0.0, STEP), 120, &edges);
         assert!(end.x >= -0.2, "ended inside the shape at {end}");
+    }
+
+    #[test]
+    fn an_area_is_grown_by_the_half_width_on_the_left_and_right_only() {
+        assert_eq!(
+            grow_sideways(Rect::new(-30.0, 5.0, 18.0, 41.0), 7.5),
+            Rect::new(-37.5, 5.0, 25.5, 41.0)
+        );
     }
 
     #[test]

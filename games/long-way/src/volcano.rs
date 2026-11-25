@@ -15,8 +15,8 @@ use std::f32::consts::TAU;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
-use game_kit::collision::Blocker;
-use game_kit::depth::{DepthSort, SortAtBlocker};
+use game_kit::collision::{Blocker, grow_sideways};
+use game_kit::depth::SortAtBlocker;
 use game_kit::hitbox::HitBox;
 use game_kit::map::Map;
 use game_kit::map_transition::{MapId, MapLoad};
@@ -163,9 +163,6 @@ fn launch_shots(
                     ProjectilePath::new(path, direction, BALL_HALF),
                     Touchable,
                     SHOT_HIT_BOX,
-                    DepthSort {
-                        feet_offset: BALL_HALF + height,
-                    },
                     Transform::from_translation(mouth.extend(0.0)),
                     Visibility::default(),
                 ))
@@ -211,12 +208,13 @@ fn hit_player(
 /// on each side by half the player's width, as a tree trunk is.
 fn blocked_area(feet: Vec2) -> Rect {
     let x = |px: f32| feet.x + (px - CANVAS_HALF_PX) * SCALE;
-    Rect::new(
-        x(BASE_LEFT_PX) - PLAYER_HALF_WIDTH,
+    let base = Rect::new(
+        x(BASE_LEFT_PX),
         feet.y,
-        x(BASE_RIGHT_PX) + PLAYER_HALF_WIDTH,
+        x(BASE_RIGHT_PX),
         feet.y + (BASE_BOTTOM_PX - BASE_TOP_PX) * SCALE,
-    )
+    );
+    grow_sideways(base, PLAYER_HALF_WIDTH)
 }
 
 /// Spawns the volcanoes of one map with the bottom of the body on the bottom middle of their cells. They carry the map
@@ -233,7 +231,6 @@ pub fn spawn_volcanoes(commands: &mut Commands, server: &AssetServer, map: &Map,
         let centre = feet + Vec2::Y * FEET_BELOW_CENTRE;
         commands.spawn((
             Volcano,
-            MapId(load.id.clone()),
             Blocker(blocked_area(feet)),
             SortAtBlocker,
             AseAnimation {
@@ -427,24 +424,16 @@ mod tests {
             ],
         );
         // The feet are at x 10.4 + 2.5 * 48 = 130.4, so 130, and y 20 + 3 * 48 = 164.
-        let load = MapLoad {
-            id: "m".to_string(),
-            origin: Vec2::new(10.4, 20.0),
-        };
+        let load = crate::test_util::map_load(Vec2::new(10.4, 20.0));
         spawn_with(&mut app, move |commands, server| {
             spawn_volcanoes(commands, server, &map, &load);
         });
-        let volcanoes: Vec<(Vec2, Rect, bool, String)> = app
+        let volcanoes: Vec<(Vec2, Rect, bool)> = app
             .world_mut()
-            .query_filtered::<(&Transform, &Blocker, Has<SortAtBlocker>, &MapId), With<Volcano>>()
+            .query_filtered::<(&Transform, &Blocker, Has<SortAtBlocker>), With<Volcano>>()
             .iter(app.world())
-            .map(|(transform, blocker, sorted, id)| {
-                (
-                    transform.translation.truncate(),
-                    blocker.0,
-                    sorted,
-                    id.0.clone(),
-                )
+            .map(|(transform, blocker, sorted)| {
+                (transform.translation.truncate(), blocker.0, sorted)
             })
             .collect();
         // Centre 31 art px x 2 above the feet. Base x 11 and 54 of the 64 px canvas, so -21 and +22 art px x 2 from the
@@ -456,8 +445,7 @@ mod tests {
             vec![(
                 Vec2::new(130.0, 226.0),
                 Rect::new(74.0, 164.0, 188.0, 190.0),
-                true,
-                "m".to_string()
+                true
             )]
         );
     }

@@ -46,10 +46,7 @@ fn collect(
     let (Ok((transform, sort)), Some(current)) = (target.single(), active.current_map()) else {
         return;
     };
-    let feet = Vec2::new(
-        transform.translation.x,
-        sort.feet_y(transform.translation.y),
-    );
+    let feet = sort.feet(transform);
     for (entity, item, id) in &items {
         if id.0 == current.id && touches(item.area, feet) {
             collected.write(Collected {

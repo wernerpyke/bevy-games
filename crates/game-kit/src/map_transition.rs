@@ -3,7 +3,8 @@
 //! fades in. See `dev-docs/extensions/map-transitions.md` and `dev-docs/adr/EXTENSIONS.md` adr-x31.
 //!
 //! The kit has no game types. The game gives it three one-shot systems (`MapHooks`):
-//! - `load` spawns the objects of one map and tags every one with `MapId`, so the kit can remove them.
+//! - `load` spawns the objects of one map. The kit makes every entity it spawns a child of the map's `MapRoot`, with the
+//!   map's `MapId`, so the kit removes them with the map and the game tags nothing by hand (adr-x58).
 //! - `rebuild` rebuilds the collision world from the entities that exist after a load or unload.
 //! - `arrive` puts the controlled entity in place after a transition and sets its facing.
 //!
@@ -14,9 +15,11 @@
 //!
 //! Only the scene transition (fade) is built so far. A seamless exit uses the same fade for now.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use bevy::ecs::system::SystemId;
+use bevy::ecs::observer::Observer;
+use bevy::ecs::system::{SystemId, SystemIdMarker};
 use bevy::prelude::*;
 
 use crate::Controlled;
@@ -238,16 +241,27 @@ impl ActiveMaps {
     }
 }
 
-/// Put this on everything a map spawns (rocks, trees and so on), so the kit can remove it when the map goes. The
-/// controlled entity does not have it: it stays through a transition.
+/// The map an entity belongs to. The kit removes every entity with a `MapId` when that map goes. Everything the `load`
+/// hook spawns gets it from the kit (`MapRoot`). A game adds it by hand only to an entity it spawns later, outside the
+/// hook, that should go with the map (a shot from a volcano). The controlled entity does not have it: it stays through
+/// a transition.
 #[derive(Component, Clone, Debug, PartialEq, Eq)]
 pub struct MapId(pub String);
 
-/// What the `load` hook gets: spawn the objects of this map with their cells counted from `origin`.
+/// The root of one loaded map, with the map's `MapId`. The kit spawns it before the `load` hook runs, then makes every
+/// top-level entity the hook spawned its child and gives it the same `MapId` (adr-x58). Removing the map despawns the
+/// root, and so everything in it. It sits at the world origin, so a child's `Transform` is its world position.
+#[derive(Component, Debug)]
+#[require(Transform, Visibility)]
+pub struct MapRoot;
+
+/// What the `load` hook gets: spawn the objects of this map with their cells counted from `origin`. The kit adopts
+/// them into `root` after the hook.
 #[derive(Clone, Debug)]
 pub struct MapLoad {
     pub id: String,
     pub origin: Vec2,
+    pub root: Entity,
 }
 
 /// What the `arrive` hook gets: the feet position in the world, and the way the player should look.
@@ -585,10 +599,7 @@ fn detect_exit(
     let Some(registered) = registry.get(&current.id) else {
         return;
     };
-    let feet = Vec2::new(
-        transform.translation.x,
-        sort.feet_y(transform.translation.y),
-    );
+    let feet = sort.feet(transform);
     let touched = trigger_at(
         triggers
             .iter()
@@ -734,9 +745,7 @@ fn unload_all(world: &mut World) {
         .query_filtered::<Entity, With<MapId>>()
         .iter(world)
         .collect();
-    for entity in old {
-        world.despawn(entity);
-    }
+    despawn_all(world, old);
 }
 
 /// Removes the entities of one map.
@@ -747,23 +756,58 @@ fn unload_entities(world: &mut World, id: &str) {
         .filter(|(_, map)| map.0 == id)
         .map(|(entity, _)| entity)
         .collect();
-    for entity in old {
-        world.despawn(entity);
+    despawn_all(world, old);
+}
+
+/// Despawns each entity that still exists. A child of a `MapRoot` has its own `MapId` and is already gone with its root.
+fn despawn_all(world: &mut World, entities: Vec<Entity>) {
+    for entity in entities {
+        if let Ok(entity) = world.get_entity_mut(entity) {
+            entity.despawn();
+        }
     }
 }
 
-/// Runs the `load` hook for one map.
+/// Runs the `load` hook for one map, inside a new `MapRoot` that adopts what the hook spawns.
 fn run_load(world: &mut World, id: &str, origin: Vec2) {
     let Some(hooks) = world.get_resource::<MapHooks>().copied() else {
         error!("maps: the game has not inserted `MapHooks`");
         return;
     };
+    let root = world.spawn((MapRoot, MapId(id.to_string()))).id();
+    let before: HashSet<Entity> = world.query::<Entity>().iter(world).collect();
     let load = MapLoad {
         id: id.to_string(),
         origin,
+        root,
     };
     if let Err(error) = world.run_system_with(hooks.load, load) {
         error!("maps: the load hook failed: {error}");
+    }
+    adopt_new_entities(world, root, id, &before);
+}
+
+/// Top-level entities that the engine itself spawns (systems and observers). They never belong to a map.
+type Adoptable = (
+    Without<ChildOf>,
+    Without<MapRoot>,
+    Without<Observer>,
+    Without<SystemIdMarker>,
+);
+
+/// Makes each top-level entity that is not in `before` a child of `root`, with the map's `MapId`.
+fn adopt_new_entities(world: &mut World, root: Entity, id: &str, before: &HashSet<Entity>) {
+    let new: Vec<Entity> = world
+        .query_filtered::<Entity, Adoptable>()
+        .iter(world)
+        .filter(|entity| !before.contains(entity))
+        .collect();
+    for entity in new {
+        let mut adopted = world.entity_mut(entity);
+        if !adopted.contains::<MapId>() {
+            adopted.insert(MapId(id.to_string()));
+        }
+        world.entity_mut(root).add_child(entity);
     }
 }
 
@@ -1047,10 +1091,7 @@ fn update_current(
     let Ok((transform, sort)) = target.single() else {
         return;
     };
-    let feet = Vec2::new(
-        transform.translation.x,
-        sort.feet_y(transform.translation.y),
-    );
+    let feet = sort.feet(transform);
     let Some(here) = active.map_at(feet).map(|m| m.id.clone()) else {
         return;
     };
@@ -1144,12 +1185,10 @@ fn retarget_camera(
     let Some(mut bounds) = bounds else {
         return;
     };
-    let feet = player.single().ok().map(|(transform, sort)| {
-        Vec2::new(
-            transform.translation.x,
-            sort.feet_y(transform.translation.y),
-        )
-    });
+    let feet = player
+        .single()
+        .ok()
+        .map(|(transform, sort)| sort.feet(transform));
     let wanted = camera_target(&active, feet);
     if bounds.0 != wanted {
         bounds.0 = wanted;
@@ -1402,18 +1441,16 @@ mod tests {
     ) {
         log.0.push(format!("load {} at {}", load.id, load.origin));
         if let (Some(extra), "2") = (extra, load.id.as_str()) {
-            commands.spawn((
-                MapId(load.id.clone()),
-                ExitTrigger {
-                    area: extra.0,
-                    to: "1".into(),
-                },
-            ));
+            commands.spawn(ExitTrigger {
+                area: extra.0,
+                to: "1".into(),
+            });
         }
-        commands.spawn(MapId(load.id));
+        // No `MapId`: the kit adopts it into the map root.
+        commands.spawn(Transform::default());
     }
 
-    fn rebuild_hook(mut log: ResMut<Log>, maps: Query<&MapId>) {
+    fn rebuild_hook(mut log: ResMut<Log>, maps: Query<&MapId, Without<MapRoot>>) {
         log.0
             .push(format!("rebuild with {} map entities", maps.iter().count()));
     }
@@ -1490,10 +1527,7 @@ mod tests {
             .world_mut()
             .query_filtered::<(&Transform, &DepthSort), With<Controlled>>();
         let (transform, sort) = query.single(app.world()).unwrap();
-        Vec2::new(
-            transform.translation.x,
-            sort.feet_y(transform.translation.y),
-        )
+        sort.feet(transform)
     }
 
     fn set_feet(app: &mut App, feet: Vec2) {
@@ -1563,14 +1597,27 @@ mod tests {
         assert!(app.world().resource::<MapTransition>().is_idle());
         // The same x along the strip, and the middle of the bottom row of the new map.
         assert_eq!(player_feet(&mut app), ORIGIN + Vec2::new(250.0, 32.0));
-        // The old map entity is gone and the new one is there.
-        let ids: Vec<String> = app
+        // The old map is gone. The new one is a root, and the entity its hook spawned without a `MapId` is the root's
+        // child with the map's `MapId`.
+        let mut maps = app
             .world_mut()
-            .query::<&MapId>()
-            .iter(app.world())
-            .map(|id| id.0.clone())
+            .query::<(Entity, &MapId, Option<&ChildOf>, Has<MapRoot>)>();
+        let entities: Vec<_> = maps.iter(app.world()).collect();
+        let [(root, root_id, None, true)] = entities
+            .iter()
+            .copied()
+            .filter(|(.., is_root)| *is_root)
+            .collect::<Vec<_>>()[..]
+        else {
+            panic!("one map root: {entities:?}");
+        };
+        assert_eq!(root_id.0, "2");
+        let children: Vec<(String, Option<Entity>)> = entities
+            .iter()
+            .filter(|(.., is_root)| !is_root)
+            .map(|(_, id, parent, _)| (id.0.clone(), parent.map(|p| p.parent())))
             .collect();
-        assert_eq!(ids, vec!["2".to_string()]);
+        assert_eq!(children, vec![("2".to_string(), Some(root))]);
     }
 
     #[test]
@@ -2265,7 +2312,8 @@ mod tests {
             .iter(app.world())
             .map(|id| id.0.clone())
             .collect();
-        assert_eq!(ids, vec!["2".to_string()], "only the second map is left");
+        // The root of map 2 and the entity its hook spawned.
+        assert_eq!(ids, vec!["2".to_string(); 2], "only the second map is left");
         assert!(
             app.world()
                 .resource::<Log>()

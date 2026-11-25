@@ -15,7 +15,7 @@ use game_kit::animation::{FacingSet, FacingTags, tag_sprite};
 use game_kit::depth::DepthSort;
 use game_kit::hitbox::HitBox;
 use game_kit::map::Map;
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 use game_kit::movement::{Mover, Stunned};
 use game_kit::strategies::{Pursue, RandomPatrol, Sentry, Strategy};
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
@@ -101,7 +101,6 @@ pub fn spawn_ghosts(commands: &mut Commands, server: &AssetServer, map: &Map, lo
         let feet = load.origin + (object.cell.as_vec2() + Vec2::splat(0.5)) * map.cell_size;
         let mut ghost = commands.spawn((
             Ghost,
-            MapId(load.id.clone()),
             Mover::new(SPEED).with_edge_margin(EDGE_MARGIN),
             HIT_BOX,
             EnemyHp::full(HIT_POINTS),
@@ -619,26 +618,19 @@ mod tests {
                 object("rock_0", 0, 0, &[]),
             ],
         );
-        let load = MapLoad {
-            id: "m".to_string(),
-            origin: Vec2::new(10.0, 20.0),
-        };
+        let load = crate::test_util::map_load(Vec2::new(10.0, 20.0));
         spawn_with(&mut app, move |commands, server| {
             spawn_ghosts(commands, server, &map, &load);
         });
-        let ghosts: Vec<(Vec2, String, bool)> = app
+        let ghosts: Vec<(Vec2, bool)> = app
             .world_mut()
-            .query_filtered::<(&Transform, &MapId, Has<Pursue>), With<Ghost>>()
+            .query_filtered::<(&Transform, Has<Pursue>), With<Ghost>>()
             .iter(app.world())
-            .map(|(transform, id, pursue)| (transform.translation.truncate(), id.0.clone(), pursue))
+            .map(|(transform, pursue)| (transform.translation.truncate(), pursue))
             .collect();
         assert_eq!(
             ghosts,
-            vec![(
-                Vec2::new(10.0 + 2.5 * 48.0, 20.0 + 3.5 * 48.0),
-                "m".to_string(),
-                true
-            )]
+            vec![(Vec2::new(10.0 + 2.5 * 48.0, 20.0 + 3.5 * 48.0), true)]
         );
     }
 }

@@ -111,3 +111,13 @@ pub fn register_built_weapons(app: &mut App) {
         ],
     );
 }
+
+/// What the kit passes to a spawn function for map "m" at `origin`. The root is a placeholder: in a test nothing adopts
+/// the spawned entities (the kit does that in `map_transition`).
+pub fn map_load(origin: Vec2) -> game_kit::map_transition::MapLoad {
+    game_kit::map_transition::MapLoad {
+        id: "m".to_string(),
+        origin,
+        root: Entity::PLACEHOLDER,
+    }
+}

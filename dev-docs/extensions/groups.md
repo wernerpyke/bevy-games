@@ -36,7 +36,7 @@ Blocking items that touch form a group. A game gives an item that stands alone a
 ## Usage
 
 - Collect the anchor cells of all blocking objects of the map. Call `neighbour_groups`, then `group_sizes`.
-- Pick the area per object with a plain function that takes the group size, so it is unit tested.
+- Pick the area per object with `group_or_alone(group_size, footprint, alone_band)`: the whole footprint in a group, the base band alone.
 - A group member should reach every side where another member touches it, or a gap stays open. Long Way drops the top inset of a rock that has a member above it.
 
 ## Limits

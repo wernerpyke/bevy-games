@@ -9,7 +9,7 @@ use game_kit::layers::{
 };
 use game_kit::map::Map;
 use game_kit::map_background::place_tiles;
-use game_kit::map_transition::{MapId, MapLoad, MapRegistry};
+use game_kit::map_transition::{MapLoad, MapRegistry};
 
 /// The tile images in `ground_tiles.aseprite`, by tag. A map file may list only these names.
 pub const TILE_NAMES: &[&str] = &[
@@ -64,7 +64,6 @@ pub fn spawn_background(commands: &mut Commands, server: &AssetServer, map: &Map
     };
     let extent = map.size.as_vec2() * map.cell_size;
     commands.spawn((
-        MapId(load.id.clone()),
         Sprite::from_color(Color::from(background.color), extent),
         Transform::from_translation((load.origin + extent / 2.0).extend(BACKGROUND_Z)),
     ));
@@ -85,7 +84,6 @@ pub fn spawn_background(commands: &mut Commands, server: &AssetServer, map: &Map
     {
         let z = BACKGROUND_TILES_Z + index as f32 * BACKGROUND_TILE_Z_STEP;
         commands.spawn((
-            MapId(load.id.clone()),
             AseAnimation {
                 aseprite: aseprite.clone(),
                 animation: Animation::tag(&background.tiles[tile.tile]),
@@ -128,21 +126,18 @@ mod tests {
     #[allow(clippy::type_complexity)]
     fn spawn(map: Map) -> (Vec<(Option<Vec2>, Vec3)>, Vec<(String, Vec3, Vec3)>) {
         let mut app = crate::test_util::asset_app(16);
-        let load = MapLoad {
-            id: "m".to_string(),
-            origin: Vec2::new(10.0, 20.0),
-        };
+        let load = crate::test_util::map_load(Vec2::new(10.0, 20.0));
         crate::test_util::spawn_with(&mut app, move |commands, server| {
             spawn_background(commands, server, &map, &load);
         });
         let world = app.world_mut();
         let colours = world
-            .query_filtered::<(&Sprite, &Transform), (With<MapId>, Without<AseAnimation>)>()
+            .query_filtered::<(&Sprite, &Transform), Without<AseAnimation>>()
             .iter(world)
             .map(|(sprite, transform)| (sprite.custom_size, transform.translation))
             .collect();
         let mut images: Vec<(String, Vec3, Vec3)> = world
-            .query_filtered::<(&AseAnimation, &Transform), With<MapId>>()
+            .query::<(&AseAnimation, &Transform)>()
             .iter(world)
             .map(|(ase, transform)| {
                 let tag = ase.animation.tag.clone().unwrap_or_default();

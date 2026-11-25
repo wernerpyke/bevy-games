@@ -126,7 +126,7 @@ pub fn spawn_player(
         DepthSort {
             feet_offset: PLAYER_FEET_OFFSET,
         },
-        Mover::new(WALK_SPEED).with_feet_offset(PLAYER_FEET_OFFSET),
+        Mover::new(WALK_SPEED),
         KeyAssist::default(),
         Transform::from_translation(start.extend(0.0)),
     ));

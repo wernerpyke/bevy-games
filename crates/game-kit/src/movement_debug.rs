@@ -6,6 +6,7 @@
 use bevy::prelude::*;
 
 use crate::debug::DebugSettings;
+use crate::depth::DepthSort;
 use crate::layers::MOVEMENT_DEBUG_Z;
 use crate::movement::{MoveGoal, Mover, PathFollower};
 use crate::spawner::Spawner;
@@ -42,7 +43,7 @@ fn draw(
     mut commands: Commands,
     settings: Res<DebugSettings>,
     root: Single<(Entity, &mut Visibility), With<DebugRoot>>,
-    movers: Query<(&Transform, &Mover, &MoveGoal, &PathFollower)>,
+    movers: Query<(&Transform, &DepthSort, &MoveGoal, &PathFollower), With<Mover>>,
     spawners: Query<&Transform, With<Spawner>>,
 ) {
     let (root, mut visibility) = root.into_inner();
@@ -57,8 +58,8 @@ fn draw(
         .entity(root)
         .despawn_children()
         .with_children(|parent| {
-            for (transform, mover, goal, follower) in &movers {
-                let mut from = mover.feet(transform);
+            for (transform, sort, goal, follower) in &movers {
+                let mut from = sort.feet(transform);
                 for to in follower.points() {
                     let (centre, length, angle) = line_between(from, to);
                     parent.spawn((
@@ -133,7 +134,8 @@ mod tests {
         // The feet are 10 below the transform, at (0, 0).
         app.world_mut().spawn((
             Transform::from_xyz(0.0, 10.0, 0.0),
-            Mover::new(10.0).with_feet_offset(10.0),
+            Mover::new(10.0),
+            DepthSort { feet_offset: 10.0 },
             MoveGoal(Some(Vec2::new(30.0, 100.0))),
             PathFollower::along(&[Vec2::new(30.0, 40.0), Vec2::new(30.0, 100.0)]),
         ));

@@ -68,7 +68,7 @@ Decisions that apply to Long Way only. Decisions about reusable code (collision,
 
 ## adr-lw13. Rock blocked area and sort line (2026-11-01)
 
-**Decision.** A rock's blocked area is its footprint inset by 10% on the left, right and top, and not at the bottom (`adr-lw8`), grown sideways by the player's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (`SORT_BIAS`), so the player standing at the rock is drawn in front.
+**Decision.** A rock's blocked area is its footprint inset by 10% on the left, right and top, and not at the bottom (`adr-lw8`), grown sideways by the player's half width. A rock sorts at the bottom of its blocked area plus 1 pixel (the kit's `SortAtBlocker`, `adr-x53`), so the player standing at the rock is drawn in front.
 
 **Rationale.** These are Long Way's rock shapes. The merged outline and the slide rules that use them are `adr-x10`. With the footprint bottom as the sort line, the player standing at the blocked bottom was drawn behind the rock and looked as if it had walked in (found by the developer, 2026-11-01).
 

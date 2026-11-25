@@ -1,6 +1,7 @@
 //! The player's collision values. The engine is `game_kit::collision` (`adr-rt5`).
 
 use bevy::prelude::*;
+use game_kit::collision::grow_sideways;
 
 use crate::camera::CELL_SIZE;
 
@@ -14,10 +15,8 @@ pub const BASE_BAND: f32 = 4.0;
 /// feet half width (`adr-rt9`).
 pub fn cell_area(cell: IVec2) -> Rect {
     let corner = cell.as_vec2() * CELL_SIZE;
-    Rect::new(
-        corner.x - FEET_HALF_WIDTH,
-        corner.y,
-        corner.x + CELL_SIZE + FEET_HALF_WIDTH,
-        corner.y + CELL_SIZE,
+    grow_sideways(
+        Rect::from_corners(corner, corner + Vec2::splat(CELL_SIZE)),
+        FEET_HALF_WIDTH,
     )
 }

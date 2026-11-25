@@ -21,13 +21,15 @@ Read this before you write game code for movement, draw order, collision, maps, 
 |---|---|
 | A character is drawn behind an object it stands in front of, or the order changes with x | `SortAtBlocker` + `Blocker` (`depth.rs`, `adr-x53`) |
 | Neighbouring objects in a row flicker or swap order | `TieBreakX` (`depth.rs`) |
-| A character is not drawn behind a tree it walks behind | `DepthSort` with the real feet offset |
+| A character is not drawn behind a tree it walks behind | `DepthSort` with the real feet offset (`DepthSort` owns it, `adr-x57`) |
+| A pickup or other non-blocking object hides a character standing on its base | `SortAtArea(ground rect)` (`depth.rs`) |
 | A sprite is under the ground or above the HUD | `layers.rs` constants, never a bare z |
 | A debug drawing covers the HUD | A sprite on `FEATURE_DEBUG_Z` or `MOVEMENT_DEBUG_Z`, not a gizmo |
 | The map edge hides the character | `EDGE_GROUND_Z` or `EDGE_CANOPY_Z` (`adr-x51`) |
 | The player walks through an object, or hits an invisible wall after a map change | `Blocker`, and a collision rebuild in `MapHooks.rebuild` |
 | The player sticks on corners | `CollisionPlugin { allow_sliding }`, `SlideTuning`, `SlideAssist` (`collision.rs`) |
-| Gaps or wrong blocked areas between neighbours | `groups.rs` |
+| Gaps or wrong blocked areas between neighbours | `groups.rs`, `group_or_alone` |
+| A body overlaps the side of an object it stops at | `collision::grow_sideways` by the body half width |
 | An enemy walks into walls | `Mover` + `NavGrid` (`movement.rs`, `nav.rs`) |
 | An enemy should patrol, chase or guard | `strategies.rs` |
 | Contact damage does not fire, or fires too often | `Touchable` + `HitBox`, `ControlledTouched` |
@@ -35,7 +37,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | A thrown shot sorts wrongly | `ProjectilePath` + `DepthSort` |
 | A `ProjectileHit` handler cannot find the projectile | Order it after `ProjectileSet` (`adr-x55`) |
 | A pickup is not collected, or is collected twice | `Collectable` + `MapId` |
-| An object stays after its map unloads | `MapId(load.id)` on everything a map spawns (`map_transition.rs`) |
+| An object stays after its map unloads | Spawn it in the `load` hook (the kit adopts it into the `MapRoot`, `adr-x58`), or add `MapId` to an entity spawned later |
 | Enemies do not appear again | `Spawner`, `SpawnRequest`, `SpawnedBy` |
 | Many sprites animate in step | `RandomStartFrame::for_cell` |
 | The animation speed is wrong | Frame durations in the `.aseprite` file (`adr-a6`) |

@@ -276,10 +276,9 @@ fn spawn_emitters(new: Query<(Entity, &Tornado), Added<Tornado>>, mut fx: Fx) {
                 &Look::Squares,
                 tornado.values.glow,
             );
-            fx.commands.entity(emitter).insert((
-                TornadoEmitter { owner, slot },
-                DepthSort { feet_offset: 0.0 },
-            ));
+            fx.commands
+                .entity(emitter)
+                .insert(TornadoEmitter { owner, slot });
         }
     }
 }

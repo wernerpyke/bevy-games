@@ -22,7 +22,6 @@ use bevy::prelude::*;
 use game_kit::area::{rect_overlaps_band, ring_radius};
 use game_kit::camera::CameraBounds;
 use game_kit::collision::CollisionWorld;
-use game_kit::depth::DepthSort;
 use game_kit::fx::{EffectLibrary, Fx, FxLooks, Look, OneShot, ParticleSpawnerState};
 use game_kit::hitbox::HitBox;
 
@@ -343,7 +342,6 @@ fn spawn_front(new: Query<(Entity, &Ring), Added<Ring>>, looks: Res<FxLooks>, mu
                 );
                 fx.commands.entity(emitter).insert((
                     Front { owner, angle },
-                    DepthSort { feet_offset: 0.0 },
                     stagger(k, art.per_position, art.front_rate),
                 ));
             }
@@ -370,11 +368,9 @@ fn spawn_burners(
                     &look,
                     ring.values.glow,
                 );
-                fx.commands.entity(emitter).insert((
-                    Burner(owner),
-                    DepthSort { feet_offset: 0.0 },
-                    stagger(k, art.per_position, art.burn_rate),
-                ));
+                fx.commands
+                    .entity(emitter)
+                    .insert((Burner(owner), stagger(k, art.per_position, art.burn_rate)));
             }
         }
     }

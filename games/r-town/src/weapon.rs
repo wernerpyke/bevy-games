@@ -3,7 +3,6 @@
 
 use bevy::prelude::*;
 use game_kit::animation::tag_sprite;
-use game_kit::depth::DepthSort;
 use game_kit::projectile::{Projectile, ProjectileSprite};
 
 use crate::input::{InputSet, PlayerInput};
@@ -39,7 +38,6 @@ fn fire(
         .spawn((
             Projectile::new(player.facing, PROJECTILE_SPEED).at_height(PROJECTILE_HEIGHT),
             MapEntity,
-            DepthSort { feet_offset: 0.0 },
             Transform::from_translation(transform.translation.truncate().extend(0.0)),
             Visibility::default(),
         ))

@@ -6,11 +6,11 @@ use bevy::prelude::*;
 use game_kit::animation::{RandomStartFrame, tag_animation};
 
 use crate::map::Kind;
-use crate::rocks::{SORT_BIAS, footprint_corner};
+use crate::rocks::footprint_corner;
 use game_kit::collectable::Collectable;
-use game_kit::depth::DepthSort;
+use game_kit::depth::SortAtArea;
 use game_kit::map::{Map, MapObject};
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 
 /// Size of the canvas of `pickups.aseprite` in art pixels.
 const ART_WIDTH: f32 = 64.0;
@@ -55,12 +55,9 @@ fn spawn_pickup(
 ) {
     let corner = footprint_corner(object, map, load.origin);
     let (width, height) = (DRAWN_SIZE.x, DRAWN_SIZE.y);
-    let centre = Vec2::new(
-        corner.x + map.cell_size / 2.0,
-        corner.y.round() + height / 2.0,
-    );
+    let base = corner.y.round();
+    let centre = Vec2::new(corner.x + map.cell_size / 2.0, base + height / 2.0);
     commands.spawn((
-        MapId(load.id.clone()),
         Collectable {
             area: Rect::from_center_size(
                 Vec2::new(corner.x + map.cell_size / 2.0, corner.y + TOUCH_CENTRE_Y),
@@ -68,9 +65,11 @@ fn spawn_pickup(
             ),
             kind: name.to_string(),
         },
-        DepthSort {
-            feet_offset: height / 2.0 - SORT_BIAS,
-        },
+        // Sorted at the base of the art, so the player is drawn in front of a pickup it stands on.
+        SortAtArea(Rect::from_center_size(
+            Vec2::new(centre.x, base + height / 2.0),
+            DRAWN_SIZE,
+        )),
         tag_animation(server, "art/pickups/pickups.aseprite", tag),
         RandomStartFrame::for_cell(&map.name, object.cell),
         Sprite {

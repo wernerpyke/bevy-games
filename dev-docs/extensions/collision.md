@@ -36,7 +36,7 @@ Decisions: `adr-x4`, `adr-x10`. Long Way rules: `adr-lw1`, `adr-lw13`. Backgroun
 
 | Parameter | Meaning | Long Way |
 |---|---|---|
-| Actor half width | The game grows each blocked area sideways by this, so the body does not overlap it | 20 |
+| Actor half width | The game grows each blocked area sideways by this with `grow_sideways(area, half_width)`, so the body does not overlap it | 20 |
 | Obstacle rules | How a game object becomes a blocked area (`Blocker`) | Trunk and rock rules |
 | `cell_size` | `CollisionPlugin` field. The slide values below scale with it (`SlideTuning::for_cell_size`) | 64 |
 | `SlideTuning::delay` | Seconds of pushing before help starts | 0.2 |

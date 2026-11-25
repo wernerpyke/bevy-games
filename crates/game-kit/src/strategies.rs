@@ -15,9 +15,9 @@ use bevy::prelude::*;
 use crate::Controlled;
 use crate::camera::CameraBounds;
 use crate::collision::CollisionWorld;
-use crate::depth::DepthSort;
+use crate::depth::{DepthSort, feet_of};
 use crate::map::Params;
-use crate::movement::{MoveGoal, MoveState, Mover, StrategySet};
+use crate::movement::{MoveGoal, MoveState, StrategySet};
 use crate::nav::{NavGrid, segment_blocked};
 use crate::outline::Edge;
 use crate::rng::{GameRng, Rng};
@@ -188,7 +188,7 @@ fn patrol(
     rng: Option<ResMut<GameRng>>,
     mut patrols: Query<(
         &Transform,
-        &Mover,
+        &DepthSort,
         &mut RandomPatrol,
         &mut MoveGoal,
         &MoveState,
@@ -199,8 +199,8 @@ fn patrol(
     };
     let dt = time.delta_secs();
     let bounds = bounds.map(|b| b.0);
-    for (transform, mover, mut patrol, mut goal, state) in &mut patrols {
-        let feet = mover.feet(transform);
+    for (transform, sort, mut patrol, mut goal, state) in &mut patrols {
+        let feet = sort.feet(transform);
         patrol_step(
             &mut patrol,
             dt,
@@ -250,15 +250,6 @@ fn patrol_step(
     }
 }
 
-/// The ground point of an entity: its feet. An entity with a `DepthSort` has its `Transform` at the centre of its
-/// sprite, so the feet are `feet_offset` below it (the Long Way player). Without one the `Transform` is the feet.
-fn ground_point(transform: &Transform, sort: Option<&DepthSort>) -> Vec2 {
-    let y = sort.map_or(transform.translation.y, |sort| {
-        sort.feet_y(transform.translation.y)
-    });
-    Vec2::new(transform.translation.x, y)
-}
-
 fn pursue(
     positions: Query<(&Transform, Option<&DepthSort>)>,
     player: Query<(&Transform, Option<&DepthSort>), With<Controlled>>,
@@ -270,7 +261,7 @@ fn pursue(
             Some(entity) => positions.get(entity).ok(),
             None => player,
         };
-        goal.0 = target.map(|(transform, sort)| ground_point(transform, sort));
+        goal.0 = target.map(|(transform, sort)| feet_of(transform, sort));
     }
 }
 
@@ -282,7 +273,13 @@ fn sentry(
     bounds: Option<Res<CameraBounds>>,
     rng: Option<ResMut<GameRng>>,
     player: Query<(&Transform, Option<&DepthSort>), With<Controlled>>,
-    mut sentries: Query<(&Transform, &Mover, &mut Sentry, &mut MoveGoal, &MoveState)>,
+    mut sentries: Query<(
+        &Transform,
+        &DepthSort,
+        &mut Sentry,
+        &mut MoveGoal,
+        &MoveState,
+    )>,
 ) {
     let Some(mut rng) = rng else {
         return;
@@ -292,9 +289,9 @@ fn sentry(
     let player = player
         .single()
         .ok()
-        .map(|(transform, sort)| ground_point(transform, sort));
-    for (transform, mover, mut sentry, mut goal, state) in &mut sentries {
-        let feet = mover.feet(transform);
+        .map(|(transform, sort)| feet_of(transform, sort));
+    for (transform, sort, mut sentry, mut goal, state) in &mut sentries {
+        let feet = sort.feet(transform);
         let home = *sentry.home.get_or_insert(feet);
         if !sentry.alerted
             && player.is_some_and(|at| can_see(feet, at, sentry.sight, world.edges()))
@@ -323,6 +320,7 @@ fn sentry(
 mod tests {
     use super::*;
     use crate::collision::CollisionWorld;
+    use crate::movement::Mover;
     use crate::test_util::{edges_of, movement_app};
 
     #[test]
@@ -631,7 +629,8 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::from_xyz(100.0, 190.0, 0.0),
-                Mover::new(10.0).with_feet_offset(30.0),
+                Mover::new(10.0),
+                DepthSort { feet_offset: 30.0 },
                 Sentry::new(10.0, 400.0),
             ))
             .id();
@@ -639,7 +638,8 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::from_xyz(300.0, 330.0, 0.0),
-                Mover::new(10.0).with_feet_offset(30.0),
+                Mover::new(10.0),
+                DepthSort { feet_offset: 30.0 },
                 RandomPatrol::new(10.0),
             ))
             .id();

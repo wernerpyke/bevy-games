@@ -1,7 +1,7 @@
 //! Long Way's collision values. The collision engine is in `game_kit::collision`.
 
 use bevy::prelude::*;
-use game_kit::collision::Blocker;
+use game_kit::collision::{Blocker, grow_sideways};
 
 /// Half the width of the player's body. The feet are blocked this far from a trunk's sides.
 /// The Hunter's cloak is about 20 px wide and the hat 30. Keep this above 12.8 (half of the 25.6 gap between two rocks two cells apart), or those rocks stop forming one cluster.
@@ -39,11 +39,9 @@ impl Trunk {
 
     /// The area the player's feet may not enter, as a rectangle.
     fn blocked_area(&self) -> Rect {
-        Rect::new(
-            self.left - PLAYER_HALF_WIDTH,
-            self.y_low(),
-            self.right + PLAYER_HALF_WIDTH,
-            self.y_high(),
+        grow_sideways(
+            Rect::new(self.left, self.y_low(), self.right, self.y_high()),
+            PLAYER_HALF_WIDTH,
         )
     }
 

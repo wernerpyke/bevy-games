@@ -183,13 +183,6 @@ fn feet_text(feet: Option<Vec2>) -> String {
     feet.map_or_else(|| "none".to_string(), |feet| format!("{feet:?}"))
 }
 
-fn feet_of(transform: &Transform, sort: &DepthSort) -> Vec2 {
-    Vec2::new(
-        transform.translation.x,
-        sort.feet_y(transform.translation.y),
-    )
-}
-
 /// What a `goto` command needs from the map lifecycle.
 #[derive(SystemParam)]
 struct MapLink<'w, 's> {
@@ -416,7 +409,7 @@ fn run_script(
             feet_text(
                 target
                     .as_ref()
-                    .map(|(transform, sort)| feet_of(transform, sort))
+                    .map(|(transform, sort)| sort.feet(transform))
             )
         );
     }
@@ -426,7 +419,7 @@ fn run_script(
             feet_text(
                 target
                     .as_ref()
-                    .map(|(transform, sort)| feet_of(transform, sort))
+                    .map(|(transform, sort)| sort.feet(transform))
             )
         );
         script.commands.pop_front();

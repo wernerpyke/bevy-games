@@ -28,7 +28,7 @@ Enemy strategies, spawners, random numbers, touch and collectables. Index of all
 
 ## adr-x38. The kit has a touch trigger for collectable items, and the game keeps the inventory (2026-11-08)
 
-**Decision.** The kit owns `Collectable { area, kind }` (with a `MapId`), the `Collected { kind }` message and `CollectablePlugin`. When the feet of the `Controlled` entity touch the area of an item of the current map, the plugin sends `Collected` and despawns the item. The game owns the art, the item kinds, the touch area size and the player state (the inventory). The kit has no inventory type.
+**Decision.** The kit owns `Collectable { area, kind }` (with the `MapId` that the kit adds, `adr-x58`), the `Collected { kind }` message and `CollectablePlugin`. When the feet of the `Controlled` entity touch the area of an item of the current map, the plugin sends `Collected` and despawns the item. The game owns the art, the item kinds, the touch area size and the player state (the inventory). The kit has no inventory type.
 
 **Rationale.** The touch test is the same for every game that has pickups, and it follows `ExitTrigger`. The shape of player state is not known yet: it will probably grow past counts (health, keys), so a kit inventory would be built on a guess. Kinds are strings from the legend, so the kit has no game types (`adr-x13`). Placed in the kit at the developer's request, before a second game needs it (`adr-x12`).
 

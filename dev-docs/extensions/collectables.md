@@ -4,7 +4,7 @@ Map items that do not block the player. The player collects one by touching it.
 
 ## Summary
 
-- A game spawns an entity with `Collectable { area, kind }` and a `MapId`.
+- A game spawns an entity with `Collectable { area, kind }` in its `load` hook, which gives it the map's `MapId` (`adr-x58`).
 - When the feet of the `Controlled` entity are inside `area`, the kit sends a `Collected { kind }` message and despawns the entity.
 - The kit knows no item kinds. `kind` is the legend name from the map file. What a kind means, how it looks and where the count is kept are the game's.
 

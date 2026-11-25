@@ -441,10 +441,7 @@ fn report_target(
         return;
     };
     let (transform, sort) = target.into_inner();
-    let world = Vec2::new(
-        transform.translation.x,
-        sort.feet_y(transform.translation.y),
-    );
+    let world = sort.feet(transform);
     // The numbers count from the map that holds the feet, or from the global grid.
     let origin = grids
         .0

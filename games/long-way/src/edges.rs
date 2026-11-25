@@ -5,11 +5,11 @@
 use bevy::prelude::*;
 use bevy_aseprite_ultra::prelude::*;
 use game_kit::animation::RandomStaticFrame;
-use game_kit::collision::Blocker;
+use game_kit::collision::{Blocker, grow_sideways};
 use game_kit::layers::{EDGE_GROUND_Z, EDGE_HALF_Z_OFFSET};
 use game_kit::map::Map;
 use game_kit::map_edge::{EdgeFit, EdgeMode, edge_blocked_rects, edge_quarters, edge_sprites};
-use game_kit::map_transition::{MapId, MapLoad};
+use game_kit::map_transition::MapLoad;
 
 use crate::collision::PLAYER_HALF_WIDTH;
 
@@ -43,7 +43,6 @@ pub fn spawn_edges(commands: &mut Commands, server: &AssetServer, map: &Map, loa
             EDGE_GROUND_Z
         };
         commands.spawn((
-            MapId(load.id.clone()),
             AseAnimation {
                 aseprite: aseprite.clone(),
                 animation: Animation::tag(sprite.piece.name()),
@@ -61,15 +60,7 @@ pub fn spawn_edges(commands: &mut Commands, server: &AssetServer, map: &Map, loa
         ));
     }
     for rect in edge_blocked_rects(map, load.origin, &quarters, EDGE_STEP) {
-        commands.spawn((
-            MapId(load.id.clone()),
-            Blocker(Rect::new(
-                rect.min.x - PLAYER_HALF_WIDTH,
-                rect.min.y,
-                rect.max.x + PLAYER_HALF_WIDTH,
-                rect.max.y,
-            )),
-        ));
+        commands.spawn(Blocker(grow_sideways(rect, PLAYER_HALF_WIDTH)));
     }
 }
 
@@ -89,10 +80,7 @@ mod tests {
     fn the_kit_sprites_are_spawned_on_the_ground_and_the_blocked_areas_grown_by_the_player_half_width()
      {
         let map = bumpy_map();
-        let load = MapLoad {
-            id: "m".to_string(),
-            origin: Vec2::new(-40.0, 24.0),
-        };
+        let load = crate::test_util::map_load(Vec2::new(-40.0, 24.0));
         let quarters = edge_quarters(EDGE_MODE, map.size, &map.edges);
         assert!(quarters.iter().any(|q| q.cut) && quarters.iter().any(|q| !q.cut));
         let mut expected: Vec<(String, Vec3, f32, Option<Rect>, u64)> =
@@ -134,11 +122,17 @@ mod tests {
         });
         let world = app.world_mut();
         let mut sprites: Vec<(String, Vec3, f32, Option<Rect>, u64)> = world
-            .query_filtered::<(&AseAnimation, &Sprite, &Transform, &RandomStaticFrame), With<MapId>>()
+            .query::<(&AseAnimation, &Sprite, &Transform, &RandomStaticFrame)>()
             .iter(world)
             .map(|(ase, sprite, transform, frame)| {
                 let tag = ase.animation.tag.clone().unwrap_or_default();
-                (tag, transform.translation, transform.scale.x, sprite.rect, frame.seed)
+                (
+                    tag,
+                    transform.translation,
+                    transform.scale.x,
+                    sprite.rect,
+                    frame.seed,
+                )
             })
             .collect();
         let key = |s: &(String, Vec3, f32, Option<Rect>, u64)| {

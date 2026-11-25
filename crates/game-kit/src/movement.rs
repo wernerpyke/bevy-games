@@ -3,13 +3,13 @@
 //! reports in `MoveState` whether the entity is walking, which way it faces, and whether it arrived or the goal is
 //! unreachable. See `dev-docs/extensions/enemy-movement.md`.
 //!
-//! The entity's feet are its `Transform` x and y, or lower by `Mover::feet_offset` (`DepthSort::feet_offset`, as for
-//! the player).
+//! The entity's feet are `DepthSort::feet`: its `Transform` x and y, lower by `DepthSort::feet_offset` (adr-x57).
 
 use bevy::prelude::*;
 
 use crate::camera::CameraBounds;
 use crate::collision::{CollisionSettings, CollisionWorld, SlideAssist, move_feet};
+use crate::depth::DepthSort;
 use crate::nav::{NavGrid, NavSet};
 
 /// Systems that choose goals run in this set, before the systems that follow them.
@@ -64,10 +64,10 @@ pub struct Stunned;
 #[derive(Component, Default, Clone, Copy, Debug, PartialEq)]
 pub struct MoveGoal(pub Option<Vec2>);
 
-/// Gives an entity the movement described above. It also adds `MoveGoal`, `MoveState`, `PathFollower` and
-/// `SlideAssist`.
+/// Gives an entity the movement described above. It also adds `MoveGoal`, `MoveState`, `PathFollower`,
+/// `SlideAssist` and `DepthSort`, which holds the feet offset.
 #[derive(Component, Clone, Copy, Debug)]
-#[require(MoveGoal, MoveState, PathFollower, SlideAssist)]
+#[require(MoveGoal, MoveState, PathFollower, SlideAssist, DepthSort)]
 pub struct Mover {
     /// World units per second.
     pub speed: f32,
@@ -75,9 +75,6 @@ pub struct Mover {
     pub edge_margin: f32,
     /// The entity has arrived when its feet are this close to the goal.
     pub arrive_distance: f32,
-    /// How far the feet are below the `Transform` (the same as `DepthSort::feet_offset`). 0 when the `Transform` is the
-    /// feet.
-    pub feet_offset: f32,
 }
 
 impl Mover {
@@ -86,25 +83,11 @@ impl Mover {
             speed,
             edge_margin: 0.0,
             arrive_distance: 2.0,
-            feet_offset: 0.0,
         }
     }
 
     pub fn with_edge_margin(mut self, margin: f32) -> Self {
         self.edge_margin = margin;
-        self
-    }
-
-    /// The feet of an entity with this `Transform`. Every system that walks, aims or looks from a mover uses this.
-    pub fn feet(&self, transform: &Transform) -> Vec2 {
-        Vec2::new(
-            transform.translation.x,
-            transform.translation.y - self.feet_offset,
-        )
-    }
-
-    pub fn with_feet_offset(mut self, offset: f32) -> Self {
-        self.feet_offset = offset;
         self
     }
 }
@@ -177,6 +160,7 @@ fn follow_goals(
     mut movers: Query<(
         &mut Transform,
         &Mover,
+        &DepthSort,
         &MoveGoal,
         &mut MoveState,
         &mut PathFollower,
@@ -187,14 +171,16 @@ fn follow_goals(
 ) {
     let dt = time.delta_secs();
     *searches_left = budget.0;
-    for (mut transform, mover, goal, mut state, mut follower, mut assist, stunned) in &mut movers {
+    for (mut transform, mover, sort, goal, mut state, mut follower, mut assist, stunned) in
+        &mut movers
+    {
         if stunned {
             state.walking = false;
             assist.reset();
             continue;
         }
         follower.since_search += dt;
-        let feet = mover.feet(&transform);
+        let feet = sort.feet(&transform);
         state.walking = false;
         let Some(goal) = goal.0 else {
             follower.clear();
@@ -272,7 +258,7 @@ fn follow_goals(
             follower.stalled = 0.0;
         }
         transform.translation.x = new.x;
-        transform.translation.y = new.y + mover.feet_offset;
+        transform.translation.y = new.y + sort.feet_offset;
     }
 }
 
@@ -334,7 +320,8 @@ mod tests {
             .world_mut()
             .spawn((
                 Transform::from_translation(Vec3::new(30.0, 62.0, 0.0)),
-                Mover::new(80.0).with_feet_offset(22.0),
+                Mover::new(80.0),
+                DepthSort { feet_offset: 22.0 },
                 MoveGoal(Some(goal)),
             ))
             .id();

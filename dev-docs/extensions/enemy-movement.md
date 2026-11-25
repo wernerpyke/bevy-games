@@ -13,7 +13,7 @@ An entity with a `Mover` walks to its `MoveGoal`. A strategy is a component and 
 - **Goal.** `MoveGoal(Option<Vec2>)`: the point to walk to. `None` means stand still.
 - **Strategy.** A component and a system in `StrategySet` that writes the goal.
 - **Mover.** The component that makes an entity follow its goal: speed, edge margin, arrival distance.
-- **Feet.** The point that collides. It is the `Transform` x and y of the entity (`DepthSort { feet_offset: 0.0 }`), or lower by `Mover::feet_offset` when the `Transform` is the middle of the sprite (the Long Way player, `feet_offset` = `DepthSort::feet_offset`). `MoveGoal` is always a place for the feet.
+- **Feet.** The point that collides. `DepthSort` owns the feet offset (`adr-x57`): the feet are the `Transform` x and y, lower by `DepthSort::feet_offset` (`depth::feet_of`, `DepthSort::feet`). `Mover` requires a `DepthSort`, with an offset of 0 by default; the Long Way player sets its own. Movement, patrol, sentry, pursue and the movement debug view all read it. `MoveGoal` is always a place for the feet.
 
 ## Parameters the game supplies
 

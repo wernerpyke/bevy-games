@@ -44,7 +44,7 @@ sequenceDiagram
 1. The player walks into an exit area. The feet point counts, and the edges of the area are inside. An exit fires once and arms again when the feet have left every exit area.
 2. The kit sends `RequestMapChange { to, entry, transition, source }`. A request during a transition is ignored.
 3. The overlay (`FADE_Z_INDEX` in `layers.rs`) fades to the colour. `MapTransition::locks_input` is true from here until the fade in ends.
-4. With the screen covered the kit removes every entity with `MapId`, sets `ActiveMaps` and `CameraBounds` to the new map, and runs the game hooks in order.
+4. With the screen covered the kit removes every entity with `MapId` (each map root takes its children with it), sets `ActiveMaps` and `CameraBounds` to the new map, and runs the game hooks in order.
 5. The overlay fades out and the lock ends.
 
 A request for a map or entry that does not exist is logged and the world stays as it was. The registry checks every exit when the game starts, so this only happens with a script `goto` that has a typo.
@@ -90,7 +90,7 @@ Constraints, checked when the maps are registered (`validate_links`, `adr-x30`):
 
 ## Exit by touching an object
 
-A legend entry with `exit_to=<map id>` makes an object an exit (`adr-x33`, rule 24 of [map-files.md](map-files.md)). The game adds `ExitTrigger { area, to }` with a `MapId` when it spawns the object. `detect_exit` tests the feet against the triggers of the current map and against the exit areas, and both use the same `armed` flag: it is false after a transition until the feet are outside every exit area and every trigger, so arriving inside a trigger does not fire it.
+A legend entry with `exit_to=<map id>` makes an object an exit (`adr-x33`, rule 24 of [map-files.md](map-files.md)). The game adds `ExitTrigger { area, to }` when it spawns the object in the `load` hook; the kit gives it the map's `MapId`. `detect_exit` tests the feet against the triggers of the current map and against the exit areas, and both use the same `armed` flag: it is false after a transition until the feet are outside every exit area and every trigger, so arriving inside a trigger does not fire it.
 
 The request is `RequestMapChange { to, entry: None, transition: Scene, source: None }`. `entry: None` puts the player at the `player_start` of the target map (`start_feet`) and keeps their facing (`Arrival.facing` is `None`). A map without a `player_start` is refused and the world stays as it was. A marker exit is never seamless: a seamless link needs an exit strip on a map edge to place the next map.
 
@@ -131,7 +131,7 @@ The player keeps their position along the strip. The offset is measured in world
 
 1. Add `MapTransitionPlugin { sources, kinds, start, origin, fade, camera_ease_secs }`. `sources` are the map files with their ids, `kinds` the legend names, `origin` the world position of cell (0,0) of a scene transition map.
 2. Insert `MapHooks`, made with `world.register_system`:
-   - `load`: `In<MapLoad>`. Spawn the objects of the map and add `MapId(id)` to each one.
+   - `load`: `In<MapLoad>`. Spawn the objects of the map at `origin`. Do not add `MapId`: the kit spawns a `MapRoot` (`MapLoad::root`) before the hook and afterwards makes every new top-level entity its child with the map's `MapId` (`adr-x58`). Spawn nothing here that must outlive the map.
    - `rebuild`: clear `CollisionWorld` and add the blocked areas of the entities that exist. Runs after every load.
    - `arrive`: `In<Arrival>`. Move the player to `arrival.feet` and set the facing. The player has no `MapId`.
    - To use exit objects, add `ExitTrigger` to the entities of objects whose `exit_to` is set (Long Way: `markers.rs`).

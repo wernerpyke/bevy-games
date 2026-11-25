@@ -249,7 +249,6 @@ pub(super) fn cast_fireballs(
             Projectile::new(direction, FIREBALL.speed).at_height(FIREBALL.height),
             Transform::from_translation(start.extend(0.0)),
             Visibility::default(),
-            DepthSort { feet_offset: 0.0 },
         ));
     }
 }
