@@ -12,6 +12,14 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 
 **How to apply.** A game supplies its values through plugin fields and marker components, not generics or Cargo features (`dev-docs/extensions/plugin-configuration.md`). Ask before adding game specific code to the kit.
 
+## adr-x56. A kit feature derives, requires or warns about what a spawn site needs (2026-11-25)
+
+**Decision.** When a kit feature needs a value or a companion component at the spawn site, the kit derives the value, requires the component with `#[require]`, or warns in debug builds when it is missing. A game never repeats a kit constant or rule by hand (for example, subtracting a sort bias).
+
+**Rationale.** The draw-order bug came back three times because each spawn site had to remember a rule (`adr-x53`). The kit review of 2026-11-23 found more of the same shape: rocks and pickups that set their sort line by hand, two sources for the feet offset, `MapId` on each map object, and `DepthSort` on projectiles and emitters. Each one can cause the same bug again. A rule that the kit enforces cannot be forgotten, and a debug warning names the entity to fix.
+
+**How to apply.** When you add a kit component, ask what a spawn site must also add or calculate, and make the kit do it. When you find game code that repeats a kit constant or rule, move the rule into the kit or add a warning. List the symptom it prevents in the symptom index (`dev-docs/extensions/README.md`).
+
 
 ## Index
 
@@ -69,3 +77,4 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x53 | An object that blocks sorts at its blocked area, set by the kit | EXTENSIONS-SCREEN.md |
 | x54 | A thrown projectile follows a kit path and collides where it is drawn | EXTENSIONS-COLLISION.md |
 | x55 | A projectile hit names the projectile, which is removed in `PostUpdate`; a projectile can skip all targets | EXTENSIONS-COLLISION.md |
+| x56 | A kit feature derives, requires or warns about what a spawn site needs | EXTENSIONS.md |

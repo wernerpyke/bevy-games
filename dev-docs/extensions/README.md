@@ -13,6 +13,44 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | Which numbers and rules does Long Way use? | `games/long-way/docs/` |
 | Why was a decision made? | `dev-docs/adr/` |
 
+## Symptom index
+
+Read this before you write game code for movement, draw order, collision, maps, projectiles, particles or the HUD. The kit probably has the fix. A kit feature derives, requires or warns about what a spawn site needs (`adr-x56`). If you find yourself repeating a kit constant or rule by hand, the kit is missing something: say so.
+
+| If you see | Use |
+|---|---|
+| A character is drawn behind an object it stands in front of, or the order changes with x | `SortAtBlocker` + `Blocker` (`depth.rs`, `adr-x53`) |
+| Neighbouring objects in a row flicker or swap order | `TieBreakX` (`depth.rs`) |
+| A character is not drawn behind a tree it walks behind | `DepthSort` with the real feet offset |
+| A sprite is under the ground or above the HUD | `layers.rs` constants, never a bare z |
+| A debug drawing covers the HUD | A sprite on `FEATURE_DEBUG_Z` or `MOVEMENT_DEBUG_Z`, not a gizmo |
+| The map edge hides the character | `EDGE_GROUND_Z` or `EDGE_CANOPY_Z` (`adr-x51`) |
+| The player walks through an object, or hits an invisible wall after a map change | `Blocker`, and a collision rebuild in `MapHooks.rebuild` |
+| The player sticks on corners | `CollisionPlugin { allow_sliding }`, `SlideTuning`, `SlideAssist` (`collision.rs`) |
+| Gaps or wrong blocked areas between neighbours | `groups.rs` |
+| An enemy walks into walls | `Mover` + `NavGrid` (`movement.rs`, `nav.rs`) |
+| An enemy should patrol, chase or guard | `strategies.rs` |
+| Contact damage does not fire, or fires too often | `Touchable` + `HitBox`, `ControlledTouched` |
+| A shot passes through trees or never leaves the map | `Projectile` + `CameraBounds` |
+| A thrown shot sorts wrongly | `ProjectilePath` + `DepthSort` |
+| A `ProjectileHit` handler cannot find the projectile | Order it after `ProjectileSet` (`adr-x55`) |
+| A pickup is not collected, or is collected twice | `Collectable` + `MapId` |
+| An object stays after its map unloads | `MapId(load.id)` on everything a map spawns (`map_transition.rs`) |
+| Enemies do not appear again | `Spawner`, `SpawnRequest`, `SpawnedBy` |
+| Many sprites animate in step | `RandomStartFrame::for_cell` |
+| The animation speed is wrong | Frame durations in the `.aseprite` file (`adr-a6`) |
+| Pixels are blurred | The kit camera's view height (`camera.rs`) |
+| The fade or entry position is wrong at an exit | `map_transition.rs` and `MapHooks` |
+| An exit leads nowhere | `map_links.rs` |
+| Ground tiles change on reload | `map_background::place_tiles` |
+| A HUD click moves the player | `BlocksWorldClick` (`pointer.rs`) |
+| The HUD overlaps the game | Screen regions (`screen.rs`) |
+| The game runs while paused | `AppState` and `PlayState` (`app_state.rs`) |
+| F1 does nothing | `ReloadPlugin` and a `ReloadMap` handler |
+| Scripted runs differ | Kit `Rng` with a seed (`rng.rs`) |
+| You need a repeatable bug | Script runner with `--debug`, `shot.sh` |
+| Particles do not follow their owner | `Fx::following`, `Follows` (`fx.rs`) |
+
 ## Index
 
 | Extension | What it gives | Code today | ADRs |
@@ -20,13 +58,13 @@ Shared code lives in the `game-kit` crate (`crates/game-kit/`, `adr-x12`). Each 
 | [collision.md](collision.md) | Feet-point collision, merged outlines, forgiving sliding | `game-kit` `collision.rs`, `outline.rs` | x4, x10 (lw1, lw13 for Long Way) |
 | [collision-research.md](collision-research.md) | Approaches compared, why outlines | none | lw1, x10 |
 | [draw-order.md](draw-order.md) | Depth sort by feet, named layers | `game-kit` `depth.rs`, `layers.rs` | x2, x9 (lw12 for Long Way) |
-| [map-files.md](map-files.md) | Text map format and parser contract, exits and entries | `game-kit` `map.rs`, `map_areas.rs`, `map_links.rs` | lw8, x11, x18, x30 |
-| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition.rs` | x30, x31, x32, lw19 |
+| [map-files.md](map-files.md) | Text map format and parser contract, exits and entries | `game-kit` `map.rs`, `map_areas.rs`, `map_links.rs`, `map_edge.rs`, `map_background.rs` | lw8, x11, x18, x30 |
+| [map-transitions.md](map-transitions.md) | Moving between maps: registry, lifecycle, fade, seamless joins, entry placement | `game-kit` `map_transition.rs`, `reload.rs` | x30, x31, x32, lw19 |
 | [groups.md](groups.md) | Single items and neighbour groups for blocked areas | `game-kit` `groups.rs` | x20, rt9, lw14 |
 | [projectiles.md](projectiles.md) | Straight-flying projectiles that stop at blocked areas and the map edge | `game-kit` `projectile.rs` | x21, rt11 |
 | [nav.md](nav.md) | Grid path finding built from the collision outlines, nearest reachable point | `game-kit` `nav.rs` | x23, x43, rt12 |
 | [area-effects.md](area-effects.md) | Ring, band and push geometry for area effects, temporary blocked areas | `game-kit` `area.rs`, `collision.rs` | none yet |
-| [particles.md](particles.md) | Enoki particle effects: plugin, glow materials, one-shot and follow-the-owner emitters | `game-kit` `fx.rs`, `vendor/bevy_enoki` | none yet |
+| [particles.md](particles.md) | Enoki particle effects: plugin, glow materials, one-shot and follow-the-owner emitters | `game-kit` `fx.rs`, `fx_strip.rs`, `vendor/bevy_enoki` | none yet |
 | [pointer.md](pointer.md) | Mouse clicks as a world position message | `game-kit` `pointer.rs` | x42, lw30 |
 | [enemy-movement.md](enemy-movement.md) | Goals, patrol, pursue and sentry strategies, touch messages, facing tags, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, x40, x41, x43, rt12 |
 | [spawners.md](spawners.md) | Spawners with settings in the map legend | `game-kit` `spawner.rs`, `map.rs` | x25, rt12 |

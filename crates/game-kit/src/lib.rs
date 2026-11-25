@@ -1,4 +1,19 @@
 //! Code shared by the games in this workspace. See `dev-docs/adr/EXTENSIONS.md` adr-x12.
+//!
+//! Before writing game code for movement, draw order, collision, maps, projectiles, particles or the HUD, look here
+//! and in the symptom index in `dev-docs/extensions/README.md`. A kit feature derives, requires or warns about what a
+//! spawn site needs (adr-x56).
+//!
+//! | Area | Modules | Guide in `dev-docs/extensions/` |
+//! |---|---|---|
+//! | Draw order | `depth` (sort by feet, `SortAtBlocker`, `TieBreakX`), `layers` (every z) | `draw-order.md` |
+//! | Collision | `collision` (`Blocker`, `CollisionWorld`, sliding), `outline` (merged edges), `groups` (neighbour groups), `area` (ring, band, push geometry) | `collision.md`, `groups.md`, `area-effects.md` |
+//! | Enemies | `movement` (`Mover`, goals), `strategies` (patrol, pursue, sentry), `nav` (path finding), `touch`, `hitbox`, `spawner`, `rng`, `movement_debug` | `enemy-movement.md`, `nav.md`, `spawners.md` |
+//! | Shots and effects | `projectile` (straight and thrown), `fx` (Enoki emitters, follow an owner), `fx_strip` (particle sheets from `.aseprite`) | `projectiles.md`, `particles.md` |
+//! | Pickups | `collectable` | `collectables.md` |
+//! | Maps | `map` (parser), `map_areas`, `map_links`, `map_edge`, `map_background`, `map_transition` (`MapId`, `MapHooks`, fades, seamless joins), `reload` (F1) | `map-files.md`, `map-transitions.md` |
+//! | Screen | `camera`, `screen` (regions), `hud`, `app_state` (`AppState`, `PlayState`, pause), `pointer` (clicks, `BlocksWorldClick`), `animation` | `screen-layout.md`, `pointer.md`, `pixel-art.md` |
+//! | Debug | `debug` (F2 info, F3 grid), `collision_debug`, `script` (scripted runs) | `debug-tools.md`, `dev-feedback.md` |
 
 pub mod animation;
 pub mod app_state;

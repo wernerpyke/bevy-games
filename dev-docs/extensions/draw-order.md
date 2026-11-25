@@ -36,12 +36,19 @@ Back to front:
 | Layer | Kind | Constant |
 |---|---|---|
 | Background | sprite z | `BACKGROUND_Z` |
+| Background tile images | sprite z | `BACKGROUND_TILES_Z` plus `BACKGROUND_TILE_Z_STEP` per image |
+| Map edge on the ground | sprite z | `EDGE_GROUND_Z` (`adr-x51`) |
 | Grid debug | sprite z | `GRID_DEBUG_Z` |
 | World | sprite z within `WORLD_HALF_BAND` of 0 | features and characters, sorted together |
+| Map edge as a canopy | sprite z | `EDGE_CANOPY_Z` (`adr-x51`) |
 | Feature debug | sprite z | `FEATURE_DEBUG_Z`, `FEATURE_DEBUG_INTERIOR_Z`, `FEATURE_DEBUG_FEET_Z` |
 | Movement debug | sprite z | `MOVEMENT_DEBUG_Z` |
 | HUD | `GlobalZIndex` | `HUD_Z_INDEX` |
-| UI | `GlobalZIndex` | `UI_Z_INDEX` |
+| Pause dim | `GlobalZIndex` | `DIM_Z_INDEX` |
+| UI (dialogs) | `GlobalZIndex` | `UI_Z_INDEX` |
+| Map fade | `GlobalZIndex` | `FADE_Z_INDEX` |
+
+A game uses one of the two edge layers. Half-size edge pieces add `EDGE_HALF_Z_OFFSET`. The full list with comments is the `//!` doc of `layers.rs`.
 
 7. Features and characters share the world layer, so a character can walk behind a feature.
 8. Draw code takes z and `GlobalZIndex` only from `layers.rs` or the game's own layers module.

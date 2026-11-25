@@ -1,3 +1,16 @@
+//! Collision of a feet point against static blocked areas (`dev-docs/extensions/collision.md`, adr-x4, adr-x10,
+//! adr-x16).
+//!
+//! - A static object that blocks gets `Blocker(rect)`: the area its feet may not enter, already grown by the actor's
+//!   half width. Give it `SortAtBlocker` too, so it is drawn on the same line (`depth.rs`, adr-x53).
+//! - `CollisionWorld` merges all blocked areas into clusters with one outline (`outline.rs`). `register_blockers`
+//!   adds every `Blocker` once, at `PostStartup`. A game that loads maps clears the world and adds the new blockers
+//!   in its `MapHooks.rebuild` (`map_transition.rs`); without that the player walks through objects or hits invisible
+//!   walls after a map change. Short-lived walls use `add_temporary`.
+//! - A moving body calls `move_feet` with `SlideAssist`. With `CollisionPlugin { allow_sliding: true }` it slides
+//!   along faces and is slid past near corners (`SlideTuning`). `resolve` is the plain stop-at-the-first-edge move,
+//!   and `ray_distance` measures how far a ray goes.
+
 use bevy::prelude::*;
 
 use crate::outline::{self, Cluster, Edge, Orientation, TOLERANCE};

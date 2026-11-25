@@ -1,3 +1,14 @@
+//! Draw order inside the world layer: each sprite's z comes from its feet, so lower feet are drawn in front
+//! (`dev-docs/extensions/draw-order.md`, adr-x2). Every other z is a named constant in `layers.rs`.
+//!
+//! - A character or other moving sprite gets `DepthSort { feet_offset }`, the distance from its centre down to its
+//!   feet. Use the real feet offset, or it is not drawn behind objects it walks behind.
+//! - An object that blocks gets `Blocker` and `SortAtBlocker`, and no `feet_offset`. The kit sorts it at the bottom of
+//!   its blocked area plus `BLOCKER_SORT_BIAS`, so a character standing at it is drawn in front (adr-x53). Do not
+//!   subtract the bias by hand. Debug builds log a `depth:` warning for a blocker that sorts by hand at or below
+//!   that line.
+//! - A sprite not anchored at the middle of its footprint adds `TieBreakX`, or neighbours in a row can swap order.
+
 use bevy::prelude::*;
 
 use crate::collision::Blocker;
