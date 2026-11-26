@@ -230,6 +230,10 @@ The grid on the left gives the pieces on the right (`c` is `center`, `n` is `nor
 
 R-Town keeps `".": empty` and has no edges.
 
+### Areas drawn as outlines
+
+35. A legend kind with the parameter `fill=enclosed` draws areas as outlines: `"F": forest fill=enclosed`. The parser reads it as an ordinary parameter. `cell_area::CellGrid::from_map` fills the inside of each closed outline. An area at the map edge draws its outline along the border cells. The rules, the limits and how the area changes during play are in `cell-areas.md` (`adr-x62`).
+
 ## Legend conventions
 
 Characters are chosen so a map can be read at a glance (`adr-x37`). Games follow them for new legends. The parser does not check them.

@@ -139,3 +139,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **Rationale.** The review of 2026-11 first left this binding in Long Way, because R-Town did not use `MapId`. Since `adr-x59` R-Town does, and it wrote `MapId(active.current.clone())` by hand at two spawn sites, while Long Way kept its own marker and observer. A forgotten tag leaves an entity in the world after a map change or F1, with no warning (`adr-x56`). "The current map" is wrong for what a map object spawns: with seamless joins the object can be in a neighbour map, so the two kinds need two rules.
 
 **How to apply.** Give a type spawned by the player's actions `#[require(OnCurrentMap)]`, or add the marker at the spawn site when the type is a kit type (R-Town's shot is a kit `Projectile`). Add `SpawnedBy` to what a spawner asks for, as before. Copy the object's `MapId` for anything else a map object spawns. Long Way also gives `OnCurrentMap` to every particle emitter, since only it uses `Fx`.
+
+## adr-x62. Cell areas: a grid of filled cells that can change while the game runs, drawn in the map as an outline (2026-11-26)
+
+**Decision.** The kit gets cell areas: a grid that says which cells of a map belong to an area (a forest, for example), with the blocked areas made from it. A map file may draw only the outline of an area; the loader fills every empty cell that cannot reach the map border through empty cells. The grid can change while the game runs, and the blocked areas and the nav grid follow. The game draws the sprites from the grid.
+
+**Rationale.** Jet will have a forest that changes over time, so a forest must be a model in the game and not only a list of objects from the file. A grid of cells is the simplest model that can grow and shrink cell by cell. Drawing only the outline makes large areas quick to write and easy to read. The user wants this in the kit now, not after a second game needs it (`adr-x12` allows that when the user says so).
+
+**How to apply.** An area's legend kind is given the fill rule in the map file. A clearing closed in on all sides by an area would be filled too: such a map needs a "never fill" marker, which does not exist yet. Change cells through the kit, never by editing `Blocker`s by hand, so collision and path finding are rebuilt.

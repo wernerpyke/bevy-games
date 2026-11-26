@@ -11,7 +11,7 @@
 //! | Enemies | `movement` (`Mover`, goals), `strategies` (patrol, pursue, sentry), `nav` (path finding), `touch`, `hitbox`, `spawner`, `rng`, `movement_debug` | `enemy-movement.md`, `nav.md`, `spawners.md` |
 //! | Shots and effects | `projectile` (straight and thrown), `fx` (Enoki emitters, follow an owner), `fx_strip` (particle sheets from `.aseprite`) | `projectiles.md`, `particles.md` |
 //! | Pickups | `collectable` | `collectables.md` |
-//! | Maps | `map` (parser), `map_areas`, `map_links`, `map_edge`, `map_background`, `map_transition` (`MapLifecyclePlugin`, `MapTransitionPlugin`, `MapId`, `MapRoot`, `OnCurrentMap`, `MapHooks`, fades, seamless joins), `reload` (F1) | `map-files.md`, `map-transitions.md` |
+//! | Maps | `map` (parser), `cell_area` (areas of cells drawn as outlines, can change during play), `map_areas`, `map_links`, `map_edge`, `map_background`, `map_transition` (`MapLifecyclePlugin`, `MapTransitionPlugin`, `MapId`, `MapRoot`, `OnCurrentMap`, `MapHooks`, fades, seamless joins), `reload` (F1) | `map-files.md`, `map-transitions.md`, `cell-areas.md` |
 //! | Screen | `camera`, `screen` (regions), `hud`, `app_state` (`AppState`, `PlayState`, pause), `pointer` (clicks, `BlocksWorldClick`), `animation` | `screen-layout.md`, `pointer.md`, `pixel-art.md` |
 //! | Debug | `debug` (F2 info, F3 grid), `collision_debug`, `script` (scripted runs) | `debug-tools.md`, `dev-feedback.md` |
 
@@ -19,6 +19,7 @@ pub mod animation;
 pub mod app_state;
 pub mod area;
 pub mod camera;
+pub mod cell_area;
 pub mod collectable;
 pub mod collision;
 pub mod collision_debug;
