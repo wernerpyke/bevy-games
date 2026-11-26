@@ -2,7 +2,7 @@
 -- Used to start a background or other flat art at an exact size. Refuses to overwrite an existing file.
 --
 -- Usage (see dev-scripts/aseprite.sh; the input file is the palette file):
---   ./dev-scripts/aseprite.sh new_sprite games/long-way/assets/art/game.aseprite \
+--   ./dev-scripts/aseprite.sh new_sprite games/long-way/assets/art/palette.aseprite \
 --     out=games/long-way/assets/art/backgrounds/hud.aseprite width=512 height=160 fill=34 layer=Background
 --
 --   out:    file to write (required)

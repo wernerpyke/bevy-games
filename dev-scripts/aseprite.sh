@@ -10,7 +10,7 @@
 #
 # Examples:
 #   ./dev-scripts/aseprite.sh check games/long-way/assets/art/characters/player.aseprite \
-#     palette=games/long-way/assets/art/game.aseprite
+#     palette=games/long-way/assets/art/palette.aseprite
 #   ./dev-scripts/aseprite.sh frame_grid games/long-way/assets/art/characters/player.aseprite \
 #     tag=Run scale=3 out=target/screenshots/run.png
 #   ./dev-scripts/aseprite.sh sheet_analysis games/long-way/input/hunter/Idle.png frame=96x64

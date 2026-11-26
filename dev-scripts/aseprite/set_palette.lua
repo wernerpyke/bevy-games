@@ -2,7 +2,7 @@
 -- when a visible colour of the file is not in that palette: nothing is saved then. Without apply=1 it only reports.
 --
 -- Usage (see dev-scripts/aseprite.sh):
---   ./dev-scripts/aseprite.sh set_palette <file.aseprite> palette=<game.aseprite> [apply=1]
+--   ./dev-scripts/aseprite.sh set_palette <file.aseprite> palette=<palette.aseprite> [apply=1]
 local spr = app.sprite
 local palette_path = app.params["palette"]
 if not spr or not palette_path then

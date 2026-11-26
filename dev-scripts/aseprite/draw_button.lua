@@ -3,7 +3,7 @@
 -- Colours are palette indexes of the open file (the game palette). Refuses to overwrite an existing file.
 --
 -- Usage (see dev-scripts/aseprite.sh; the input file is the palette file):
---   ./dev-scripts/aseprite.sh draw_button games/long-way/assets/art/game.aseprite \
+--   ./dev-scripts/aseprite.sh draw_button games/long-way/assets/art/palette.aseprite \
 --     out=games/long-way/assets/art/ui/weapon_button.aseprite width=118 height=56
 --
 --   out:            file to write (required)
