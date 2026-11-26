@@ -6,7 +6,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 ## Status (2026-11-26): resume here
 
-Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), checked and committed. Step 2 built (2026-11-26): kit `cell_area` (`adr-x62`, `cell-areas.md`), Jet's map `assets/maps/1.txt` (a draft for the user to edit), house, forest, the top HUD bar (empty), F1/F2/F3, draw order by the kit depth sort (`adr-jt15`). The blocked areas are not grown by the actor size yet: that is step 3 (Q4). Next: the user's check of the map, then step 3.
+Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), checked and committed. Step 2 built (2026-11-26): kit `cell_area` (`adr-x62`, `cell-areas.md`), Jet's map `assets/maps/1.txt` (a draft for the user to edit), house, forest, the top HUD bar (empty), F1/F2/F3, draw order by the kit depth sort (`adr-jt15`). The user checked the map (2026-11-26). Step 3 built (2026-11-26, not committed): `input.rs` (key rules), `player.rs` (Q4 built as `adr-jt16`: one point at the leading edge on the centre line, no growth, no kit sliding, so the blocked areas stay ungrown), kit `screen_fx` (`CameraShake`, `CameraFollowSet`, `screen-fx.md`), the shake on every block except the house (changed after the play test). The user play tested and confirmed step 3 (2026-11-26), committed. Next: step 4.
 
 ## Designer's intent (from the brief)
 
@@ -25,7 +25,7 @@ Record each one as an ADR in `games/jet/docs/adr.md` (prefix `jt`) in step 0.
 | Screen | 16:9. Window 960 × 540 art pixels (2× on a 1080p screen). One fixed screen, no scrolling. |
 | Cell | 16 px (the 8 px Pyxel tiles at 2×). |
 | Layout (Q2, 2026-11-26) | A HUD bar of 28 px at the top. Below it the map, 60 × 32 cells (960 × 512 px), at the bottom of the window. The play field is the middle 40 × 32 cells (640 × 512 px), with the house exactly in the centre. The 10 columns on each side are forest (160 px each side). |
-| Field edge (2026-11-26) | The side forest is solid trees. The camera shakes when the player hits the field edge: the map edge at the top and bottom, and the side forest at the left and right. Trees inside the field do not shake the camera, as in the original. |
+| Field edge (2026-11-26) | The side forest is solid trees. The camera shakes when the player hits any wall: every tree and the map edge, not the house (changed after the first play test, `adr-jt10`). |
 | Screen effects in the kit (Q10, 2026-11-26) | A new kit concept `screen_fx` holds effects on the whole view. Camera shake is the first. The kit has no game values: Jet supplies the time, the distance and the direction. Later effects (for example a flash) go there too. |
 | Field size (2026-11-26) | 40 × 32 was chosen so enemies take about as long to reach the house as in the original: 18 cells from the sides (4.8 s), 14 cells from the top and the bottom (3.7 s). A larger field makes the swarm slow to form. |
 | Speeds | Same tiles per second as the real Pyxel speeds: player 30 cells/s (480 px/s), Spinner 3.75 cells/s (60 px/s). Then tune by play. |
@@ -129,12 +129,12 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - `player.rs`: `Controlled`, `DepthSort`, `SlideAssist`, a `HitBox`. Move at 480 px/s with `move_feet`. Ask Q4 and tune. Blocked means: stop, clear the held direction, and report what blocked (`PlayerBlocked { by: Edge | Tree | House }` as a message).
 - At 480 px/s the player moves 8 px a frame at 60 fps, more on a slow frame. Check that a long frame cannot carry the player through a thin tree band. Test it in the kit if the kit is the cause.
 - Animation: `Move` plays once, rotated to the direction, then holds the last frame. `Idle` is not rotated. The trail (one cell behind) and the shockwave (one cell ahead, 3 cells wide) are children, so they move and rotate with the player, and they are removed on stop.
-- Field-edge shake with a new kit module `crates/game-kit/src/screen_fx.rs` (Q10):
+- Wall shake with a new kit module `crates/game-kit/src/screen_fx.rs` (Q10):
   - The game asks for a shake with a message (duration, distance, direction). The kit moves the `GameCamera` by an offset, flipping sides each frame, and puts it back exactly when the shake ends.
   - Its order with `CameraFollowPlugin` and the whole-pixel rounding (`adr-x17`) must be right, so a scrolling game can use it too. The offset is in whole art pixels. It uses game time, so it stops while paused.
   - Kit tests: the offset per frame, the flip, the exact end position, a new shake while one runs, a pause. Prove each test can fail (`dev-docs/testing.md`).
   - An extension doc `dev-docs/extensions/screen-fx.md` (added to the index and the symptom index), an ADR in `dev-docs/adr/EXTENSIONS-SCREEN.md`, and a row in the module table of `crates/game-kit/src/lib.rs`.
-  - Jet values: 0.1 s, 2 px along the direction of travel. It happens at the top and bottom map edges and at the side forest, so `PlayerBlocked` must tell a side forest tree from a field tree (for example a `SideForest` marker, or the field rectangle).
+  - Jet values: 0.1 s, 2 px along the direction of travel. It happens on every block except the house (`PlayerBlocked { by: House | Wall }`).
 - Check: scripted runs for each direction, a switch, a fallback, a wall stop at a tree, at the house and at the screen edge.
 
 ### 4. Spinners and spawning

@@ -1,7 +1,9 @@
 mod camera;
 mod forest;
 mod house;
+mod input;
 mod map;
+mod player;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -49,11 +51,12 @@ fn main() {
             game_kit::animation::AnimationHelpPlugin,
             game_kit::cell_area::CellAreaPlugin,
             game_kit::reload::ReloadPlugin,
+            game_kit::screen_fx::ScreenFxPlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "JET",
                 game_commands: &[],
             },
         ))
-        .add_plugins((map::MapPlugin, forest::ForestPlugin))
+        .add_plugins((map::MapPlugin, forest::ForestPlugin, player::PlayerPlugin))
         .run();
 }

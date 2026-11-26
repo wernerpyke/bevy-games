@@ -1,6 +1,6 @@
 # Jet: specification
 
-Status: draft (2026-11-26). The port from Pyxel is planned and not built. Decisions: `adr.md`.
+Status: draft (2026-11-26). The port from Pyxel is in progress: the map, the house, the forest and the player are built. Decisions: `adr.md`.
 
 Source: the Pyxel game Jet and its port brief, `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). This file copies the rules of the brief that the port keeps, converted to the new cell size, and the changes the user decided. Where this file and the brief differ, this file wins.
 
@@ -59,11 +59,10 @@ Running into a tree, the house or the field edge stops the player **and clears t
 
 | Blocked by | Result |
 |---|---|
-| Field edge: the map edge at the top and bottom, the side forest at the left and right | Stop. Camera shake: 0.1 s, 2 px along the direction of travel, flipping sides each frame (`adr-jt10`). |
-| A tree inside the field | Stop. No shake. |
+| A wall: any tree (in the field or the side forest), or the map edge | Stop. Camera shake: 0.1 s, 2 px along the direction of travel, flipping sides each frame (`adr-jt10`). |
 | The house | Stop. Heals the house if a heal is charged (section 7). No shake. |
 
-The original tests one point: the cell just ahead of the leading edge, on the centre line, so the player slides past tree corners. The port uses the kit collision; the feel is tuned by play (plan question Q4).
+Collision tests one point, as in the original: the middle of the leading edge, on the centre line. The blocked areas are not grown. So the player slides past a tree corner that only its side overlaps, and fits through a gap of one cell (`adr-jt16`). A long frame cannot carry the player through a tree: the whole step is tested.
 
 ### Animation and attached sprites
 
@@ -85,7 +84,7 @@ The original tests one point: the cell just ahead of the leading edge, on the ce
 
 - The map is a text file in the kit format (`dev-docs/extensions/map-files.md`, `adr-jt6`). The legend follows `adr-x37`: `@` is the player start, letters are features.
 - **House:** 4 × 4 cells, exactly in the centre of the field. Its top row (roof and chimney) is passable; the lower three rows are solid. It loops a 4-frame chimney smoke at 4 fps.
-- **Trees:** 2 × 2 cells. The original places them in groups every 2 columns and every 1 row, so the rows overlap and the clusters look dense. Each tree picks one of 8 images at random (the 5th twice as likely) and a small random offset: x −8 to +8 px (twice the Pyxel range at 2×, so the columns of trees do not line up) and y 0 to 4 px up. Each tree stands on the bottom of its cell, so the trunk ends on the blocked area's edge and on its sort line; the canopy covers the row above, and the top row of a cluster reaches one cell above it (2026-11-26). 15% of the tree places stay empty at random, to break up the rows, but only inside the forest, where the trees beside and below hide the gap; a tree at the edge is always drawn. A tree at the end of a row shifts only outwards, so its thin art does not leave the end cell bare (2026-11-26). The offset and the gaps are only visual: every forest cell still blocks. Every forest cell is solid; the player slides along the forest edge with the kit sliding (`adr-jt14`). The Pyxel game's passable edge tiles are dropped.
+- **Trees:** 2 × 2 cells. The original places them in groups every 2 columns and every 1 row, so the rows overlap and the clusters look dense. Each tree picks one of 8 images at random (the 5th twice as likely) and a small random offset: x −8 to +8 px (twice the Pyxel range at 2×, so the columns of trees do not line up) and y 0 to 4 px up. Each tree stands on the bottom of its cell, so the trunk ends on the blocked area's edge and on its sort line; the canopy covers the row above, and the top row of a cluster reaches one cell above it (2026-11-26). 15% of the tree places stay empty at random, to break up the rows, but only inside the forest, where the trees beside and below hide the gap; a tree at the edge is always drawn. A tree at the end of a row shifts only outwards, so its thin art does not leave the end cell bare (2026-11-26). The offset and the gaps are only visual: every forest cell still blocks. Every forest cell is solid (`adr-jt14`); the player passes forest corners by its centre-line collision (`adr-jt16`). The Pyxel game's passable edge tiles are dropped.
 - **Forest in the map file:** the forest is a kit cell area (`adr-x62`). The file draws only the outline of each forest area with `F`; the loader fills the inside. The game places the tree sprites over the forest cells. The forest can change while the game runs (section 12).
 - The field layout is the brief's map (section 3 of the brief) fitted to 40 × 32. The brief's 40 × 40 collision map is the reference.
 - The forest will change over time in a later version (section 12). Then the map file is only the start state.
@@ -203,7 +202,7 @@ None.
 
 Asked at their plan step (`dev-docs/PLAN-jet-port.md`):
 
-- Q4: collision point and sliding for the player.
+- Q4: collision point and sliding for the player. Answered: `adr-jt16` (the Pyxel rule), confirmed in play.
 - Q5: the attack zone size, and how a power-up changes it.
 - Q6: when a Spinner counts as hitting the house.
 - Q7: spawning with the kit spawner (extended) or a Jet director.

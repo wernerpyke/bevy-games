@@ -10,7 +10,7 @@ use game_kit::map_transition::{
 };
 use game_kit::reload::ReloadMap;
 
-use crate::camera::MAP_ORIGIN;
+use crate::camera::{CELL_SIZE, MAP_ORIGIN};
 
 /// The default map file, relative to the game folder. It is read from disk, so F1 reloads it.
 const MAP_NAME: &str = "assets/maps/1.txt";
@@ -19,6 +19,9 @@ const MAP_VARIABLE: &str = "JET_MAP";
 
 pub const HOUSE: &str = "house";
 pub const FOREST: &str = "forest";
+
+/// The map size in cells: the window shows exactly this (`adr-jt2`).
+pub const MAP_CELLS: IVec2 = IVec2::new(60, 32);
 
 /// The legend names the parser accepts.
 const KIND_NAMES: &[&str] = &[PLAYER_START, HOUSE, FOREST];
@@ -70,6 +73,12 @@ fn read_source() -> Result<(String, String), String> {
 /// Parses the map and checks what the game needs: one player start, one house, and a valid forest.
 fn check(name: &str, source: &str) -> Result<(), String> {
     let map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
+    if map.size != MAP_CELLS {
+        return Err(format!(
+            "{name}: the map must be {}x{} cells, the size of the window",
+            MAP_CELLS.x, MAP_CELLS.y
+        ));
+    }
     player_start(name, &map)?;
     house_cell(name, &map)?;
     crate::forest::forest_grid(name, &map).map_err(|error| error.to_string())?;
@@ -132,6 +141,7 @@ fn load_hook(In(load): In<MapLoad>, world: &mut World) {
     let _ = world.run_system_cached(number_rows_like_the_file);
     let _ = world.run_system_cached(crate::house::spawn_house);
     let _ = world.run_system_cached(crate::forest::spawn_forest);
+    let _ = world.run_system_cached_with(crate::player::spawn_player, start);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): checks the file first, then lets the kit load the map again. A file
@@ -168,4 +178,9 @@ pub struct HouseCell(pub IVec2);
 /// The world position of the bottom left corner of `cell`.
 pub fn cell_corner(cell: IVec2, cell_size: f32) -> Vec2 {
     MAP_ORIGIN + cell.as_vec2() * cell_size
+}
+
+/// The whole map in world units.
+pub fn map_rect() -> Rect {
+    Rect::from_corners(MAP_ORIGIN, MAP_ORIGIN + MAP_CELLS.as_vec2() * CELL_SIZE)
 }

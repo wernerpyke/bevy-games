@@ -48,6 +48,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | Ground tiles change on reload | `map_background::place_tiles` |
 | A HUD click moves the player | `BlocksWorldClick` (`pointer.rs`) |
 | The HUD overlaps the game | Screen regions (`screen.rs`) |
+| The camera must shake, or a whole-view effect fights the camera follow | `CameraShake` (`screen_fx.rs`, `adr-x61`) |
 | The game runs while paused | `AppState` and `PlayState` (`app_state.rs`) |
 | F1 does nothing | `ReloadPlugin` and a `ReloadMap` handler |
 | Scripted runs differ | Kit `Rng` with a seed (`rng.rs`) |
@@ -78,6 +79,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | [dev-feedback.md](dev-feedback.md) | Plain function tests, logging, scripted input, screenshots | `game-kit` `script.rs`, `dev-scripts/rust.sh` | x5 |
 | [plugin-configuration.md](plugin-configuration.md) | Plugin fields stored as a resource | `game-kit` `collision.rs`, `debug.rs` | none |
 | [screen-layout.md](screen-layout.md) | Screen regions, HUD bar, app states, pause | `game-kit` `screen.rs`, `hud.rs`, `app_state.rs`, `camera.rs` | x34, x35, x45, lw24, lw34 |
+| [screen-fx.md](screen-fx.md) | Effects on the whole view: camera shake | `game-kit` `screen_fx.rs` | x61 |
 | [pixel-art.md](pixel-art.md) | View height scale, animation tag switching, animation speed, random start frame | `game-kit` `camera.rs`, `animation.rs` | e7, a6, x39 |
 | [tile-sheet-catalogue.md](tile-sheet-catalogue.md) | Make a bought tile sheet readable (rulers and grid, 1:1) and cut sprites by position | `dev-scripts/aseprite/catalogue.lua` | a7 |
 

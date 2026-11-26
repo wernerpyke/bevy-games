@@ -111,11 +111,18 @@ struct SmoothState {
 /// rounded to a whole world unit, so pixel art does not shimmer when it scrolls.
 pub struct CameraFollowPlugin;
 
+/// The set in `PostUpdate` that sets the camera position from its target (`CameraFollowPlugin`). Screen effects
+/// (`screen_fx.rs`) run after it, so their offset is added to the followed position.
+#[derive(SystemSet, Debug, Hash, PartialEq, Eq, Clone)]
+pub struct CameraFollowSet;
+
 impl Plugin for CameraFollowPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             PostUpdate,
-            follow_controlled.before(TransformSystems::Propagate),
+            follow_controlled
+                .in_set(CameraFollowSet)
+                .before(TransformSystems::Propagate),
         );
     }
 }

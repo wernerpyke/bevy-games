@@ -72,13 +72,13 @@
 
 **How to apply.** Use the kit HUD widgets in the 28 px bar (`adr-jt2`).
 
-## adr-jt10. The camera shakes at the field edge, with a kit screen effect (2026-11-26)
+## adr-jt10. The camera shakes when the player hits a wall, with a kit screen effect (2026-11-26)
 
-**Decision.** The camera shakes when the player runs into the field edge: the map edge at the top and bottom, and the side forest at the left and right. Trees inside the field do not shake it. The shake is a kit screen effect (`screen_fx`), with Jet's values: 0.1 s, 2 px along the direction of travel, flipping sides each frame.
+**Decision.** The camera shakes on every block except the house: any tree (in the field or the side forest) and the map edge. The shake is a kit screen effect (`screen_fx`), with Jet's values: 0.1 s, 2 px along the direction of travel, flipping sides each frame. Changed on 2026-11-26 after the user's play test; at first only the field edge shook.
 
-**Rationale.** The Pyxel game shakes at the screen edge. In the port the side forest is the edge of the field, so the player feels the same limit there. The user wants screen effects as a kit concept so other games can use them.
+**Rationale.** The Pyxel game shakes at the screen edge. After the first play test of the port, the user chose a shake for every wall the player hits, not only the field edge. The user wants screen effects as a kit concept so other games can use them.
 
-**How to apply.** The player's blocked check must tell a side-forest tree from a field tree. The kit decision is `adr-x61`.
+**How to apply.** The player's blocked check tells only the house from a wall (`PlayerBlocked { by: House | Wall }`). The kit decision is `adr-x61`.
 
 ## adr-jt11. Bugs of the Pyxel game that the port fixes (2026-11-26)
 
@@ -106,11 +106,11 @@
 
 ## adr-jt14. The forest is a kit cell area with no passable edge cells (2026-11-26)
 
-**Decision.** The forest (the side forest and the groups in the field) is a kit cell area (`adr-x62`), drawn in the map file as outlines. Every forest cell is solid. There are no passable edge cells: the player slides along the forest edge with the kit sliding, as in Long Way.
+**Decision.** The forest (the side forest and the groups in the field) is a kit cell area (`adr-x62`), drawn in the map file as outlines. Every forest cell is solid. There are no passable edge cells. The player passes forest corners by its centre-line collision (`adr-jt16`), not by the kit sliding.
 
 **Rationale.** The Pyxel game made some edge tiles passable only because its collision tested one point on the centre line and caught on corners. The kit sliding solves that problem directly. A cell area also gives the later dynamic forest its model.
 
-**How to apply.** Tree sprites are placed by the game from the area's cells (a tree every 2 columns and every row, random variant and offset). The forest edge feel is tuned in plan question Q4.
+**How to apply.** Tree sprites are placed by the game from the area's cells (a tree every 2 columns and every row, random variant and offset). The forest edge feel is set by `adr-jt16`.
 
 ## adr-jt15. Trees, the house and actors sort by their feet, with the kit depth sort (2026-11-26)
 
@@ -119,3 +119,11 @@
 **Rationale.** The user chose the kit pattern over the Pyxel draw order. Trees in lower rows are drawn over the rows above them, which suits the dense, overlapping clusters, and an actor just above a tree is drawn behind its top.
 
 **How to apply.** A tree sorts at its cell (`SortAtArea`), the house at its blocked area (`SortAtBlocker`), and actors by their feet (`DepthSort`). Effects use the kit layers above the world.
+
+## adr-jt16. The player tests one point at its leading edge, on its centre line, with no grown areas (2026-11-26)
+
+**Decision.** The player's collision tests one point: the middle of its leading edge, which is on its centre line. The blocked areas are not grown by the player's size. The test runs from the player's centre to that point plus the step, with the kit `resolve`. The kit assisted sliding is not used. The user confirmed it in the first play test (2026-11-26).
+
+**Rationale.** This is the Pyxel rule: it tests the cell just ahead of the leading edge, on the centre line. It keeps the feel the port must keep (`adr-jt1`): the player slides past a tree corner that only its side overlaps, and fits through a gap of one cell. A grown area or a feet point with sideways growth would close the one-cell corridors of the map, and at 8 px a frame the player could not line up with a narrower gap. The kit sliding starts only after the player pushes against a face for a while, and a Jet player never pushes: a block stops it and clears the held keys. The test starts at the centre, which never stands in a blocked area, so a tree that already overlaps the front half after a turn still stops the player.
+
+**How to apply.** The forest cell area and the house have no growth. Enemies choose their own collision rule. This changes the sliding part of `adr-jt14`: the player passes forest corners by this rule, not by the kit sliding.
