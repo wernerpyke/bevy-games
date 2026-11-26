@@ -22,11 +22,15 @@ Record each one as an ADR in `games/jet/docs/adr.md` (prefix `jt`) in step 0.
 |---|---|
 | Crate | `jet`, in `games/jet/`. |
 | Not a 1:1 port | Improve the game while porting. Keep the player's speed and agility exactly. |
-| Screen | 16:9. View 960 × 540 art pixels (2× on a 1080p screen). One fixed screen, no scrolling. |
-| Cell | 16 px (the 8 px Pyxel tiles at 2×). The map is 60 cells wide. 540 / 16 = 33.75, so the map is 33 rows (528 px), and 12 px are left over (open question Q2). |
+| Screen | 16:9. Window 960 × 540 art pixels (2× on a 1080p screen). One fixed screen, no scrolling. |
+| Cell | 16 px (the 8 px Pyxel tiles at 2×). |
+| Layout (Q2, 2026-11-26) | A HUD bar of 28 px at the top. Below it the map, 60 × 32 cells (960 × 512 px), at the bottom of the window. The play field is the middle 40 × 32 cells (640 × 512 px), with the house exactly in the centre. The 10 columns on each side are forest (160 px each side). |
+| Field edge (2026-11-26) | The side forest is solid trees. The camera shakes when the player hits the field edge: the map edge at the top and bottom, and the side forest at the left and right. Trees inside the field do not shake the camera, as in the original. |
+| Screen effects in the kit (Q10, 2026-11-26) | A new kit concept `screen_fx` holds effects on the whole view. Camera shake is the first. The kit has no game values: Jet supplies the time, the distance and the direction. Later effects (for example a flash) go there too. |
+| Field size (2026-11-26) | 40 × 32 was chosen so enemies take about as long to reach the house as in the original: 18 cells from the sides (4.8 s), 14 cells from the top and the bottom (3.7 s). A larger field makes the swarm slow to form. |
 | Speeds | Same tiles per second as the real Pyxel speeds: player 30 cells/s (480 px/s), Spinner 3.75 cells/s (60 px/s). Then tune by play. |
 | Art | The `.aseprite` files are the source. Copy them, resize them 2×, and load them directly. No exported sprite sheets. Not marked `_placeholder`. Files and tags are checked and standardised with the user (step 1). |
-| Palette | A richer palette than the Pyxel 16 colours. Which one is open (Q1). |
+| Palette | A new Jet palette (Q1, 2026-11-26). Sprites stay white line art on a black background. The palette starts with the colours the game recolours to: white, black, and the feedback colours of the brief (grey for dying, magenta-red for the kill X and damage level 2, pink for damage level 1, purple for damage level 3, teal-green for the heal charge). More colours are agreed when particles and other effects are added. |
 | Map | A text map file in the kit format (`map-files.md`), like Long Way. A dynamic forest comes later, and then the map stops being only a file. |
 | Enemies | Real path finding, so Spinners go around trees. Spreading (not stacking) is wanted. A flow field is explored during the port. |
 | Game over | On the 4th hit the house is destroyed: play stops, a screen shows the survival time, and a key restarts. |
@@ -62,8 +66,6 @@ These define the feel. Keep them unless the user changes them:
 
 | # | Question | Step |
 |---|---|---|
-| Q1 | Which palette: a new Jet palette (how many colours, from where), or a copy of Long Way's? Keep the white line art on black? | 1 |
-| Q2 | The 12 px left over below the 33-row map: a border top and bottom, or a strip for the HUD? | 2 |
 | Q3 | How trees go in the map file: one character per tree (2 × 2 footprint, `T` solid and `t` passable), or one character per blocked cell that the game fills with tree sprites (the user's idea of an outline filled at random)? | 2 |
 | Q4 | Collision feel: the original tests only the centre line, so the player slides past tree corners. The kit tests a feet point with `allow_sliding`. Which point and which sliding setting feels right? | 3 |
 | Q5 | Attack zone: a hit box 3 cells wide and 1 cell deep in front of the player, the size of the shockwave. Tune by play. Should a power-up change it by one number (for example a scale)? | 5 |
@@ -71,14 +73,13 @@ These define the feel. Keep them unless the user changes them:
 | Q7 | Spawning: the kit `Spawner` has a fixed interval and one entity per request. Jet needs random edge positions, a random gap and groups. Extend the kit spawner, or keep a Jet "director" in the game? | 4 |
 | Q8 | Spreading and the flow field: add them to the kit (a kit change, so ask), or keep them in Jet first? | 7 |
 | Q9 | Colour feedback: a sprite tint works while the art is white line art. With coloured art a tint changes every colour. Use a tint now, or a palette swap shader? | 5 |
-| Q10 | Camera shake on hitting the screen edge: in the game, or as a kit feature? | 3 |
 | Q11 | Pause key (`Escape`, the kit default) and the restart key on the game-over screen. | 6 |
 
 ## Facts found while writing this plan
 
 - The Jet source files are `sprites.aseprite` (8 × 16, 9 frames: the player row of the sheet above the trail row, so one frame holds two sprites), `house.aseprite` (32 × 32, 4 frames), `forest.aseprite` (16 × 16, 8 frames, one tree per frame), `shockwave.aseprite` (24 × 8, 4 frames) and `sheet1.aseprite` (256 × 256, 1 frame). Every file has a visible `Background` layer. The only tags are `Loop` tags that do not match the brief, and every frame is 100 ms (the brief says 16 fps, 4 fps for the house). So step 1 must split `sprites.aseprite`, remove or hide the backgrounds, and set tags and durations.
 - `collision::move_feet` returns only the new feet position. The game finds "blocked" by comparing it with the wanted position, and finds what blocked it (house, tree, screen edge) itself.
-- The kit has `ScreenMode::Overlay` (a HUD drawn over the game). It is computed and tested, but no game uses it yet. Jet would be the first.
+- The kit's bar layout fits the HUD: `ScreenMode::BarTop { ratio }` with ratio 28 / 512 = 0.0546875 gives a game region of 960 × 512 and a 28 px bar. With `VIEW_HEIGHT` 512, the game is a whole-number 2× on a 1080p screen. Long Way uses `BarBottom`, so `BarTop` is computed and tested, but no game uses it yet.
 - The kit `Spawner` supports a fixed interval only (`spawners.md`, Limits).
 - `Mover` runs at most 4 path searches per frame (`enemy-movement.md`). A large swarm queues its searches.
 
@@ -102,15 +103,16 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
   - tags for the house (`Smoke`), trees (one tag or frame per variant) and shockwave (`Wave`);
   - durations: 16 fps is 62.5 ms, so 62 or 63 ms per frame; the house is 250 ms;
   - the background layers: remove them, or keep them hidden.
-- Ask Q1 (palette), then apply it with `remap_colors` and `set_palette`.
+- Make the palette file `assets/art/palette.aseprite` (`new_sprite` needs an existing palette file, so this needs a small script or the user in Aseprite; the colours of the palette decision; ask whether to keep the brief's exact hex values or adjust them). Then move each file onto it with `remap_colors` and `set_palette`.
 - Resize 2× with `dev-scripts/aseprite/resize.lua`, and save into `games/jet/assets/art/`.
 - Write `docs/art-tags.md`: every file, frame and tag, as in R-Town.
 - The user checks the files in Aseprite before step 2.
 
 ### 2. Screen, map and static world
 
-- `camera.rs`: `VIEW_HEIGHT` 540, `CELL_SIZE` 16, colours. Window 960 × 540. `PixelCameraPlugin` with no follow (fixed screen), `CameraBounds` set to the map.
-- Ask Q2 and Q3. Then write `assets/maps/1.txt` (60 × 33, `origin: top-left`, legend after `adr-x37`: `@` the player start, `H` the house, tree letters as agreed). Draft it from the brief's layout (section 3), widened to 60 columns. The user edits it.
+- `camera.rs`: `VIEW_HEIGHT` 512, `CELL_SIZE` 16, colours. Window 960 × 540. `PixelCameraPlugin` with no follow (fixed screen), `ScreenPlugin { mode: BarTop { ratio: 28.0 / 512.0 } }` (an empty bar for now), `CameraBounds` set to the map. Check that the bar is 28 px and the game region 960 × 512 at scale factors 1 and 2.
+- Ask Q3. Then write `assets/maps/1.txt` (60 × 32, `origin: top-left`, legend after `adr-x37`: `@` the player start, `H` the house, tree letters as agreed). The middle 40 columns are the field, drafted from the brief's layout (section 3) fitted to 40 × 32 with the house in the centre. The 10 columns on each side are forest. The user edits it.
+- The field has a hard edge: the map edge at the top and bottom, and the side forest at the left and right. The side forest is solid trees (2026-11-26), so it blocks like any other tree.
 - `map.rs` (kinds, loading), `house.rs` and `trees.rs`: spawn with `Blocker` rects and the right layers. The house's top row is passable, as in the original. Trees keep the random variant (the 5th variant twice as likely) and the small random offset, from the kit `Rng` with a seed per cell, so F1 gives the same forest.
 - Kit plugins: `CollisionPlugin`, `CollisionDebugPlugin`, `DebugPlugin` (F2, F3), `DepthPlugin`, `ReloadPlugin` (F1), `ScriptPlugin { env_prefix: "JET" }`, `AnimationHelpPlugin` (random start frames for the house smoke if wanted).
 - Check: a screenshot with `--debug` shows the map, the grid and the collision overlay. Compare the blocked cells with the drafted map.
@@ -121,7 +123,12 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - `player.rs`: `Controlled`, `DepthSort`, `SlideAssist`, a `HitBox`. Move at 480 px/s with `move_feet`. Ask Q4 and tune. Blocked means: stop, clear the held direction, and report what blocked (`PlayerBlocked { by: Edge | Tree | House }` as a message).
 - At 480 px/s the player moves 8 px a frame at 60 fps, more on a slow frame. Check that a long frame cannot carry the player through a thin tree band. Test it in the kit if the kit is the cause.
 - Animation: `Move` plays once, rotated to the direction, then holds the last frame. `Idle` is not rotated. The trail (one cell behind) and the shockwave (one cell ahead, 3 cells wide) are children, so they move and rotate with the player, and they are removed on stop.
-- Screen-edge shake (ask Q10): 0.1 s, 2 px along the direction, flipping each frame.
+- Field-edge shake with a new kit module `crates/game-kit/src/screen_fx.rs` (Q10):
+  - The game asks for a shake with a message (duration, distance, direction). The kit moves the `GameCamera` by an offset, flipping sides each frame, and puts it back exactly when the shake ends.
+  - Its order with `CameraFollowPlugin` and the whole-pixel rounding (`adr-x17`) must be right, so a scrolling game can use it too. The offset is in whole art pixels. It uses game time, so it stops while paused.
+  - Kit tests: the offset per frame, the flip, the exact end position, a new shake while one runs, a pause. Prove each test can fail (`dev-docs/testing.md`).
+  - An extension doc `dev-docs/extensions/screen-fx.md` (added to the index and the symptom index), an ADR in `dev-docs/adr/EXTENSIONS-SCREEN.md`, and a row in the module table of `crates/game-kit/src/lib.rs`.
+  - Jet values: 0.1 s, 2 px along the direction of travel. It happens at the top and bottom map edges and at the side forest, so `PlayerBlocked` must tell a side forest tree from a field tree (for example a `SideForest` marker, or the field rectangle).
 - Check: scripted runs for each direction, a switch, a fallback, a wall stop at a tree, at the house and at the screen edge.
 
 ### 4. Spinners and spawning
@@ -129,7 +136,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - `enemy.rs`: an `EnemyKind` enum (only `Spinner` now) with a values table (speed, hit box, art file), so a new kind is a new row and its own art.
 - Spinners use the kit `Mover` (60 px/s), `NavPlugin`, `MovementPlugin` and a Jet strategy `RaidHouse` in `StrategySet`: it picks one of the target points around the house at random, and then goes for the house (ask Q6). An enemy whose search fails searches again later. It never freezes.
 - States: moving (`Move` loop), dying (`Die` once, then despawn), hitting the house (`Kill` once, the house takes 1 damage, then despawn). Mark the enemy `Dead` at once, so no hit check sees it again (brief #5). Follow the `FacingSet` order rule of `enemy-movement.md` rule 7b.
-- Ask Q7. Then build spawning: each Spinner starts at a random cell on a random screen edge (only on free ground), with the difficulty curve of brief section 9 as a plain struct with unit tests (level-ups, limits, group size rounding, the first spawn one gap after the start).
+- Ask Q7. Then build spawning: each Spinner starts at a random cell on a random edge of the field (top row, bottom row, or the first or last field column next to the side forest; only on free ground), with the difficulty curve of brief section 9 as a plain struct with unit tests (level-ups, limits, group size rounding, the first spawn one gap after the start).
 - Check: a scripted run of 90 s with `JET_SEED` set. Spinners come around trees, the spawn rate rises, and the movement debug (F3) shows the paths.
 
 ### 5. Combat, house and particles
@@ -143,7 +150,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 ### 6. HUD, pause and game over
 
 - `AppFlowPlugin` starts in `Playing` (no title). Pause with the kit pause key (Q11). The timers use game time, so pause stops spawning and level-ups.
-- HUD: survival time and kill count, in the place agreed in Q2 (an overlay over the map uses `ScreenMode::Overlay`, which no game uses yet, so test it).
+- HUD: survival time and kill count in the 28 px top bar (children of the kit `Hud` root, kit `label`).
 - `HouseDestroyed` → `AppState::GameOver`. A `state_root` screen shows "house destroyed" and the survival time. A key restarts: a full reset (enemies, house, timers, difficulty, player, HUD counts). Reuse the F1 reset path where it fits.
 - Check: a scripted run with a fast difficulty (a test seed or a script command) that reaches the game-over screen and restarts.
 
