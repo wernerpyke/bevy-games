@@ -7,8 +7,9 @@
 # Usage:
 #   ./dev-scripts/rust.sh build [game]        # build one game, or all
 #   ./dev-scripts/rust.sh test [game]         # test one game, or all
-#   ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title]
+#   ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title] [--script "<commands>"]
 #                                             # run a game, for example: run long-way. A map name starts in that map: run long-way 3 (or 3.txt). F1 reloads the map.
+#                                             # --script runs script commands at the start and leaves the game open, for example: --script "pickup:energy_red:2"
 #                                             # --debug turns on the F2 info box and the F3 grid (off without it)
 #   ./dev-scripts/rust.sh lint                # cargo fmt (formats, lists changed files) + clippy -D warnings (all crates)
 #   ./dev-scripts/rust.sh web [game]          # cargo check for wasm32-unknown-unknown
@@ -37,20 +38,31 @@ case "${1:-}" in
     ;;
   run)
     shift
-    # --debug and --skip-title are not cargo arguments: they set GAME_KIT_DEBUG and GAME_KIT_SKIP_TITLE, which the kit reads.
-    args=(); debug=0
+    # --debug, --skip-title and --script are not cargo arguments: they set GAME_KIT_DEBUG, GAME_KIT_SKIP_TITLE and the
+    # game's script (<GAME>_SCRIPT, with GAME_KIT_SCRIPT_STAY_OPEN so the game stays open when the script has run).
+    args=(); debug=0; script=""; want_script=0
     for arg in "$@"; do
-      if [ "$arg" = "--debug" ]; then debug=1
+      if [ "$want_script" = 1 ]; then script="$arg"; want_script=0
+      elif [ "$arg" = "--debug" ]; then debug=1
       elif [ "$arg" = "--skip-title" ]; then export GAME_KIT_SKIP_TITLE=1
+      elif [ "$arg" = "--script" ]; then want_script=1
       else args+=("$arg"); fi
     done
+    if [ "$want_script" = 1 ] || { [ -n "$script" ] && [ "$script" != "${script#-}" ]; }; then
+      echo "✗ --script needs the commands after it, for example: --script \"pickup:energy_red:2\"" >&2
+      exit 1
+    fi
     set -- ${args[@]+"${args[@]}"}
     if [ "$debug" = 1 ]; then export GAME_KIT_DEBUG=1; fi
     if [ -z "${1:-}" ]; then
-      echo "✗ Usage: ./dev-scripts/rust.sh run <game> [map-file] [cargo args]" >&2
+      echo "✗ Usage: ./dev-scripts/rust.sh run <game> [map-file] [--debug] [--skip-title] [--script \"<commands>\"] [cargo args]" >&2
       exit 1
     fi
     game="$1"; shift
+    if [ -n "$script" ]; then
+      export "$(echo "$game" | tr 'a-z-' 'A-Z_')_SCRIPT=$script"
+      export GAME_KIT_SCRIPT_STAY_OPEN=1
+    fi
     # An optional map file: a path, or a name in games/<game>/assets/maps/ (".txt" may be left out). The game reads it from
     # <GAME>_MAP and starts in that map, for example: run long-way 3. F1 in the game reloads it.
     if [ -n "${1:-}" ] && [ "${1#-}" = "$1" ]; then

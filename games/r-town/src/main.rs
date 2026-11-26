@@ -42,6 +42,7 @@ fn main() {
             game_kit::reload::ReloadPlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "R_TOWN",
+                game_commands: &[],
             },
             input::InputPlugin,
         ))

@@ -33,13 +33,13 @@ Both start visible. The collision overlay is in `collision_debug.rs` and follows
 
 **How to apply.** Add a new tool as a new system in `DebugPlugin`, with a key toggle in `toggle_tools` and a field in `DebugSettings`. Report values from any system through `DebugInfo`. The code stays in the game crate until a second game needs it (`adr-w6`). Remove or gate the tools behind a debug feature before a release build.
 
-## adr-x15. Scripted run tool is in the kit and extensible (2026-11-02)
+## adr-x15. Scripted run tool is in the kit and extensible (2026-11-02, game commands designed 2026-11-26)
 
-**Decision.** The kit owns the script parser and runner (teleport, hold, wait, screenshot, quit). The game marks its target entity with a `ScriptTarget` component and can register its own commands.
+**Decision.** The kit owns the script parser and runner and every command that works the same in each game (teleport, hold, click, ui_click, wait, screenshot, goto, quit). A game adds its own commands by listing their names in `ScriptPlugin::game_commands`. The kit checks each name when the script loads, skips an unknown command with a warning, and sends `ScriptCommand { name, args }` when the command's turn comes. The game reads that message in an ordinary system, checks the arguments and logs what it did. A game command may not use the name of a kit command: the kit stops at start if it does. With `GAME_KIT_SCRIPT_STAY_OPEN` set (`rust.sh run <game> --script "<commands>"`), the game stays open when the script has run, for manual testing; a scripted run (`rust.sh script`) quits at the end.
 
-**Rationale.** Both games get scripted runs and screenshots without copying (adr-x5). R-Town will need game commands such as attacks once combat exists.
+**Rationale.** Both games get scripted runs and screenshots without copying (adr-x5). A game command needs game types the kit must not know (`adr-x13`), so the kit passes only text. A message keeps the kit and the game apart, as elsewhere. Listing the names lets the kit catch a typo when the script loads; the price is that a bad argument shows only when the command runs. The user chose this over handlers with world access (2026-11-26), with Long Way's `pickup:<kind>:<count>` as the first game command.
 
-**How to apply.** Game commands are added through a registration API in the kit. Design that API with the first game command, not before.
+**How to apply.** `crates/game-kit/src/script.rs`. A game lists a constant name in `ScriptPlugin` (Long Way: `inventory::PICKUP_COMMAND`) and handles `ScriptCommand` filtered by that name. Keep the argument rules in a plain function with its own test.
 
 ## adr-x19. Debug keys F2 info, F3 grid, F1 map reload (2026-11-03)
 

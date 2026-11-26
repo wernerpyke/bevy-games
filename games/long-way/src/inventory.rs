@@ -1,9 +1,16 @@
 //! What the player carries: a count of each energy colour. It grows when the kit reports a collected pickup
 //! (`game_kit::collectable::Collected`), up to `MAX_ENERGY` each. A pickup collected at the maximum is lost
 //! (`adr-lw34`). A cast spends the cost of its weapon (`try_spend`, called by `weapons/mod.rs`).
+//!
+//! The script command `pickup:<kind>:<count>` (`PICKUP_COMMAND`, `game_kit::script`) adds `count` of a pickup kind as if
+//! the player had collected it that many times, for example `pickup:energy_red:2`.
 
 use bevy::prelude::*;
 use game_kit::collectable::Collected;
+use game_kit::script::ScriptCommand;
+
+/// The name of the script command that adds pickups.
+pub const PICKUP_COMMAND: &str = "pickup";
 
 /// The four kinds of energy, one per pickup colour.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,7 +113,42 @@ pub struct InventoryPlugin;
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Inventory>()
-            .add_systems(Update, add_collected);
+            .add_systems(Update, (add_collected, add_from_script));
+    }
+}
+
+/// The energy and count of a `pickup` command's parts: a pickup kind from the map legend and a whole number above 0.
+fn pickup_args(args: &[String]) -> Result<(Energy, u32), String> {
+    let [kind, count] = args else {
+        return Err(format!(
+            "needs a kind and a count, for example `pickup:energy_red:2`, found {} parts",
+            args.len()
+        ));
+    };
+    let energy = Energy::from_kind(kind).ok_or_else(|| format!("`{kind}` is not a pickup kind"))?;
+    match count.parse::<u32>() {
+        Ok(count) if count > 0 => Ok((energy, count)),
+        _ => Err(format!("`{count}` is not a count above 0")),
+    }
+}
+
+/// The script's `pickup` commands: each adds its count, one at a time, so the maximum holds as for a real pickup.
+fn add_from_script(mut commands: MessageReader<ScriptCommand>, mut inventory: ResMut<Inventory>) {
+    for command in commands.read().filter(|c| c.name == PICKUP_COMMAND) {
+        match pickup_args(&command.args) {
+            Ok((energy, count)) => {
+                let before = inventory.count(energy);
+                for _ in 0..count {
+                    inventory.add(energy);
+                }
+                let added = inventory.count(energy) - before;
+                info!(
+                    "inventory: script pickup of {count} {energy:?}, {added} added (at most {MAX_ENERGY}): {}",
+                    inventory.summary()
+                );
+            }
+            Err(problem) => warn!("inventory: script `pickup` {problem}, skipped"),
+        }
     }
 }
 
@@ -190,9 +232,70 @@ mod tests {
     }
 
     #[test]
+    fn pickup_takes_a_pickup_kind_and_a_count_above_zero() {
+        let args = |parts: &[&str]| parts.iter().map(|p| p.to_string()).collect::<Vec<_>>();
+        assert_eq!(
+            pickup_args(&args(&["energy_red", "2"])),
+            Ok((Energy::Red, 2))
+        );
+        assert_eq!(
+            pickup_args(&args(&["energy_black", "1"])),
+            Ok((Energy::Black, 1))
+        );
+        assert_eq!(
+            pickup_args(&args(&["energy_red"])),
+            Err(
+                "needs a kind and a count, for example `pickup:energy_red:2`, found 1 parts".into()
+            )
+        );
+        assert_eq!(
+            pickup_args(&args(&["energy_red", "2", "3"])),
+            Err(
+                "needs a kind and a count, for example `pickup:energy_red:2`, found 3 parts".into()
+            )
+        );
+        assert_eq!(
+            pickup_args(&args(&["rock_0", "2"])),
+            Err("`rock_0` is not a pickup kind".into())
+        );
+        for count in ["0", "-1", "two"] {
+            assert_eq!(
+                pickup_args(&args(&["energy_blue", count])),
+                Err(format!("`{count}` is not a count above 0"))
+            );
+        }
+    }
+
+    #[test]
+    fn a_script_pickup_adds_its_count_up_to_the_maximum_and_other_or_bad_commands_add_nothing() {
+        let mut app = App::new();
+        app.add_message::<Collected>()
+            .add_message::<ScriptCommand>()
+            .add_plugins(InventoryPlugin);
+        for (name, args) in [
+            ("pickup", vec!["energy_red", "2"]),
+            ("pickup", vec!["energy_violet", "12"]),
+            ("pickup", vec!["energy_blue", "zero"]),
+            ("give", vec!["energy_blue", "3"]),
+        ] {
+            app.world_mut().write_message(ScriptCommand {
+                name: name.to_string(),
+                args: args.into_iter().map(String::from).collect(),
+            });
+        }
+        app.update();
+        assert_eq!(
+            app.world().resource::<Inventory>().summary(),
+            "B 0  R 2  V 10  K 0"
+        );
+    }
+
+    #[test]
     fn a_collected_energy_is_counted_and_an_unknown_kind_is_not() {
         let mut app = App::new();
-        app.add_message::<Collected>().add_plugins(InventoryPlugin);
+        app.add_message::<Collected>()
+            .add_message::<ScriptCommand>()
+            .add_plugins(InventoryPlugin);
         for kind in ["energy_red", "moss", "energy_red"] {
             app.world_mut().write_message(Collected {
                 kind: kind.to_string(),

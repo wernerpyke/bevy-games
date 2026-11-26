@@ -87,6 +87,7 @@ fn main() {
             game_kit::reload::ReloadPlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "LONG_WAY",
+                game_commands: &[inventory::PICKUP_COMMAND],
             },
         ))
         .add_plugins((

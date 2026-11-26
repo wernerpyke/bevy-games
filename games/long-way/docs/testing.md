@@ -23,7 +23,7 @@ Rules for writing a test (prove that it can fail, exact values, one test layer p
 | `rocks.rs` | Placement (whole scale, the sort line), the blocked area in a group (with and without an open top) and alone, the jitter range |
 | `trees.rs`, `scenery.rs` | Where the canvas hangs, the trunk band of an object alone and the anchor cell in a group |
 | `markers.rs` | The blocked area on whole pixels and the touch area of an exit marker |
-| `pickups.rs`, `inventory.rs` | Each pickup kind has the art and the name of its own energy. Counts per energy, the maximum and the fraction; an unknown kind is not counted |
+| `pickups.rs`, `inventory.rs` | Each pickup kind has the art and the name of its own energy. Counts per energy, the maximum and the fraction; an unknown kind is not counted. The script command `pickup`: its parts and their errors, the count up to the maximum |
 | `hud.rs` | HP icon tags. Systems: each gauge follows its own energy, an active button shows its slot's weapon icon (no label) or is blank, only a primary click on a button or a gauge sends its energy, the HP row. The button frames, the gauge fill and the hover line are kit tests (`game_kit::hud`) |
 | `background.rs` | Unknown tile names, the colour rectangle and the tile images of a map |
 

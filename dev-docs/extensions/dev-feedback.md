@@ -15,7 +15,7 @@ The order of work for a behaviour that fails in the real game is in `CLAUDE.md`,
 
 | Part | Code today | Shared? |
 |---|---|---|
-| Scripted input | `crates/game-kit/src/script.rs`, `dev-scripts/rust.sh` | Shared. Game specific commands are not supported yet (adr-x15) |
+| Scripted input | `crates/game-kit/src/script.rs`, `dev-scripts/rust.sh` | Shared. A game adds its own commands by name and handles `ScriptCommand` (adr-x15); Long Way has `pickup:<kind>:<count>`. `rust.sh run <game> --script "<commands>"` runs a script and leaves the game open |
 | Logging | `collision.rs` and others | Pattern only |
 | Plain function tests | inline in each module | Pattern only |
 

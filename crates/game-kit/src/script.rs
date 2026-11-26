@@ -20,9 +20,16 @@
 //!   (`map_transition.rs`). The player is put in the middle of the entry
 //! - `goto:<map>`                   the same, and the player arrives at the `player_start` of the map
 //! - `quit`
+//! - a game command: a name the game lists in `ScriptPlugin::game_commands`, then its own `:` parts, for example Long
+//!   Way's `pickup:energy_red:2`. The kit sends `ScriptCommand { name, args }` and goes on in the next frame; the game
+//!   reads the message in its own system, checks the arguments and logs what it did (adr-x15).
 //!
-//! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`. Game specific commands
-//! are not supported yet (adr-x15): add the registration when a game needs its first one.
+//! A command that is not known, or has bad parts, is skipped with a warning in the log when the script loads.
+//!
+//! When the commands run out the game quits, unless `GAME_KIT_SCRIPT_STAY_OPEN` is set (`rust.sh run <game> --script
+//! "<commands>"` sets it): then the game stays open for play.
+//!
+//! Example: `LONG_WAY_SCRIPT="teleport:225:-150;hold:up:3;quit" RUST_LOG=long_way=debug ...`.
 
 use std::collections::VecDeque;
 
@@ -47,18 +54,52 @@ const START_DELAY: f32 = 1.0;
 /// Seconds between position log lines while a command runs.
 const LOG_INTERVAL: f32 = 0.25;
 
+/// The environment variable that keeps the game open when the script has run out. `rust.sh run --script` sets it.
+pub const STAY_OPEN_VARIABLE: &str = "GAME_KIT_SCRIPT_STAY_OPEN";
+
+/// The names of the kit's own commands. A game command may not use one.
+const BUILT_IN: [&str; 8] = [
+    "teleport",
+    "hold",
+    "click",
+    "ui_click",
+    "wait",
+    "screenshot",
+    "goto",
+    "quit",
+];
+
 pub struct ScriptPlugin {
     /// Prefix of the environment variables, in capitals with underscores, for example "LONG_WAY". `dev-scripts/rust.sh`
     /// builds it from the game name.
     pub env_prefix: &'static str,
+    /// The names of the game's own commands. The kit sends each as a `ScriptCommand` message when its turn comes.
+    pub game_commands: &'static [&'static str],
+}
+
+/// A game command of the script, sent when its turn comes: its name and the `:` parts after it, as written. The game
+/// checks them, acts and logs. The kit goes on with the next command in the next frame.
+#[derive(Message, Clone, Debug, PartialEq, Eq)]
+pub struct ScriptCommand {
+    pub name: String,
+    pub args: Vec<String>,
 }
 
 impl Plugin for ScriptPlugin {
     fn build(&self, app: &mut App) {
+        if let Some(name) = self
+            .game_commands
+            .iter()
+            .find(|name| BUILT_IN.contains(name))
+        {
+            panic!("script: the game command `{name}` has the name of a kit command");
+        }
+        // Always added, so a game system that reads it runs without a script too.
+        app.add_message::<ScriptCommand>();
         let Ok(text) = std::env::var(format!("{}_SCRIPT", self.env_prefix)) else {
             return;
         };
-        let commands = parse(&text);
+        let commands = parse(&text, self.game_commands);
         info!("script: {} commands loaded", commands.len());
         app.add_message::<RequestMapChange>()
             .add_message::<WorldClick>()
@@ -73,6 +114,8 @@ impl Plugin for ScriptPlugin {
                 goto_sent: false,
                 goto_busy: false,
                 screenshot_dir_variable: format!("{}_SCREENSHOT_DIR", self.env_prefix),
+                stay_open: std::env::var_os(STAY_OPEN_VARIABLE).is_some_and(|value| value != "0"),
+                done: false,
             })
             .add_systems(
                 PreUpdate,
@@ -94,6 +137,7 @@ enum Command {
     Screenshot(String),
     Goto(String, Option<String>),
     Quit,
+    Game(ScriptCommand),
 }
 
 #[derive(Resource)]
@@ -112,43 +156,59 @@ struct Script {
     goto_busy: bool,
     /// Name of the environment variable that sets the screenshot folder.
     screenshot_dir_variable: String,
+    /// Keep the game open when the commands run out (`STAY_OPEN_VARIABLE`).
+    stay_open: bool,
+    /// The commands have run out and the game stays open.
+    done: bool,
 }
 
-fn parse(text: &str) -> VecDeque<Command> {
+/// The commands of `text`. A part that is not a command, kit or game (`game_commands`), or has bad parts, is skipped
+/// with a warning.
+fn parse(text: &str, game_commands: &[&str]) -> VecDeque<Command> {
     text.split(';')
         .map(str::trim)
         .filter(|part| !part.is_empty())
         .filter_map(|part| {
-            let fields: Vec<&str> = part.split(':').collect();
-            let command = match fields.as_slice() {
-                ["teleport", x, y] => {
-                    Command::Teleport(Vec2::new(x.parse().ok()?, y.parse().ok()?))
-                }
-                ["hold", keys, seconds] => {
-                    let keys = keys.split('+').map(key).collect::<Option<Vec<_>>>()?;
-                    Command::Hold(keys, seconds.parse().ok()?)
-                }
-                ["wait", seconds] => Command::Wait(seconds.parse().ok()?),
-                ["click", x, y] => Command::Click(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
-                ["ui_click", x, y] => Command::UiClick(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
-                ["screenshot", name]
-                    if !name.is_empty()
-                        && name
-                            .chars()
-                            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
-                {
-                    Command::Screenshot(name.to_string())
-                }
-                ["goto", map] if !map.is_empty() => Command::Goto(map.to_string(), None),
-                ["goto", map, entry] if !map.is_empty() && !entry.is_empty() => {
-                    Command::Goto(map.to_string(), Some(entry.to_string()))
-                }
-                ["quit"] => Command::Quit,
-                _ => None?,
-            };
-            Some(command)
+            let command = parse_one(part, game_commands);
+            if command.is_none() {
+                warn!("script: `{part}` is not a known command or has bad parts, skipped");
+            }
+            command
         })
         .collect()
+}
+
+fn parse_one(part: &str, game_commands: &[&str]) -> Option<Command> {
+    let fields: Vec<&str> = part.split(':').collect();
+    let command = match fields.as_slice() {
+        ["teleport", x, y] => Command::Teleport(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
+        ["hold", keys, seconds] => {
+            let keys = keys.split('+').map(key).collect::<Option<Vec<_>>>()?;
+            Command::Hold(keys, seconds.parse().ok()?)
+        }
+        ["wait", seconds] => Command::Wait(seconds.parse().ok()?),
+        ["click", x, y] => Command::Click(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
+        ["ui_click", x, y] => Command::UiClick(Vec2::new(x.parse().ok()?, y.parse().ok()?)),
+        ["screenshot", name]
+            if !name.is_empty()
+                && name
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') =>
+        {
+            Command::Screenshot(name.to_string())
+        }
+        ["goto", map] if !map.is_empty() => Command::Goto(map.to_string(), None),
+        ["goto", map, entry] if !map.is_empty() && !entry.is_empty() => {
+            Command::Goto(map.to_string(), Some(entry.to_string()))
+        }
+        ["quit"] => Command::Quit,
+        [name, args @ ..] if game_commands.contains(name) => Command::Game(ScriptCommand {
+            name: name.to_string(),
+            args: args.iter().map(|arg| arg.to_string()).collect(),
+        }),
+        _ => None?,
+    };
+    Some(command)
 }
 
 fn key(name: &str) -> Option<KeyCode> {
@@ -183,12 +243,13 @@ fn feet_text(feet: Option<Vec2>) -> String {
     feet.map_or_else(|| "none".to_string(), |feet| format!("{feet:?}"))
 }
 
-/// What a `goto` command needs from the map lifecycle.
+/// What a `goto` command needs from the map lifecycle, and the writers of the click and game commands.
 #[derive(SystemParam)]
 struct MapLink<'w, 's> {
     pointer: UiPointer<'w, 's>,
     changes: MessageWriter<'w, RequestMapChange>,
     clicks: MessageWriter<'w, WorldClick>,
+    game_commands: MessageWriter<'w, ScriptCommand>,
     transition: Option<Res<'w, MapTransition>>,
     maps: Option<Res<'w, ActiveMaps>>,
 }
@@ -288,7 +349,12 @@ fn run_script(
     let mut target = target.single_mut().ok();
 
     let Some(command) = script.commands.front().cloned() else {
-        exit.write(AppExit::Success);
+        if !script.stay_open {
+            exit.write(AppExit::Success);
+        } else if !script.done {
+            script.done = true;
+            info!("script: done, the game stays open");
+        }
         return;
     };
 
@@ -398,6 +464,14 @@ fn run_script(
             exit.write(AppExit::Success);
             true
         }
+        Command::Game(game_command) => {
+            info!(
+                "script: game command `{}` with {:?}",
+                game_command.name, game_command.args
+            );
+            link.game_commands.write(game_command.clone());
+            true
+        }
     };
 
     script.since_log += time.delta_secs();
@@ -438,7 +512,10 @@ mod tests {
 
     #[test]
     fn commands_are_parsed_in_order() {
-        let commands = parse("teleport:225:-150; hold:up+left:2 ;wait:0.5;screenshot:a_1;quit");
+        let commands = parse(
+            "teleport:225:-150; hold:up+left:2 ;wait:0.5;screenshot:a_1;quit",
+            &[],
+        );
         assert_eq!(commands.len(), 5);
         assert!(matches!(commands[0], Command::Teleport(p) if p == Vec2::new(225.0, -150.0)));
         assert!(matches!(&commands[1], Command::Hold(keys, s) if keys.len() == 2 && *s == 2.0));
@@ -449,21 +526,21 @@ mod tests {
 
     #[test]
     fn click_takes_a_world_position() {
-        let commands = parse("click:100:-20.5;click:1;click:a:b");
+        let commands = parse("click:100:-20.5;click:1;click:a:b", &[]);
         assert_eq!(commands.len(), 1);
         assert!(matches!(commands[0], Command::Click(p) if p == Vec2::new(100.0, -20.5)));
     }
 
     #[test]
     fn ui_click_takes_a_window_position() {
-        let commands = parse("ui_click:60:-20.5;ui_click:1;ui_click:a:b");
+        let commands = parse("ui_click:60:-20.5;ui_click:1;ui_click:a:b", &[]);
         assert_eq!(commands.len(), 1);
         assert!(matches!(commands[0], Command::UiClick(p) if p == Vec2::new(60.0, -20.5)));
     }
 
     #[test]
     fn goto_takes_a_map_and_an_optional_entry() {
-        let commands = parse("goto:2:from_1;goto:2;goto::x;goto:");
+        let commands = parse("goto:2:from_1;goto:2;goto::x;goto:", &[]);
         assert_eq!(commands.len(), 2);
         assert!(
             matches!(&commands[0], Command::Goto(map, Some(entry)) if map == "2" && entry == "from_1")
@@ -473,14 +550,42 @@ mod tests {
 
     #[test]
     fn bad_commands_are_skipped() {
-        let commands = parse("teleport:1;hold:sideways:2;screenshot:bad/name;wait:x;quit");
+        let commands = parse(
+            "teleport:1;hold:sideways:2;screenshot:bad/name;wait:x;quit",
+            &[],
+        );
         assert_eq!(commands.len(), 1);
         assert!(matches!(commands[0], Command::Quit));
     }
 
     #[test]
+    fn a_listed_game_command_keeps_its_parts_and_an_unlisted_name_is_skipped() {
+        let commands = parse("give:apple:3;give;wait:1;take:apple", &["give", "drop"]);
+        assert_eq!(commands.len(), 3);
+        assert!(
+            matches!(&commands[0], Command::Game(c) if *c == ScriptCommand {
+                name: "give".into(),
+                args: vec!["apple".into(), "3".into()],
+            })
+        );
+        assert!(matches!(&commands[1], Command::Game(c) if c.name == "give" && c.args.is_empty()));
+        assert!(matches!(commands[2], Command::Wait(s) if s == 1.0));
+        // A kit command keeps its own meaning, whatever the game lists.
+        assert!(matches!(parse("wait:2", &["give"])[0], Command::Wait(s) if s == 2.0));
+    }
+
+    #[test]
+    #[should_panic(expected = "the game command `wait` has the name of a kit command")]
+    fn a_game_command_with_the_name_of_a_kit_command_stops_the_start() {
+        App::new().add_plugins(ScriptPlugin {
+            env_prefix: "GAME_KIT_TEST_NO_SCRIPT",
+            game_commands: &["give", "wait"],
+        });
+    }
+
+    #[test]
     fn empty_parts_are_ignored() {
-        assert!(parse(";; ;").is_empty());
+        assert!(parse(";; ;", &[]).is_empty());
     }
 
     #[test]
@@ -536,19 +641,27 @@ mod tests {
         }
     }
 
-    /// The runner on `text`, with frames of `FRAME` seconds of real time and no start delay. The first update, which
-    /// has no time step, runs before the script is added.
+    /// The game command names of the runner tests: neutral, not a game's.
+    const GAME_COMMANDS: &[&str] = &["give"];
+
     fn runner(text: &str) -> App {
+        runner_with(text, false)
+    }
+
+    /// The runner on `text`, with frames of `FRAME` seconds of real time and no start delay. The first update, which
+    /// has no time step, runs before the script is added. `stay_open` keeps the app open when the commands run out.
+    fn runner_with(text: &str, stay_open: bool) -> App {
         let mut app = timed_app(std::time::Duration::from_secs_f32(FRAME));
         app.init_resource::<ButtonInput<KeyCode>>()
             .init_resource::<ButtonInput<MouseButton>>()
             .init_resource::<Seen>()
             .add_message::<RequestMapChange>()
             .add_message::<WorldClick>()
-            .add_message::<PointerInput>();
+            .add_message::<PointerInput>()
+            .add_message::<ScriptCommand>();
         app.update();
         app.insert_resource(Script {
-            commands: parse(text),
+            commands: parse(text, GAME_COMMANDS),
             elapsed: 0.0,
             since_log: 0.0,
             shot_requested: false,
@@ -557,6 +670,8 @@ mod tests {
             goto_sent: false,
             goto_busy: false,
             screenshot_dir_variable: "GAME_KIT_TEST_SCREENSHOT_DIR".to_string(),
+            stay_open,
+            done: false,
         })
         .add_systems(Update, (run_script, collect).chain());
         app
@@ -603,6 +718,37 @@ mod tests {
         let mut app = runner("");
         app.update();
         assert_eq!(app.should_exit(), Some(AppExit::Success));
+    }
+
+    #[test]
+    fn a_script_that_stays_open_leaves_the_app_running_when_its_commands_run_out() {
+        let mut app = runner_with("wait:0.15", true);
+        for _ in 0..5 {
+            app.update();
+        }
+        assert_eq!(left(&app), 0);
+        assert_eq!(app.should_exit(), None);
+        assert!(app.world().resource::<Script>().done);
+    }
+
+    #[test]
+    fn a_game_command_is_sent_with_its_parts_and_the_next_command_starts_in_the_next_frame() {
+        let mut app = runner("give:apple:3;wait:5");
+        app.update();
+        let sent: Vec<ScriptCommand> = app
+            .world()
+            .resource::<Messages<ScriptCommand>>()
+            .iter_current_update_messages()
+            .cloned()
+            .collect();
+        assert_eq!(
+            sent,
+            vec![ScriptCommand {
+                name: "give".into(),
+                args: vec!["apple".into(), "3".into()],
+            }]
+        );
+        assert_eq!(left(&app), 1);
     }
 
     #[test]

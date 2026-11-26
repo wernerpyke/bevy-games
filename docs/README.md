@@ -24,7 +24,13 @@ Single entry point for players and users: quick start, controls, common commands
 # starts in a map of games/<game>/assets/maps/ (".txt" may be left out; F1 reloads the map file)
 ./dev-scripts/rust.sh run long-way 3
 ./dev-scripts/rust.sh run long-way 3 --debug
+
+# runs script commands about 1 s after the start, then leaves the game open to play
+# (`pickup:<kind>:<count>` gives the player pickups; the other commands are in crates/game-kit/src/script.rs)
+./dev-scripts/rust.sh run long-way 3 --script "pickup:energy_red:2;pickup:energy_blue:3"
 ```
+
+A script command with a typo is skipped, and the log says so (`script: ... skipped`).
 
 The first build takes several minutes.
 
