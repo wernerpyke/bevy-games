@@ -52,6 +52,7 @@ User context: knows common game engine architecture and mechanics, so do not exp
 |---|---|
 | Long Way | `long-way`, `games/long-way/` |
 | R-Town | `r-town`, `games/r-town/` |
+| Jet | `jet`, `games/jet/` |
 | Shared code | `game-kit`, `crates/game-kit/` (a library, not a game) |
 
 Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
@@ -67,7 +68,7 @@ Rules (`dev-docs/adr/WORKSPACE.md` adr-w4 to adr-w6):
 - macOS (native) only. The web build (WebAssembly) is paused (`dev-docs/adr/ENGINE.md` adr-e11): do not check it, and a dependency need not support it. Maps are read from disk, not built in, so a map edit needs no rebuild.
 - 2D only. Disable unused Bevy default features where practical.
 - Pixel art rendering: nearest-neighbour sampling, integer scaling, fixed low-resolution camera.
-- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (`games/r-town/docs/SPEC.md`). Other games state their own timing model, so ask.
+- Long Way is real-time: movement and collision use `time.delta_secs()`. It is not turn-based or grid-locked (adr-lw7). R-Town is also real-time (`games/r-town/docs/SPEC.md`), and so is Jet (`games/jet/docs/SPEC.md`). Other games state their own timing model, so ask.
 
 ## Working rules
 

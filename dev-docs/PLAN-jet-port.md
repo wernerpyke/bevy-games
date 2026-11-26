@@ -6,7 +6,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 ## Status (2026-11-26): resume here
 
-Not started. Next: step 0.
+Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Next: step 1 (art).
 
 ## Designer's intent (from the brief)
 

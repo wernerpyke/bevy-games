@@ -6,6 +6,7 @@ A Cargo workspace of pixel art games built with Bevy. Each game lives in `games/
 |---|---|
 | Long Way | `games/long-way/` |
 | R-Town | `games/r-town/` |
+| Jet | `games/jet/` (being ported from Pyxel: an empty window for now) |
 
 Single entry point for players and users: quick start, controls, common commands and troubleshooting.
 
@@ -14,6 +15,7 @@ Single entry point for players and users: quick start, controls, common commands
 ```
 ./dev-scripts/rust.sh run long-way
 ./dev-scripts/rust.sh run r-town
+./dev-scripts/rust.sh run jet
 
 # starts with the F2 info box and the F3 grid visible
 ./dev-scripts/rust.sh run r-town --debug

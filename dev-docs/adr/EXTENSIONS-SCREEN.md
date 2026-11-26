@@ -92,3 +92,11 @@ Screen regions, app states, camera, draw order layers and animation. Index of al
 **Rationale.** A character's feet stop exactly on the bottom of a blocked area. An object sorting on that line ties with a character standing there, and the tie breaks by x, so the character is drawn behind the object on one side of it. Each object set its line by hand and had to remember the bias: rocks were wrong first (`adr-lw13`), and the volcano repeated it (2026-11-23). `adr-x2` already says the sort line and the collision line are one line; deriving one from the other makes that true by construction. The warning catches an object that still sorts by hand.
 
 **How to apply.** Spawn a blocking object with `Blocker(area)` and `SortAtBlocker`, and no `feet_offset`. Use `SortAtArea(ground rect)` for a static object that does not block (a pickup), and a hand-set `DepthSort` only for moving things (characters, projectiles). The bias is private: no game adds it by hand (`adr-x56`). A `depth:` warning in the log names the entity to change.
+
+## adr-x61. Effects on the whole view are a kit concept, `screen_fx` (2026-11-26)
+
+**Decision.** The kit gets a module `screen_fx` for effects on the whole game view. Camera shake is the first. A game asks for an effect with a message and gives all values (time, distance, direction). Later view effects, such as a flash, go in the same module.
+
+**Rationale.** Jet needs a camera shake, and screen effects are useful to every game. The kit owns the game camera, its follow and its whole-pixel rounding (`adr-x17`), so an offset written by a game could fight them. One kit module puts the offset in the right order and returns the camera exactly when the effect ends.
+
+**How to apply.** A game never moves the `GameCamera` for an effect itself. The kit has no game values. Jet's values are in `adr-jt10`.
