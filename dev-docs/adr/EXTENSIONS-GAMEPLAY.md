@@ -60,3 +60,11 @@ Enemy strategies, spawners, random numbers, touch and collectables. Index of all
 **Rationale.** The user approved both for Long Way's ice ring (2026-11-13). Neither holds a Long Way value: a stun and "how far does this reach before a wall" are useful to any game, such as a spell or a trap in R-Town. A marker read by the kit's own systems is the smallest change: the alternative, removing `Mover` and the strategy and putting them back, would lose the path and the strategy's state. The ray test follows `resolve` so that the reach agrees with where a pushed body actually stops.
 
 **How to apply.** `dev-docs/extensions/enemy-movement.md` (Stunned), `dev-docs/extensions/collision.md` (`ray_distance`). Long Way: `weapons/ice_ring.rs`.
+
+## adr-x63. A spawner sends groups, picks free places, and its gap can change during play (2026-11-26)
+
+**Decision.** The kit `Spawner` gets a group size (that many requests in one frame), an option to wait one gap before the first spawn, a gap the game can change while it runs (`set_every`, which restarts the timer), and `SpawnPlaces`: groups of points, each group with the same chance, and a free point of it at random. A point inside a blocked area is never picked. The kit still sends one request per entity.
+
+**Rationale.** Jet spawns groups of enemies on random free cells of the four field edges, with a gap that its difficulty curve changes every 10 s. The user chose to extend the kit spawner for this rather than write a Jet spawner, so any game gets the same tools. Equal chance per group keeps each edge as likely as the others, whatever its length. Checking the collision world at request time keeps the places right when blocked areas change during play.
+
+**How to apply.** The game keeps its own values and rules: it builds the places, and it decides when and how the gap and the group size change. A spawner with places needs `RngPlugin`. `max` still counts live entities and can cut a group short.

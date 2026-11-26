@@ -18,6 +18,27 @@ const SOLID_ROWS: i32 = 3;
 #[derive(Component)]
 pub struct House;
 
+/// An enemy hit the house. Damage comes with the combat (`SPEC.md` section 7); for now it is logged.
+#[derive(Message, Clone, Copy, Debug)]
+pub struct HouseHit {
+    pub by: Entity,
+}
+
+pub struct HousePlugin;
+
+impl Plugin for HousePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_message::<HouseHit>()
+            .add_systems(Update, log_hits.run_if(on_message::<HouseHit>));
+    }
+}
+
+fn log_hits(mut hits: MessageReader<HouseHit>) {
+    for hit in hits.read() {
+        info!("house: hit by {:?}", hit.by);
+    }
+}
+
 /// The blocked area of a house whose footprint has its bottom left cell at `anchor`.
 fn blocked_area(anchor: IVec2, cell_size: f32) -> Rect {
     let min = cell_corner(anchor, cell_size);

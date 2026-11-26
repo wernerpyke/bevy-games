@@ -127,3 +127,19 @@
 **Rationale.** This is the Pyxel rule: it tests the cell just ahead of the leading edge, on the centre line. It keeps the feel the port must keep (`adr-jt1`): the player slides past a tree corner that only its side overlaps, and fits through a gap of one cell. A grown area or a feet point with sideways growth would close the one-cell corridors of the map, and at 8 px a frame the player could not line up with a narrower gap. The kit sliding starts only after the player pushes against a face for a while, and a Jet player never pushes: a block stops it and clears the held keys. The test starts at the centre, which never stands in a blocked area, so a tree that already overlaps the front half after a turn still stops the player.
 
 **How to apply.** The forest cell area and the house have no growth. Enemies choose their own collision rule. This changes the sliding part of `adr-jt14`: the player passes forest corners by this rule, not by the kit sliding.
+
+## adr-jt17. A Spinner hits the house when it arrives at its target point (2026-11-26)
+
+**Decision.** A Spinner walks to one of four target points next to the house and hits the house the moment it arrives there. The targets are the cells left (−1, +1), right (+4, +1), below left (0, +4) and below right (+3, +4) of the house's top left cell, with the feet at the bottom middle of the cell. The brief's below right target (+4, +4) is moved to (+3, +4). A Spinner whose target has no path picks another of the four.
+
+**Rationale.** The user chose the simplest rule (plan question Q6). A Spinner is one cell wide, so on its target its sprite already touches the house wall, and the hit looks like contact. It never pushes into the house, so the roof row needs no rule. The brief's (+4, +4) touches the house only at a corner, so it is moved under the house to touch a wall like the others.
+
+**How to apply.** The hit marks the Spinner `Dead` at once (`adr-jt11`), stops it, plays `Kill` once and sends `HouseHit`. The Spinner is removed when the animation ends.
+
+## adr-jt18. Spawning uses the extended kit spawner, and the difficulty is worked out from the level number (2026-11-26)
+
+**Decision.** One kit `Spawner` puts the Spinners on the field (`adr-x63`): groups, the first group one gap after the start, and places on the free cells of the four field edges, one group of places per edge. Jet keeps the difficulty curve: every 10 s of game time the level goes up, Jet draws a new gap from the level's range and sets it and the group size on the spawner. The level's values come from the level number in whole hundredths and tenths.
+
+**Rationale.** The user chose to extend the kit spawner rather than write a Jet spawner (plan question Q7). Whole-number maths gives exactly the table of the SPEC (0.8 to 1.2 s from level 7, group 2 from level 25), which float steps do not.
+
+**How to apply.** The spawner is spawned in the map's `load` hook, so F1 starts it and the difficulty again. The script command `level:<n>` jumps to a level for tests.

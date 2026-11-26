@@ -1,11 +1,14 @@
-//! Spawners: an entity that asks the game for a new entity every so many seconds. The kit keeps the timer and the
-//! limit and sends `SpawnRequest`. The game reads it, spawns what it wants at the position and adds `SpawnedBy` to
-//! it, so the spawner can count its live entities for `max`. See `dev-docs/extensions/spawners.md`.
+//! Spawners: an entity that asks the game for new entities every so many seconds. The kit keeps the timer, the group
+//! size, the limit and the places, and sends one `SpawnRequest` per entity. The game reads it, spawns what it wants at
+//! the position and adds `SpawnedBy` to it, so the spawner can count its live entities for `max`. See
+//! `dev-docs/extensions/spawners.md`.
 
 use bevy::prelude::*;
 
+use crate::collision::CollisionWorld;
 use crate::map::Params;
 use crate::map_transition::MapId;
+use crate::rng::{GameRng, Rng};
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::world::DeferredWorld;
 
@@ -43,16 +46,38 @@ impl SpawnTimer {
         true
     }
 
+    /// A timer that is empty at the start, so the first spawn comes one interval after it.
+    pub fn after_gap(every: f32) -> Self {
+        Self {
+            every,
+            elapsed: 0.0,
+        }
+    }
+
+    /// Changes the interval and starts it again, so the next spawn comes one new interval from now.
+    pub fn restart(&mut self, every: f32) {
+        self.every = every;
+        self.elapsed = 0.0;
+    }
+
     /// Keeps a spawn due: used when a limit stops it, so it happens as soon as the limit allows.
     pub fn hold(&mut self) {
         self.elapsed = self.every;
     }
 }
 
-/// Spawns every `every` seconds at the entity's own position (`Transform` x and y), the first one at once.
+/// Spawns `group` entities every `every` seconds, the first group at once (or one interval after the start, with
+/// `first_after_gap`). Each entity is at the entity's own position (`Transform` x and y), or at a free point of
+/// `places`.
 #[derive(Component, Clone, Debug)]
 pub struct Spawner {
     timer: SpawnTimer,
+    /// Entities per spawn, sent as that many requests in one frame. `max` can cut a group short.
+    pub group: u32,
+    /// Where the entities start. None means the spawner's own position.
+    pub places: Option<SpawnPlaces>,
+    /// Set after the warning that `places` has no free point, so it is logged once.
+    warned_no_place: bool,
     /// The most live entities of this spawner. None means no limit.
     pub max: Option<usize>,
     /// The legend parameters of the spawner, passed to the game in each request.
@@ -63,9 +88,38 @@ impl Spawner {
     pub fn new(every: f32, max: Option<usize>, params: Params) -> Self {
         Self {
             timer: SpawnTimer::new(every),
+            group: 1,
+            places: None,
+            warned_no_place: false,
             max,
             params,
         }
+    }
+
+    /// The first spawn comes one interval after the start, not at once.
+    pub fn first_after_gap(mut self) -> Self {
+        self.timer = SpawnTimer::after_gap(self.timer.every);
+        self
+    }
+
+    pub fn with_group(mut self, group: u32) -> Self {
+        self.group = group;
+        self
+    }
+
+    pub fn with_places(mut self, places: SpawnPlaces) -> Self {
+        self.places = Some(places);
+        self
+    }
+
+    /// Changes the interval while the game runs and starts it again: the next spawn is one new interval from now.
+    pub fn set_every(&mut self, every: f32) {
+        self.timer.restart(every);
+    }
+
+    /// The interval in seconds.
+    pub fn every(&self) -> f32 {
+        self.timer.every
     }
 
     /// Reads `every` (seconds, above 0) and `max` (a whole number, 1 or more, optional) from the legend
@@ -119,28 +173,85 @@ pub struct SpawnRequest {
     pub params: Params,
 }
 
+/// Where a spawner's entities start: groups of points, for example one group per edge of a field. Each entity picks
+/// a group at random, each group with the same chance however many points it has, then a free point of that group.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct SpawnPlaces {
+    pub groups: Vec<Vec<Vec2>>,
+}
+
+impl SpawnPlaces {
+    /// A random point for which `free` is true. Groups with no free point are left out. None when no point is free.
+    pub fn pick(&self, rng: &mut Rng, free: impl Fn(Vec2) -> bool) -> Option<Vec2> {
+        let open: Vec<Vec<Vec2>> = self
+            .groups
+            .iter()
+            .map(|group| {
+                group
+                    .iter()
+                    .copied()
+                    .filter(|p| free(*p))
+                    .collect::<Vec<_>>()
+            })
+            .filter(|group| !group.is_empty())
+            .collect();
+        if open.is_empty() {
+            return None;
+        }
+        let group = &open[(rng.next_u64() % open.len() as u64) as usize];
+        Some(group[(rng.next_u64() % group.len() as u64) as usize])
+    }
+}
+
 fn run_spawners(
     time: Res<Time>,
     mut spawners: Query<(Entity, &Transform, &mut Spawner)>,
     spawned: Query<&SpawnedBy>,
+    world: Option<Res<CollisionWorld>>,
+    mut rng: Option<ResMut<GameRng>>,
     mut requests: MessageWriter<SpawnRequest>,
 ) {
     for (entity, transform, mut spawner) in &mut spawners {
         if !spawner.timer.tick(time.delta_secs()) {
             continue;
         }
+        let mut room = spawner.group as usize;
         if let Some(max) = spawner.max {
             let alive = spawned.iter().filter(|by| by.0 == entity).count();
             if alive >= max {
                 spawner.timer.hold();
                 continue;
             }
+            room = room.min(max - alive);
         }
-        requests.write(SpawnRequest {
-            spawner: entity,
-            position: transform.translation.truncate(),
-            params: spawner.params.clone(),
-        });
+        for _ in 0..room {
+            let position = match (&spawner.places, rng.as_deref_mut()) {
+                (None, _) => Some(transform.translation.truncate()),
+                (Some(places), Some(rng)) => places.pick(rng, |point| {
+                    world.as_ref().is_none_or(|world| !world.is_blocked(point))
+                }),
+                (Some(_), None) => {
+                    if !spawner.warned_no_place {
+                        warn!(
+                            "spawner: {entity:?} has places but there is no `GameRng` (add `RngPlugin`)"
+                        );
+                    }
+                    None
+                }
+            };
+            let Some(position) = position else {
+                if !spawner.warned_no_place {
+                    warn!("spawner: {entity:?} has no free place, the spawn is skipped");
+                    spawner.warned_no_place = true;
+                }
+                break;
+            };
+            requests.write(SpawnRequest {
+                spawner: entity,
+                position,
+                params: spawner.params.clone(),
+            });
+        }
     }
 }
 
@@ -165,6 +276,63 @@ mod tests {
         assert!(timer.tick(0.0));
         assert!(timer.tick(7.5));
         assert!(!timer.tick(0.1));
+    }
+
+    #[test]
+    fn a_timer_after_a_gap_fires_first_one_interval_after_the_start() {
+        let mut timer = SpawnTimer::after_gap(3.0);
+        assert!(!timer.tick(0.0));
+        assert!(!timer.tick(2.9));
+        assert!(timer.tick(0.2));
+        assert!(!timer.tick(2.5));
+    }
+
+    #[test]
+    fn a_restart_changes_the_interval_and_counts_it_from_now() {
+        let mut timer = SpawnTimer::new(4.0);
+        assert!(timer.tick(0.0));
+        assert!(!timer.tick(3.5));
+        // 3.5 s of the old 4 s interval had passed: the restart drops them.
+        timer.restart(2.0);
+        assert!(!timer.tick(1.9));
+        assert!(timer.tick(0.2));
+        assert!(!timer.tick(1.7));
+        assert!(timer.tick(0.2));
+    }
+
+    #[test]
+    fn each_group_of_places_has_the_same_chance_however_many_points_it_has() {
+        let alone = Vec2::new(-5.0, 7.0);
+        let crowd: Vec<Vec2> = (0..9).map(|i| Vec2::new(i as f32 * 3.0, 40.0)).collect();
+        let places = SpawnPlaces {
+            groups: vec![vec![alone], crowd.clone()],
+        };
+        let mut rng = Rng::new(11);
+        let picks: Vec<Vec2> = (0..2000)
+            .map(|_| places.pick(&mut rng, |_| true).unwrap())
+            .collect();
+        let lone = picks.iter().filter(|p| **p == alone).count();
+        assert!((900..1100).contains(&lone), "{lone} of 2000");
+        // Every point of the large group is picked.
+        for point in &crowd {
+            assert!(picks.contains(point), "{point}");
+        }
+    }
+
+    #[test]
+    fn a_place_that_is_not_free_is_never_picked_and_a_group_with_none_free_is_left_out() {
+        let blocked = Vec2::new(1.0, 1.0);
+        let open = Vec2::new(2.0, 2.0);
+        let places = SpawnPlaces {
+            groups: vec![vec![blocked, open], vec![Vec2::new(9.0, 9.0)]],
+        };
+        let free = |p: Vec2| p != blocked && p.x < 5.0;
+        let mut rng = Rng::new(3);
+        for _ in 0..200 {
+            assert_eq!(places.pick(&mut rng, free), Some(open));
+        }
+        assert_eq!(places.pick(&mut rng, |_| false), None);
+        assert_eq!(SpawnPlaces::default().pick(&mut rng, |_| true), None);
     }
 
     #[test]
@@ -219,6 +387,88 @@ mod tests {
         // 225 frames of 16 ms are 3.58 s: spawns at 0, 1, 2 and 3 seconds.
         assert_eq!(seen.len(), 4);
         assert_eq!(seen[0].position, Vec2::new(40.0, 80.0));
+    }
+
+    fn drain(app: &mut App) -> Vec<SpawnRequest> {
+        app.world_mut()
+            .resource_mut::<Requests>()
+            .0
+            .drain(..)
+            .collect()
+    }
+
+    #[test]
+    fn a_group_sends_its_requests_in_one_frame_and_max_cuts_it_short() {
+        let mut app = app();
+        let spawner = app
+            .world_mut()
+            .spawn((
+                Transform::from_xyz(-12.0, 30.0, 0.0),
+                Spawner::new(1.0, Some(5), Params::default()).with_group(3),
+            ))
+            .id();
+        app.update();
+        let first = drain(&mut app);
+        assert_eq!(first.len(), 3);
+        assert!(
+            first
+                .iter()
+                .all(|r| r.spawner == spawner && r.position == Vec2::new(-12.0, 30.0))
+        );
+        for _ in 0..3 {
+            app.world_mut().spawn(SpawnedBy(spawner));
+        }
+        // 1 s later: 3 alive of at most 5, so only 2 of the group of 3.
+        for _ in 0..63 {
+            app.update();
+        }
+        assert_eq!(drain(&mut app).len(), 2);
+    }
+
+    #[test]
+    fn a_spawner_that_starts_after_a_gap_sends_nothing_at_the_start() {
+        let mut app = app();
+        app.world_mut().spawn((
+            Transform::default(),
+            Spawner::new(0.5, None, Params::default()).first_after_gap(),
+        ));
+        // The first update has no time step, so 32 updates are 31 frames of 16 ms, 0.496 s: not yet.
+        for _ in 0..32 {
+            app.update();
+        }
+        assert_eq!(drain(&mut app).len(), 0);
+        app.update();
+        assert_eq!(drain(&mut app).len(), 1);
+    }
+
+    #[test]
+    fn requests_use_a_place_that_the_collision_world_leaves_free() {
+        let mut app = app();
+        let inside = Vec2::new(50.0, 50.0);
+        let open = Vec2::new(-70.0, 10.0);
+        let mut world = CollisionWorld::default();
+        world.add_blocked(&[Rect::new(40.0, 40.0, 60.0, 60.0)]);
+        app.insert_resource(world)
+            .insert_resource(GameRng::seeded(5));
+        app.world_mut().spawn((
+            Transform::default(),
+            Spawner::new(0.1, None, Params::default())
+                .with_group(4)
+                .with_places(SpawnPlaces {
+                    groups: vec![vec![inside], vec![open]],
+                }),
+        ));
+        app.update();
+        let positions: Vec<Vec2> = drain(&mut app).iter().map(|r| r.position).collect();
+        assert_eq!(positions, vec![open; 4]);
+        // The open place is blocked now (the forest grew): no place is free, so there is no request.
+        app.world_mut()
+            .resource_mut::<CollisionWorld>()
+            .add_temporary(Rect::new(-80.0, 0.0, -60.0, 20.0));
+        for _ in 0..20 {
+            app.update();
+        }
+        assert_eq!(drain(&mut app).len(), 0);
     }
 
     #[test]

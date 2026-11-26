@@ -2,6 +2,7 @@
 //! cell area (`forest.rs`, `adr-jt14`).
 
 use bevy::prelude::*;
+use game_kit::camera::CameraBounds;
 use game_kit::collision::rebuild_blockers;
 use game_kit::debug::DebugSettings;
 use game_kit::map::{Map, Origin, PLAYER_START, parse, start_feet};
@@ -22,6 +23,8 @@ pub const FOREST: &str = "forest";
 
 /// The map size in cells: the window shows exactly this (`adr-jt2`).
 pub const MAP_CELLS: IVec2 = IVec2::new(60, 32);
+/// Columns of side forest on each side of the field (`adr-jt3`).
+pub const SIDE_FOREST_COLUMNS: i32 = 10;
 
 /// The legend names the parser accepts.
 const KIND_NAMES: &[&str] = &[PLAYER_START, HOUSE, FOREST];
@@ -53,6 +56,7 @@ impl Plugin for MapPlugin {
             arrive: None,
         };
         app.insert_resource(hooks)
+            .insert_resource(CameraBounds(map_rect()))
             .add_systems(Update, reload_map.run_if(on_message::<ReloadMap>));
     }
 }
@@ -142,6 +146,7 @@ fn load_hook(In(load): In<MapLoad>, world: &mut World) {
     let _ = world.run_system_cached(crate::house::spawn_house);
     let _ = world.run_system_cached(crate::forest::spawn_forest);
     let _ = world.run_system_cached_with(crate::player::spawn_player, start);
+    let _ = world.run_system_cached(crate::spawning::spawn_spawner);
 }
 
 /// Runs on `ReloadMap` (F1, sent by the kit): checks the file first, then lets the kit load the map again. A file

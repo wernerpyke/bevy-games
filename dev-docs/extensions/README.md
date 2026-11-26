@@ -38,7 +38,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | A `ProjectileHit` handler cannot find the projectile | Order it after `ProjectileSet` (`adr-x55`) |
 | A pickup is not collected, or is collected twice | `Collectable` + `MapId` |
 | An object stays after its map unloads or F1 | Spawn it in the `load` hook (the kit adopts it into the `MapRoot`, `adr-x58`). Spawned later: `#[require(OnCurrentMap)]` for what the player causes, `SpawnedBy` for a spawner's entity, or copy the spawning object's `MapId` (`adr-x60`) |
-| Enemies do not appear again | `Spawner`, `SpawnRequest`, `SpawnedBy` |
+| Enemies do not appear again, or must come in groups, on random free places, or with a gap that changes during play | `Spawner` (`with_group`, `with_places`, `set_every`, `first_after_gap`), `SpawnRequest`, `SpawnedBy` (`adr-x63`) |
 | Many sprites animate in step | `RandomStartFrame::for_cell` |
 | The animation speed is wrong | Frame durations in the `.aseprite` file (`adr-a6`) |
 | Pixels are blurred | The kit camera's view height (`camera.rs`) |
@@ -72,7 +72,7 @@ Read this before you write game code for movement, draw order, collision, maps, 
 | [particles.md](particles.md) | Enoki particle effects: plugin, glow materials, one-shot and follow-the-owner emitters | `game-kit` `fx.rs`, `fx_strip.rs`, `vendor/bevy_enoki` | none yet |
 | [pointer.md](pointer.md) | Mouse clicks as a world position message | `game-kit` `pointer.rs` | x42, lw30 |
 | [enemy-movement.md](enemy-movement.md) | Goals, patrol, pursue and sentry strategies, touch messages, facing tags, hit boxes, seeded random numbers | `game-kit` `movement.rs`, `strategies.rs`, `touch.rs`, `hitbox.rs`, `rng.rs`, `movement_debug.rs` | x24, x26, x27, x40, x41, x43, rt12 |
-| [spawners.md](spawners.md) | Spawners with settings in the map legend | `game-kit` `spawner.rs`, `map.rs` | x25, rt12 |
+| [spawners.md](spawners.md) | Spawners with settings in the map legend, groups, random free places, a gap that changes during play | `game-kit` `spawner.rs`, `map.rs` | x25, x63, rt12 |
 | [debug-tools.md](debug-tools.md) | Grid, info box, collision overlay | `game-kit` `debug.rs`, `collision_debug.rs` | x3, x6 |
 | [collectables.md](collectables.md) | Items the player collects by touch, `Collected` message | `game-kit` `collectable.rs` | x38, lw27 |
 | [dev-scripts.md](dev-scripts.md) | Zoomed screenshots and Aseprite checks (`shot.sh`, `aseprite.sh`) | `dev-scripts/` | |

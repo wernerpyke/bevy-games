@@ -523,7 +523,7 @@ mod tests {
     }
 
     #[test]
-    fn a_leg_from_a_box_corner_into_the_box_is_blocked() {
+    fn a_leg_from_or_through_a_box_corner_into_the_box_is_blocked() {
         // The start is exactly on the bottom left corner of the box, and the goal is on the far side of it.
         let block = Rect::new(80.0, 80.0, 120.0, 120.0);
         let edges = edges_of(&[block]);
@@ -535,6 +535,27 @@ mod tests {
         assert!(!segment_blocked(corner, Vec2::new(60.0, 140.0), &edges));
         assert!(!segment_blocked(corner, Vec2::new(140.0, 80.0), &edges));
         assert!(!segment_blocked(corner, Vec2::new(60.0, 60.0), &edges));
+        // A leg that starts outside and passes exactly through a corner into the box is blocked, at each corner
+        // and in both directions along the line.
+        for (from, to) in [
+            (Vec2::new(60.0, 66.0), Vec2::new(110.0, 101.0)),
+            (Vec2::new(140.0, 66.0), Vec2::new(90.0, 101.0)),
+            (Vec2::new(60.0, 134.0), Vec2::new(110.0, 99.0)),
+            (Vec2::new(140.0, 134.0), Vec2::new(90.0, 99.0)),
+        ] {
+            assert!(segment_blocked(from, to, &edges), "{from} to {to}");
+        }
+        // A leg that passes exactly through a corner and stays outside the box still passes.
+        assert!(!segment_blocked(
+            Vec2::new(60.0, 100.0),
+            Vec2::new(100.0, 60.0),
+            &edges
+        ));
+        assert!(!segment_blocked(
+            Vec2::new(100.0, 140.0),
+            Vec2::new(140.0, 100.0),
+            &edges
+        ));
     }
 
     #[test]

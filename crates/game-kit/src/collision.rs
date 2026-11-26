@@ -134,6 +134,17 @@ impl CollisionWorld {
         removed
     }
 
+    /// True when `point` is inside a blocked area (temporary ones too) by more than `TOLERANCE`. A point on an edge
+    /// counts as free, like feet stopped on it.
+    pub fn is_blocked(&self, point: Vec2) -> bool {
+        self.built.iter().any(|area| {
+            point.x > area.min.x + TOLERANCE
+                && point.x < area.max.x - TOLERANCE
+                && point.y > area.min.y + TOLERANCE
+                && point.y < area.max.y - TOLERANCE
+        })
+    }
+
     fn rebuild(&mut self) {
         self.built.clear();
         self.built.extend_from_slice(&self.areas);
@@ -335,13 +346,12 @@ fn crossing(a: Vec2, b: Vec2, edge: &Edge) -> Option<f32> {
     if edge.covers(along_from + fraction * along_change) {
         return Some(fraction);
     }
-    // A move that starts on the edge line at a convex end passes the end itself, but not when it heads on into the
-    // shape: look a little way along it (`resolve` stops that move).
-    if (from - edge.at).abs() <= TOLERANCE {
-        let ahead = (2.0 * TOLERANCE / along_change.abs().max(f32::EPSILON)).min(1.0);
-        if edge.covers(along_from + ahead * along_change) {
-            return Some(fraction);
-        }
+    // A move that reaches the edge line exactly at a convex end passes the end itself, but not when it heads on into
+    // the shape: look a little way past the crossing. This holds for a move that starts on the edge line (`resolve`
+    // stops that move) and for one that passes through the corner of a shape on its way.
+    let ahead = 2.0 * TOLERANCE / along_change.abs().max(f32::EPSILON);
+    if edge.covers(along_from + (fraction + ahead).min(1.0) * along_change) {
+        return Some(fraction);
     }
     None
 }
@@ -1295,6 +1305,32 @@ mod temporary_tests {
         assert_eq!(world.interior_areas().collect::<Vec<_>>(), vec![middle]);
         world.remove_temporary(id);
         assert_eq!(world.interior_areas().count(), 0);
+    }
+
+    #[test]
+    fn a_point_is_blocked_only_inside_an_area_and_an_edge_is_free() {
+        let mut world = CollisionWorld::default();
+        world.add_blocked(&[Rect::new(-30.0, 5.0, -10.0, 25.0)]);
+        assert!(world.is_blocked(Vec2::new(-20.0, 15.0)));
+        assert!(world.is_blocked(Vec2::new(-29.9, 24.9)));
+        for free in [
+            Vec2::new(-30.0, 15.0),
+            Vec2::new(-10.0, 15.0),
+            Vec2::new(-20.0, 5.0),
+            Vec2::new(-20.0, 25.0),
+            // Inside by less than `TOLERANCE`: rounding noise on the edge.
+            Vec2::new(-20.0, 24.995),
+            Vec2::new(0.0, 15.0),
+            Vec2::new(-20.0, 30.0),
+        ] {
+            assert!(!world.is_blocked(free), "{free}");
+        }
+        // A temporary area blocks too, and stops blocking when it is removed.
+        let point = Vec2::new(40.0, 40.0);
+        let id = world.add_temporary(Rect::new(35.0, 35.0, 45.0, 45.0));
+        assert!(world.is_blocked(point));
+        world.remove_temporary(id);
+        assert!(!world.is_blocked(point));
     }
 
     /// Run with `--ignored --nocapture` to read the cost of one rebuild with many blocked areas.

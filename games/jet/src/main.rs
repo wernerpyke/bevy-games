@@ -1,9 +1,11 @@
 mod camera;
+mod enemy;
 mod forest;
 mod house;
 mod input;
 mod map;
 mod player;
+mod spawning;
 
 use bevy::prelude::*;
 use bevy_aseprite_ultra::AsepriteUltraPlugin;
@@ -54,9 +56,23 @@ fn main() {
             game_kit::screen_fx::ScreenFxPlugin,
             game_kit::script::ScriptPlugin {
                 env_prefix: "JET",
-                game_commands: &[],
+                game_commands: &[spawning::LEVEL_COMMAND, spawning::SPINNER_COMMAND],
             },
         ))
-        .add_plugins((map::MapPlugin, forest::ForestPlugin, player::PlayerPlugin))
+        .add_plugins((
+            game_kit::nav::NavPlugin { step: 4.0 },
+            game_kit::movement::MovementPlugin::default(),
+            game_kit::movement_debug::MovementDebugPlugin,
+            game_kit::rng::RngPlugin { env_prefix: "JET" },
+            game_kit::spawner::SpawnerPlugin,
+        ))
+        .add_plugins((
+            map::MapPlugin,
+            forest::ForestPlugin,
+            house::HousePlugin,
+            player::PlayerPlugin,
+            enemy::EnemyPlugin,
+            spawning::SpawningPlugin,
+        ))
         .run();
 }

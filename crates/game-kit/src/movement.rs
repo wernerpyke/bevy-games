@@ -516,4 +516,26 @@ mod tests {
         }
         assert!(feet(&app, entity).distance(home) <= 2.5);
     }
+
+    #[test]
+    fn an_entity_never_walks_into_a_corner_contact_on_a_grid_point() {
+        // Two blocks touch only at (100, 100), a grid point of the nav (step 4). The entity starts below the upper
+        // block and left of the lower one, so the straight way to its goal runs through the contact.
+        let contact = Vec2::new(100.0, 100.0);
+        let mut app = app_with(&[
+            Rect::new(84.0, 100.0, 100.0, 116.0),
+            Rect::new(100.0, 84.0, 116.0, 100.0),
+        ]);
+        let goal = Vec2::new(180.0, 160.0);
+        let entity = spawn(&mut app, Vec2::new(60.0, 84.0), Some(goal));
+        for frame in 0..400 {
+            app.update();
+            let at = feet(&app, entity);
+            assert!(
+                at.distance(contact) > 0.5,
+                "frame {frame}: the feet are at the contact, {at}"
+            );
+        }
+        assert!(feet(&app, entity).distance(goal) <= 2.5);
+    }
 }

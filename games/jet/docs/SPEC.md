@@ -1,6 +1,6 @@
 # Jet: specification
 
-Status: draft (2026-11-26). The port from Pyxel is in progress: the map, the house, the forest and the player are built. Decisions: `adr.md`.
+Status: draft (2026-11-26). The port from Pyxel is in progress: the map, the house, the forest, the player, the Spinners and the spawning are built. The combat (kills, house damage) is not. Decisions: `adr.md`.
 
 Source: the Pyxel game Jet and its port brief, `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). This file copies the rules of the brief that the port keeps, converted to the new cell size, and the changes the user decided. Where this file and the brief differ, this file wins.
 
@@ -99,9 +99,9 @@ One kind now: the **Spinner**. More kinds come later (section 12).
 
 ### Spawning
 
-- Each spawn puts a group of Spinners on the map. Each Spinner starts on a random free cell of a random field edge: the top row, the bottom row, or the field column next to the left or right forest (equal chance per edge).
-- Each Spinner picks one of four target points next to the house at random. Relative to the house's top-left cell (x right, y down): left side (−1, +1), right side (+4, +1), below left (0, +4), below right (+4, +4).
-- When it reaches its target it goes for the house. When it counts as hitting the house is open (plan question Q6).
+- Each spawn puts a group of Spinners on the map. Each Spinner starts on a random free cell of a random field edge: the top row, the bottom row, or the field column next to the left or right forest (equal chance per edge). The kit spawner picks the cell and skips forest cells (`adr-jt18`, `adr-x63`).
+- Each Spinner picks one of four target points next to the house at random. Relative to the house's top-left cell (x right, y down): left side (−1, +1), right side (+4, +1), below left (0, +4), below right (+3, +4). The brief has (+4, +4) for below right, which touches the house only at a corner; the port uses the cell under the bottom right cell, so every target touches a wall (`adr-jt17`). The feet go at the bottom middle of the target cell, so the sprite fills the cell.
+- When it arrives at its target point it hits the house (`adr-jt17`). When the path finding finds no way to its target, it picks another of the four.
 
 ### Movement
 
@@ -109,14 +109,14 @@ One kind now: the **Spinner**. More kinds come later (section 12).
 |---|---|
 | Speed | 3.75 cells/s, 60 px/s (`adr-jt4`). The player is 8 times faster. |
 | Path | Path finding around trees and the house (`adr-jt7`). The same speed in every direction. A blocked Spinner finds a new path and never freezes. |
-| Collisions | Trees, the house and the field edge. Spinners pass through the player. Spreading (not stacking) is wanted (`adr-jt7`). |
+| Collisions | Trees, the house and the field edge, with the kit feet point (the bottom middle of the sprite) against the same ungrown blocked areas as the player (`adr-jt16`), so a Spinner can overlap a tree sideways by up to half a cell. Spinners pass through the player and through each other. Spreading (not stacking) is wanted (`adr-jt7`). |
 | Animation | A 4-frame spin, looped at 16 fps, while moving. The same frames in every direction, not rotated. |
 
 ### Events
 
 | Event | Result |
 |---|---|
-| Hits the house | Stops. Plays the red kill X once (2 frames). The house takes 1 damage. Removed when the animation ends. |
+| Hits the house | Stops and is marked dead at once. Plays the red kill X once (2 frames). The house takes 1 damage (logged only until the combat is built). Removed when the animation ends. |
 | In the player's attack zone | Dies (section 7). |
 
 ## 7. Combat and the house
@@ -159,7 +159,7 @@ No waves or levels on screen. Difficulty rises quietly.
 | Longest spawn gap | 4.0 s |
 
 - A repeating timer spawns a group. The gap is chosen at random between the shortest and longest gap, once, and stays until the next level-up. The first group spawns one gap after the start.
-- Every 10 s (level-up): group size +0.02; shortest gap −0.2 s while above 1.0 s; longest gap −0.4 s while above 1.5 s; a new gap is chosen and the spawn timer restarts.
+- Every 10 s of game time (level-up): group size +0.02 (rounded to a whole number); shortest gap −0.2 s down to 0.8 s; longest gap −0.4 s down to 1.2 s; a new gap is chosen and the spawn timer restarts. The values are worked out from the level number in whole hundredths and tenths, so they match the table exactly (`adr-jt18`). The brief says "while above 1.0 s", but the Pyxel game reached 0.8 s through float noise, and the table below is the rule.
 
 | Time | Group size | Spawn gap |
 |---|---|---|
@@ -204,8 +204,8 @@ Asked at their plan step (`dev-docs/PLAN-jet-port.md`):
 
 - Q4: collision point and sliding for the player. Answered: `adr-jt16` (the Pyxel rule), confirmed in play.
 - Q5: the attack zone size, and how a power-up changes it.
-- Q6: when a Spinner counts as hitting the house.
-- Q7: spawning with the kit spawner (extended) or a Jet director.
+- Q6: when a Spinner counts as hitting the house. Answered: when it arrives at its target point (`adr-jt17`).
+- Q7: spawning with the kit spawner (extended) or a Jet director. Answered: the kit spawner, extended (`adr-jt18`, `adr-x63`).
 - Q8: the flow field and spreading: in the kit or in Jet first.
 - Q9: colour feedback by sprite tint or a palette swap shader.
 - Q11: the pause key and the restart key.
