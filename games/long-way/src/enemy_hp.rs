@@ -71,6 +71,12 @@ pub struct EnemyHurt(pub Entity);
 #[derive(Component, Clone, Copy, Debug, Default)]
 pub struct HurtFrames;
 
+/// Marks an enemy shot: a projectile an enemy launches (the volcano shot), not an enemy (`adr-lw44`). It has hit
+/// points and reactions like an enemy, so weapons touch it as its table says, but a weapon that chooses a target (the
+/// fireball) never chooses it.
+#[derive(Component, Clone, Copy, Debug, Default)]
+pub struct EnemyShot;
+
 /// Sent once when an enemy's hit points reach 0.
 #[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EnemyDied(pub Entity);

@@ -193,14 +193,13 @@ pub(super) fn cast_fireballs(
         .read()
         .filter(|order| order.weapon == WeaponKind::Fireball)
     {
-        // Only an enemy that red damages is chosen. One it touches with no effect (the volcano) still stops it on the
-        // way (`mark_targets`).
+        // Any enemy it touches is a candidate, also one red does not damage (the user, 2026-11-26: a later power-up may
+        // make it choose better). An enemy shot is never chosen (`adr-lw44`), but stops it on the way if red touches it
+        // (`mark_targets`).
         let bodies: Vec<(Entity, Rect)> = enemies
             .iter()
-            .filter_map(|enemy| {
-                let (body, hit) = enemy.hit_by(WeaponKind::Fireball.energy())?;
-                (hit.damage > 0.0).then_some((enemy.entity, body))
-            })
+            .filter(|enemy| !enemy.shot)
+            .filter_map(|enemy| Some((enemy.entity, body_for_fireball(&enemy)?)))
             .collect();
         let centres: Vec<(Entity, Vec2)> = bodies
             .iter()
@@ -238,7 +237,7 @@ pub(super) fn cast_fireballs(
                 }
             ),
             None => info!(
-                "fireball: cast at ({:.0}, {:.0}) with no enemy on the map that it damages, towards ({:.2}, {:.2})",
+                "fireball: cast at ({:.0}, {:.0}) with no enemy on the map, towards ({:.2}, {:.2})",
                 start.x, start.y, direction.x, direction.y
             ),
         }
@@ -667,34 +666,35 @@ mod tests {
     }
 
     #[test]
-    fn an_enemy_red_does_not_damage_is_never_the_target_but_stops_a_fireball_in_its_way() {
+    fn the_nearest_enemy_is_the_target_whatever_red_deals_it_and_an_enemy_shot_never_is() {
+        use crate::enemy_hp::EnemyShot;
         use crate::reactions::{Hit, Reaction, Reactions};
-        let no_effect = Reactions {
+        // An enemy red does not damage, closer than the ghost and off the line to it: it is the target (the user,
+        // 2026-11-26), and the fireball explodes on it.
+        let mut app = app(&[], None);
+        let unharmed = enemy(&mut app, Vec2::new(-20.0, 60.0));
+        app.world_mut().entity_mut(unharmed).insert(Reactions {
             red: Reaction::Hit(Hit {
                 damage: 0.0,
                 push: 0.0,
                 interrupt: false,
             }),
             ..Reactions::FULL
-        };
-        // Closer than the ghost but off the line: the ghost is the target, and the shot passes the other.
-        let mut app = app(&[], None);
-        let closer = enemy(&mut app, Vec2::new(-20.0, 60.0));
-        app.world_mut().entity_mut(closer).insert(no_effect);
+        });
+        enemy(&mut app, Vec2::new(220.0, 0.0));
+        cast(&mut app);
+        run_until_exploded(&mut app);
+        assert_eq!(booms(&app)[0].why, Why::Enemy);
+        assert_eq!(booms(&app)[0].direct, Some(unharmed));
+        // An enemy shot that red touches in full, in the same place: not the target, so the ghost is.
+        let mut app = self::app(&[], None);
+        let shot = enemy(&mut app, Vec2::new(-20.0, 60.0));
+        app.world_mut().entity_mut(shot).insert(EnemyShot);
         let ghost = enemy(&mut app, Vec2::new(220.0, 0.0));
         cast(&mut app);
         run_until_exploded(&mut app);
         assert_eq!(booms(&app)[0].direct, Some(ghost));
-        // In the line to the ghost: the shot explodes on it.
-        let mut app = self::app(&[], None);
-        let in_the_way = enemy(&mut app, Vec2::new(110.0, 0.0));
-        app.world_mut().entity_mut(in_the_way).insert(no_effect);
-        let ghost = enemy(&mut app, Vec2::new(220.0, 0.0));
-        cast(&mut app);
-        run_until_exploded(&mut app);
-        assert_eq!(booms(&app)[0].why, Why::Enemy);
-        assert_eq!(booms(&app)[0].direct, Some(in_the_way));
-        assert!(taken(&app, ghost).is_empty());
+        assert!(taken(&app, shot).is_empty());
     }
 
     #[test]

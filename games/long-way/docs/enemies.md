@@ -13,6 +13,7 @@ These rules apply to every enemy.
 5. **Hurt.** An enemy with its own hurt frames carries `HurtFrames` and plays its `Hurt` tag. Every other enemy flashes `#993D41` for 0.12 s (`HURT_COLOUR`, `HURT_FLASH_SECS` in `enemy_hp.rs`).
 6. **Damage to the player.** An enemy sends `DamagePlayer { amount }` (`hp.rs`). The player has no invincibility frames: every hit counts, also two in the same frame (b15).
 7. **No friendly fire.** An enemy attack hits only the player (b16, `adr-lw42`). The player's weapons affect an enemy shot only as its reaction table says (`adr-lw43`). An enemy shot uses `Projectile::without_targets()`. A reader of `ControlledTouched` filters on its own marker (`With<Ghost>`, `With<VolcanoShot>`).
+8. **Enemy and enemy shot** (`adr-lw44`). An enemy is a character. An enemy shot is a projectile an enemy launches, and carries `EnemyShot`. A shot has hit points and a reaction table like an enemy, so weapons touch it as its table says, but a weapon that chooses a target (the fireball) never chooses a shot.
 
 ## Values
 
@@ -59,11 +60,11 @@ These rules apply to every enemy.
 
 **Placement.** Give it about 5 cells of open ground. Blocked areas and the map edge band remove shots early. The bottom rows of a map can be under the HUD.
 
-**Weapons** (`adr-lw43`). Red touches it with no effect: the fire ring touches it, and a fireball that meets it on its way explodes on it, but deals nothing. A fireball never chooses it as its target, because red does not damage it. Blue interrupts it on every hit: it plays `Hurt` once (4 frames of 100 ms), then `Attack` from frame 1, and it launches nothing while `Hurt` plays. An interrupt while `Hurt` plays does not start `Hurt` again. Nothing pushes it.
+**Weapons** (`adr-lw43`). Red touches it with no effect: the fire ring touches it, and the fireball targets it like any enemy and explodes on it, but deals nothing (`adr-lw44`). Blue interrupts it on every hit: it plays `Hurt` once (4 frames of 50 ms), then `Attack` from frame 1, and it launches nothing while `Hurt` plays. An interrupt while `Hurt` plays does not start `Hurt` again. Nothing pushes it.
 
 **Hit box** (`HIT_BOX`). The drawn cone (top at art row 20) and the blocked base, 2 px further all round. The ice ring stops at the base, so the hit box reaches past it, and the ring touches the volcano from every side.
 
-**Tuning note** (2026-11-25, scripted run in map 3, tornado cast next to the cone). The tornado hits every 0.5 s and `Hurt` lasts about 0.4 s, so `Attack` never gets back to frame 7: the volcano launches nothing for the whole 5.5 s of the tornado. The values give this, not a rule. Tune in step 5 of `dev-docs/PLAN-energy-reactions.md`.
+**Tuning note** (2026-11-25, scripted run in map 3, tornado cast next to the cone). The tornado hits every 0.5 s and `Hurt` then lasted about 0.4 s, so `Attack` never got back to frame 7: the volcano launched nothing for the whole 5.5 s of the tornado. After a manual test (2026-11-26, `Hurt` now 50 ms a frame) the user kept this as rule b17 (`balance.md`).
 
 **Open.** How it dies (no `Die` tag yet, and no current weapon can kill it). How a damaging hit from a later violet or black weapon shows: it has no `HurtFrames`, so such a hit flashes the colour.
 
@@ -118,7 +119,7 @@ Weapon values are in `weapons.md`. The balance rules in brackets keep these resu
 | Fire ring | Dies on the first tick, 100 (b1) | Touched, no effect |
 | Ice ring | Pushed to the edge for 50, 10 more if it walks in. One ring never kills (b3). A pinned ghost is stunned | Not moved and never stunned. Interrupted on every hit |
 | Tornado | 13 per tick, bumped back 40 px on every second tick. Dies after more than 60 % of the tornado's time in contact (b5). Gets through to a player who stands still (b7, b9) | Not moved. Interrupted on every tick |
-| Fireball | A direct hit (150) kills (b10). The blast (100) kills (b11) | Never the target. Explodes on it when it is in the way, with no effect |
+| Fireball | A direct hit (150) kills (b10). The blast (100) kills (b11) | The target when it is the nearest enemy (`adr-lw44`). Explodes on it with no effect |
 
 ## Add a new enemy kind
 
@@ -128,6 +129,6 @@ Weapon values are in `weapons.md`. The balance rules in brackets keep these resu
 4. Give it `EnemyHp::full(<its own HP>)`, also when no current weapon can hurt it, so a later weapon can. Do not change the ghost's HP or a weapon's damage to suit it (b1, b2).
 5. Write its `REACTIONS` table, one reaction per energy, and add its row to "Reactions to weapon energy". If it interrupts, handle `EnemyInterrupted` in its plugin.
 6. Hurt: add `HurtFrames` and a `Hurt` tag, or use the colour flash.
-7. Its attacks hit only the player (b16): shots use `Projectile::without_targets()`, and touch readers filter on its own marker.
+7. Its attacks hit only the player (b16): shots use `Projectile::without_targets()`, and touch readers filter on its own marker. Each shot carries `EnemyShot`, its own hit points and reaction table (`adr-lw44`).
 8. Check the "by hand" rules in `balance.md`: b2 (fire ring), b13 (fireball direct hit) and b16 (friendly fire).
 9. Add a row to "Values" and a column to "Against each weapon" here, its marker to `maps.md` and its tags to `art-tags.md`.

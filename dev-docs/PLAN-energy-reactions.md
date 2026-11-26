@@ -26,7 +26,7 @@ The user's decisions (2026-11-25):
 
 ## Step 3. The volcano (done 2026-11-25)
 
-Done: `EnemyHp` 300 (placeholder), `REACTIONS`, a `HIT_BOX` over the cone and the base with a 2 px margin (the ice ring stops at the base), `Hurt` on an interrupt then `Attack` from frame 0. The fireball does not choose a target that red does not damage (Claude's default, to confirm with the user). Fixed in the real game: the animation crate moves to the new tag one frame late, so both shots launched when `Attack` started again; `finish_hurt` now sets frame 0. Scripted run in map 3: the tornado interrupts the volcano on every tick and it launches nothing for the tornado's 5.5 s; the fire ring touches it 6 times with no effect. Not seen: the ice ring and the fireball on the volcano (they need a click in the drawer, which the script cannot do). Still open: its death.
+Done: `EnemyHp` 300 (placeholder), `REACTIONS`, a `HIT_BOX` over the cone and the base with a 2 px margin (the ice ring stops at the base), `Hurt` on an interrupt then `Attack` from frame 0. The fireball first did not choose a target that red does not damage (Claude's default). After a manual test the user changed it (2026-11-26, `adr-lw44`): the fireball targets the nearest enemy whatever it can damage, and never an enemy shot (`EnemyShot`). Fixed in the real game: the animation crate moves to the new tag one frame late, so both shots launched when `Attack` started again; `finish_hurt` now sets frame 0. Scripted run in map 3: the tornado interrupts the volcano on every tick and it launches nothing for the tornado's 5.5 s; the fire ring touches it 6 times with no effect. Not seen: the ice ring and the fireball on the volcano (they need a click in the drawer, which the script cannot do). Still open: its death.
 
 The plan as written:
 
@@ -56,6 +56,9 @@ The plan as written:
 - Tuning target: the shot holds at the tornado's rim when the player stands still and is carried when the player walks.
 
 ## Step 5. Tuning with the user
+
+Manual test by the user (2026-11-26, map 3, `run --script`): the fire ring and the ice ring behave as intended, including a shot that hopped over the ice ring (accepted: weapons see a shot where it is drawn). The fireball did not target the volcano; changed the same day (`adr-lw44`). The user then made the volcano's `Hurt` frames 50 ms (looks better) and tried `Attack` frames of 45 ms (the volcano fired too often). Kept: `Attack` 100 ms, `Hurt` 50 ms, and the volcano does not fire while the tornado touches it, recorded as b17 (`balance.md`).
+
 
 - Interrupt rate of the volcano under the tornado and the ice ring.
 - The shot's push share against the tornado and the ice ring.

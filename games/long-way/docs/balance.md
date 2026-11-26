@@ -26,6 +26,7 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 | b14 | **The enemy a fireball hits directly takes only the direct hit, never the blast as well.** | 2026-11-13 | `the_blast_hits_every_other_living_enemy_within_its_radius_and_no_one_else` and `an_enemy_in_the_way_takes_the_direct_hit_and_the_target_near_it_the_blast` in `weapons/fireball.rs` |
 | b15 | **The player has no invincibility frames.** Every hit takes its HP, also two in the same frame (`adr-lw42`). | 2026-11-23 | `a_shot_that_touches_the_player_takes_1_hp_and_goes_and_two_take_2` in `volcano.rs`; `a_damage_message_takes_points_and_at_zero_the_player_is_hurt_no_more` in `hp.rs` |
 | b16 | **No friendly fire: an enemy's attack never hurts another enemy.** The player's weapons affect an enemy shot only as the shot's reaction table says (`adr-lw42`, `adr-lw43`): the volcano shot lets red pass through and is pushed, not hurt, by blue. | 2026-11-23, shots and weapons changed 2026-11-25 | `a_volcano_launches_at_frames_7_and_9_from_the_mouth_of_that_frame_each_in_a_random_direction` in `volcano.rs` (its shots skip targets); by hand: check it when a new enemy attack is added |
+| b17 | **While the tornado touches the volcano, the volcano launches no shot.** Every tick interrupts it before `Attack` reaches its first launch frame again. | 2026-11-26 | By hand: check it when the volcano's `Attack` or `Hurt` durations (`volcano.aseprite`), its launch frames (`LAUNCHES` in `volcano.rs`) or the tornado tick change |
 
 ## b1. The fire ring always kills a ghost
 
@@ -77,3 +78,11 @@ Values: `weapons/values.rs` (weapons), `ghost.rs` (`HIT_POINTS`), `volcano.rs` (
 - b12: 100 < 150.
 - b13: no test yet. The volcano survives a direct hit, because its reaction to red has a damage share of 0 (`adr-lw43`). Check again when its reaction changes, when a new enemy kind is added, or when the direct hit grows.
 - b14: the explosion deals the direct hit to the enemy touched and the blast only to the others (`explode` in `weapons/fireball.rs`).
+
+## b17. The tornado silences the volcano
+
+**Rule.** The user's choice after a manual test (2026-11-26): a blue tornado held against the volcano keeps it from firing for as long as it touches it. Blue interrupts the volcano on every hit (`adr-lw43`, `enemies.md`).
+
+**How.** A tornado tick interrupts the volcano every 0.5 s. `Hurt` plays (4 frames of 50 ms, 0.2 s), then `Attack` starts again from frame 1, and the first shot leaves when frame 7 starts, 6 frames of 100 ms (0.6 s) later. 0.2 + 0.6 = 0.8 s is longer than the 0.5 s to the next tick, so no shot leaves. The rule holds while `Hurt` + 6 `Attack` frames ≥ the tornado tick, with some margin: at 60 fps the frame is checked every 16.7 ms.
+
+**Rejected:** `Attack` frames of 45 ms (the user, 2026-11-26). The frame-7 shot then leaves under the tornado (0.2 + 0.27 = 0.47 s), but the volcano fires far too often when no tornado is near.

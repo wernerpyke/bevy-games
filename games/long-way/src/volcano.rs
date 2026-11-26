@@ -29,7 +29,7 @@ use game_kit::rng::GameRng;
 use game_kit::touch::{ControlledTouched, TouchSet, Touchable};
 
 use crate::collision::PLAYER_HALF_WIDTH;
-use crate::enemy_hp::EnemyHp;
+use crate::enemy_hp::{EnemyHp, EnemyShot};
 use crate::hp::DamagePlayer;
 use crate::map::Kind;
 use crate::reactions::{Deflects, EnemyInterrupted, Hit, Reaction, Reactions};
@@ -291,6 +291,7 @@ fn launch_shots(
                     ProjectilePath::new(path, direction, BALL_HALF),
                     Touchable,
                     SHOT_HIT_BOX,
+                    EnemyShot,
                     EnemyHp::full(SHOT_HIT_POINTS),
                     SHOT_REACTIONS,
                     Deflects,
@@ -512,16 +513,16 @@ mod tests {
             // 1e-6: `ProjectilePath::new` normalises the unit vector again.
             assert!(shot.0.distance(direction) < 1e-6, "{shot:?} vs {direction}");
         }
-        // Weapons see each shot: its hit points, its reactions, and a push turns it.
-        let bodies: Vec<(EnemyHp, Reactions, bool)> = app
+        // Weapons see each shot as an enemy shot, not an enemy: its hit points, its reactions, and a push turns it.
+        let bodies: Vec<(EnemyHp, Reactions, bool, bool)> = app
             .world_mut()
-            .query_filtered::<(&EnemyHp, &Reactions, Has<Deflects>), With<VolcanoShot>>()
+            .query_filtered::<(&EnemyHp, &Reactions, Has<Deflects>, Has<EnemyShot>), With<VolcanoShot>>()
             .iter(app.world())
-            .map(|(hp, reactions, deflects)| (*hp, *reactions, deflects))
+            .map(|(hp, reactions, deflects, shot)| (*hp, *reactions, deflects, shot))
             .collect();
         assert_eq!(
             bodies,
-            vec![(EnemyHp::full(SHOT_HIT_POINTS), SHOT_REACTIONS, true); 4]
+            vec![(EnemyHp::full(SHOT_HIT_POINTS), SHOT_REACTIONS, true, true); 4]
         );
     }
 

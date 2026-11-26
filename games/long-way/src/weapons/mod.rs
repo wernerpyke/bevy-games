@@ -23,7 +23,7 @@ use game_kit::hitbox::HitBox;
 use game_kit::map_transition::OnCurrentMap;
 use game_kit::movement::{FollowSet, MoveState, Mover};
 
-use crate::enemy_hp::EnemyHp;
+use crate::enemy_hp::{EnemyHp, EnemyShot};
 use crate::inventory::{Energy, Inventory};
 use crate::player::feet_of;
 use crate::reactions::{Hit, Reactions};
@@ -85,6 +85,8 @@ pub struct EnemyBody {
     pub hp: &'static EnemyHp,
     pub reactions: &'static Reactions,
     pub mover: Option<&'static Mover>,
+    /// An enemy shot, not an enemy (`EnemyShot`): never a weapon's chosen target.
+    pub shot: Has<EnemyShot>,
 }
 
 impl EnemyBodyItem<'_, '_> {
