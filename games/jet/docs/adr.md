@@ -95,3 +95,11 @@
 **Rationale.** The user will add these features soon after the port. A port that hard-codes one enemy, fixed stats and a fixed forest would need rework. Kit patterns used from the start avoid the bugs that the kit already fixes.
 
 **How to apply.** Enemy kinds are rows of a table, power-ups change one stats resource, pickups use the kit `Collectable`, and a forest change rebuilds collision and the nav grid. Stubs compile and are documented, with no gameplay.
+
+## adr-jt13. One file per character, a hidden black backdrop, Pyxel animation speeds (2026-11-26)
+
+**Decision.** The Pyxel `sprites.aseprite` is split into `player.aseprite` (tags `Idle`, `Move`, `Trail`) and `spinner.aseprite` (tags `Move`, `Die`, `Kill`), one sprite per frame. Every art file keeps a hidden black layer `backdrop` at the bottom, for drawing; the Pyxel background layers are removed. Frames last 62 ms (16 fps), the house 250 ms (4 fps), as in the Pyxel game. The palette uses the exact Pyxel colours.
+
+**Rationale.** One file per character with one sprite per frame is how Long Way and R-Town load art, and tags name each animation. A black backdrop lets the user see white line art while drawing, and the loader draws only visible layers, so the game ignores it with no code. The Pyxel speeds keep the original look; the files had 100 ms everywhere, which did not match the game.
+
+**How to apply.** Keep `backdrop` hidden. A new enemy gets its own file with the same tag names where they fit (`Move`, `Die`, `Kill`). The file list and tags are in `art-tags.md`.

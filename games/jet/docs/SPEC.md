@@ -182,11 +182,10 @@ These numbers are settings the designer tunes.
 
 ## 10. Art
 
-- Sources: the Pyxel game's `.aseprite` files (`sprites`, `house`, `forest`, `shockwave`), copied into `games/jet/input/`, resized 2×, and loaded directly. No exported sprite sheets (`adr-jt5`).
+- Files: `player`, `spinner`, `house`, `trees`, `shockwave` and `palette.aseprite` in `assets/art/`, built from the Pyxel game's `.aseprite` files, resized 2×, and loaded directly. No exported sprite sheets (`adr-jt5`, `adr-jt13`). Every file, frame and tag: `art-tags.md`.
 - Style: thin white line art on black. Colour is used only for feedback.
 - Palette: a new Jet palette. It starts with black, white `#EEEEEE` and the feedback colours: grey `#A3A3A3` (dying), magenta-red `#D4186C` (kill X, damage 2), pink `#FF9798` (damage 1), purple `#7E2072` (damage 3), teal-green `#19959C` (heal charge). More colours are agreed with the particles.
 - Animation speed is set as frame durations in the `.aseprite` files (`adr-a6`): 16 fps for the player, trail, shockwave and Spinner; 4 fps for the house.
-- The files need work before use (plan step 1): `sprites.aseprite` holds the player above the trail in each 8 × 16 frame, every file has a visible `Background` layer, the tags do not match the brief, and every frame is 100 ms.
 - Particles: a burst when an enemy dies, at the house on damage, and on a heal (Enoki, `dev-docs/extensions/particles.md`).
 
 ## 11. Audio

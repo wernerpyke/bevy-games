@@ -6,6 +6,7 @@ Documentation for this game only. General rules that other games may reuse are e
 |---|---|
 | [SPEC.md](SPEC.md) | The specification: rules, values, what is decided, open questions |
 | [adr.md](adr.md) | Decisions that apply to Jet only (`adr-jt1` and on) |
+| [art-tags.md](art-tags.md) | The palette, the `.aseprite` files, every frame and tag, and where they came from |
 
 Status: being ported from the user's Pyxel game. The port plan is `dev-docs/PLAN-jet-port.md`.
 

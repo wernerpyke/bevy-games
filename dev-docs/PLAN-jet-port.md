@@ -6,7 +6,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 ## Status (2026-11-26): resume here
 
-Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Next: step 1 (art).
+Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), waiting for the user's check in Aseprite. Next: step 2.
 
 ## Designer's intent (from the brief)
 
