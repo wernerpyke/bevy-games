@@ -6,7 +6,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 ## Status (2026-11-26): resume here
 
-Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), waiting for the user's check in Aseprite. Next: step 2.
+Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), checked and committed. Step 2 built (2026-11-26): kit `cell_area` (`adr-x62`, `cell-areas.md`), Jet's map `assets/maps/1.txt` (a draft for the user to edit), house, forest, the top HUD bar (empty), F1/F2/F3, draw order by the kit depth sort (`adr-jt15`). The blocked areas are not grown by the actor size yet: that is step 3 (Q4). Next: the user's check of the map, then step 3.
 
 ## Designer's intent (from the brief)
 
@@ -66,7 +66,6 @@ These define the feel. Keep them unless the user changes them:
 
 | # | Question | Step |
 |---|---|---|
-| Q3 | How trees go in the map file: one character per tree (2 × 2 footprint, `T` solid and `t` passable), or one character per blocked cell that the game fills with tree sprites (the user's idea of an outline filled at random)? | 2 |
 | Q4 | Collision feel: the original tests only the centre line, so the player slides past tree corners. The kit tests a feet point with `allow_sliding`. Which point and which sliding setting feels right? | 3 |
 | Q5 | Attack zone: a hit box 3 cells wide and 1 cell deep in front of the player, the size of the shockwave. Tune by play. Should a power-up change it by one number (for example a scale)? | 5 |
 | Q6 | When does a Spinner count as hitting the house: when it reaches its target point next to the house, or when it touches the house's blocked area? | 4 |
@@ -111,9 +110,16 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 ### 2. Screen, map and static world
 
 - `camera.rs`: `VIEW_HEIGHT` 512, `CELL_SIZE` 16, colours. Window 960 × 540. `PixelCameraPlugin` with no follow (fixed screen), `ScreenPlugin { mode: BarTop { ratio: 28.0 / 512.0 } }` (an empty bar for now), `CameraBounds` set to the map. Check that the bar is 28 px and the game region 960 × 512 at scale factors 1 and 2.
-- Ask Q3. Then write `assets/maps/1.txt` (60 × 32, `origin: top-left`, legend after `adr-x37`: `@` the player start, `H` the house, tree letters as agreed). The middle 40 columns are the field, drafted from the brief's layout (section 3) fitted to 40 × 32 with the house in the centre. The 10 columns on each side are forest. The user edits it.
-- The field has a hard edge: the map edge at the top and bottom, and the side forest at the left and right. The side forest is solid trees (2026-11-26), so it blocks like any other tree.
-- `map.rs` (kinds, loading), `house.rs` and `trees.rs`: spawn with `Blocker` rects and the right layers. The house's top row is passable, as in the original. Trees keep the random variant (the 5th variant twice as likely) and the small random offset, from the kit `Rng` with a seed per cell, so F1 gives the same forest.
+- **Kit: cell areas** (Q3 answered 2026-11-26: `adr-x62`, `adr-jt14`). A forest is drawn in the map as outlines, the loader fills the inside, and the forest is a grid of cells that can change while the game runs. Design (confirm with the user before coding):
+  - New kit module `crates/game-kit/src/cell_area.rs`.
+  - Pure part: `CellGrid` (size, one flag per cell, `get`, `set`, filled cells, and the blocked rectangles: runs of filled cells in a row, merged with equal runs in the rows above). `fill_enclosed(size, outline)`: the outline cells plus every empty cell that cannot reach the map border through empty cells (4 neighbours).
+  - From a map: `CellGrid::from_map(&map, kind)` takes the cells of one legend kind. The legend parameter `fill=enclosed` (for example `"F": forest fill=enclosed`) applies `fill_enclosed`; without it the cells are used as drawn. A bad value is a load error with the legend line.
+  - ECS part: a component `CellArea { grid, cell_size, origin, grow }` on one entity per area (the game adds its own marker, for example `Forest`). The kit keeps one `Blocker` child per blocked rectangle, grown by `grow` (the game's actor size, set in step 3, Q4), and rebuilds the collision world when the grid changes, so the nav grid follows. It sends `CellAreaChanged { area, cells }` with the changed cells (all cells on spawn), so the game redraws only those sprites. The blockers must exist before the map's `rebuild` hook runs at load; a kit test proves it.
+  - A change while playing: `CellArea::set(cell, filled)` through `Mut`, nothing else. Kit tests: the fill (a closed outline, an outline closed by the map border, a strip with no inside, an open outline that does not fill, a closed clearing that is filled, the known limit), the rectangles, `from_map` with and without `fill`, the blockers and the collision world after a change, the message.
+  - Docs: an extension doc `dev-docs/extensions/cell-areas.md` (index and symptom index), the module table in `lib.rs`, a section in `map-files.md` for `fill=enclosed`.
+- Write `assets/maps/1.txt` (60 × 32, `origin: top-left`, legend after `adr-x37`: `@` the player start, `H` the house, `F` the forest with `fill=enclosed`). The middle 40 columns are the field, drafted from the brief's layout (section 3) fitted to 40 × 32 with the house in the centre. The 10 columns on each side are forest outlines. There are no passable forest cells (`adr-jt14`). The user edits it.
+- The field has a hard edge: the map edge at the top and bottom, and the side forest at the left and right.
+- `map.rs` (kinds, loading), `house.rs` and `forest.rs`. The house is an object with `Blocker` rects; its top row is passable, as in the original. The forest is a `CellArea`. `forest.rs` draws trees from the grid when it gets `CellAreaChanged`: a tree every 2 columns and every row over the filled cells, so the rows overlap as in Pyxel, with a random variant (frame 5 twice as likely) and a small random offset from a seed per cell, so F1 gives the same forest.
 - Kit plugins: `CollisionPlugin`, `CollisionDebugPlugin`, `DebugPlugin` (F2, F3), `DepthPlugin`, `ReloadPlugin` (F1), `ScriptPlugin { env_prefix: "JET" }`, `AnimationHelpPlugin` (random start frames for the house smoke if wanted).
 - Check: a screenshot with `--debug` shows the map, the grid and the collision overlay. Compare the blocked cells with the drafted map.
 

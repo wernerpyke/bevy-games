@@ -103,3 +103,19 @@
 **Rationale.** One file per character with one sprite per frame is how Long Way and R-Town load art, and tags name each animation. A black backdrop lets the user see white line art while drawing, and the loader draws only visible layers, so the game ignores it with no code. The Pyxel speeds keep the original look; the files had 100 ms everywhere, which did not match the game.
 
 **How to apply.** Keep `backdrop` hidden. A new enemy gets its own file with the same tag names where they fit (`Move`, `Die`, `Kill`). The file list and tags are in `art-tags.md`.
+
+## adr-jt14. The forest is a kit cell area with no passable edge cells (2026-11-26)
+
+**Decision.** The forest (the side forest and the groups in the field) is a kit cell area (`adr-x62`), drawn in the map file as outlines. Every forest cell is solid. There are no passable edge cells: the player slides along the forest edge with the kit sliding, as in Long Way.
+
+**Rationale.** The Pyxel game made some edge tiles passable only because its collision tested one point on the centre line and caught on corners. The kit sliding solves that problem directly. A cell area also gives the later dynamic forest its model.
+
+**How to apply.** Tree sprites are placed by the game from the area's cells (a tree every 2 columns and every row, random variant and offset). The forest edge feel is tuned in plan question Q4.
+
+## adr-jt15. Trees, the house and actors sort by their feet, with the kit depth sort (2026-11-26)
+
+**Decision.** Jet uses the kit depth sort, as Long Way and R-Town do. Trees, the house, enemies and the player are one world layer, sorted by their feet. It does not use the fixed layers of the Pyxel game (trees, house, enemies, player, effects).
+
+**Rationale.** The user chose the kit pattern over the Pyxel draw order. Trees in lower rows are drawn over the rows above them, which suits the dense, overlapping clusters, and an actor just above a tree is drawn behind its top.
+
+**How to apply.** A tree sorts at its cell (`SortAtArea`), the house at its blocked area (`SortAtBlocker`), and actors by their feet (`DepthSort`). Effects use the kit layers above the world.

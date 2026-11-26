@@ -6,7 +6,7 @@ A Cargo workspace of pixel art games built with Bevy. Each game lives in `games/
 |---|---|
 | Long Way | `games/long-way/` |
 | R-Town | `games/r-town/` |
-| Jet | `games/jet/` (being ported from Pyxel: an empty window for now) |
+| Jet | `games/jet/` (being ported from Pyxel: the map only, no player yet) |
 
 Single entry point for players and users: quick start, controls, common commands and troubleshooting.
 
