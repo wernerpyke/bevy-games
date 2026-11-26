@@ -66,7 +66,7 @@ These rules apply to every enemy.
 
 **Tuning note** (2026-11-25, scripted run in map 3, tornado cast next to the cone). The tornado hits every 0.5 s and `Hurt` then lasted about 0.4 s, so `Attack` never got back to frame 7: the volcano launched nothing for the whole 5.5 s of the tornado. After a manual test (2026-11-26, `Hurt` now 50 ms a frame) the user kept this as rule b17 (`balance.md`).
 
-**Open.** How it dies (no `Die` tag yet, and no current weapon can kill it). How a damaging hit from a later violet or black weapon shows: it has no `HurtFrames`, so such a hit flashes the colour.
+**Not needed yet** (the user, 2026-11-26): how it dies. No current weapon can kill it, and it has no `Die` tag. Decide it with the first weapon that damages it, together with how such a hit shows: it has no `HurtFrames`, so a damaging hit flashes the colour.
 
 ## Reactions to weapon energy
 
@@ -89,7 +89,7 @@ How often an enemy is interrupted, and how far it is pushed, follow from the wea
 
 **Tuning target, volcano shot:** under the tornado, the shot holds at the outer rim while the player stands still (some jitter is fine), and the tornado carries it while the player walks.
 
-**Tuning note** (2026-11-25, scripted runs in map 3, seed 7, the player standing north of the volcano, a shot coming head on). With `SHOT_BLUE_PUSH` 8, the tornado's bump is also multiplied: 40 px becomes 320 px, and it threw the shot 404 px back past the volcano. In an experiment with no bump on a body the tick does not damage, the same shot held at the rim until its path ended (pushed 172 px, it stopped 8 px outside the rim and glanced a little east). Decided by the user the same day: only a tick that damages bumps (`weapons.md`, "Tornado"). With that, the head-on shot held at the rim of a standing player until its path ended, and when the player walked towards it for 0.4 s the tornado carried it 226 px. The tuning target is met at 8.
+**Tuning note** (2026-11-25, scripted runs in map 3, seed 7, the player standing north of the volcano, a shot coming head on). With `SHOT_BLUE_PUSH` 8, the tornado's bump is also multiplied: 40 px becomes 320 px, and it threw the shot 404 px back past the volcano. In an experiment with no bump on a body the tick does not damage, the same shot held at the rim until its path ended (pushed 172 px, it stopped 8 px outside the rim and glanced a little east). Decided by the user the same day: only a tick that damages bumps (`weapons.md`, "Tornado"). With that, the head-on shot held at the rim of a standing player until its path ended, and when the player walked towards it for 0.4 s the tornado carried it 226 px. The tuning target is met at 8. The ice ring scales its push to its edge by the same 8, so it throws a shot far past its edge; the user keeps this (2026-11-26). Not checked yet: a glance at a wide angle (the scripted runs gave only a slight one).
 
 **Code.** Each enemy's table is the constant `REACTIONS` in its own file, next to its hit points. An enemy spawned without a table reacts in full to every energy (`Reactions::FULL`).
 
