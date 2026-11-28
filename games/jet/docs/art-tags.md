@@ -14,7 +14,7 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 
 ## Palette: `palette.aseprite`
 
-168 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
+208 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
 
 | Index | Hex | Used for |
 |---|---|---|
@@ -39,6 +39,11 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 | 18 | `#2F5A3C` | Dark leaves: mid |
 | 19 | `#C4DDE9` | Ice: light |
 | 20 | `#5F8FA8` | Ice: deep |
+| 21 | `#EF0000` | Added by the user (2026-11-28), used in `house` |
+| 22 | `#F75200` | Added by the user, used in `house` |
+| 23 | `#2F63F8` | Added by the user, used in `house` |
+| 24 | `#FFFFFF` | Added by the user, used in `house` |
+| 25 | `#0E36B3` | Added by the user, used in `shockwave` |
 
 More colours are added with the particles. Add a colour to this file first, then use it.
 
@@ -46,17 +51,17 @@ More colours are added with the particles. Add a colour to this file first, then
 
 | File | Canvas | Frames | Layers | Tags |
 |---|---|---|---|---|
-| `player.aseprite` | 32 × 32 | 9 | `backdrop` (hidden), `art` | `Idle` 1 (62 ms), `Move` 2–5, `Trail` 6–9 |
+| `player.aseprite` | 32 × 32 | 10 | `backdrop` (hidden), `art` | `Idle` 1–2 (500 ms), `Move` 3–6, `Trail` 7–10 |
 | `spinner.aseprite` | 32 × 32 | 8 | `backdrop` (hidden), `art` | `Move` 1–4, `Die` 5–6 (grey), `Kill` 7–8 (red X) |
-| `house.aseprite` | 128 × 128 | 4 | `backdrop` (hidden), `art` | `Idle` 1–4 (250 ms; named `Smoke`, with a separate `smoke` layer, until 2026-11-28). The chimney smoke and a small shift of the window change between frames. |
-| `trees.aseprite` | 64 × 64 | 4 | `backdrop` (hidden), `art` | None. Each frame is one tree variant (2 × 2 cells), shown as a still frame, each picked as often. Drawn by the user (2026-11-26, as `trees2.aseprite`); it replaced the Pyxel trees (32 × 32, 8 variants) on 2026-11-28. |
+| `house.aseprite` | 128 × 128 | 8 | `backdrop` (hidden), `house`, `over`, `over2`, `anim` | `Idle` 1–4 (250 ms; named `Smoke`, with a separate `smoke` layer, until 2026-11-28), `Hurt` 5–6 (250 ms), `Heal` 7–8 (250 ms). `Hurt` and `Heal` are added by the user (2026-11-28) and not played yet (step 5). The chimney smoke and a small shift of the window change between frames. |
+| `trees.aseprite` | 64 × 64 | 5 | `backdrop` (hidden), `art` | None. Each frame is one tree variant (2 × 2 cells), shown as a still frame, each picked as often. The game picks from every frame of the file (kit `RandomStaticFrame`), so a new frame is a new tree with no code change. The 5th tree was added by the user on 2026-11-28. Drawn by the user (2026-11-26, as `trees2.aseprite`); it replaced the Pyxel trees (32 × 32, 8 variants) on 2026-11-28. |
 | `shockwave.aseprite` | 96 × 32 | 4 | `backdrop` (hidden), `art` | `Wave` 1–4 |
 
 Tag use in the game (from `SPEC.md`):
 
 - `player`: `Idle` while still (not rotated). `Move` plays once on a start or a turn, rotated, and holds its last frame. `Trail` loops on a separate sprite one cell behind the player.
 - `spinner`: `Move` loops while walking (not rotated). `Die` plays once when the player kills it. `Kill` plays once when it hits the house.
-- `house`: `Idle` loops.
+- `house`: `Idle` loops. `Hurt` and `Heal`: to be played on a hit and a heal (step 5).
 - `shockwave`: `Wave` loops one cell ahead of the moving player, rotated.
 
 ## Where the files came from

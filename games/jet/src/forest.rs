@@ -4,7 +4,7 @@
 //! dice of its cell, so F1 gives the same forest.
 
 use bevy::prelude::*;
-use game_kit::animation::{StaticFrame, all_frames_sprite};
+use game_kit::animation::{RandomStaticFrame, all_frames_sprite};
 use game_kit::cell_area::{CellArea, CellAreaChanged, CellAreaSet, CellGrid};
 use game_kit::depth::SortAtArea;
 use game_kit::map::{Map, MapError};
@@ -14,8 +14,6 @@ use crate::camera::{CELL_SIZE, MAP_ORIGIN};
 use crate::map::{CurrentMap, FOREST};
 
 const ART: &str = "art/trees.aseprite";
-/// Number of tree variants: the frames of `trees.aseprite`, each picked as often.
-const VARIANTS: u64 = 4;
 /// Largest random shift of a tree sideways, in art pixels. Twice the Pyxel range at 4x, so the trees of one column
 /// do not form neat vertical lines.
 const JITTER_X: f32 = 16.0;
@@ -91,11 +89,6 @@ fn tree_centre(grid: &CellGrid, cell: IVec2, cell_size: f32) -> Vec2 {
     corner + Vec2::new(x, TREE_HEIGHT / 2.0)
 }
 
-/// The variant (frame index) for a dice roll.
-fn variant(roll: u64) -> u16 {
-    (roll % VARIANTS) as u16
-}
-
 /// The right-hand cell that the tree of `cell` covers: the cell to its right when that is forest, else `cell`
 /// (`tree_centre`).
 fn last_covered(grid: &CellGrid, cell: IVec2) -> IVec2 {
@@ -158,7 +151,6 @@ fn draw_trees(
             ) {
                 continue;
             }
-            let frame = variant(cell_dice(&map.map.name, SALT_VARIANT, cell).next_u64());
             let mut dice = cell_dice(&map.map.name, SALT_JITTER, cell);
             let (min_x, max_x) = sideways_range(grid, cell);
             let shift = Vec2::new(
@@ -169,7 +161,10 @@ fn draw_trees(
             commands.spawn((
                 Tree,
                 all_frames_sprite(&server, ART),
-                StaticFrame { relative: frame },
+                // Any frame of the file, each as likely, so a tree drawn as a new frame is used with no code change.
+                RandomStaticFrame {
+                    seed: cell_dice(&map.map.name, SALT_VARIANT, cell).next_u64(),
+                },
                 SortAtArea(area.cell_rect(cell)),
                 Transform::from_translation(centre.extend(0.0)),
                 ChildOf(entity),
@@ -260,11 +255,5 @@ mod tests {
         );
         assert_eq!(sideways_range(&forest, IVec2::new(4, 0)), (0.0, JITTER_X));
         assert_eq!(sideways_range(&forest, IVec2::new(7, 0)), (0.0, 0.0));
-    }
-
-    #[test]
-    fn the_variant_cycles_through_every_frame() {
-        let picks: Vec<u16> = (0..=VARIANTS).map(variant).collect();
-        assert_eq!(picks, vec![0, 1, 2, 3, 0]);
     }
 }
