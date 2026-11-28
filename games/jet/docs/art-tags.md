@@ -5,21 +5,22 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 ## Common rules
 
 - RGB colour mode, on the palette of `palette.aseprite`. Check with `./dev-scripts/aseprite.sh check <file> palette=games/jet/assets/art/palette.aseprite`.
-- Thin white line art on transparent, except the trees, which are coloured (2026-11-28). The art layers are visible. Each file has a hidden layer `backdrop` (black) at the bottom, for drawing on black in Aseprite. The game draws only visible layers (the `bevy_aseprite_ultra` default), so it never draws the backdrop. Keep it hidden.
+- Black line art on transparent, on a snow ground (index 14, `#F4F8FB`), since 2026-11-28 (was white line art on black, `adr-jt5`). The trees are coloured. The art layers are visible. Each file has a hidden layer `backdrop` (the snow colour) at the bottom, for drawing on black in Aseprite. The game draws only visible layers (the `bevy_aseprite_ultra` default), so it never draws the backdrop. Keep it hidden.
 - A cell is 32 px (`adr-jt2`, 2026-11-28). The sprites from the Pyxel game are at 4× the Pyxel size: 1 Pyxel pixel is 4 × 4 pixels, so one 8 px Pyxel tile is one 32 px cell. The trees are drawn new for 32 px cells.
 - Frame durations are in the files (`adr-a6`): 62 ms (16 fps) for fast animations, 250 ms (4 fps) for the house.
 - Sprites fill their cells, so most frames touch the canvas edge. That is expected.
 - Player, trail and shockwave art face **up**. The game rotates them for the other directions.
+- **The sprites will get a more 3D look over time.** The user will update the existing sprites by hand, a little at a time, so for a while some sprites will be flat line art and some shaded. Do not redraw, recolour or regenerate a sprite: the user owns these changes. When a file changes, update its row here (layers, tags, colours) and check that its tags still match the code.
 
 ## Palette: `palette.aseprite`
 
-112 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
+120 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
 
 | Index | Hex | Used for |
 |---|---|---|
 | 0 | transparent | |
-| 1 | `#000000` | Ground, backdrop |
-| 2 | `#EEEEEE` | All line art |
+| 1 | `#000000` | All line art (since 2026-11-28) |
+| 2 | `#EEEEEE` | Was the line art until 2026-11-28; not used now |
 | 3 | `#A3A3A3` | Spinner `Die` |
 | 4 | `#D4186C` | Spinner `Kill`; house damage 2 |
 | 5 | `#FF9798` | House damage 1 |
@@ -31,6 +32,7 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 | 11 | `#2F1A0F` | Trees: dark bark |
 | 12 | `#645122` | Trees: bark light |
 | 13 | `#9D8231` | Trees: bark highlight |
+| 14 | `#F4F8FB` | Snow: the ground (`CLEAR_COLOR`) and the backdrops |
 
 More colours are added with the particles. Add a colour to this file first, then use it.
 
@@ -61,3 +63,4 @@ Built on 2026-11-26 from the Pyxel game's files (`~/Dark/pyxel/games/jet/assets/
 - Every colour was already one of the palette colours, so no pixel colour changed.
 - 2026-11-28: `player`, `spinner`, `house` and `shockwave` resized 2× again (nearest neighbour, `dev-scripts/aseprite/resize.lua`) for 32 px cells. Tags and durations checked unchanged.
 - 2026-11-28: the Pyxel `trees.aseprite` was deleted and the user's `trees2.aseprite` renamed to `trees.aseprite`. Its 6 colours were added to the palette as indexes 8 to 13 (`extend_palette.lua`; the swatches drawn with a one-off script).
+- 2026-11-28: black line art on snow. In `player`, `spinner`, `house` and `shockwave` the line art `#EEEEEE` became `#000000` (`remap_colors.lua`). The backdrops became the snow colour `#F4F8FB`, added to the palette as index 14 (tried `#E6EDF2` and `#E9EDF0` first): the house backdrop from pink, the trees backdrop from black.

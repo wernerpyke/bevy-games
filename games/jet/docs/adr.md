@@ -42,6 +42,8 @@
 
 **Updated 2026-11-28.** With 32 px cells (`adr-jt2`) the Pyxel sprites are resized 4× in all. The trees are new art by the user (`trees.aseprite`, 64 × 64); its 6 colours were added to the palette (indexes 8 to 13).
 
+**Updated 2026-11-28 (later): black line art on snow.** The sprites are black line art, and the ground is a blue-tinted off-white, `#F4F8FB` (palette index 14). Why: the user wants Jet to take place in a snowy realm. The user will also give the sprites a more 3D look over time, by hand and a little at a time, so the art will be a mix of flat and shaded sprites for a while. A colour tint cannot recolour black pixels (a tint multiplies, and black stays black), so the colour feedback (dying, house damage, heal charge) needs a palette swap or coloured frames: open question Q9 in step 5.
+
 **How to apply.** Frame durations are set in the files (`adr-a6`). Every new colour is added to the palette file first.
 
 ## adr-jt6. The map is a kit text file now, and the forest becomes dynamic later (2026-11-26)
@@ -105,6 +107,8 @@
 **Decision.** The Pyxel `sprites.aseprite` is split into `player.aseprite` (tags `Idle`, `Move`, `Trail`) and `spinner.aseprite` (tags `Move`, `Die`, `Kill`), one sprite per frame. Every art file keeps a hidden black layer `backdrop` at the bottom, for drawing; the Pyxel background layers are removed. Frames last 62 ms (16 fps), the house 250 ms (4 fps), as in the Pyxel game. The palette uses the exact Pyxel colours.
 
 **Rationale.** One file per character with one sprite per frame is how Long Way and R-Town load art, and tags name each animation. A black backdrop lets the user see white line art while drawing, and the loader draws only visible layers, so the game ignores it with no code. The Pyxel speeds keep the original look; the files had 100 ms everywhere, which did not match the game.
+
+**Updated 2026-11-28.** The backdrop is now the snow colour `#F4F8FB`, so the user draws black art on the game's ground.
 
 **How to apply.** Keep `backdrop` hidden. A new enemy gets its own file with the same tag names where they fit (`Move`, `Die`, `Kill`). The file list and tags are in `art-tags.md`.
 

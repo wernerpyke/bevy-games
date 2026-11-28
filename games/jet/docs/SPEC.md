@@ -69,7 +69,7 @@ Collision tests one point, as in the original: the middle of the leading edge, o
 - Idle: one frame, not rotated.
 - Start moving or change direction: the move animation plays once at 16 fps, rotated to the direction, and holds its last frame. A trail one cell behind and a shockwave one cell ahead (3 cells wide, across the direction) loop their frames, move with the player and turn with it. Stop: the trail and the shockwave go, and the idle frame shows.
 - Art faces up. Right is 90° clockwise, down 180°, left 270° clockwise, about the sprite's centre.
-- Heal charged: the player's white line art is drawn teal-green.
+- Heal charged: the player is drawn teal-green (the method is open: Q9, `adr-jt5`).
 
 ## 5. World and map
 
@@ -80,7 +80,7 @@ Collision tests one point, as in the original: the middle of the leading edge, o
 | Map | 60 × 32 cells of 32 px (1920 × 1024 px), below the bar, fixed. No scrolling. |
 | Field | The middle 40 × 32 cells (1280 × 1024 px) (`adr-jt3`) |
 | Side forest | 10 columns on each side, solid trees |
-| Ground | Black |
+| Ground | Snow, a blue-tinted off-white `#F4F8FB` (2026-11-28) |
 
 - The map is a text file in the kit format (`dev-docs/extensions/map-files.md`, `adr-jt6`). The legend follows `adr-x37`: `@` is the player start, letters are features.
 - **House:** 4 × 4 cells, exactly in the centre of the field. Its top row (roof and chimney) is passable; the lower three rows are solid. It loops a 4-frame chimney smoke at 4 fps.
@@ -132,7 +132,7 @@ One kind now: the **Spinner**. More kinds come later (section 12).
 
 | Damage level | House colour |
 |---|---|
-| 0 | White |
+| 0 | Black, as drawn |
 | 1 | Pink `#FF9798` |
 | 2 | Magenta-red `#D4186C` |
 | 3 | Purple `#7E2072` |
@@ -144,7 +144,7 @@ Each damage and each heal makes the house pulse: scale 1.0 → 1.2 → 1.0 about
 
 1. A kill gives a heal charge for 2 s. The player is teal-green while charged.
 2. While charged, the player runs into a solid house cell (not the roof row).
-3. House damaged: the level goes down by 1, the colour follows, the charge is used and the player turns white, the house pulses.
+3. House damaged: the level goes down by 1, the colour follows, the charge is used and the player is drawn as normal again, the house pulses.
 4. House not damaged: nothing happens and the player keeps the charge.
 5. 2 s with no kill: the charge is lost.
 
@@ -183,8 +183,8 @@ These numbers are settings the designer tunes.
 ## 10. Art
 
 - Files: `player`, `spinner`, `house`, `shockwave` and `palette.aseprite` in `assets/art/`, built from the Pyxel game's `.aseprite` files, resized 4×, and loaded directly; `trees.aseprite`, drawn new for 32 px cells. No exported sprite sheets (`adr-jt5`, `adr-jt13`). Every file, frame and tag: `art-tags.md`.
-- Style: thin white line art on black. Colour is used only for feedback.
-- Palette: a new Jet palette. It starts with black, white `#EEEEEE` and the feedback colours: grey `#A3A3A3` (dying), magenta-red `#D4186C` (kill X, damage 2), pink `#FF9798` (damage 1), purple `#7E2072` (damage 3), teal-green `#19959C` (heal charge). More colours are agreed with the particles.
+- Style: black line art on snow (`#F4F8FB`), since 2026-11-28; Jet takes place in a snowy realm. The trees are coloured. The user will give the sprites a more 3D look over time, by hand, a little at a time (`art-tags.md`). Colour is otherwise used for feedback.
+- Palette: a new Jet palette. It starts with black, white `#EEEEEE`, the snow `#F4F8FB`, the tree colours and the feedback colours: grey `#A3A3A3` (dying), magenta-red `#D4186C` (kill X, damage 2), pink `#FF9798` (damage 1), purple `#7E2072` (damage 3), teal-green `#19959C` (heal charge). More colours are agreed with the particles.
 - Animation speed is set as frame durations in the `.aseprite` files (`adr-a6`): 16 fps for the player, trail, shockwave and Spinner; 4 fps for the house.
 - Particles: a burst when an enemy dies, at the house on damage, and on a heal (Enoki, `dev-docs/extensions/particles.md`).
 

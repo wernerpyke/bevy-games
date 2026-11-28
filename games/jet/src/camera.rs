@@ -17,8 +17,8 @@ pub const CELL_SIZE: f32 = 32.0;
 /// 60 x 32 map is centred on it.
 pub const MAP_ORIGIN: Vec2 = Vec2::new(-960.0, -512.0);
 
-/// Black ground: the sprites are white line art on black (`adr-jt5`).
-pub const CLEAR_COLOR: Color = Color::BLACK;
+/// Snow ground, a blue-tinted off-white (palette index 14): the sprites are black line art on snow (`adr-jt5`).
+pub const CLEAR_COLOR: Color = Color::srgb_u8(0xf4, 0xf8, 0xfb);
 
 /// The F3 grid: palette teal-green, so it stands out from the white art (`art-tags.md`).
 pub const GRID_COLOR: Color = Color::srgb_u8(0x19, 0x95, 0x9c);

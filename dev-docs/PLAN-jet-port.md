@@ -47,7 +47,7 @@ Record each one as an ADR in `games/jet/docs/adr.md` (prefix `jt`) in step 0.
 | Field size (2026-11-26) | 40 × 32 was chosen so enemies take about as long to reach the house as in the original: 18 cells from the sides (4.8 s), 14 cells from the top and the bottom (3.7 s). A larger field makes the swarm slow to form. |
 | Speeds | Same tiles per second as the real Pyxel speeds: player 30 cells/s, Spinner 3.75 cells/s (960 and 120 px/s at 32 px cells). Then tune by play. |
 | Art | The `.aseprite` files are the source. Copy them, resize them 2×, and load them directly. No exported sprite sheets. Not marked `_placeholder`. Files and tags are checked and standardised with the user (step 1). |
-| Palette | A new Jet palette (Q1, 2026-11-26). Sprites stay white line art on a black background. The palette starts with the colours the game recolours to: white, black, and the feedback colours of the brief (grey for dying, magenta-red for the kill X and damage level 2, pink for damage level 1, purple for damage level 3, teal-green for the heal charge). More colours are agreed when particles and other effects are added. |
+| Palette | A new Jet palette (Q1, 2026-11-26). Sprites stay white line art on a black background. **Changed 2026-11-28: black line art on snow (`#F4F8FB`, index 14), and the user will give the sprites a more 3D look over time, by hand (`adr-jt5`).** The palette starts with the colours the game recolours to: white, black, and the feedback colours of the brief (grey for dying, magenta-red for the kill X and damage level 2, pink for damage level 1, purple for damage level 3, teal-green for the heal charge). More colours are agreed when particles and other effects are added. |
 | Map | A text map file in the kit format (`map-files.md`), like Long Way. A dynamic forest comes later, and then the map stops being only a file. |
 | Enemies | Real path finding, so Spinners go around trees. Spreading (not stacking) is wanted. A flow field is explored during the port. |
 | Game over | On the 4th hit the house is destroyed: play stops, a screen shows the survival time, and a key restarts. |
@@ -88,7 +88,7 @@ These define the feel. Keep them unless the user changes them:
 | Q6 | Answered: a Spinner hits the house when it arrives at its target point (`adr-jt17`). | 4 |
 | Q7 | Answered: the kit spawner is extended (`adr-x63`, `adr-jt18`). | 4 |
 | Q8 | Spreading and the flow field: add them to the kit (a kit change, so ask), or keep them in Jet first? | 7 |
-| Q9 | Colour feedback: a sprite tint works while the art is white line art. With coloured art a tint changes every colour. Use a tint now, or a palette swap shader? | 5 |
+| Q9 | Colour feedback: since 2026-11-28 the art is black line art, and a tint cannot recolour black (it multiplies). The sprites will also get shading over time. Palette swap shader, or coloured frames in the art? | 5 |
 | Q11 | Pause key (`Escape`, the kit default) and the restart key on the game-over screen. | 6 |
 
 ## Facts found while writing this plan
