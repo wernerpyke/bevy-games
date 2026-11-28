@@ -14,7 +14,7 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 
 ## Palette: `palette.aseprite`
 
-120 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
+168 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
 
 | Index | Hex | Used for |
 |---|---|---|
@@ -33,6 +33,12 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 | 12 | `#645122` | Trees: bark light |
 | 13 | `#9D8231` | Trees: bark highlight |
 | 14 | `#F4F8FB` | Snow: the ground (`CLEAR_COLOR`) and the backdrops |
+| 15 | `#1E110A` | Dark wood: deepest |
+| 16 | `#5A3A22` | Dark wood: warm mid |
+| 17 | `#1C3326` | Dark leaves: deep |
+| 18 | `#2F5A3C` | Dark leaves: mid |
+| 19 | `#C4DDE9` | Ice: light |
+| 20 | `#5F8FA8` | Ice: deep |
 
 More colours are added with the particles. Add a colour to this file first, then use it.
 

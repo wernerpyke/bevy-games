@@ -4,9 +4,19 @@ Port the Pyxel game Jet into a new workspace game, `games/jet/`. This is not a 1
 
 Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0 copies its rules into `games/jet/docs/SPEC.md`, so the game docs do not depend on the Pyxel repo.
 
-## Status (end of 2026-11-26): resume here
+## Status (2026-11-28): resume here
 
-**Steps 0 to 4 are done, play tested by the user, committed and pushed** (last commit `f52ff1f` on `main`). **32 px cells are built on the branch `jet-32px-cells`, not committed** (2026-11-28, `adr-jt2` updated): `CELL_SIZE` 32, `VIEW_HEIGHT` 1024, HUD bar 56 px, the four Pyxel sprites resized 2× again, the forest drawn from the user's new `trees.aseprite` (64 × 64, 4 variants, its colours added to the palette as indexes 8 to 13; the Pyxel trees deleted), the map file `cell: 32`, and Jet's map check now rejects a map cell that is not `CELL_SIZE`. The 32 px work is committed and pushed (`4fa1802`). **Step 4b is built, not committed** (2026-11-28, `adr-x64`). **Next: the user's check and commit of step 4b, then step 5. Start step 5 by asking Q5 and Q9.**
+**Steps 0 to 4 and 4b are done, play tested, committed and pushed** (`main`). Since step 4 (2026-11-28):
+
+- `4fa1802`: 32 px cells (`adr-jt2` updated). `CELL_SIZE` 32, `VIEW_HEIGHT` 1024, HUD bar 56 px; the Pyxel sprites resized 2× again; the forest is the user's `trees.aseprite` (64 × 64, 4 variants).
+- `cc14c6c`: step 4b, the game gives the map cell size and map files have no `cell:` line (`adr-x64`).
+- `5231ccb`: the house tag is `Idle` (the user renamed `Smoke` and merged the smoke layer).
+- `1c58013`: black line art on snow, ground `#F4F8FB` (palette index 14), every backdrop the snow colour (`adr-jt5` updated).
+- The palette has 21 colours: indexes 15 to 20 are dark woods, dark leaf greens and ices for shading (`art-tags.md`).
+
+**The user is shading the sprites by hand for a more 3D look, a little at a time** (`art-tags.md`, "Common rules"). Do not redraw or recolour a sprite. When a file changes, update `art-tags.md` and check its tags against the code (the house tag rename broke the game once).
+
+**Next: step 5 (combat, house and particles). Start by asking Q5 and Q9.** Q9 is now a real choice: a tint cannot recolour black line art or shading.
 
 | Step | Commit | What exists |
 |---|---|---|
@@ -163,7 +173,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Ask Q7. Then build spawning: each Spinner starts at a random cell on a random edge of the field (top row, bottom row, or the first or last field column next to the side forest; only on free ground), with the difficulty curve of brief section 9 as a plain struct with unit tests (level-ups, limits, group size rounding, the first spawn one gap after the start).
 - Check: a scripted run of 90 s with `JET_SEED` set. Spinners come around trees, the spawn rate rises, and the movement debug (F3) shows the paths.
 
-### 4b. Remove `cell:` from the map files (its own commit; built 2026-11-28)
+### 4b. Remove `cell:` from the map files (done, `cc14c6c`)
 
 Every game uses one cell size for all its maps, and sets it in code. The `cell:` line in a map file is a second copy that can disagree: Jet's map still said `cell: 16` after the change to 32 px cells, and the kit then took the map rectangle as a quarter of the world (player start, F3 grid, nav bounds all wrong, 2026-11-28).
 
