@@ -56,7 +56,7 @@ pub fn spawn_house(mut commands: Commands, server: Res<AssetServer>, house: Res<
         Blocker(blocked_area(house.0, CELL_SIZE)),
         SortAtBlocker,
         Transform::from_translation(centre.extend(0.0)),
-        tag_sprite(&server, ART, "Smoke"),
+        tag_sprite(&server, ART, "Idle"),
     ));
 }
 
