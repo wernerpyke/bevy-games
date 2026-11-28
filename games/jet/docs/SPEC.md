@@ -69,7 +69,7 @@ Collision tests one point, as in the original: the middle of the leading edge, o
 - Idle: one frame, not rotated.
 - Start moving or change direction: the move animation plays once at 16 fps, rotated to the direction, and holds its last frame. A trail one cell behind and a shockwave one cell ahead (3 cells wide, across the direction) loop their frames, move with the player and turn with it. Stop: the trail and the shockwave go, and the idle frame shows.
 - Art faces up. Right is 90° clockwise, down 180°, left 270° clockwise, about the sprite's centre.
-- Heal charged: the player is drawn teal-green (the method is open: Q9, `adr-jt5`).
+- Heal charged: the player shows its charged tags, drawn teal-green by the user (`adr-jt19`).
 
 ## 5. World and map
 
@@ -130,12 +130,12 @@ One kind now: the **Spinner**. More kinds come later (section 12).
 
 ### House damage
 
-| Damage level | House colour |
+| Damage level | House look (a tag drawn by the user, `adr-jt19`) |
 |---|---|
-| 0 | Black, as drawn |
-| 1 | Pink `#FF9798` |
-| 2 | Magenta-red `#D4186C` |
-| 3 | Purple `#7E2072` |
+| 0 | `Idle`, as drawn |
+| 1 | Damage 1 (the brief: pink `#FF9798`) |
+| 2 | Damage 2 (the brief: magenta-red `#D4186C`) |
+| 3 | Damage 3 (the brief: purple `#7E2072`) |
 | 4th hit | Destroyed: game over (section 9) |
 
 Each damage and each heal makes the house pulse: scale 1.0 → 1.2 → 1.0 about its centre, 0.1 s in all.
@@ -207,5 +207,5 @@ Asked at their plan step (`dev-docs/PLAN-jet-port.md`):
 - Q6: when a Spinner counts as hitting the house. Answered: when it arrives at its target point (`adr-jt17`).
 - Q7: spawning with the kit spawner (extended) or a Jet director. Answered: the kit spawner, extended (`adr-jt18`, `adr-x63`).
 - Q8: the flow field and spreading: in the kit or in Jet first.
-- Q9: colour feedback by sprite tint or a palette swap shader.
+- Q9: answered, colour feedback is drawn in the art (`adr-jt19`).
 - Q11: the pause key and the restart key.

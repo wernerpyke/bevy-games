@@ -151,3 +151,11 @@
 **Rationale.** The user chose to extend the kit spawner rather than write a Jet spawner (plan question Q7). Whole-number maths gives exactly the table of the SPEC (0.8 to 1.2 s from level 7, group 2 from level 25), which float steps do not.
 
 **How to apply.** The spawner is spawned in the map's `load` hook, so F1 starts it and the difficulty again. The script command `level:<n>` jumps to a level for tests.
+
+## adr-jt19. Colour feedback is drawn in the art, not recoloured in code (2026-11-28)
+
+**Decision.** Every colour change of the brief (a dying Spinner, the house damage levels, the player's heal charge) is drawn by the user as frames and tags in the `.aseprite` files. The game only switches tags. There is no sprite tint and no palette swap shader.
+
+**Rationale.** The art is now black line art with hand shading (`adr-jt5`). A tint multiplies colours, so it cannot recolour black, and it would change the shading too. A palette swap would need a mapping for every shade the user adds. Drawn frames need no shader code, and they let a state look different in more than colour (cracks or smoke on a damaged house, for example).
+
+**How to apply.** A colour state is a tag. The names are agreed in `art-tags.md` before the code plays them: the house has one idle loop per damage level (`Idle1` to `Idle3`), and the player has `IdleCharged` and `MoveCharged`. When a tag is missing, the game logs a warning and keeps the current look; it does not recolour. This answers Q9 of the port plan.

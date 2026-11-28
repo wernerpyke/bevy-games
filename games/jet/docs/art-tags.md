@@ -56,6 +56,7 @@ More colours are added with the particles. Add a colour to this file first, then
 | `house.aseprite` | 128 × 128 | 8 | `backdrop` (hidden), `house`, `over`, `over2`, `anim` | `Idle` 1–4 (250 ms; named `Smoke`, with a separate `smoke` layer, until 2026-11-28), `Hurt` 5–6 (250 ms), `Heal` 7–8 (250 ms). `Hurt` and `Heal` are added by the user (2026-11-28) and not played yet (step 5). The chimney smoke and a small shift of the window change between frames. |
 | `trees.aseprite` | 64 × 64 | 5 | `backdrop` (hidden), `art` | None. Each frame is one tree variant (2 × 2 cells), shown as a still frame, each picked as often. The game picks from every frame of the file (kit `RandomStaticFrame`), so a new frame is a new tree with no code change. The 5th tree was added by the user on 2026-11-28. Drawn by the user (2026-11-26, as `trees2.aseprite`); it replaced the Pyxel trees (32 × 32, 8 variants) on 2026-11-28. |
 | `shockwave.aseprite` | 96 × 32 | 4 | `backdrop` (hidden), `art` | `Wave` 1–4 |
+| `particles.aseprite` | 32 × 32 | 3 | `backdrop` (hidden), `art` | `Blood` 1, `Debris` 2, `Heal` 3: empty frames, created 2026-11-28 for the user to draw (see "Tags to draw for step 5"). One cell, like Long Way's particle file; the kit crops each look to its visible pixels. Frame durations are not used: the effect file spreads the frames over a particle's life. |
 
 Tag use in the game (from `SPEC.md`):
 
@@ -63,6 +64,16 @@ Tag use in the game (from `SPEC.md`):
 - `spinner`: `Move` loops while walking (not rotated). `Die` plays once when the player kills it. `Kill` plays once when it hits the house.
 - `house`: `Idle` loops. `Hurt` and `Heal`: to be played on a hit and a heal (step 5).
 - `shockwave`: `Wave` loops one cell ahead of the moving player, rotated.
+
+## Tags to draw for step 5
+
+Agreed with the user on 2026-11-28 (`adr-jt19`: colour states are drawn, not recoloured). The user draws them; the code plays these names. Move a row up to "Files" when it is drawn.
+
+| File | Tag | When it plays |
+|---|---|---|
+| `house.aseprite` | `Idle1`, `Idle2`, `Idle3` | Loops at damage levels 1, 2 and 3 (`Idle` is level 0). The brief's colours are pink, magenta-red and purple; the look is the user's choice. `Hurt` and `Heal` stay one tag each: they play once over any level, then the new level's idle loops. |
+| `player.aseprite` | `IdleCharged`, `MoveCharged` | In place of `Idle` and `Move` while the heal charge lasts (2 s after a kill; the brief makes the player teal). The same frame counts as `Idle` and `Move` are best, so a switch in the middle of `Move` can keep its frame. The trail and the shockwave do not change. |
+| `particles.aseprite` (created empty) | `Blood`, `Debris`, `Heal` | Particle looks (kit `FxLooks`): the burst when a Spinner dies, the burst at the house on a hit, the sparkle on the house and the player on a heal. The frames of a tag are a particle's life. Small and square: Enoki draws every particle as a square. |
 
 ## Where the files came from
 

@@ -16,7 +16,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 **The user is shading the sprites by hand for a more 3D look, a little at a time** (`art-tags.md`, "Common rules"). Do not redraw or recolour a sprite. When a file changes, update `art-tags.md` and check its tags against the code (the house tag rename broke the game once).
 
-**Next: step 5 (combat, house and particles). Start by asking Q5 and Q9.** Q9 is now a real choice: a tint cannot recolour black line art or shading.
+**Next: step 5 (combat, house and particles). Start by asking Q5.** Q9 is answered: the user draws the colour states as tags (`adr-jt19`). Agree the tag names with the user and list them in `art-tags.md` before the code plays them.
 
 | Step | Commit | What exists |
 |---|---|---|
@@ -86,7 +86,7 @@ These define the feel. Keep them unless the user changes them:
 - Running into a wall stops the player and clears the held direction. A key held from before does not start movement.
 - The moving player is the weapon. The shockwave sprite in front of the player shows the attack zone. A player standing still kills nothing.
 - Enemies cannot hurt the player. Player and enemies pass through each other.
-- A kill gives a heal charge for 2 s (teal tint). Running into the house while charged heals one damage level, if the house is damaged.
+- A kill gives a heal charge for 2 s (teal charged tags, drawn by the user, `adr-jt19`). Running into the house while charged heals one damage level, if the house is damaged.
 - The difficulty curve of brief section 9 (group size, spawn gap range, level-up every 10 s), in game time, so pause stops it.
 
 ## Open questions (ask at the step named)
@@ -98,7 +98,7 @@ These define the feel. Keep them unless the user changes them:
 | Q6 | Answered: a Spinner hits the house when it arrives at its target point (`adr-jt17`). | 4 |
 | Q7 | Answered: the kit spawner is extended (`adr-x63`, `adr-jt18`). | 4 |
 | Q8 | Spreading and the flow field: add them to the kit (a kit change, so ask), or keep them in Jet first? | 7 |
-| Q9 | Colour feedback: since 2026-11-28 the art is black line art, and a tint cannot recolour black (it multiplies). The sprites will also get shading over time. Palette swap shader, or coloured frames in the art? | 5 |
+| Q9 | Answered 2026-11-28: no tint and no palette swap. The user draws every colour state as frames and tags (`adr-jt19`). | 5 |
 | Q11 | Pause key (`Escape`, the kit default) and the restart key on the game-over screen. | 6 |
 
 ## Facts found while writing this plan
@@ -190,8 +190,8 @@ Every game uses one cell size for all its maps, and sets it in code. The `cell:`
 
 - Kill: an enemy in the zone gets `Dead` at once, stops (kit `Stunned`), plays `Die` once; `remove_finished` already despawns it. Count kills for the HUD (step 6).
 - Attack zone (Q5): a `HitBox` ahead of the moving player, taken from a `PlayerStats` resource, so a power-up can change it later. Every live enemy in it dies. Test the zone for all four directions, a still player (no kill), and a dead enemy (skipped).
-- `house.rs`: damage level 0 to 3, then destroyed (`HouseDestroyed` message). Colour per level (Q9). A pulse of 1.0 → 1.2 → 1.0 over 0.1 s about the centre.
-- Heal charge: a kill sets it to 2 s, and each kill resets the time. The player is tinted while charged. Blocked by the house while charged and the house is damaged: heal one level, use the charge, pulse. Not damaged: keep the charge. Unit tests for these rules.
+- `house.rs`: damage level 0 to 3, then destroyed (`HouseDestroyed` message). A tag per level, drawn by the user (`adr-jt19`). A pulse of 1.0 → 1.2 → 1.0 over 0.1 s about the centre.
+- Heal charge: a kill sets it to 2 s, and each kill resets the time. The player shows its charged tags while charged (`adr-jt19`). Blocked by the house while charged and the house is damaged: heal one level, use the charge, pulse. Not damaged: keep the charge. Unit tests for these rules.
 - Particles with `game_kit::fx` (`particles.md`): a blood burst on a kill (it replaces the Pyxel pixel splatter), a burst at the house on damage, a heal effect on the house and on the player. Effect files in `assets/effects/`, particle sprites from `.aseprite` tags through `FxLooks`. The user tunes the look.
 - Check: scripted runs of a kill, a house hit, a heal, and a heal with no damage.
 
