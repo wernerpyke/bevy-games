@@ -83,6 +83,12 @@ fn check(name: &str, source: &str) -> Result<(), String> {
             MAP_CELLS.x, MAP_CELLS.y
         ));
     }
+    if map.cell_size != CELL_SIZE {
+        return Err(format!(
+            "{name}: the map cell must be {CELL_SIZE} px (`cell: {CELL_SIZE}`), the game's cell size, not {}",
+            map.cell_size
+        ));
+    }
     player_start(name, &map)?;
     house_cell(name, &map)?;
     crate::forest::forest_grid(name, &map).map_err(|error| error.to_string())?;

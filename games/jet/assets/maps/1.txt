@@ -1,6 +1,6 @@
 ---
 map: 1
-cell: 16
+cell: 32
 origin: top-left
 size: 60x32
 legend:

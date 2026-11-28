@@ -5,15 +5,15 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 ## Common rules
 
 - RGB colour mode, on the palette of `palette.aseprite`. Check with `./dev-scripts/aseprite.sh check <file> palette=games/jet/assets/art/palette.aseprite`.
-- Thin white line art on transparent. The art layers are visible. Each file has a hidden layer `backdrop` (black) at the bottom, for drawing on black in Aseprite. The game draws only visible layers (the `bevy_aseprite_ultra` default), so it never draws the backdrop. Keep it hidden.
-- Art is at 2× the Pyxel size: 1 Pyxel pixel is 2 × 2 pixels, so one 8 px Pyxel tile is one 16 px cell.
+- Thin white line art on transparent, except the trees, which are coloured (2026-11-28). The art layers are visible. Each file has a hidden layer `backdrop` (black) at the bottom, for drawing on black in Aseprite. The game draws only visible layers (the `bevy_aseprite_ultra` default), so it never draws the backdrop. Keep it hidden.
+- A cell is 32 px (`adr-jt2`, 2026-11-28). The sprites from the Pyxel game are at 4× the Pyxel size: 1 Pyxel pixel is 4 × 4 pixels, so one 8 px Pyxel tile is one 32 px cell. The trees are drawn new for 32 px cells.
 - Frame durations are in the files (`adr-a6`): 62 ms (16 fps) for fast animations, 250 ms (4 fps) for the house.
 - Sprites fill their cells, so most frames touch the canvas edge. That is expected.
 - Player, trail and shockwave art face **up**. The game rotates them for the other directions.
 
 ## Palette: `palette.aseprite`
 
-64 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
+112 × 8, one 8 px swatch per entry, layer `Swatches`. Index 0 is transparent.
 
 | Index | Hex | Used for |
 |---|---|---|
@@ -25,6 +25,12 @@ Every file in `games/jet/assets/art/` (`adr-jt5`, `adr-jt13`). The `.aseprite` f
 | 5 | `#FF9798` | House damage 1 |
 | 6 | `#7E2072` | House damage 3 |
 | 7 | `#19959C` | Player while a heal is charged |
+| 8 | `#FFEDE4` | Trees: snow highlight |
+| 9 | `#92BED2` | Trees: snow shade |
+| 10 | `#4B3418` | Trees: bark |
+| 11 | `#2F1A0F` | Trees: dark bark |
+| 12 | `#645122` | Trees: bark light |
+| 13 | `#9D8231` | Trees: bark highlight |
 
 More colours are added with the particles. Add a colour to this file first, then use it.
 
@@ -32,11 +38,11 @@ More colours are added with the particles. Add a colour to this file first, then
 
 | File | Canvas | Frames | Layers | Tags |
 |---|---|---|---|---|
-| `player.aseprite` | 16 × 16 | 9 | `backdrop` (hidden), `art` | `Idle` 1 (62 ms), `Move` 2–5, `Trail` 6–9 |
-| `spinner.aseprite` | 16 × 16 | 8 | `backdrop` (hidden), `art` | `Move` 1–4, `Die` 5–6 (grey), `Kill` 7–8 (red X) |
-| `house.aseprite` | 64 × 64 | 4 | `backdrop` (hidden), `art`, `smoke` | `Smoke` 1–4 (250 ms). The chimney smoke and a small shift of the window change between frames. |
-| `trees.aseprite` | 32 × 32 | 8 | `backdrop` (hidden), `art` | None. Each frame is one tree variant, shown as a still frame. The Pyxel game picks frame 5 twice as often as the others; the game code does that. |
-| `shockwave.aseprite` | 48 × 16 | 4 | `backdrop` (hidden), `art` | `Wave` 1–4 |
+| `player.aseprite` | 32 × 32 | 9 | `backdrop` (hidden), `art` | `Idle` 1 (62 ms), `Move` 2–5, `Trail` 6–9 |
+| `spinner.aseprite` | 32 × 32 | 8 | `backdrop` (hidden), `art` | `Move` 1–4, `Die` 5–6 (grey), `Kill` 7–8 (red X) |
+| `house.aseprite` | 128 × 128 | 4 | `backdrop` (hidden), `art`, `smoke` | `Smoke` 1–4 (250 ms). The chimney smoke and a small shift of the window change between frames. |
+| `trees.aseprite` | 64 × 64 | 4 | `backdrop` (hidden), `art` | None. Each frame is one tree variant (2 × 2 cells), shown as a still frame, each picked as often. Drawn by the user (2026-11-26, as `trees2.aseprite`); it replaced the Pyxel trees (32 × 32, 8 variants) on 2026-11-28. |
+| `shockwave.aseprite` | 96 × 32 | 4 | `backdrop` (hidden), `art` | `Wave` 1–4 |
 
 Tag use in the game (from `SPEC.md`):
 
@@ -53,3 +59,5 @@ Built on 2026-11-26 from the Pyxel game's files (`~/Dark/pyxel/games/jet/assets/
 - `house.aseprite`, `forest.aseprite` (now `trees.aseprite`) and `shockwave.aseprite`: art layers kept (`layer` renamed to `art`).
 - In every file: the visible `Background` layer (the Pyxel transparent beige, navy in `sprites`) and the `bg` layer (beige or black) were removed, and the hidden `backdrop` was added. The old `Loop` tags were removed. Durations were set from 100 ms to the Pyxel speeds. Then the canvas was resized 2× (nearest neighbour), and the palette was set.
 - Every colour was already one of the palette colours, so no pixel colour changed.
+- 2026-11-28: `player`, `spinner`, `house` and `shockwave` resized 2× again (nearest neighbour, `dev-scripts/aseprite/resize.lua`) for 32 px cells. Tags and durations checked unchanged.
+- 2026-11-28: the Pyxel `trees.aseprite` was deleted and the user's `trees2.aseprite` renamed to `trees.aseprite`. Its 6 colours were added to the palette as indexes 8 to 13 (`extend_palette.lua`; the swatches drawn with a one-off script).

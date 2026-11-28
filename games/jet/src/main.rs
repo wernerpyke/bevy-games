@@ -60,7 +60,7 @@ fn main() {
             },
         ))
         .add_plugins((
-            game_kit::nav::NavPlugin { step: 4.0 },
+            game_kit::nav::NavPlugin { step: 8.0 },
             game_kit::movement::MovementPlugin::default(),
             game_kit::movement_debug::MovementDebugPlugin,
             game_kit::rng::RngPlugin { env_prefix: "JET" },

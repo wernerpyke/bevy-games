@@ -47,7 +47,7 @@ The port is not 1:1. It keeps the player's feel and the core loop, and adds a la
 | Item | Value |
 |---|---|
 | Start | Next to the house: 2 cells left of its left edge, on its bottom row (the brief's tile (18, 23) against the house at (20, 20)). The map file marks it with `@`. |
-| Speed | 30 cells/s, 480 px/s (`adr-jt4`). The player crosses the 40-cell field in about 1.3 s. |
+| Speed | 30 cells/s, 960 px/s (`adr-jt4`). The player crosses the 40-cell field in about 1.3 s. |
 | Acceleration | None. Full speed at once, full stop at once. |
 | Grid | None. The player moves freely in pixels along one axis. |
 
@@ -59,7 +59,7 @@ Running into a tree, the house or the field edge stops the player **and clears t
 
 | Blocked by | Result |
 |---|---|
-| A wall: any tree (in the field or the side forest), or the map edge | Stop. Camera shake: 0.1 s, 2 px along the direction of travel, flipping sides each frame (`adr-jt10`). |
+| A wall: any tree (in the field or the side forest), or the map edge | Stop. Camera shake: 0.1 s, 4 px along the direction of travel, flipping sides each frame (`adr-jt10`). |
 | The house | Stop. Heals the house if a heal is charged (section 7). No shake. |
 
 Collision tests one point, as in the original: the middle of the leading edge, on the centre line. The blocked areas are not grown. So the player slides past a tree corner that only its side overlaps, and fits through a gap of one cell (`adr-jt16`). A long frame cannot carry the player through a tree: the whole step is tested.
@@ -75,16 +75,16 @@ Collision tests one point, as in the original: the middle of the leading edge, o
 
 | Item | Value |
 |---|---|
-| Window | 960 × 540 art pixels, 16:9, 2× on a 1080p screen (`adr-jt2`) |
-| HUD bar | 28 px at the top |
-| Map | 60 × 32 cells of 16 px (960 × 512 px), below the bar, fixed. No scrolling. |
-| Field | The middle 40 × 32 cells (640 × 512 px) (`adr-jt3`) |
+| Window | 960 × 540 logical pixels, 16:9; 1920 × 1080 art pixels, 1× on a Retina or 1080p screen (`adr-jt2`) |
+| HUD bar | 56 px at the top |
+| Map | 60 × 32 cells of 32 px (1920 × 1024 px), below the bar, fixed. No scrolling. |
+| Field | The middle 40 × 32 cells (1280 × 1024 px) (`adr-jt3`) |
 | Side forest | 10 columns on each side, solid trees |
 | Ground | Black |
 
 - The map is a text file in the kit format (`dev-docs/extensions/map-files.md`, `adr-jt6`). The legend follows `adr-x37`: `@` is the player start, letters are features.
 - **House:** 4 × 4 cells, exactly in the centre of the field. Its top row (roof and chimney) is passable; the lower three rows are solid. It loops a 4-frame chimney smoke at 4 fps.
-- **Trees:** 2 × 2 cells. The original places them in groups every 2 columns and every 1 row, so the rows overlap and the clusters look dense. Each tree picks one of 8 images at random (the 5th twice as likely) and a small random offset: x −8 to +8 px (twice the Pyxel range at 2×, so the columns of trees do not line up) and y 0 to 4 px up. Each tree stands on the bottom of its cell, so the trunk ends on the blocked area's edge and on its sort line; the canopy covers the row above, and the top row of a cluster reaches one cell above it (2026-11-26). 15% of the tree places stay empty at random, to break up the rows, but only inside the forest, where the trees beside and below hide the gap; a tree at the edge is always drawn. A tree at the end of a row shifts only outwards, so its thin art does not leave the end cell bare (2026-11-26). The offset and the gaps are only visual: every forest cell still blocks. Every forest cell is solid (`adr-jt14`); the player passes forest corners by its centre-line collision (`adr-jt16`). The Pyxel game's passable edge tiles are dropped.
+- **Trees:** 2 × 2 cells. The original places them in groups every 2 columns and every 1 row, so the rows overlap and the clusters look dense. Each tree picks one of the 4 images of `trees.aseprite` at random (each as likely; the Pyxel game had 8, the 5th twice as likely) and a small random offset: x −16 to +16 px (twice the Pyxel range at 4×, so the columns of trees do not line up) and y 0 to 8 px up. Each tree stands on the bottom of its cell, so the trunk ends on the blocked area's edge and on its sort line; the canopy covers the row above, and the top row of a cluster reaches one cell above it (2026-11-26). 15% of the tree places stay empty at random, to break up the rows, but only inside the forest, where the trees beside and below hide the gap; a tree at the edge is always drawn. A tree at the end of a row shifts only outwards, so its thin art does not leave the end cell bare (2026-11-26). The offset and the gaps are only visual: every forest cell still blocks. Every forest cell is solid (`adr-jt14`); the player passes forest corners by its centre-line collision (`adr-jt16`). The Pyxel game's passable edge tiles are dropped.
 - **Forest in the map file:** the forest is a kit cell area (`adr-x62`). The file draws only the outline of each forest area with `F`; the loader fills the inside. The game places the tree sprites over the forest cells. The forest can change while the game runs (section 12).
 - The field layout is the brief's map (section 3 of the brief) fitted to 40 × 32. The brief's 40 × 40 collision map is the reference.
 - The forest will change over time in a later version (section 12). Then the map file is only the start state.
@@ -107,7 +107,7 @@ One kind now: the **Spinner**. More kinds come later (section 12).
 
 | Item | Value |
 |---|---|
-| Speed | 3.75 cells/s, 60 px/s (`adr-jt4`). The player is 8 times faster. |
+| Speed | 3.75 cells/s, 120 px/s (`adr-jt4`). The player is 8 times faster. |
 | Path | Path finding around trees and the house (`adr-jt7`). The same speed in every direction. A blocked Spinner finds a new path and never freezes. |
 | Collisions | Trees, the house and the field edge, with the kit feet point (the bottom middle of the sprite) against the same ungrown blocked areas as the player (`adr-jt16`), so a Spinner can overlap a tree sideways by up to half a cell. Spinners pass through the player and through each other. Spreading (not stacking) is wanted (`adr-jt7`). |
 | Animation | A 4-frame spin, looped at 16 fps, while moving. The same frames in every direction, not rotated. |
@@ -175,14 +175,14 @@ These numbers are settings the designer tunes.
 ## 9. UI and flow
 
 - No title screen in the port (`adr-jt8`). The game starts playing.
-- HUD bar (28 px, top): survival time and kill count (`adr-jt9`).
+- HUD bar (56 px, top): survival time and kill count (`adr-jt9`).
 - Pause: the kit pause. The key is open (plan question Q11).
 - Game over: the 4th hit on the house stops play, and a screen shows "house destroyed" and the survival time. A key restarts everything (`adr-jt8`).
 - Kit debug tools: F1 reload, F2 info box, F3 grid and overlays, scripted runs.
 
 ## 10. Art
 
-- Files: `player`, `spinner`, `house`, `trees`, `shockwave` and `palette.aseprite` in `assets/art/`, built from the Pyxel game's `.aseprite` files, resized 2×, and loaded directly. No exported sprite sheets (`adr-jt5`, `adr-jt13`). Every file, frame and tag: `art-tags.md`.
+- Files: `player`, `spinner`, `house`, `shockwave` and `palette.aseprite` in `assets/art/`, built from the Pyxel game's `.aseprite` files, resized 4×, and loaded directly; `trees.aseprite`, drawn new for 32 px cells. No exported sprite sheets (`adr-jt5`, `adr-jt13`). Every file, frame and tag: `art-tags.md`.
 - Style: thin white line art on black. Colour is used only for feedback.
 - Palette: a new Jet palette. It starts with black, white `#EEEEEE` and the feedback colours: grey `#A3A3A3` (dying), magenta-red `#D4186C` (kill X, damage 2), pink `#FF9798` (damage 1), purple `#7E2072` (damage 3), teal-green `#19959C` (heal charge). More colours are agreed with the particles.
 - Animation speed is set as frame durations in the `.aseprite` files (`adr-a6`): 16 fps for the player, trail, shockwave and Spinner; 4 fps for the house.

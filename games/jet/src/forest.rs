@@ -14,18 +14,16 @@ use crate::camera::{CELL_SIZE, MAP_ORIGIN};
 use crate::map::{CurrentMap, FOREST};
 
 const ART: &str = "art/trees.aseprite";
-/// Number of tree variants: the frames of `trees.aseprite`.
-const VARIANTS: u64 = 8;
-/// The 5th variant (frame index 4) is picked twice as often as the others, as in the Pyxel game.
-const DOUBLE_VARIANT: u64 = 4;
-/// Largest random shift of a tree sideways, in art pixels. Twice the Pyxel range at 2x, so the trees of one column
+/// Number of tree variants: the frames of `trees.aseprite`, each picked as often.
+const VARIANTS: u64 = 4;
+/// Largest random shift of a tree sideways, in art pixels. Twice the Pyxel range at 4x, so the trees of one column
 /// do not form neat vertical lines.
-const JITTER_X: f32 = 8.0;
-/// Largest random shift of a tree upwards, in art pixels: the size of the Pyxel range (0 to 2) at 2x. Upwards only,
+const JITTER_X: f32 = 16.0;
+/// Largest random shift of a tree upwards, in art pixels: the size of the Pyxel range (0 to 2) at 4x. Upwards only,
 /// so a trunk never stands below its cell, where it does not block.
-const JITTER_UP: f32 = 4.0;
+const JITTER_UP: f32 = 8.0;
 /// Height of the canvas of `trees.aseprite`. The trunk ends at its bottom row.
-const TREE_HEIGHT: f32 = 32.0;
+const TREE_HEIGHT: f32 = 64.0;
 /// Share of the tree places left empty at random, to break up the rows and columns.
 const THINNING: f32 = 0.15;
 /// Dice salts, one per use (`cell_dice`).
@@ -93,14 +91,9 @@ fn tree_centre(grid: &CellGrid, cell: IVec2, cell_size: f32) -> Vec2 {
     corner + Vec2::new(x, TREE_HEIGHT / 2.0)
 }
 
-/// The variant (frame index) for a roll from 0 to `VARIANTS`: each variant once, `DOUBLE_VARIANT` twice.
+/// The variant (frame index) for a dice roll.
 fn variant(roll: u64) -> u16 {
-    let roll = roll % (VARIANTS + 1);
-    (if roll > DOUBLE_VARIANT {
-        roll - 1
-    } else {
-        roll
-    }) as u16
+    (roll % VARIANTS) as u16
 }
 
 /// The right-hand cell that the tree of `cell` covers: the cell to its right when that is forest, else `cell`
@@ -270,9 +263,8 @@ mod tests {
     }
 
     #[test]
-    fn every_variant_is_picked_once_and_the_double_one_twice() {
+    fn the_variant_cycles_through_every_frame() {
         let picks: Vec<u16> = (0..=VARIANTS).map(variant).collect();
-        assert_eq!(picks, vec![0, 1, 2, 3, 4, 4, 5, 6, 7]);
-        assert_eq!(variant(VARIANTS + 1), 0);
+        assert_eq!(picks, vec![0, 1, 2, 3, 0]);
     }
 }

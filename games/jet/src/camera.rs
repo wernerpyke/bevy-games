@@ -1,21 +1,21 @@
 use bevy::prelude::*;
 
 /// Height of the game region in art pixels: the map, 32 cells (`adr-jt2`).
-pub const VIEW_HEIGHT: f32 = 512.0;
+pub const VIEW_HEIGHT: f32 = 1024.0;
 
 /// Height of the HUD bar above the game region, in art pixels (`adr-jt2`).
-pub const HUD_BAR_HEIGHT: f32 = 28.0;
+pub const HUD_BAR_HEIGHT: f32 = 56.0;
 
-/// Size of the window in logical pixels: 2x on a 1080p screen at scale factor 2 (`adr-jt2`).
+/// Size of the window in logical pixels: 1x on a 1080p screen at scale factor 2 (`adr-jt2`).
 pub const WINDOW_WIDTH: u32 = 960;
 pub const WINDOW_HEIGHT: u32 = 540;
 
-/// Size of one grid cell in art pixels: an 8 px Pyxel tile at 2x (`adr-jt2`).
-pub const CELL_SIZE: f32 = 16.0;
+/// Size of one grid cell in art pixels (`adr-jt2`).
+pub const CELL_SIZE: f32 = 32.0;
 
 /// World position of the bottom left corner of map cell (0, 0). The camera is fixed at the world origin, so the
 /// 60 x 32 map is centred on it.
-pub const MAP_ORIGIN: Vec2 = Vec2::new(-480.0, -256.0);
+pub const MAP_ORIGIN: Vec2 = Vec2::new(-960.0, -512.0);
 
 /// Black ground: the sprites are white line art on black (`adr-jt5`).
 pub const CLEAR_COLOR: Color = Color::BLACK;

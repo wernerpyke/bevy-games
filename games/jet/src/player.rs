@@ -30,7 +30,7 @@ const PROBE_PAST: f32 = 0.5;
 const BLOCK_TOLERANCE: f32 = 0.001;
 /// The shake on every block except the house (`adr-jt10`).
 const SHAKE_SECONDS: f32 = 0.1;
-const SHAKE_DISTANCE: f32 = 2.0;
+const SHAKE_DISTANCE: f32 = 4.0;
 
 const ART: &str = "art/player.aseprite";
 const SHOCKWAVE_ART: &str = "art/shockwave.aseprite";
@@ -104,10 +104,10 @@ struct Step {
     blocked_at: Option<Vec2>,
 }
 
-/// Moves the player's `centre` `distance` towards `dir`. The leading edge stops at the first edge of a blocked area
+/// Moves the player's `centre` `distance` towards `dir`. `half` is from the centre to the leading edge. The leading edge stops at the first edge of a blocked area
 /// that the centre line crosses, and at the map edge. A step of any length is tested along its whole path, so a long
 /// frame cannot carry the player through a tree.
-fn step(centre: Vec2, dir: Dir, distance: f32, edges: &[Edge], map: Rect) -> Step {
+fn step(centre: Vec2, dir: Dir, distance: f32, half: f32, edges: &[Edge], map: Rect) -> Step {
     let d = dir.vec();
     let to_map_edge = match dir {
         Dir::Up => map.max.y - centre.y,
@@ -115,11 +115,11 @@ fn step(centre: Vec2, dir: Dir, distance: f32, edges: &[Edge], map: Rect) -> Ste
         Dir::Left => centre.x - map.min.x,
         Dir::Right => map.max.x - centre.x,
     };
-    let wanted = HALF + distance;
+    let wanted = half + distance;
     let reach = wanted.min(to_map_edge);
     let ahead = resolve(centre, centre + d * reach, edges).feet;
     let reached = (ahead - centre).dot(d);
-    let moved = (reached - HALF).max(0.0);
+    let moved = (reached - half).max(0.0);
     Step {
         centre: centre + d * moved,
         blocked_at: (reached < wanted - BLOCK_TOLERANCE)
@@ -170,6 +170,7 @@ fn move_player(
             transform.translation.truncate(),
             dir,
             SPEED * time.delta_secs(),
+            HALF,
             world.edges(),
             map,
         );
@@ -265,6 +266,9 @@ mod tests {
             .collect()
     }
 
+    /// The fixtures are drawn for a player of 16 px, whatever `CELL_SIZE` is.
+    const TEST_HALF: f32 = 8.0;
+
     const MAP: Rect = Rect {
         min: Vec2::new(0.0, 0.0),
         max: Vec2::new(320.0, 160.0),
@@ -286,7 +290,7 @@ mod tests {
             (Dir::Right, Vec2::new(108.0, 100.0)),
         ] {
             assert_eq!(
-                step(from, dir, 8.0, &edges, MAP),
+                step(from, dir, 8.0, TEST_HALF, &edges, MAP),
                 Step {
                     centre: to,
                     blocked_at: None
@@ -327,7 +331,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                step(from, dir, 30.0, &edges, MAP),
+                step(from, dir, 30.0, TEST_HALF, &edges, MAP),
                 Step {
                     centre: stop,
                     blocked_at: Some(at)
@@ -341,11 +345,25 @@ mod tests {
     fn the_player_passes_a_tree_that_only_its_side_overlaps() {
         let edges = edges_of(&[tree()]);
         // Centre 1 px left of the tree's left face: the right half of the player overlaps the tree by 7 px.
-        let beside = step(Vec2::new(159.0, 40.0), Dir::Up, 60.0, &edges, MAP);
+        let beside = step(
+            Vec2::new(159.0, 40.0),
+            Dir::Up,
+            60.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(beside.centre, Vec2::new(159.0, 100.0));
         assert_eq!(beside.blocked_at, None);
         // 1 px further right, the centre line meets the tree.
-        let onto = step(Vec2::new(161.0, 40.0), Dir::Up, 60.0, &edges, MAP);
+        let onto = step(
+            Vec2::new(161.0, 40.0),
+            Dir::Up,
+            60.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(onto.centre, Vec2::new(161.0, 56.0));
     }
 
@@ -356,7 +374,14 @@ mod tests {
             Rect::new(144.0, 64.0, 160.0, 80.0),
             Rect::new(176.0, 64.0, 192.0, 80.0),
         ]);
-        let through = step(Vec2::new(168.0, 40.0), Dir::Up, 60.0, &edges, MAP);
+        let through = step(
+            Vec2::new(168.0, 40.0),
+            Dir::Up,
+            60.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(through.centre, Vec2::new(168.0, 100.0));
         assert_eq!(through.blocked_at, None);
     }
@@ -365,7 +390,14 @@ mod tests {
     fn a_tree_already_in_front_after_a_turn_stops_the_player_where_it_is() {
         let edges = edges_of(&[tree()]);
         // Centre 3 px left of the tree's face, so the front half already overlaps it when the player turns right.
-        let turned = step(Vec2::new(157.0, 72.0), Dir::Right, 8.0, &edges, MAP);
+        let turned = step(
+            Vec2::new(157.0, 72.0),
+            Dir::Right,
+            8.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(
             turned,
             Step {
@@ -379,7 +411,14 @@ mod tests {
     fn a_long_frame_cannot_carry_the_player_through_a_thin_tree_band() {
         // A band one cell thick across the map, and a step of 200 px (a frame of 0.4 s at full speed).
         let edges = edges_of(&[Rect::new(0.0, 64.0, 320.0, 80.0)]);
-        let moved = step(Vec2::new(100.0, 20.0), Dir::Up, 200.0, &edges, MAP);
+        let moved = step(
+            Vec2::new(100.0, 20.0),
+            Dir::Up,
+            200.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(moved.centre, Vec2::new(100.0, 56.0));
         assert_eq!(moved.blocked_at, Some(Vec2::new(100.0, 64.5)));
     }
@@ -413,7 +452,7 @@ mod tests {
             ),
         ] {
             assert_eq!(
-                step(from, dir, 8.0, &[], MAP),
+                step(from, dir, 8.0, TEST_HALF, &[], MAP),
                 Step {
                     centre: stop,
                     blocked_at: Some(at)
@@ -426,7 +465,14 @@ mod tests {
     #[test]
     fn a_step_that_ends_exactly_on_a_face_is_not_blocked() {
         let edges = edges_of(&[tree()]);
-        let moved = step(Vec2::new(144.0, 72.0), Dir::Right, 8.0, &edges, MAP);
+        let moved = step(
+            Vec2::new(144.0, 72.0),
+            Dir::Right,
+            8.0,
+            TEST_HALF,
+            &edges,
+            MAP,
+        );
         assert_eq!(moved.centre, Vec2::new(152.0, 72.0));
         assert_eq!(moved.blocked_at, None);
     }

@@ -16,6 +16,8 @@
 
 **How to apply.** The view height of the game region is 512. The HUD uses the kit bar layout at the top (`ScreenMode::BarTop`).
 
+**Updated 2026-11-28: 32 px cells.** A cell is now 32 px, and the art is drawn for it (the sprites resized 2× again, the trees redrawn by the user at 64 × 64). The view shows 1920 × 1024 art pixels for the map and a 56 px HUD bar. The window stays 960 × 540 logical pixels, so on a Retina screen (scale factor 2) one art pixel is one screen pixel. The map stays 60 × 32 cells. Why: the user wants more detail in the art. 64 px cells were rejected: the view would be 3840 × 2048 art pixels and the developer's 2560 × 1600 laptop would have to downscale it, which drops half the pixels. At 32 px cells there is no room for a whole-number 2×, so a 1080p screen shows 1×. The view height of the game region is now 1024.
+
 ## adr-jt3. A 40 × 32 field in the centre, with solid forest at the sides (2026-11-26)
 
 **Decision.** The map is 60 × 32 cells. The play field is the middle 40 × 32 cells, with the house exactly in the centre. The 10 columns at each side are solid forest.
@@ -30,13 +32,15 @@
 
 **Rationale.** The real speeds are what the game feels like now. Keeping cells per second keeps that feel at the new cell size. The values are then tuned by play.
 
-**How to apply.** Write speeds as cells per second times the cell size, so a cell size change keeps the feel.
+**How to apply.** Write speeds as cells per second times the cell size, so a cell size change keeps the feel. With 32 px cells (`adr-jt2`, 2026-11-28) the speeds are 960 px/s and 120 px/s.
 
 ## adr-jt5. Art from the Pyxel `.aseprite` files, resized 2×, white line art on black, a new palette (2026-11-26)
 
 **Decision.** The art is the Pyxel game's `.aseprite` files, copied into the game, resized 2× and loaded directly with `bevy_aseprite_ultra`. No exported sprite sheets. The files are not marked `_placeholder`. Their tags and layers are standardised with the user. Sprites stay thin white line art on a black background. The game gets a new palette, which starts with black, white and the colours the game recolours to (damage, healing, dying), and grows when particles are added.
 
 **Rationale.** The `.aseprite` file is the source of truth in this workspace (`adr-a1`), so the art can be changed in one place. The white line art is the game's look. The Pyxel game recolours its white pixels for feedback, so the palette must hold those colours from the start.
+
+**Updated 2026-11-28.** With 32 px cells (`adr-jt2`) the Pyxel sprites are resized 4× in all. The trees are new art by the user (`trees.aseprite`, 64 × 64); its 6 colours were added to the palette (indexes 8 to 13).
 
 **How to apply.** Frame durations are set in the files (`adr-a6`). Every new colour is added to the palette file first.
 
@@ -70,11 +74,11 @@
 
 **Rationale.** The house colour already shows its damage level. Time and kills give the player a score to beat.
 
-**How to apply.** Use the kit HUD widgets in the 28 px bar (`adr-jt2`).
+**How to apply.** Use the kit HUD widgets in the HUD bar (`adr-jt2`).
 
 ## adr-jt10. The camera shakes when the player hits a wall, with a kit screen effect (2026-11-26)
 
-**Decision.** The camera shakes on every block except the house: any tree (in the field or the side forest) and the map edge. The shake is a kit screen effect (`screen_fx`), with Jet's values: 0.1 s, 2 px along the direction of travel, flipping sides each frame. Changed on 2026-11-26 after the user's play test; at first only the field edge shook.
+**Decision.** The camera shakes on every block except the house: any tree (in the field or the side forest) and the map edge. The shake is a kit screen effect (`screen_fx`), with Jet's values: 0.1 s, 2 px along the direction of travel, flipping sides each frame. Changed on 2026-11-26 after the user's play test; at first only the field edge shook. With 32 px cells (2026-11-28) the shake is 4 px, the same distance on screen.
 
 **Rationale.** The Pyxel game shakes at the screen edge. After the first play test of the port, the user chose a shake for every wall the player hits, not only the field edge. The user wants screen effects as a kit concept so other games can use them.
 

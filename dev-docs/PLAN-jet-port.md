@@ -4,9 +4,26 @@ Port the Pyxel game Jet into a new workspace game, `games/jet/`. This is not a 1
 
 Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0 copies its rules into `games/jet/docs/SPEC.md`, so the game docs do not depend on the Pyxel repo.
 
-## Status (2026-11-26): resume here
+## Status (end of 2026-11-26): resume here
 
-Step 0 done (2026-11-26): the crate, `SPEC.md`, `adr.md` (`adr-jt1` to `adr-jt12`), `adr-x61` for `screen_fx`, and the game tables. `ScriptPlugin` is already added. Step 1 built (2026-11-26): `assets/art/` has `palette`, `player`, `spinner`, `house`, `trees`, `shockwave.aseprite` (`art-tags.md`, `adr-jt13`), checked and committed. Step 2 built (2026-11-26): kit `cell_area` (`adr-x62`, `cell-areas.md`), Jet's map `assets/maps/1.txt` (a draft for the user to edit), house, forest, the top HUD bar (empty), F1/F2/F3, draw order by the kit depth sort (`adr-jt15`). The user checked the map (2026-11-26). Step 3 built (2026-11-26, not committed): `input.rs` (key rules), `player.rs` (Q4 built as `adr-jt16`: one point at the leading edge on the centre line, no growth, no kit sliding, so the blocked areas stay ungrown), kit `screen_fx` (`CameraShake`, `CameraFollowSet`, `screen-fx.md`), the shake on every block except the house (changed after the play test). The user play tested and confirmed step 3 (2026-11-26), committed. Step 4 built (2026-11-26, not committed): kit spawner groups, places, `set_every`, `first_after_gap`, `CollisionWorld::is_blocked` (`adr-x63`); `enemy.rs` (Spinner, `RaidHouse`, house hit on the target point, `adr-jt17`), `spawning.rs` (difficulty from the level number, `level:<n>` script command, `adr-jt18`). Next: the user's play test of step 4, then the commit, then step 5.
+**Steps 0 to 4 are done, play tested by the user, committed and pushed** (last commit `f52ff1f` on `main`). **32 px cells are built on the branch `jet-32px-cells`, not committed** (2026-11-28, `adr-jt2` updated): `CELL_SIZE` 32, `VIEW_HEIGHT` 1024, HUD bar 56 px, the four Pyxel sprites resized 2× again, the forest drawn from the user's new `trees.aseprite` (64 × 64, 4 variants, its colours added to the palette as indexes 8 to 13; the Pyxel trees deleted), the map file `cell: 32`, and Jet's map check now rejects a map cell that is not `CELL_SIZE`. **Next: the user's play test and commit of the 32 px work, then step 4b (remove `cell:` from the map files), then step 5. Start step 5 by asking Q5 and Q9.**
+
+| Step | Commit | What exists |
+|---|---|---|
+| 0 | `a3a2b79` | Crate, `SPEC.md`, `adr-jt1` to `adr-jt12`, `adr-x61` |
+| 1 | `262a0ad` | `assets/art/*.aseprite` on the Jet palette (`art-tags.md`, `adr-jt13`) |
+| 2 | `338fc7b`, `b82b5b4` | Kit `cell_area` (`adr-x62`); map `assets/maps/1.txt` (checked by the user), house, forest, empty top HUD bar, F1/F2/F3, depth sort (`adr-jt14`, `adr-jt15`) |
+| 3 | `358fd77` | `input.rs` (key rules), `player.rs` (collision `adr-jt16`, confirmed), kit `screen_fx` (`CameraShake`, `CameraFollowSet`); the camera shakes on every block except the house (`adr-jt10`) |
+| 4 | `f52ff1f` | Kit spawner groups, places, `set_every`, `first_after_gap`, `CollisionWorld::is_blocked` (`adr-x63`); `enemy.rs` (Spinner, `RaidHouse`, hit on the target point, `adr-jt17`); `spawning.rs` (difficulty from the level number, `adr-jt18`); kit fix: `segment_hit` stops a line through a convex corner into a shape (Spinners had stalled at a corner contact and backed out) |
+
+What step 5 builds on (all in `games/jet/src/`):
+
+- `enemy.rs`: `Enemy`, `EnemyKind` (table: speed, art; add the hit box size here), `Dead` (set at once, the `Alive` filter skips it), `remove_finished` (despawns a `Dead` enemy on `AnimationEvents::Finished`), `hit_house` (plays `Kill`, sends `HouseHit`). The Spinner's `Die` tag (grey, 2 frames) is not used yet. The sprite is on the enemy entity itself (no child, no `FacingTags`).
+- `house.rs`: `House`, `HouseHit { by }` (only logged now: damage is step 5), `HousePlugin`.
+- `player.rs`: `Player`, `PlayerBlocked { by: House | Wall, direction, at }` (healing reads `by == House`), `Steering`, the shockwave child one cell ahead (`Attached` marker), `SPEED`. No `HitBox` yet: the attack zone is step 5.
+- Debug tools: script commands `level:<n>` and `spinner:<column>:<row>[:<target>]` (rows from the top, as on the F3 grid; targets 0 to 3 are left, right, below left, below right of the house); `JET_SEED=<n>` for repeatable runs; a Spinner still for 0.2 s logs `enemy: ... stuck at` with its cell, target and path (`report_stuck`). Filter the log with `LOG_FILTER="jet::|..."` on `rust.sh script`.
+- Known limits, left for step 7: a Spinner can overlap a tree sideways by up to half a cell (it uses the ungrown areas of `adr-jt16`); Spinners stack on each other.
+- `target/` grows past 8 GB after a day of test rebuilds: run `./dev-scripts/rust.sh size` at the start and `prune` when it is over.
 
 ## Designer's intent (from the brief)
 
@@ -22,13 +39,13 @@ Record each one as an ADR in `games/jet/docs/adr.md` (prefix `jt`) in step 0.
 |---|---|
 | Crate | `jet`, in `games/jet/`. |
 | Not a 1:1 port | Improve the game while porting. Keep the player's speed and agility exactly. |
-| Screen | 16:9. Window 960 × 540 art pixels (2× on a 1080p screen). One fixed screen, no scrolling. |
-| Cell | 16 px (the 8 px Pyxel tiles at 2×). |
-| Layout (Q2, 2026-11-26) | A HUD bar of 28 px at the top. Below it the map, 60 × 32 cells (960 × 512 px), at the bottom of the window. The play field is the middle 40 × 32 cells (640 × 512 px), with the house exactly in the centre. The 10 columns on each side are forest (160 px each side). |
+| Screen | 16:9. Window 960 × 540 logical pixels, one fixed screen, no scrolling. Since 2026-11-28 the view is 1920 × 1080 art pixels, 1× on a Retina screen (`adr-jt2`). |
+| Cell | 32 px since 2026-11-28 (was 16 px, the 8 px Pyxel tiles at 2×). |
+| Layout (Q2, 2026-11-26) | A HUD bar of 28 px at the top. Below it the map, 60 × 32 cells (960 × 512 px), at the bottom of the window. The play field is the middle 40 × 32 cells (640 × 512 px), with the house exactly in the centre. The 10 columns on each side are forest (160 px each side). Pixel sizes here are for 16 px cells; at 32 px cells (2026-11-28) all double. |
 | Field edge (2026-11-26) | The side forest is solid trees. The camera shakes when the player hits any wall: every tree and the map edge, not the house (changed after the first play test, `adr-jt10`). |
 | Screen effects in the kit (Q10, 2026-11-26) | A new kit concept `screen_fx` holds effects on the whole view. Camera shake is the first. The kit has no game values: Jet supplies the time, the distance and the direction. Later effects (for example a flash) go there too. |
 | Field size (2026-11-26) | 40 × 32 was chosen so enemies take about as long to reach the house as in the original: 18 cells from the sides (4.8 s), 14 cells from the top and the bottom (3.7 s). A larger field makes the swarm slow to form. |
-| Speeds | Same tiles per second as the real Pyxel speeds: player 30 cells/s (480 px/s), Spinner 3.75 cells/s (60 px/s). Then tune by play. |
+| Speeds | Same tiles per second as the real Pyxel speeds: player 30 cells/s, Spinner 3.75 cells/s (960 and 120 px/s at 32 px cells). Then tune by play. |
 | Art | The `.aseprite` files are the source. Copy them, resize them 2×, and load them directly. No exported sprite sheets. Not marked `_placeholder`. Files and tags are checked and standardised with the user (step 1). |
 | Palette | A new Jet palette (Q1, 2026-11-26). Sprites stay white line art on a black background. The palette starts with the colours the game recolours to: white, black, and the feedback colours of the brief (grey for dying, magenta-red for the kill X and damage level 2, pink for damage level 1, purple for damage level 3, teal-green for the heal charge). More colours are agreed when particles and other effects are added. |
 | Map | A text map file in the kit format (`map-files.md`), like Long Way. A dynamic forest comes later, and then the map stops being only a file. |
@@ -66,10 +83,10 @@ These define the feel. Keep them unless the user changes them:
 
 | # | Question | Step |
 |---|---|---|
-| Q4 | Collision feel: the original tests only the centre line, so the player slides past tree corners. The kit tests a feet point with `allow_sliding`. Which point and which sliding setting feels right? | 3 |
+| Q4 | Answered: one point at the leading edge on the centre line, no grown areas, no kit sliding (`adr-jt16`). | 3 |
 | Q5 | Attack zone: a hit box 3 cells wide and 1 cell deep in front of the player, the size of the shockwave. Tune by play. Should a power-up change it by one number (for example a scale)? | 5 |
-| Q6 | When does a Spinner count as hitting the house: when it reaches its target point next to the house, or when it touches the house's blocked area? | 4 |
-| Q7 | Spawning: the kit `Spawner` has a fixed interval and one entity per request. Jet needs random edge positions, a random gap and groups. Extend the kit spawner, or keep a Jet "director" in the game? | 4 |
+| Q6 | Answered: a Spinner hits the house when it arrives at its target point (`adr-jt17`). | 4 |
+| Q7 | Answered: the kit spawner is extended (`adr-x63`, `adr-jt18`). | 4 |
 | Q8 | Spreading and the flow field: add them to the kit (a kit change, so ask), or keep them in Jet first? | 7 |
 | Q9 | Colour feedback: a sprite tint works while the art is white line art. With coloured art a tint changes every colour. Use a tint now, or a palette swap shader? | 5 |
 | Q11 | Pause key (`Escape`, the kit default) and the restart key on the game-over screen. | 6 |
@@ -79,14 +96,15 @@ These define the feel. Keep them unless the user changes them:
 - The Jet source files are `sprites.aseprite` (8 × 16, 9 frames: the player row of the sheet above the trail row, so one frame holds two sprites), `house.aseprite` (32 × 32, 4 frames), `forest.aseprite` (16 × 16, 8 frames, one tree per frame), `shockwave.aseprite` (24 × 8, 4 frames) and `sheet1.aseprite` (256 × 256, 1 frame). Every file has a visible `Background` layer. The only tags are `Loop` tags that do not match the brief, and every frame is 100 ms (the brief says 16 fps, 4 fps for the house). So step 1 must split `sprites.aseprite`, remove or hide the backgrounds, and set tags and durations.
 - `collision::move_feet` returns only the new feet position. The game finds "blocked" by comparing it with the wanted position, and finds what blocked it (house, tree, screen edge) itself.
 - The kit's bar layout fits the HUD: `ScreenMode::BarTop { ratio }` with ratio 28 / 512 = 0.0546875 gives a game region of 960 × 512 and a 28 px bar. With `VIEW_HEIGHT` 512, the game is a whole-number 2× on a 1080p screen. Long Way uses `BarBottom`, so `BarTop` is computed and tested, but no game uses it yet.
-- The kit `Spawner` supports a fixed interval only (`spawners.md`, Limits).
+- The kit `Spawner` now has groups, places and a gap that changes during play (`adr-x63`, `spawners.md`).
+- The kit `Mover` searches again after 0.5 s without progress (`STALL_TIME` in `movement.rs`), and a goal with no path sets `MoveState.unreachable`; `RaidHouse` then picks another target.
 - `Mover` runs at most 4 path searches per frame (`enemy-movement.md`). A large swarm queues its searches.
 
 ## Steps
 
 Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate, a scripted run with `--debug` and screenshots where it shows something, the user's play test, and a commit only when the user says so. Run `./dev-scripts/rust.sh size` at the start and after the steps that rebuild a lot.
 
-### 0. Scaffold and docs
+### 0. Scaffold and docs (done)
 
 - Follow `dev-docs/WORKFLOW.md` steps 1, 5, 6 and 10. Create `games/jet/` with `Cargo.toml` (`bevy`, `game-kit`, `bevy_aseprite_ultra`, all `.workspace = true`), `src/main.rs`, `input/` and `docs/`.
 - `docs/SPEC.md` (template in `WORKFLOW.md`): the rules of the brief, converted to 16 px cells and the decisions above. Keep section 12 of the brief as the open-question list.
@@ -94,7 +112,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Add Jet to the games table in `CLAUDE.md`, and a run line to `docs/README.md`.
 - Check: `lint`, `build jet`, and `run jet` opens an empty window.
 
-### 1. Art: copy, check and standardise
+### 1. Art: copy, check and standardise (done)
 
 - Copy `sprites`, `house`, `forest` and `shockwave.aseprite` from `~/Dark/pyxel/games/jet/assets/` into `games/jet/input/`. Ask whether `sheet1.aseprite` is needed.
 - Go through each file with the user (`aseprite.sh check`, `frame_grid`). Agree on:
@@ -107,7 +125,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Write `docs/art-tags.md`: every file, frame and tag, as in R-Town.
 - The user checks the files in Aseprite before step 2.
 
-### 2. Screen, map and static world
+### 2. Screen, map and static world (done)
 
 - `camera.rs`: `VIEW_HEIGHT` 512, `CELL_SIZE` 16, colours. Window 960 × 540. `PixelCameraPlugin` with no follow (fixed screen), `ScreenPlugin { mode: BarTop { ratio: 28.0 / 512.0 } }` (an empty bar for now), `CameraBounds` set to the map. Check that the bar is 28 px and the game region 960 × 512 at scale factors 1 and 2.
 - **Kit: cell areas** (Q3 answered 2026-11-26: `adr-x62`, `adr-jt14`). A forest is drawn in the map as outlines, the loader fills the inside, and the forest is a grid of cells that can change while the game runs. Design (confirm with the user before coding):
@@ -123,7 +141,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Kit plugins: `CollisionPlugin`, `CollisionDebugPlugin`, `DebugPlugin` (F2, F3), `DepthPlugin`, `ReloadPlugin` (F1), `ScriptPlugin { env_prefix: "JET" }`, `AnimationHelpPlugin` (random start frames for the house smoke if wanted).
 - Check: a screenshot with `--debug` shows the map, the grid and the collision overlay. Compare the blocked cells with the drafted map.
 
-### 3. Player
+### 3. Player (done)
 
 - `input.rs`: the key rules of brief section 4 as a plain function (pressed, released and held keys in, direction and fallback out). Unit tests for every rule: start, switch, fall back, stop, the fallback dropped, a held key that does not start movement after a wall.
 - `player.rs`: `Controlled`, `DepthSort`, `SlideAssist`, a `HitBox`. Move at 480 px/s with `move_feet`. Ask Q4 and tune. Blocked means: stop, clear the held direction, and report what blocked (`PlayerBlocked { by: Edge | Tree | House }` as a message).
@@ -137,7 +155,7 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
   - Jet values: 0.1 s, 2 px along the direction of travel. It happens on every block except the house (`PlayerBlocked { by: House | Wall }`).
 - Check: scripted runs for each direction, a switch, a fallback, a wall stop at a tree, at the house and at the screen edge.
 
-### 4. Spinners and spawning
+### 4. Spinners and spawning (done)
 
 - `enemy.rs`: an `EnemyKind` enum (only `Spinner` now) with a values table (speed, hit box, art file), so a new kind is a new row and its own art.
 - Spinners use the kit `Mover` (60 px/s), `NavPlugin`, `MovementPlugin` and a Jet strategy `RaidHouse` in `StrategySet`: it picks one of the target points around the house at random, and then goes for the house (ask Q6). An enemy whose search fails searches again later. It never freezes.
@@ -145,8 +163,22 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Ask Q7. Then build spawning: each Spinner starts at a random cell on a random edge of the field (top row, bottom row, or the first or last field column next to the side forest; only on free ground), with the difficulty curve of brief section 9 as a plain struct with unit tests (level-ups, limits, group size rounding, the first spawn one gap after the start).
 - Check: a scripted run of 90 s with `JET_SEED` set. Spinners come around trees, the spawn rate rises, and the movement debug (F3) shows the paths.
 
-### 5. Combat, house and particles
+### 4b. Remove `cell:` from the map files (its own commit)
 
+Every game uses one cell size for all its maps, and sets it in code. The `cell:` line in a map file is a second copy that can disagree: Jet's map still said `cell: 16` after the change to 32 px cells, and the kit then took the map rectangle as a quarter of the world (player start, F3 grid, nav bounds all wrong, 2026-11-28).
+
+- Kit: the game gives the cell size once (from `CollisionPlugin.cell_size`, which every game sets, or one map setting: confirm with the user). Map loading fills `Map.cell_size` from it. The parser takes the cell size as an input.
+- A file that still has `cell:` fails to load, with a message to remove the line. No transition period.
+- Map transitions keep working (every map has the same cell size). Their scaling for different cell sizes stays or goes: ask.
+- Remove `cell:` from all map files: Long Way `1.txt`, `2.txt`, `3.txt`, R-Town `test.txt`, Jet `1.txt`. Remove Jet's own cell check in `map.rs` if the kit makes it impossible.
+- Kit tests: the cell size comes from the input, a `cell:` line is an error with its line. Update the tests that read `cell:`.
+- Docs: `map-files.md` (header table, examples), a new ADR in `dev-docs/adr/EXTENSIONS-MAPS.md` (and its index row in `EXTENSIONS.md`).
+- Check: `lint`, `test game-kit`, `build` (all games), a scripted run of each game with `--debug`.
+- Commit on its own, when the user says so.
+
+### 5. Combat, house and particles (next)
+
+- Kill: an enemy in the zone gets `Dead` at once, stops (kit `Stunned`), plays `Die` once; `remove_finished` already despawns it. Count kills for the HUD (step 6).
 - Attack zone (Q5): a `HitBox` ahead of the moving player, taken from a `PlayerStats` resource, so a power-up can change it later. Every live enemy in it dies. Test the zone for all four directions, a still player (no kill), and a dead enemy (skipped).
 - `house.rs`: damage level 0 to 3, then destroyed (`HouseDestroyed` message). Colour per level (Q9). A pulse of 1.0 → 1.2 → 1.0 over 0.1 s about the centre.
 - Heal charge: a kill sets it to 2 s, and each kill resets the time. The player is tinted while charged. Blocked by the house while charged and the house is damaged: heal one level, use the charge, pulse. Not damaged: keep the charge. Unit tests for these rules.
