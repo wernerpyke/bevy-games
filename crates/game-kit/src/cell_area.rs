@@ -441,17 +441,17 @@ mod tests {
         assert_eq!(grid.filled().collect::<Vec<_>>(), vec![IVec2::new(2, 1)]);
     }
 
-    /// A 7 by 5 map (cell 10, top-left origin) with a box drawn with `F`, and `legend` as the legend line of `F`.
+    /// A 7 by 5 map (cells of 10, top-left origin) with a box drawn with `F`, and `legend` as the legend line of `F`.
     fn map_with(legend: &str) -> Result<Map, MapError> {
         let text = format!(
-            "---\nmap: t\ncell: 10\norigin: top-left\nsize: 7x5\nlegend:\n  \".\": empty\n{legend}\n---\n\
+            "---\nmap: t\norigin: top-left\nsize: 7x5\nlegend:\n  \".\": empty\n{legend}\n---\n\
              0 |. . . . . . .|\n\
              1 |. F F F F . .|\n\
              2 |. F     F . .|\n\
              3 |. F F F F . .|\n\
              4 |. . . . . . .|\n"
         );
-        parse("t.txt", &text, &["forest"])
+        parse("t.txt", &text, &["forest"], 10.0)
     }
 
     #[test]
@@ -476,7 +476,7 @@ mod tests {
         let error = CellGrid::from_map("t.txt", &map, "forest").unwrap_err();
         assert_eq!(
             error.to_string(),
-            "t.txt:8: `forest`: parameter `fill` must be `enclosed`, found `all`"
+            "t.txt:7: `forest`: parameter `fill` must be `enclosed`, found `all`"
         );
     }
 

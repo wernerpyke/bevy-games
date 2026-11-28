@@ -195,9 +195,9 @@ mod tests {
     fn marker_map(to: Option<&str>, cells: &str) -> Map {
         let exit = to.map(|to| format!(" exit_to={to}")).unwrap_or_default();
         let text = format!(
-            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 3x1\nlegend:\n  \".\": empty\n  \"m\": marker{exit}\n  \"@\": player_start\n---\n 0 |{cells}|\n"
+            "---\nmap: t\norigin: bottom-left\nsize: 3x1\nlegend:\n  \".\": empty\n  \"m\": marker{exit}\n  \"@\": player_start\n---\n 0 |{cells}|\n"
         );
-        parse("t.txt", &text, &["marker", PLAYER_START]).unwrap_or_else(|e| panic!("{e}"))
+        parse("t.txt", &text, &["marker", PLAYER_START], 16.0).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
     fn a_marker_exit_to_an_unknown_map_names_the_legend_line() {
         let first = marker_map(Some("9"), "m . .");
         let e = problem(&[("1", &first)]);
-        assert_eq!((e.file.as_str(), e.line), ("m.txt", 8));
+        assert_eq!((e.file.as_str(), e.line), ("m.txt", 7));
         assert!(
             e.message.contains("map `9`") && e.message.contains("registered: 1"),
             "{e}"
@@ -236,7 +236,7 @@ mod tests {
         let first = top_exit("9", "e", "scene");
         let second = entry_map("3..6,0");
         let e = problem(&[("1", &first), ("2", &second)]);
-        assert_eq!((e.file.as_str(), e.line), ("m.txt", 9));
+        assert_eq!((e.file.as_str(), e.line), ("m.txt", 8));
         assert!(
             e.message.contains("map `9`") && e.message.contains("registered: 1, 2"),
             "{e}"

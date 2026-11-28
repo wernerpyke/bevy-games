@@ -169,6 +169,9 @@ pub struct MapLifecyclePlugin {
     pub sources: &'static [MapSource],
     /// The legend names the game's maps may use.
     pub kinds: &'static [&'static str],
+    /// The cell size of every map, in world units: the game's cell size, the one it gives `CollisionPlugin`. Map files do
+    /// not say it.
+    pub cell_size: f32,
     /// The id of the map the game starts in.
     pub start: String,
     /// World position of cell (0,0) of the start map (`MapOrigin`).
@@ -177,8 +180,8 @@ pub struct MapLifecyclePlugin {
 
 impl Plugin for MapLifecyclePlugin {
     fn build(&self, app: &mut App) {
-        let registry =
-            MapRegistry::load(self.sources, self.kinds).unwrap_or_else(|error| panic!("{error}"));
+        let registry = MapRegistry::load(self.sources, self.kinds, self.cell_size)
+            .unwrap_or_else(|error| panic!("{error}"));
         let known: Vec<&str> = registry.ids().collect();
         assert!(
             known.contains(&self.start.as_str()),

@@ -102,9 +102,9 @@ mod tests {
 
     fn map_with_tiles(tiles: &str) -> Map {
         let source = format!(
-            "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: 1x1\nbackground:\n  color: \"#000000\"\n  mode: random\n  fill: 1\n  tiles: {tiles}\nlegend:\n  \".\": empty\n---\n |0|\n 0 |.|\n"
+            "---\nmap: t\norigin: bottom-left\nsize: 1x1\nbackground:\n  color: \"#000000\"\n  mode: random\n  fill: 1\n  tiles: {tiles}\nlegend:\n  \".\": empty\n---\n |0|\n 0 |.|\n"
         );
-        parse("t.txt", &source, &[]).unwrap_or_else(|e| panic!("{e}"))
+        parse("t.txt", &source, &[], 64.0).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
@@ -116,9 +116,9 @@ mod tests {
     /// A map of 3 by 2 cells of 48, every cell with an image at scale 2.
     fn map_3x2(tiles: &str) -> Map {
         let source = format!(
-            "---\nmap: t\ncell: 48\norigin: bottom-left\nsize: 3x2\nbackground:\n  color: \"#336699\"\n  mode: random\n  fill: 1\n  scale: 2\n  tiles: {tiles}\nlegend:\n  \".\": empty\n---\n   |0 1 2|\n 1 |. . .|\n 0 |. . .|\n"
+            "---\nmap: t\norigin: bottom-left\nsize: 3x2\nbackground:\n  color: \"#336699\"\n  mode: random\n  fill: 1\n  scale: 2\n  tiles: {tiles}\nlegend:\n  \".\": empty\n---\n   |0 1 2|\n 1 |. . .|\n 0 |. . .|\n"
         );
-        parse("t.txt", &source, &[]).unwrap_or_else(|e| panic!("{e}"))
+        parse("t.txt", &source, &[], 48.0).unwrap_or_else(|e| panic!("{e}"))
     }
 
     /// The colour rectangles (size, position) and the images (tag, position, scale) that the map spawns, the images

@@ -299,7 +299,7 @@ mod tests {
         RegisteredMap {
             id: id.into(),
             file: format!("{id}.txt"),
-            map: parse("t.txt", &empty_map_text(id, cell, w, h, blocks), &[]).unwrap(),
+            map: parse("t.txt", &empty_map_text(id, w, h, blocks), &[], cell as f32).unwrap(),
         }
     }
 
@@ -578,7 +578,7 @@ mod tests {
     /// A 10 by 10 map with a `player_start` at `start` and no exits.
     fn registered_with_start(id: &str, start: (usize, usize)) -> RegisteredMap {
         let head = format!(
-            "---\nmap: {id}\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": empty\n  \"@\": player_start\n---\n"
+            "---\nmap: {id}\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": empty\n  \"@\": player_start\n---\n"
         );
         let rows: String = (0..10)
             .rev()
@@ -592,7 +592,7 @@ mod tests {
         RegisteredMap {
             id: id.into(),
             file: format!("{id}.txt"),
-            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START]).unwrap(),
+            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START], 64.0).unwrap(),
         }
     }
 
@@ -638,7 +638,7 @@ mod tests {
     #[test]
     fn an_arrival_at_a_start_on_an_edge_cell_is_placed_off_its_blocked_half() {
         // Map 2 has an edge ring with the start on its west side, at cell (0,4): a `west` piece.
-        let head = "---\nmap: 2\ncell: 64\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": edge\n  \"@\": player_start\n---\n";
+        let head = "---\nmap: 2\norigin: bottom-left\nsize: 10x10\nlegend:\n  \".\": edge\n  \"@\": player_start\n---\n";
         let rows: String = (0..10)
             .rev()
             .map(|y| {
@@ -655,7 +655,7 @@ mod tests {
         let two = RegisteredMap {
             id: "2".into(),
             file: "2.txt".into(),
-            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START]).unwrap(),
+            map: parse("t.txt", &format!("{head}{rows}"), &[PLAYER_START], 64.0).unwrap(),
         };
         let mut app = app_with_two_maps();
         app.insert_resource(
@@ -1366,7 +1366,7 @@ mod tests {
         );
         let two = registered_sized(
             "2",
-            32,
+            64,
             12,
             8,
             "entries:\n  from_1: area=2..5,0 facing=up\n",
@@ -1403,9 +1403,9 @@ mod tests {
     }
 
     #[test]
-    fn the_position_along_the_strip_is_scaled_to_the_cells_of_the_new_map() {
+    fn a_scene_switch_keeps_the_position_along_the_strip_in_the_new_map() {
         let world = world_for_plans();
-        // 58 units along an exit of 64 unit cells is 29 units along an entry of 32 unit cells.
+        // 58 units along the exit (from x 192) is 58 units along the entry (from x 2 * 64), in the middle of its depth.
         let request = RequestMapChange {
             to: "2".into(),
             entry: Some("from_1".into()),
@@ -1417,7 +1417,7 @@ mod tests {
         assert_eq!(switch.origin, Vec2::new(300.0, -200.0));
         assert_eq!(
             switch.arrival.feet,
-            Vec2::new(300.0 + 64.0 + 29.0, -200.0 + 16.0)
+            Vec2::new(300.0 + 128.0 + 58.0, -200.0 + 32.0)
         );
         assert_eq!(switch.arrival.facing, Some(Facing::Up));
     }
@@ -1528,7 +1528,7 @@ mod tests {
     #[test]
     fn loading_names_the_file_of_a_missing_file_a_bad_file_and_a_broken_link() {
         let dir = temp_folder("load");
-        let good = map_file(&dir, "1", &empty_map_text("1", 64, 10, 10, ""));
+        let good = map_file(&dir, "1", &empty_map_text("1", 10, 10, ""));
         let missing = MapSource {
             id: "2",
             file: dir.join("none.txt").display().to_string().leak(),
@@ -1539,33 +1539,36 @@ mod tests {
             "4",
             &empty_map_text(
                 "4",
-                64,
                 10,
                 10,
                 "exits:\n  up: area=3..6,9 to=9 entry=e transition=scene\n",
             ),
         );
-        let error = MapRegistry::load(&[good, missing], &[]).err().unwrap();
+        let error = MapRegistry::load(&[good, missing], &[], 64.0)
+            .err()
+            .unwrap();
         // The rest of the message comes from the operating system.
         assert!(error.starts_with(&format!("{}: ", missing.file)), "{error}");
         assert_eq!(
-            MapRegistry::load(&[good, bad], &[]).err(),
+            MapRegistry::load(&[good, bad], &[], 64.0).err(),
             Some(format!(
                 "{}:1: the file must start with a `---` frontmatter line",
                 bad.file
             ))
         );
-        let error = MapRegistry::load(&[good, lost], &[]).err().unwrap();
+        let error = MapRegistry::load(&[good, lost], &[], 64.0).err().unwrap();
         assert!(
             error.starts_with(&format!(
-                "{}:9: exit `up` leads to map `9`, which is not registered",
+                "{}:8: exit `up` leads to map `9`, which is not registered",
                 lost.file
             )),
             "{error}"
         );
-        let registry = MapRegistry::load(&[good], &[]).unwrap();
+        let registry = MapRegistry::load(&[good], &[], 48.0).unwrap();
         assert_eq!(registry.ids().collect::<Vec<_>>(), vec!["1"]);
         assert_eq!(registry.get("1").unwrap().file, good.file);
+        // The map file has no cell size: the game gives it.
+        assert_eq!(registry.get("1").unwrap().map.cell_size, 48.0);
         std::fs::remove_dir_all(dir).unwrap();
     }
 
@@ -1577,7 +1580,6 @@ mod tests {
             "1",
             &empty_map_text(
                 "1",
-                64,
                 10,
                 10,
                 "exits:\n  up: area=3..6,9 to=2 entry=e transition=scene\n",
@@ -1586,9 +1588,9 @@ mod tests {
         let two = map_file(
             &dir,
             "2",
-            &empty_map_text("2", 64, 10, 10, "entries:\n  e: area=3..6,0\n"),
+            &empty_map_text("2", 10, 10, "entries:\n  e: area=3..6,0\n"),
         );
-        let mut registry = MapRegistry::load(&[one, two], &[]).unwrap();
+        let mut registry = MapRegistry::load(&[one, two], &[], 48.0).unwrap();
         let before = registry.get("2").unwrap().map.clone();
         // A file that does not parse.
         std::fs::write(two.file, "no front matter\n").unwrap();
@@ -1603,7 +1605,7 @@ mod tests {
         // A file that parses but breaks a link: the exit of map 1 leads to the entry `e`, which is gone.
         std::fs::write(
             two.file,
-            empty_map_text("2", 64, 10, 10, "entries:\n  f: area=3..6,0\n"),
+            empty_map_text("2", 10, 10, "entries:\n  f: area=3..6,0\n"),
         )
         .unwrap();
         let error = registry.reload("2").unwrap_err();
@@ -1615,7 +1617,7 @@ mod tests {
         // A good file is read again.
         std::fs::write(
             two.file,
-            empty_map_text("2", 64, 10, 10, "entries:\n  e: area=3..6,1\n"),
+            empty_map_text("2", 10, 10, "entries:\n  e: area=3..6,1\n"),
         )
         .unwrap();
         registry.reload("2").unwrap();
@@ -1623,6 +1625,7 @@ mod tests {
             registry.get("2").unwrap().map.entries[0].area,
             area(cell(3, 1), cell(6, 1))
         );
+        assert_eq!(registry.get("2").unwrap().map.cell_size, 48.0);
         assert_eq!(
             registry.reload("9"),
             Err("map `9` is not registered".to_string())

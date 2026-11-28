@@ -439,11 +439,11 @@ mod tests {
 
     const KINDS: &[&str] = &["player_start", "tree_big"];
 
-    /// A 6 by 4 map. `blocks` goes into the front matter after the legend. Its first line is line 10, so the first
-    /// item is line 11. `rows` are the four grid rows, top row first.
+    /// A 6 by 4 map. `blocks` goes into the front matter after the legend. Its first line is line 9, so the first
+    /// item is line 10. `rows` are the four grid rows, top row first.
     fn source(blocks: &str, rows: [&str; 4]) -> String {
         format!(
-            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 6x4\nlegend:\n  \".\": empty\n  \"@\": player_start\n  \"g\": tree_big\n{blocks}---\n   |0 1 2 3 4 5|\n 3 |{}|\n 2 |{}|\n 1 |{}|\n 0 |{}|\n",
+            "---\nmap: t\norigin: bottom-left\nsize: 6x4\nlegend:\n  \".\": empty\n  \"@\": player_start\n  \"g\": tree_big\n{blocks}---\n   |0 1 2 3 4 5|\n 3 |{}|\n 2 |{}|\n 1 |{}|\n 0 |{}|\n",
             rows[0], rows[1], rows[2], rows[3]
         )
     }
@@ -455,7 +455,7 @@ mod tests {
     }
 
     fn try_parse(text: &str) -> Result<Map, MapError> {
-        parse("t.txt", text, KINDS)
+        parse("t.txt", text, KINDS, 16.0)
     }
 
     fn parse_ok(text: &str) -> Map {
@@ -546,7 +546,7 @@ mod tests {
                 to: "2".into(),
                 entry: "from_1".into(),
                 transition: Transition::Seamless,
-                line: 11,
+                line: 10,
             }
         );
         assert_eq!(map.exits[1].area, Area::new(cell(5, 1), cell(5, 2)));
@@ -575,7 +575,7 @@ mod tests {
 
     #[test]
     fn a_top_left_file_numbers_areas_like_its_row_labels() {
-        let text = "---\nmap: t\ncell: 16\norigin: top-left\nsize: 6x4\nlegend:\n  \".\": empty\nexits:\n  up: area=1..2,0 to=2 entry=a transition=scene\nentries:\n  low: area=4,3\n  side: area=0,0..1\n---\n   |0 1 2 3 4 5|\n 0 |. . . . . .|\n 1 |. . . . . .|\n 2 |. . . . . .|\n 3 |. . . . . .|\n";
+        let text = "---\nmap: t\norigin: top-left\nsize: 6x4\nlegend:\n  \".\": empty\nexits:\n  up: area=1..2,0 to=2 entry=a transition=scene\nentries:\n  low: area=4,3\n  side: area=0,0..1\n---\n   |0 1 2 3 4 5|\n 0 |. . . . . .|\n 1 |. . . . . .|\n 2 |. . . . . .|\n 3 |. . . . . .|\n";
         let map = parse_ok(text);
         // Row 0 of this file is the top row, which is y = 3 from the bottom.
         assert_eq!(map.exits[0].area, Area::new(cell(1, 3), cell(2, 3)));
@@ -595,7 +595,7 @@ mod tests {
         let e = error(&open(
             "exits:\n  mid: area=2..3,2 to=2 entry=a transition=scene\n",
         ));
-        assert_eq!(e.line, 11);
+        assert_eq!(e.line, 10);
         assert!(e.message.contains("must lie along a map edge"), "{e}");
         // A vertical strip on the right edge is fine even when it reaches a corner.
         parse_ok(&open(
@@ -620,7 +620,7 @@ mod tests {
     fn an_area_outside_the_map_is_an_error() {
         for area in ["6,1", "0..6,0", "0,4", "-1,2", "0,0..4"] {
             let e = error(&open(&format!("entries:\n  e: area={area}\n")));
-            assert_eq!(e.line, 11, "{area}");
+            assert_eq!(e.line, 10, "{area}");
             assert!(e.message.contains("outside the map"), "{area}: {e}");
         }
     }
@@ -668,7 +668,7 @@ mod tests {
         for (blocks, message) in cases {
             let e = error(&open(blocks));
             assert!(e.message.contains(message), "{blocks}: {e}");
-            assert!(e.line >= 11, "{blocks}: {e}");
+            assert!(e.line >= 10, "{blocks}: {e}");
         }
     }
 
@@ -686,7 +686,7 @@ mod tests {
             "exits:\n  s: area=2..4,0 to=2 entry=a transition=scene\n",
             rows,
         ));
-        assert_eq!(e.line, 11);
+        assert_eq!(e.line, 10);
         assert!(
             e.message
                 .contains("`tree_big` at cell (3,0) is inside exit `s`"),
@@ -719,12 +719,12 @@ mod tests {
         let e = error(&open(
             "exits:\n  a: area=1..3,0 to=2 entry=x transition=scene\n  b: area=3..4,0 to=2 entry=x transition=scene\n",
         ));
-        assert_eq!(e.line, 12);
+        assert_eq!(e.line, 11);
         assert!(e.message.contains("exit `b` overlaps exit `a`"), "{e}");
         let e = error(&open(
             "exits:\n  a: area=1..3,0 to=2 entry=x transition=scene\nentries:\n  e: area=3,0\n",
         ));
-        assert_eq!(e.line, 13);
+        assert_eq!(e.line, 12);
         assert!(e.message.contains("entry `e` overlaps exit `a`"), "{e}");
     }
 
@@ -744,7 +744,7 @@ mod tests {
             (entry, "`.` at cell (2,0) is inside entry `e`"),
         ] {
             let e = error(&edge_source(blocks, RING));
-            assert_eq!(e.line, 11, "{blocks}");
+            assert_eq!(e.line, 10, "{blocks}");
             assert!(e.message.contains(message), "{e}");
             // Blanks in the area are fine, and so is a `.` when `.` is empty.
             parse_ok(&edge_source(

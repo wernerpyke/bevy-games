@@ -942,10 +942,10 @@ mod tests {
     /// A 5 by 4 map with `".": edge`, cells of `cell` pixels, rows drawn top row first.
     fn map(cell: f32, rows: [&str; 4]) -> Map {
         let source = format!(
-            "---\nmap: t\ncell: {cell}\norigin: bottom-left\nsize: 5x4\nlegend:\n  \".\": edge\n  \"@\": player_start\n  \"t\": tree\n---\n 3 |{}|\n 2 |{}|\n 1 |{}|\n 0 |{}|\n",
+            "---\nmap: t\norigin: bottom-left\nsize: 5x4\nlegend:\n  \".\": edge\n  \"@\": player_start\n  \"t\": tree\n---\n 3 |{}|\n 2 |{}|\n 1 |{}|\n 0 |{}|\n",
             rows[0], rows[1], rows[2], rows[3]
         );
-        parse("t.txt", &source, KINDS).unwrap_or_else(|e| panic!("{e}"))
+        parse("t.txt", &source, KINDS, cell).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]

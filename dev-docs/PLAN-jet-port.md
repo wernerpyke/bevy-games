@@ -6,7 +6,7 @@ Source brief: `~/Dark/pyxel/games/jet/BRIEF-port.md` (outside this repo). Step 0
 
 ## Status (end of 2026-11-26): resume here
 
-**Steps 0 to 4 are done, play tested by the user, committed and pushed** (last commit `f52ff1f` on `main`). **32 px cells are built on the branch `jet-32px-cells`, not committed** (2026-11-28, `adr-jt2` updated): `CELL_SIZE` 32, `VIEW_HEIGHT` 1024, HUD bar 56 px, the four Pyxel sprites resized 2× again, the forest drawn from the user's new `trees.aseprite` (64 × 64, 4 variants, its colours added to the palette as indexes 8 to 13; the Pyxel trees deleted), the map file `cell: 32`, and Jet's map check now rejects a map cell that is not `CELL_SIZE`. **Next: the user's play test and commit of the 32 px work, then step 4b (remove `cell:` from the map files), then step 5. Start step 5 by asking Q5 and Q9.**
+**Steps 0 to 4 are done, play tested by the user, committed and pushed** (last commit `f52ff1f` on `main`). **32 px cells are built on the branch `jet-32px-cells`, not committed** (2026-11-28, `adr-jt2` updated): `CELL_SIZE` 32, `VIEW_HEIGHT` 1024, HUD bar 56 px, the four Pyxel sprites resized 2× again, the forest drawn from the user's new `trees.aseprite` (64 × 64, 4 variants, its colours added to the palette as indexes 8 to 13; the Pyxel trees deleted), the map file `cell: 32`, and Jet's map check now rejects a map cell that is not `CELL_SIZE`. The 32 px work is committed and pushed (`4fa1802`). **Step 4b is built, not committed** (2026-11-28, `adr-x64`). **Next: the user's check and commit of step 4b, then step 5. Start step 5 by asking Q5 and Q9.**
 
 | Step | Commit | What exists |
 |---|---|---|
@@ -163,11 +163,11 @@ Each step ends with `./dev-scripts/rust.sh lint`, `test` for each changed crate,
 - Ask Q7. Then build spawning: each Spinner starts at a random cell on a random edge of the field (top row, bottom row, or the first or last field column next to the side forest; only on free ground), with the difficulty curve of brief section 9 as a plain struct with unit tests (level-ups, limits, group size rounding, the first spawn one gap after the start).
 - Check: a scripted run of 90 s with `JET_SEED` set. Spinners come around trees, the spawn rate rises, and the movement debug (F3) shows the paths.
 
-### 4b. Remove `cell:` from the map files (its own commit)
+### 4b. Remove `cell:` from the map files (its own commit; built 2026-11-28)
 
 Every game uses one cell size for all its maps, and sets it in code. The `cell:` line in a map file is a second copy that can disagree: Jet's map still said `cell: 16` after the change to 32 px cells, and the kit then took the map rectangle as a quarter of the world (player start, F3 grid, nav bounds all wrong, 2026-11-28).
 
-- Kit: the game gives the cell size once (from `CollisionPlugin.cell_size`, which every game sets, or one map setting: confirm with the user). Map loading fills `Map.cell_size` from it. The parser takes the cell size as an input.
+- Kit: the game gives the cell size once (from `CollisionPlugin.cell_size`, which every game sets, or one map setting: confirm with the user). Answered: a `cell_size` field on `MapLifecyclePlugin` and `MapTransitionPlugin`; the transition scaling is removed (`adr-x64`). Map loading fills `Map.cell_size` from it. The parser takes the cell size as an input.
 - A file that still has `cell:` fails to load, with a message to remove the line. No transition period.
 - Map transitions keep working (every map has the same cell size). Their scaling for different cell sizes stays or goes: ask.
 - Remove `cell:` from all map files: Long Way `1.txt`, `2.txt`, `3.txt`, R-Town `test.txt`, Jet `1.txt`. Remove Jet's own cell check in `map.rs` if the kit makes it impossible.

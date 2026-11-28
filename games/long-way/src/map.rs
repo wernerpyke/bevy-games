@@ -72,6 +72,7 @@ impl Plugin for MapPlugin {
         app.add_plugins(MapTransitionPlugin {
             sources: MAPS,
             kinds: KIND_NAMES,
+            cell_size: crate::camera::CELL_SIZE,
             start: start_map(),
             origin: MAP_ORIGIN,
             fade: Fade::default(),
@@ -329,7 +330,7 @@ mod tests {
     /// A map of 8 by 6 cells with `objects` as (legend character, x, y), cell (0, 0) at the bottom left.
     fn map_with(objects: &[(char, i32, i32)]) -> Map {
         let mut text = String::from(
-            "---\nmap: t\ncell: 64\norigin: bottom-left\nsize: 8x6\nlegend:\n  \".\": empty\n  \"R\": rock_0\n  \"G\": green_tree\n  \"s\": green_shrub\n  \"t\": red_tree_medium\n---\n",
+            "---\nmap: t\norigin: bottom-left\nsize: 8x6\nlegend:\n  \".\": empty\n  \"R\": rock_0\n  \"G\": green_tree\n  \"s\": green_shrub\n  \"t\": red_tree_medium\n---\n",
         );
         for y in (0..6).rev() {
             let row: Vec<String> = (0..8)
@@ -343,7 +344,7 @@ mod tests {
                 .collect();
             text.push_str(&format!(" {y} |{}|\n", row.join(" ")));
         }
-        parse("test.txt", &text, KIND_NAMES).unwrap()
+        parse("test.txt", &text, KIND_NAMES, crate::camera::CELL_SIZE).unwrap()
     }
 
     fn group_at(map: &Map, groups: &[Group], x: i32, y: i32) -> Group {

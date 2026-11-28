@@ -90,3 +90,7 @@ The decisions are split by area, all with the prefix `x`. This file holds `adr-x
 | x58 | The kit puts everything a map's `load` hook spawns under a map root | EXTENSIONS-MAPS.md |
 | x59 | The map lifecycle is a plugin of its own, and R-Town uses it | EXTENSIONS-MAPS.md |
 | x60 | The kit gives a `MapId` to entities spawned during play | EXTENSIONS-MAPS.md |
+| x61 | Effects on the whole view are a kit concept, `screen_fx` | EXTENSIONS-SCREEN.md |
+| x62 | Cell areas: a grid of filled cells that can change while the game runs, drawn in the map as an outline | EXTENSIONS-MAPS.md |
+| x63 | A spawner sends groups, picks free places, and its gap can change during play | EXTENSIONS-GAMEPLAY.md |
+| x64 | The game gives the map cell size, map files do not say it | EXTENSIONS-MAPS.md |

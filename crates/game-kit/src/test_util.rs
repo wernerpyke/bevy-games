@@ -71,16 +71,22 @@ pub(crate) fn collect<M: Message + Clone>(
 }
 
 /// The text of an empty map file (bottom-left origin) of `w` by `h` cells. `blocks` goes after the legend.
-pub(crate) fn empty_map_text(name: &str, cell: u32, w: i32, h: i32, blocks: &str) -> String {
+pub(crate) fn empty_map_text(name: &str, w: i32, h: i32, blocks: &str) -> String {
     let head = format!(
-        "---\nmap: {name}\ncell: {cell}\norigin: bottom-left\nsize: {w}x{h}\nlegend:\n  \".\": empty\n{blocks}---\n"
+        "---\nmap: {name}\norigin: bottom-left\nsize: {w}x{h}\nlegend:\n  \".\": empty\n{blocks}---\n"
     );
     let row = vec!["."; w as usize].join(" ");
     let rows: String = (0..h).rev().map(|y| format!("{y:>2} |{row}|\n")).collect();
     format!("{head}{rows}")
 }
 
-/// The parsed `empty_map_text` of a map named `t`.
+/// The parsed `empty_map_text` of a map named `t`, with cells of `cell`.
 pub(crate) fn empty_map(cell: u32, w: i32, h: i32, blocks: &str) -> Map {
-    parse("t.txt", &empty_map_text("t", cell, w, h, blocks), &[]).unwrap_or_else(|e| panic!("{e}"))
+    parse(
+        "t.txt",
+        &empty_map_text("t", w, h, blocks),
+        &[],
+        cell as f32,
+    )
+    .unwrap_or_else(|e| panic!("{e}"))
 }

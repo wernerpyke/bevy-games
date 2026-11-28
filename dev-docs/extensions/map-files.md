@@ -31,7 +31,6 @@ Decisions: `adr-x18`, `adr-x30` (exits and entries), `adr-x33` (exit objects), `
 ```
 ---
 map: demo
-cell: 16
 origin: bottom-left
 size: 6x4
 legend:
@@ -74,7 +73,6 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 | Key | Needed | Meaning |
 |---|---|---|
 | `map` | yes | Map name, used in log and error messages |
-| `cell` | yes | Grid cell size in pixels |
 | `origin` | yes | `bottom-left` or `top-left`: the corner where row labels start at 0. See rule 6 |
 | `size` | yes | Width and height in cells, written `WxH` |
 | `legend` | yes | Maps each character in the grid to an object kind |
@@ -84,6 +82,7 @@ The tree is at (1,2) in this file, and the game still sees it at (1,1). See rule
 | `entries` | no | Places where the player arrives from another map. See "Exits and entries" |
 | `background` | no | The ground of the map: a colour and tile images. See rule 25 |
 
+There is no `cell` key. Every map of a game has the same cell size, so the game gives it once: `MapLifecyclePlugin::cell_size` (or `MapTransitionPlugin::cell_size`), which `parse` receives, the same value the game gives `CollisionPlugin`. A `cell` line is an error that names its line (`adr-x64`). Before 2026-11-28 each file had one, and a file that disagreed with the game was not caught.
 3. A legend character is one character, in quotes. `.` is written `".": empty` or `".": edge` (see "Map edges"), and any other value is an error. The keys `.`, `|` and a space are reserved and cannot name an object kind.
 4. The game defines the set of kinds. It passes the names it knows to `parse`, which reports any other name with its line. Objects carry the name as a `String`, and the game converts it to its own enum (adr-x13).
 5. A legend entry can be a marker, such as `"@": player_start`. A marker is an ordinary object with that kind. The game reads its cell and does not spawn art for it.
@@ -273,7 +272,7 @@ Inline in `game-kit` `map.rs`. Each game tests that its own map file parses (cou
 - Labels and rulers: wrong row labels name their line (for both origins), and rulers are ignored at the top, at the bottom, at both ends or absent.
 - Origin: `top-left` and `bottom-left` files with the same drawing give the same objects, and an unknown origin is an error.
 - Legend: a character that is not in the legend names its line, reserved keys (`|`, `.`, space) are errors, and a marker such as `player_start` comes back as an ordinary object.
-- Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw`, `jitter` and `cell` values, an unknown kind, comments and optional keys.
+- Front matter: missing keys, a bad `size`, unknown keys (including the removed `pitch`), bad `draw` and `jitter` values, a `cell` line (an error, `adr-x64`), an unknown kind, comments and optional keys.
 - Exits and entries: `map_areas.rs` tests the area notation, the edge rules, objects in areas, overlaps and a `top-left` file. `map_links.rs` tests the checks between maps. It also tests `exit_to` (unknown map, a target without exactly one start). `map.rs` tests `exit_to` and `start_feet`.
 - Background: a full block, defaults, a block with only a colour and a mode, no block, every error with its line, `scale` (including `0.5`), a repeated key or block, and the map key `jitter` kept apart. `map_background.rs` tests the placement: fill 0 and 1, the same result for the same input, a different seed, the share close to `fill`, jitter and the clamp inside the map, a map that grows, and a fixed expected list so the hash never changes.
 - Other: comments, blank lines and Windows line endings, and objects come back in a fixed order (top row first, then left to right).

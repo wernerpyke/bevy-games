@@ -197,6 +197,8 @@ pub struct MapTransitionPlugin {
     pub sources: &'static [MapSource],
     /// The legend names the games' maps may use.
     pub kinds: &'static [&'static str],
+    /// The cell size of every map (`MapLifecyclePlugin::cell_size`).
+    pub cell_size: f32,
     /// The id of the map the game starts in.
     pub start: String,
     /// World position of cell (0,0) of a map that a scene transition loads.
@@ -214,6 +216,7 @@ impl Plugin for MapTransitionPlugin {
         app.add_plugins(MapLifecyclePlugin {
             sources: self.sources,
             kinds: self.kinds,
+            cell_size: self.cell_size,
             start: self.start.clone(),
             origin: self.origin,
         })
@@ -440,8 +443,7 @@ pub(super) fn plan_switch(world: &World, request: &RequestMapChange) -> Result<S
         let from = registry.get(&used.from)?;
         let exit = from.map.exits.iter().find(|exit| exit.name == used.exit)?;
         let from_origin = active.get(&used.from)?.origin;
-        let along = strip_offset(&exit.area, from_origin, from.map.cell_size, used.feet)?;
-        Some(along * to.map.cell_size / from.map.cell_size)
+        strip_offset(&exit.area, from_origin, from.map.cell_size, used.feet)
     });
     Ok(Switch {
         id: request.to.clone(),

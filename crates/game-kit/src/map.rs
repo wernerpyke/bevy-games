@@ -162,6 +162,7 @@ pub struct Background {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Map {
     pub name: String,
+    /// The game's cell size in world units, given to `parse`.
     pub cell_size: f32,
     /// The `origin` key: how the file numbers its rows.
     pub origin: Origin,
@@ -409,7 +410,6 @@ fn read_background_line(
 #[derive(Default)]
 struct Header {
     name: Option<String>,
-    cell_size: Option<f32>,
     origin: Option<Origin>,
     size: Option<IVec2>,
     draw_size: Option<f32>,
@@ -432,12 +432,12 @@ enum Block {
     Background,
 }
 
-/// Reads the frontmatter. Returns the index of the closing `---` line, the header, the map name and the cell size.
+/// Reads the frontmatter. Returns the index of the closing `---` line, the header and the map name.
 fn front_matter(
     lines: &[&str],
     kinds: &[&str],
     fail: &Fail,
-) -> Result<(usize, Header, String, f32), MapError> {
+) -> Result<(usize, Header, String), MapError> {
     if lines.first().map(|l| l.trim()) != Some("---") {
         return Err(fail(
             1,
@@ -454,28 +454,26 @@ fn front_matter(
         .name
         .clone()
         .ok_or_else(|| fail(1, "missing required key `map`".into()))?;
-    let cell_size = header
-        .cell_size
-        .ok_or_else(|| fail(1, "missing required key `cell`".into()))?;
     if header.origin.is_none() {
         return Err(fail(
             1,
             "missing required key `origin` (`bottom-left` or `top-left`)".into(),
         ));
     }
-    Ok((close, header, name, cell_size))
+    Ok((close, header, name))
 }
 
 /// Parses a text map file: frontmatter, then a drawn grid (`dev-docs/extensions/map-files.md`). `file` is only
-/// used in error messages. `kinds` are the legend names the game knows.
-pub fn parse(file: &str, source: &str, kinds: &[&str]) -> Result<Map, MapError> {
+/// used in error messages. `kinds` are the legend names the game knows. `cell_size` is the game's cell size in world
+/// units: every map of a game has the same one, so a map file does not say it.
+pub fn parse(file: &str, source: &str, kinds: &[&str], cell_size: f32) -> Result<Map, MapError> {
     let fail = |line: usize, message: String| MapError {
         file: file.to_string(),
         line,
         message,
     };
     let lines: Vec<&str> = source.lines().collect();
-    let (close, header, name, cell_size) = front_matter(&lines, kinds, &fail)?;
+    let (close, header, name) = front_matter(&lines, kinds, &fail)?;
     let size = header
         .size
         .ok_or_else(|| fail(1, "missing required key `size`".into()))?;
@@ -799,7 +797,13 @@ fn parse_header(
         block = Block::None;
         match key.as_str() {
             "map" => header.name = Some(value.to_string()),
-            "cell" => header.cell_size = Some(positive(value, "cell", line, fail)?),
+            "cell" => {
+                return Err(fail(
+                    line,
+                    "`cell` is not a map key: remove the line. The game sets the cell size (`MapLifecyclePlugin.cell_size`)"
+                        .into(),
+                ));
+            }
             "origin" => {
                 header.origin = Some(match value {
                     "bottom-left" => Origin::BottomLeft,
@@ -931,10 +935,10 @@ mod text_tests {
     const RULERS: &str = "   |0 1 2 3 4 5|\n";
     const DOTS: &str = ". . . . . .";
 
-    /// The front matter of a 6 by 4 test map. It is 11 lines, so the grid starts on line 12.
+    /// The front matter of a 6 by 4 test map. It is 10 lines, so the grid starts on line 11.
     fn head(size: &str) -> String {
         format!(
-            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: {size}\nlegend:\n  \".\": empty\n  \"@\": player_start\n  \"g\": tree_big\n  \"r\": red\n---\n"
+            "---\nmap: t\norigin: bottom-left\nsize: {size}\nlegend:\n  \".\": empty\n  \"@\": player_start\n  \"g\": tree_big\n  \"r\": red\n---\n"
         )
     }
 
@@ -946,13 +950,16 @@ mod text_tests {
         )
     }
 
-    /// A whole test file with the top ruler. Rulers are on line 12 and the rows on lines 13 to 16.
+    /// A whole test file with the top ruler. Rulers are on line 11 and the rows on lines 12 to 15.
     fn grid(rows: [&str; 4]) -> String {
         format!("{}{RULERS}{}", head("6x4"), body(rows))
     }
 
+    /// The cell size the tests give `parse`.
+    const CELL: f32 = 16.0;
+
     fn try_parse(source: &str) -> Result<Map, MapError> {
-        parse("t.txt", source, KINDS)
+        parse("t.txt", source, KINDS, CELL)
     }
 
     fn parse_ok(source: &str) -> Map {
@@ -1005,14 +1012,14 @@ mod text_tests {
     #[test]
     fn a_row_of_the_wrong_width_names_its_line() {
         let e = error(&grid([DOTS, DOTS, ". . . . .", DOTS]));
-        assert_eq!(e.line, 15);
+        assert_eq!(e.line, 14);
         assert!(e.message.contains("characters between the bars"), "{e}");
     }
 
     #[test]
     fn a_wrong_row_label_names_its_line() {
         let e = error(&grid([DOTS; 4]).replace(" 2 |", " 5 |"));
-        assert_eq!(e.line, 14);
+        assert_eq!(e.line, 13);
         assert!(
             e.message.contains("label") && e.message.contains("expected 2"),
             "{e}"
@@ -1042,7 +1049,7 @@ mod text_tests {
     #[test]
     fn a_character_not_in_the_legend_names_its_line() {
         let e = error(&grid([DOTS, DOTS, ". x . . . .", DOTS]));
-        assert_eq!(e.line, 15);
+        assert_eq!(e.line, 14);
         assert!(e.message.contains("`x` is not in the legend"), "{e}");
     }
 
@@ -1051,7 +1058,7 @@ mod text_tests {
         let map = parse_ok(&grid(["g . . . . .", DOTS, DOTS, "g . . . . ."]));
         assert_eq!(cells(&map, "tree_big"), vec![(0, 0), (0, 3)]);
         assert_eq!(map.size, IVec2::new(6, 4));
-        assert_eq!(map.cell_size, 16.0);
+        assert_eq!(map.cell_size, CELL);
         assert_eq!(map.name, "t");
     }
 
@@ -1068,7 +1075,7 @@ mod text_tests {
         );
         let many = format!("{}{RULERS}{} -1 |{DOTS}|\n", head("6x4"), body([DOTS; 4]));
         let e = error(&many);
-        assert_eq!(e.line, 17);
+        assert_eq!(e.line, 16);
         assert!(e.message.contains("more rows"), "{e}");
     }
 
@@ -1081,7 +1088,7 @@ mod text_tests {
     #[test]
     fn a_character_between_cells_must_be_a_space() {
         let e = error(&grid([DOTS, DOTS, ".x. . . . .", DOTS]));
-        assert_eq!(e.line, 15);
+        assert_eq!(e.line, 14);
         assert!(e.message.contains("space"), "{e}");
     }
 
@@ -1089,7 +1096,7 @@ mod text_tests {
     fn a_row_needs_both_bars() {
         let no_close = format!("{}{}", head("6x4"), " 3 |. . . . . .\n");
         let e = error(&no_close);
-        assert_eq!(e.line, 12);
+        assert_eq!(e.line, 11);
         assert!(e.message.contains("closing"), "{e}");
         let no_bars = format!("{}{}", head("6x4"), ". . . . . .\n");
         let e = error(&no_bars);
@@ -1101,7 +1108,7 @@ mod text_tests {
         for key in ["|", " "] {
             let source = head("6x4").replace("\"g\": tree_big", &format!("\"{key}\": tree_big"));
             let e = error(&format!("{source}{RULERS}{}", body([DOTS; 4])));
-            assert_eq!(e.line, 9, "key `{key}`: {e}");
+            assert_eq!(e.line, 8, "key `{key}`: {e}");
         }
     }
 
@@ -1127,7 +1134,7 @@ mod text_tests {
         assert!(e.message.contains("missing required key `size`"), "{e}");
         for bad in ["6by4", "0x4", "6x", "6x-1"] {
             let e = error(&format!("{}{rows}", head(bad)));
-            assert_eq!(e.line, 5, "size `{bad}`");
+            assert_eq!(e.line, 4, "size `{bad}`");
             assert!(e.message.contains("`size`"), "{e}");
         }
     }
@@ -1141,8 +1148,9 @@ mod text_tests {
 
     #[test]
     fn optional_keys_and_comments() {
-        let source = "---\n# a comment\nmap: t # trailing\ncell: 32\norigin: bottom-left\nsize: 1x1\ndraw: 160\njitter: 8\nlegend:\n  \"#\": tree_big # quoted hash key\n---\n# a note\n   |0|\n 0 |#|\n";
-        let map = parse_ok(source);
+        let source = "---\n# a comment\nmap: t # trailing\norigin: bottom-left\nsize: 1x1\ndraw: 160\njitter: 8\nlegend:\n  \"#\": tree_big # quoted hash key\n---\n# a note\n   |0|\n 0 |#|\n";
+        // The cell size comes from the game, not the file.
+        let map = parse("t.txt", source, KINDS, 32.0).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(map.name, "t");
         assert_eq!(map.cell_size, 32.0);
         assert_eq!(map.draw_size, Some(160.0));
@@ -1155,60 +1163,61 @@ mod text_tests {
         assert_eq!(error("# no front matter\n").line, 1);
         assert!(error("---\nmap: t\n").message.contains("not closed"));
         let base = "origin: bottom-left\nsize: 1x1\n---\n";
+        assert!(error(&format!("---\n{base}")).message.contains("`map`"));
         assert!(
-            error(&format!("---\ncell: 16\n{base}"))
-                .message
-                .contains("`map`")
-        );
-        assert!(
-            error(&format!("---\nmap: t\n{base}"))
-                .message
-                .contains("`cell`")
-        );
-        assert!(
-            error("---\nmap: t\ncell: 16\nsize: 1x1\n---\n")
+            error("---\nmap: t\nsize: 1x1\n---\n")
                 .message
                 .contains("`origin`")
         );
-        let head = "---\nmap: t\ncell: 16\norigin: bottom-left\n";
+        let head = "---\nmap: t\norigin: bottom-left\n";
         for (extra, line, text) in [
-            ("color: 3\n", 5, "unknown key `color`"),
-            ("pitch: 2\n", 5, "unknown key `pitch`"),
-            ("draw: 0\n", 5, "`draw`"),
-            ("jitter: -1\n", 5, "`jitter`"),
+            ("color: 3\n", 4, "unknown key `color`"),
+            ("pitch: 2\n", 4, "unknown key `pitch`"),
+            ("draw: 0\n", 4, "`draw`"),
+            ("jitter: -1\n", 4, "`jitter`"),
         ] {
             let e = error(&format!("{head}{extra}size: 1x1\n---\n"));
             assert_eq!(e.line, line, "{extra}");
             assert!(e.message.contains(text), "{e}");
         }
-        let e = error("---\nmap: t\ncell: -1\norigin: bottom-left\nsize: 1x1\n---\n");
-        assert_eq!(e.line, 3);
+        // The game sets the cell size, so a `cell` line is an error, at any value.
+        for value in ["16", "-1"] {
+            let e = error(&format!(
+                "---\nmap: t\ncell: {value}\norigin: bottom-left\nsize: 1x1\n---\n"
+            ));
+            assert_eq!(e.line, 3, "{value}");
+            assert!(
+                e.message
+                    .contains("`cell` is not a map key: remove the line"),
+                "{e}"
+            );
+        }
     }
 
     #[test]
     fn legend_problems_are_errors() {
-        let base = "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 1x1\nlegend:\n";
+        let base = "---\nmap: t\norigin: bottom-left\nsize: 1x1\nlegend:\n";
         let e = error(&format!("{base}  \"0\": boulder\n---\n"));
-        assert_eq!(e.line, 7);
+        assert_eq!(e.line, 6);
         assert!(e.message.contains("unknown kind `boulder`"), "{e}");
         let e = error(&format!("{base}  \"ab\": tree_big\n---\n"));
         assert!(e.message.contains("exactly one character"), "{e}");
         for value in ["tree_big", "empty_ish", "edge x=1"] {
             let e = error(&format!("{base}  \".\": {value}\n---\n"));
-            assert_eq!(e.line, 7, "{value}");
+            assert_eq!(e.line, 6, "{value}");
             assert!(
                 e.message
                     .contains(&format!("`.` must be `empty` or `edge`, found `{value}`")),
                 "{e}"
             );
         }
-        let e = error("---\nmap: t\ncell: 16\norigin: bottom-left\n  \"g\": tree_big\n---\n");
+        let e = error("---\nmap: t\norigin: bottom-left\n  \"g\": tree_big\n---\n");
         assert!(e.message.contains("outside `legend`"), "{e}");
     }
 
     fn legend_map(entries: &str) -> String {
         format!(
-            "---\nmap: t\ncell: 16\norigin: bottom-left\nsize: 2x1\nlegend:\n  \".\": empty\n{entries}---\n   |0 1|\n 0 |a b|\n"
+            "---\nmap: t\norigin: bottom-left\nsize: 2x1\nlegend:\n  \".\": empty\n{entries}---\n   |0 1|\n 0 |a b|\n"
         )
     }
 
@@ -1218,7 +1227,7 @@ mod text_tests {
         let source = legend_map(
             "  \"a\": spawn_a every=10 strategy=patrol radius=120.5\n  \"b\": tree_big\n",
         );
-        let map = parse("t.txt", &source, &kinds).unwrap();
+        let map = parse("t.txt", &source, &kinds, CELL).unwrap();
         assert_eq!(map.objects.len(), 2);
         let spawner = &map.objects[0];
         assert_eq!(spawner.kind, "spawn_a");
@@ -1252,14 +1261,14 @@ mod text_tests {
     fn the_start_is_the_centre_of_the_player_start_cell() {
         let kinds = ["tree_big", PLAYER_START];
         let source = legend_map("  \"a\": tree_big\n  \"b\": player_start\n");
-        let map = parse("t.txt", &source, &kinds).unwrap();
+        let map = parse("t.txt", &source, &kinds, CELL).unwrap();
         // Cell (1,0) of 16 px cells, map origin (100, 200).
         assert_eq!(
             start_feet(&map, Vec2::new(100.0, 200.0)),
             Some(Vec2::new(124.0, 208.0))
         );
         let source = legend_map("  \"a\": tree_big\n  \"b\": tree_big\n");
-        let map = parse("t.txt", &source, &kinds).unwrap();
+        let map = parse("t.txt", &source, &kinds, CELL).unwrap();
         assert_eq!(start_feet(&map, Vec2::ZERO), None);
     }
 
@@ -1275,8 +1284,8 @@ mod text_tests {
             ("nope every=5", "unknown kind `nope`"),
         ] {
             let source = legend_map(&format!("  \"a\": {entry}\n  \"b\": tree_big\n"));
-            let e = parse("t.txt", &source, &kinds).unwrap_err();
-            assert_eq!(e.line, 8, "{entry}");
+            let e = parse("t.txt", &source, &kinds, CELL).unwrap_err();
+            assert_eq!(e.line, 7, "{entry}");
             assert!(e.message.contains(text), "{entry}: {e}");
         }
     }
@@ -1338,14 +1347,14 @@ mod text_tests {
     #[test]
     fn an_edge_cell_one_cell_thick_names_its_line() {
         let e = error(&edge_grid([DOTS, ".   .     .", ".   .     .", DOTS]));
-        assert_eq!(e.line, 14);
+        assert_eq!(e.line, 13);
         assert!(
             e.message
                 .contains("edge cell (2,2) has free space on the east and west sides"),
             "{e}"
         );
         let e = error(&edge_grid([DOTS, ".         .", DOTS, ". .   . . ."]));
-        assert_eq!(e.line, 15);
+        assert_eq!(e.line, 14);
         assert!(
             e.message
                 .contains("edge cell (2,1) has free space on the north and south sides"),
@@ -1356,7 +1365,7 @@ mod text_tests {
     #[test]
     fn a_map_with_no_free_cell_is_an_error() {
         let e = error(&edge_grid([DOTS; 4]));
-        assert_eq!(e.line, 7);
+        assert_eq!(e.line, 6);
         assert!(e.message.contains("needs at least one free cell"), "{e}");
     }
 
@@ -1388,21 +1397,21 @@ mod text_tests {
     fn top_left_row_labels_are_checked() {
         let wrong = grid([DOTS; 4]).replace("origin: bottom-left", "origin: top-left");
         let e = error(&wrong);
-        assert_eq!(e.line, 13);
+        assert_eq!(e.line, 12);
         assert!(e.message.contains("expected 0"), "{e}");
         let e = error(&grid_top_left([DOTS; 4]).replace(" 2 |", " 7 |"));
-        assert_eq!(e.line, 15);
+        assert_eq!(e.line, 14);
         assert!(e.message.contains("expected 2"), "{e}");
     }
 
     #[test]
     fn an_unknown_origin_is_an_error() {
         let e = error(&grid([DOTS; 4]).replace("bottom-left", "centre"));
-        assert_eq!(e.line, 4);
+        assert_eq!(e.line, 3);
         assert!(e.message.contains("`bottom-left` or `top-left`"), "{e}");
     }
 
-    /// The test map with a `background:` block before the legend. `background:` is line 6, its keys follow.
+    /// The test map with a `background:` block before the legend. `background:` is line 5, its keys follow.
     fn with_background(block: &str) -> String {
         grid([DOTS; 4]).replace("legend:\n", &format!("background:\n{block}legend:\n"))
     }
@@ -1420,7 +1429,7 @@ mod text_tests {
         assert_eq!(background.scale, 2.0);
         assert_eq!(background.seed, 3);
         assert_eq!(background.tiles, vec!["grass_0", "flowers_1"]);
-        assert_eq!(background.line, 6);
+        assert_eq!(background.line, 5);
         // The rest of the file is read as before.
         assert_eq!(map.size, IVec2::new(6, 4));
     }
@@ -1451,43 +1460,43 @@ mod text_tests {
     fn a_background_error_names_the_line() {
         let ok = "  color: \"#2a3f5b\"\n  mode: random\n";
         let cases: Vec<(String, usize, &str)> = vec![
-            ("  mode: random\n".into(), 6, "needs a `color`"),
-            ("  color: \"#000000\"\n".into(), 6, "needs a `mode`"),
+            ("  mode: random\n".into(), 5, "needs a `color`"),
+            ("  color: \"#000000\"\n".into(), 5, "needs a `mode`"),
             (
                 "  color: \"#000000\"\n  mode: stripes\n".into(),
-                8,
+                7,
                 "`random` or `pattern`",
             ),
             (
                 "  color: \"#000000\"\n  mode: pattern\n".into(),
-                8,
+                7,
                 "not implemented yet",
             ),
-            ("  color: #2a3f5b\n  mode: random\n".into(), 7, "quote it"),
+            ("  color: #2a3f5b\n  mode: random\n".into(), 6, "quote it"),
             (
                 "  color: \"2a3f5b\"\n  mode: random\n".into(),
-                7,
+                6,
                 "hex colour",
             ),
             (
                 "  color: \"#2a3f5\"\n  mode: random\n".into(),
-                7,
+                6,
                 "hex colour",
             ),
-            (format!("{ok}  fill: 1.5\n  tiles: a\n"), 9, "from 0 to 1"),
-            (format!("{ok}  jitter: -1\n"), 9, "at least 0"),
-            (format!("{ok}  scale: 0\n"), 9, "number above 0"),
-            (format!("{ok}  scale: -2\n"), 9, "number above 0"),
-            (format!("{ok}  scale: big\n"), 9, "number above 0"),
-            (format!("{ok}  fill: 0.5\n"), 6, "needs `tiles`"),
-            (format!("{ok}  tiles: a b a\n"), 9, "listed twice"),
+            (format!("{ok}  fill: 1.5\n  tiles: a\n"), 8, "from 0 to 1"),
+            (format!("{ok}  jitter: -1\n"), 8, "at least 0"),
+            (format!("{ok}  scale: 0\n"), 8, "number above 0"),
+            (format!("{ok}  scale: -2\n"), 8, "number above 0"),
+            (format!("{ok}  scale: big\n"), 8, "number above 0"),
+            (format!("{ok}  fill: 0.5\n"), 5, "needs `tiles`"),
+            (format!("{ok}  tiles: a b a\n"), 8, "listed twice"),
             (
                 format!("{ok}  tiles:\n"),
-                9,
+                8,
                 "`tiles` needs at least one name",
             ),
-            (format!("{ok}  size: 3\n"), 9, "unknown key `size`"),
-            (format!("{ok}  seed: -2\n"), 9, "whole number"),
+            (format!("{ok}  size: 3\n"), 8, "unknown key `size`"),
+            (format!("{ok}  seed: -2\n"), 8, "whole number"),
         ];
         for (block, line, text) in cases {
             let e = error(&with_background(&block));
@@ -1498,15 +1507,15 @@ mod text_tests {
 
     #[test]
     fn each_background_key_given_twice_names_the_second_line() {
-        // `color` and `mode` are on lines 7 and 8. Each other key is on lines 9 and 10.
+        // `color` and `mode` are on lines 6 and 7. Each other key is on lines 8 and 9.
         for (key, value, line) in [
-            ("color", "\"#000000\"", 9),
-            ("mode", "random", 9),
-            ("fill", "0", 10),
-            ("jitter", "1", 10),
-            ("scale", "1", 10),
-            ("seed", "1", 10),
-            ("tiles", "a", 10),
+            ("color", "\"#000000\"", 8),
+            ("mode", "random", 8),
+            ("fill", "0", 9),
+            ("jitter", "1", 9),
+            ("scale", "1", 9),
+            ("seed", "1", 9),
+            ("tiles", "a", 9),
         ] {
             let block = format!(
                 "  color: \"#2a3f5b\"\n  mode: random\n  {key}: {value}\n  {key}: {value}\n"
@@ -1524,7 +1533,7 @@ mod text_tests {
             "background:\n  color: \"#000000\"\n  mode: random\nbackground:\n  color: \"#000000\"\n  mode: random\nlegend:\n",
         );
         let e = error(&source);
-        assert_eq!(e.line, 9);
+        assert_eq!(e.line, 8);
         assert!(e.message.contains("given twice"), "{e}");
     }
 

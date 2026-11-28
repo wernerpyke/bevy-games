@@ -125,7 +125,7 @@ sequenceDiagram
 ## Where the player arrives
 
 
-The player keeps their position along the strip. The offset is measured in world units from the low end of the exit strip (the smaller x of a horizontal strip, the smaller y of a vertical one) and added to the low end of the entry strip, scaled if the cell sizes differ. Across the strip the player stands in the middle of its depth. When one strip is horizontal and the other vertical, the offset moves to the other axis and the low end stays the low end (a transpose, not a rotation). A single cell, and a `goto` with no exit, put the player in the middle of the entry. Pure functions: `strip_offset` and `entry_feet`.
+The player keeps their position along the strip. The offset is measured in world units from the low end of the exit strip (the smaller x of a horizontal strip, the smaller y of a vertical one) and added to the low end of the entry strip. All maps of a game have the same cell size (`adr-x64`), so the offset is not scaled. Across the strip the player stands in the middle of its depth. When one strip is horizontal and the other vertical, the offset moves to the other axis and the low end stays the low end (a transpose, not a rotation). A single cell, and a `goto` with no exit, put the player in the middle of the entry. Pure functions: `strip_offset` and `entry_feet`.
 
 ## What a game does
 

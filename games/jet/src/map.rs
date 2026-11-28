@@ -47,6 +47,7 @@ impl Plugin for MapPlugin {
         app.add_plugins(MapLifecyclePlugin {
             sources,
             kinds: KIND_NAMES,
+            cell_size: CELL_SIZE,
             start: MAP_ID.to_string(),
             origin: MAP_ORIGIN,
         });
@@ -76,17 +77,11 @@ fn read_source() -> Result<(String, String), String> {
 
 /// Parses the map and checks what the game needs: one player start, one house, and a valid forest.
 fn check(name: &str, source: &str) -> Result<(), String> {
-    let map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
+    let map = parse(name, source, KIND_NAMES, CELL_SIZE).map_err(|error| error.to_string())?;
     if map.size != MAP_CELLS {
         return Err(format!(
             "{name}: the map must be {}x{} cells, the size of the window",
             MAP_CELLS.x, MAP_CELLS.y
-        ));
-    }
-    if map.cell_size != CELL_SIZE {
-        return Err(format!(
-            "{name}: the map cell must be {CELL_SIZE} px (`cell: {CELL_SIZE}`), the game's cell size, not {}",
-            map.cell_size
         ));
     }
     player_start(name, &map)?;

@@ -24,23 +24,26 @@ pub struct RegisteredMap {
 pub struct MapRegistry {
     sources: Vec<MapSource>,
     kinds: &'static [&'static str],
+    cell_size: f32,
     maps: Vec<RegisteredMap>,
 }
 
 impl MapRegistry {
-    /// Reads and checks every map. The error names the file and line.
+    /// Reads and checks every map, with the game's cell size. The error names the file and line.
     pub fn load(
         sources: &[MapSource],
         kinds: &'static [&'static str],
+        cell_size: f32,
     ) -> Result<MapRegistry, String> {
         let maps = sources
             .iter()
-            .map(|source| read(source, kinds))
+            .map(|source| read(source, kinds, cell_size))
             .collect::<Result<Vec<_>, _>>()?;
         check_links(&maps)?;
         Ok(MapRegistry {
             sources: sources.to_vec(),
             kinds,
+            cell_size,
             maps,
         })
     }
@@ -51,6 +54,8 @@ impl MapRegistry {
         Ok(MapRegistry {
             sources: Vec::new(),
             kinds: &[],
+            // Only used to read a map again, which this registry cannot do.
+            cell_size: 0.0,
             maps,
         })
     }
@@ -75,7 +80,7 @@ impl MapRegistry {
             .get(index)
             .ok_or_else(|| format!("map `{id}` has no file to read again"))?;
         let mut maps = self.maps.clone();
-        maps[index] = read(source, self.kinds)?;
+        maps[index] = read(source, self.kinds, self.cell_size)?;
         check_links(&maps)?;
         self.maps = maps;
         Ok(())
@@ -95,11 +100,15 @@ pub fn game_folder() -> PathBuf {
         .unwrap_or_default()
 }
 
-pub(super) fn read(source: &MapSource, kinds: &[&str]) -> Result<RegisteredMap, String> {
+pub(super) fn read(
+    source: &MapSource,
+    kinds: &[&str],
+    cell_size: f32,
+) -> Result<RegisteredMap, String> {
     let path = game_folder().join(source.file);
     let file = path.display().to_string();
     let text = std::fs::read_to_string(&path).map_err(|error| format!("{file}: {error}"))?;
-    let map = parse(&file, &text, kinds).map_err(|error| error.to_string())?;
+    let map = parse(&file, &text, kinds, cell_size).map_err(|error| error.to_string())?;
     Ok(RegisteredMap {
         id: source.id.to_string(),
         file,

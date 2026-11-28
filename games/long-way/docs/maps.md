@@ -5,7 +5,7 @@ How to write a map file for Long Way. The file format itself is the [map files e
 - Files are in `games/long-way/assets/maps/`. The current map is `1.txt`, a 10 by 10 cell map.
 - The game registers all three maps (`MAPS` in `src/map.rs`, ids `1`, `2`, `3`) and starts in map 1. Add a map there and in the legend list. `rust.sh run long-way 2.txt` starts in map 2 at its `@`. The name list is set in `src/map.rs` (`MAP_NAME` and `MAP_SOURCE`), which also lists the kind names. After you edit the file, rebuild the game.
 - The file uses `origin: bottom-left`, so the row labels in the file are the same numbers as the F3 grid. Press F3 to show the grid with cell numbers.
-- Cell size is 64 pixels (`cell: 64`).
+- Cell size is 64 pixels (`CELL_SIZE` in `camera.rs`). The map files do not say it (`adr-x64`).
 - Cell (0, 0) is the fixed world position `MAP_ORIGIN` in `camera.rs` (-1024, -576). The view is 8 by 8 cells (`adr-lw17`). A map larger than 8 cells scrolls (`adr-lw16`), and a smaller one is centred. The size is read from the file, so you can change it freely. The player starts at the `player_start` marker (`adr-lw19`).
 - Use a fixed-width font and turn off word wrap. Each cell takes two characters, so a row of 32 cells is 63 characters between the bars.
 
@@ -111,7 +111,6 @@ The player cannot walk through a rock. The game joins the rocks of a cluster, an
 ```
 ---
 map: small
-cell: 64
 origin: bottom-left
 size: 12x4
 legend:

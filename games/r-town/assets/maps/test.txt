@@ -1,6 +1,5 @@
 ---
 map: test
-cell: 16
 origin: top-left
 size: 60x60
 legend:

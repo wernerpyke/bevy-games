@@ -68,6 +68,7 @@ impl Plugin for MapPlugin {
         app.add_plugins(MapLifecyclePlugin {
             sources,
             kinds: KIND_NAMES,
+            cell_size: CELL_SIZE,
             start: MAP_ID.to_string(),
             origin: Vec2::ZERO,
         });
@@ -143,7 +144,7 @@ pub struct Loaded {
 
 /// Parses a map and takes out its markers (`split_markers`).
 fn parse_map(name: &str, source: &str) -> Result<Loaded, String> {
-    let map = parse(name, source, KIND_NAMES).map_err(|error| error.to_string())?;
+    let map = parse(name, source, KIND_NAMES, CELL_SIZE).map_err(|error| error.to_string())?;
     split_markers(name, map)
 }
 
@@ -309,7 +310,6 @@ mod tests {
     #[test]
     fn the_default_map_parses_and_stays_inside_the_map() {
         let Loaded { map, .. } = parse_map(MAP_NAME, &source()).unwrap();
-        assert_eq!(map.cell_size, CELL_SIZE);
         for object in &map.objects {
             assert!(inside(&map, object.cell), "{object:?} is outside the map");
         }

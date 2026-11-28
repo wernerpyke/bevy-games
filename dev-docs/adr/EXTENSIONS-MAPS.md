@@ -147,3 +147,11 @@ Everything else in the file is notes for people. Trees are map kinds (`green_tre
 **Rationale.** Jet will have a forest that changes over time, so a forest must be a model in the game and not only a list of objects from the file. A grid of cells is the simplest model that can grow and shrink cell by cell. Drawing only the outline makes large areas quick to write and easy to read. The user wants this in the kit now, not after a second game needs it (`adr-x12` allows that when the user says so).
 
 **How to apply.** An area's legend kind is given the fill rule in the map file. A clearing closed in on all sides by an area would be filled too: such a map needs a "never fill" marker, which does not exist yet. Change cells through the kit, never by editing `Blocker`s by hand, so collision and path finding are rebuilt.
+
+## adr-x64. The game gives the map cell size, map files do not say it (2026-11-28)
+
+**Decision.** A map file has no `cell` key. The game gives the cell size once, as `MapLifecyclePlugin::cell_size` (or `MapTransitionPlugin::cell_size`), and `parse` takes it as an argument. A `cell` line is an error that names its line. The scaling of the player's position between two maps with different cell sizes is removed.
+
+**Rationale.** Every game uses one cell size for all its maps, and already sets it in code for collision, the debug grid and its own values. The `cell` line was a second copy that nothing compared with the first. When Jet moved to 32 px cells, its map still said 16: the kit then took the map as a quarter of the world, so the player start, the F3 grid and the path-finding area were wrong, with no error. One value in code cannot disagree with itself. An old `cell` line is an error, not ignored, so a file never seems to set something it does not. With one cell size per game the transition scaling could never run.
+
+**How to apply.** Give the map plugin the same constant as `CollisionPlugin`. A game that parses a file itself passes its cell size to `parse`. A game that ever needs maps with different cell sizes needs a new decision.

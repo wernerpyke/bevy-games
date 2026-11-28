@@ -1,6 +1,5 @@
 ---
 map: 2
-cell: 64
 origin: bottom-left
 size: 10x10
 background:

@@ -72,8 +72,8 @@ mod tests {
     /// A ring with a bump on the left (a cut at its tip) and a step down on the top right (fills in the inside
     /// corners), drawn with cells of 32.
     fn bumpy_map() -> Map {
-        let source = "---\nmap: t\ncell: 32\norigin: bottom-left\nsize: 6x6\nlegend:\n  \".\": edge\n---\n 5 |. . . . . .|\n 4 |.       . .|\n 3 |. .       .|\n 2 |. . .     .|\n 1 |. .       .|\n 0 |. . . . . .|\n";
-        parse("t.txt", source, &[]).unwrap_or_else(|e| panic!("{e}"))
+        let source = "---\nmap: t\norigin: bottom-left\nsize: 6x6\nlegend:\n  \".\": edge\n---\n 5 |. . . . . .|\n 4 |.       . .|\n 3 |. .       .|\n 2 |. . .     .|\n 1 |. .       .|\n 0 |. . . . . .|\n";
+        parse("t.txt", source, &[], 32.0).unwrap_or_else(|e| panic!("{e}"))
     }
 
     #[test]
